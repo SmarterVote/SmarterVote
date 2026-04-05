@@ -30,6 +30,7 @@ from pipeline_client.agent.agent import (
     _fetch_page,
     _is_unusable_page_text,
     _load_existing,
+    _page_fetch_log_hint,
     _select_target_candidates,
     _serper_search,
     run_agent,
@@ -512,6 +513,27 @@ def test_is_unusable_page_text_detects_block_pages():
     """Blocked placeholder content is treated as unusable."""
     blocked = "Please enable JavaScript to continue. Attention required by security check."
     assert _is_unusable_page_text(blocked) is True
+
+
+def test_page_fetch_log_hint_reports_failed_fetch_strings():
+    url = "https://www.jeffwadlin.com/issues"
+    page_text = "[Failed to fetch https://www.jeffwadlin.com/issues: 403 forbidden]"
+
+    hint = _page_fetch_log_hint(url, page_text)
+
+    assert hint is not None
+    assert "fetch failed" in hint
+    assert "jeffwadlin.com/issues" in hint
+
+
+def test_page_fetch_log_hint_flags_short_policy_pages():
+    url = "https://www.jeffwadlin.com/issues"
+    page_text = "Wadlin for Senate This request returned 403 Forbidden."
+
+    hint = _page_fetch_log_hint(url, page_text)
+
+    assert hint is not None
+    assert "short policy-page content" in hint or "blocked/unusable" in hint
 
 
 @pytest.mark.asyncio

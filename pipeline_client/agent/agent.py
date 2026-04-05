@@ -288,6 +288,31 @@ def _is_unusable_page_text(text: str) -> bool:
     return False
 
 
+def _is_likely_policy_url(url: str) -> bool:
+    lowered = (url or "").lower()
+    return any(token in lowered for token in ["/issues", "/issue", "/policy", "/policies", "/platform"])
+
+
+def _page_fetch_log_hint(url: str, page_text: str) -> Optional[str]:
+    """Return a concise warning hint for suspicious fetch results, else None."""
+    text = (page_text or "").strip()
+    lowered = text.lower()
+
+    if lowered.startswith("[failed to fetch"):
+        return f"fetch failed for {url[:80]} — {text[:220]}"
+
+    matched_markers = [marker for marker in _UNUSABLE_PAGE_MARKERS if marker in lowered]
+    if matched_markers:
+        marker = matched_markers[0]
+        return f"content appears blocked/unusable for {url[:80]} (marker='{marker}', chars={len(text)})"
+
+    if _is_likely_policy_url(url) and 0 < len(text) < _PAGE_PROXY_RETRY_CHARS:
+        preview = " ".join(text.split())[:180]
+        return f"short policy-page content for {url[:80]} ({len(text)} chars). preview='{preview}'"
+
+    return None
+
+
 async def _serper_search(
     query: str, *, num_results: int = 8, race_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -633,6 +658,9 @@ async def _agent_loop(
                     log("info", f"    📄 fetching {url[:80]}")
                     page_text = await _fetch_page(url)
                     log("debug", f"    📄 got {len(page_text)} chars")
+                    fetch_hint = _page_fetch_log_hint(url, page_text)
+                    if fetch_hint:
+                        log("warning", f"    📄 {fetch_hint}")
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
