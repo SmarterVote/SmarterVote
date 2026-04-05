@@ -25,6 +25,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -163,6 +164,80 @@ _UNUSABLE_PAGE_MARKERS = [
     "our systems have detected unusual traffic",
 ]
 
+_POLICY_PATH_TOKENS = [
+    "issue",
+    "issues",
+    "policy",
+    "policies",
+    "platform",
+    "priorit",
+    "learn",
+    "blog",
+    "about",
+]
+
+_NON_POLICY_PATH_TOKENS = [
+    "donate",
+    "volunteer",
+    "events",
+    "join",
+    "orientation",
+    "testing",
+    "sitemap",
+]
+
+_POLICY_TEXT_TOKENS = [
+    "issues",
+    "healthcare",
+    "econom",
+    "tax",
+    "immigration",
+    "border",
+    "guns",
+    "education",
+    "abortion",
+    "reproductive",
+    "climate",
+    "energy",
+    "foreign",
+    "defense",
+    "election",
+    "voting",
+    "social justice",
+    "technology",
+    "liberty",
+    "freedom",
+    "democracy",
+    "rights",
+    "responsibility",
+    "constitution",
+    "federal",
+    "inflation",
+    "debt",
+    "artificial intelligence",
+]
+
+_LOW_SIGNAL_PAGE_MARKERS = [
+    "lorem ipsum",
+    "created with nationbuilder",
+    "please check your email for a link to activate",
+]
+
+_BOILERPLATE_SEGMENT_MARKERS = [
+    "paid for by",
+    "all rights reserved",
+    "created with nationbuilder",
+    "join my campaign",
+    "contributions are not tax deductible",
+    "dolor sit amet",
+    "consectetur adipiscing",
+    "eiusmod tempor incididunt",
+    "ut enim ad minim veniam",
+    "duis aute irure",
+    "excepteur sint occaecat",
+    "mollit anim id est laborum",
+]
+
 _fetch_clients_by_loop: Dict[int, httpx.AsyncClient] = {}
 _serper_clients_by_loop: Dict[int, httpx.AsyncClient] = {}
 
@@ -270,7 +345,197 @@ async def _fetch_page(url: str) -> str:
     except Exception as exc:
         failure_reasons.append(f"proxy: {exc}")
 
+    # Campaign issue pages are often blocked while other site pages remain accessible.
+    # If the requested URL looks like policy/issues content, attempt sitemap-driven recovery.
+    fallback_text = await _try_sitemap_policy_fallback(url, client, failure_reasons)
+    if fallback_text:
+        if cache:
+            cache.set_page(url, fallback_text)
+        return fallback_text
+
     return f"[Failed to fetch {url}: {' | '.join(failure_reasons[:3])}]"
+
+
+def _extract_sitemap_urls(xml_text: str, site_host: str) -> List[str]:
+    urls = re.findall(r"<loc>(.*?)</loc>", xml_text or "", flags=re.IGNORECASE)
+    out: List[str] = []
+    for raw in urls:
+        u = (raw or "").strip()
+        if not u:
+            continue
+        parsed = urlparse(u)
+        if parsed.scheme not in {"http", "https"}:
+            continue
+        if parsed.netloc.lower() != site_host.lower():
+            continue
+        if u not in out:
+            out.append(u)
+    return out
+
+
+def _extract_policy_segments(text: str) -> List[str]:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return []
+
+    segments = re.split(r"\n+|(?<=[.!?])\s+", cleaned)
+    selected: List[str] = []
+    seen: set[str] = set()
+
+    for segment in segments:
+        s = re.sub(r"\s+", " ", segment).strip()
+        if len(s) < 30:
+            continue
+        low = s.lower()
+        if any(token in low for token in _LOW_SIGNAL_PAGE_MARKERS):
+            continue
+        if any(marker in low for marker in _BOILERPLATE_SEGMENT_MARKERS):
+            continue
+        if s.count(",") > 20:
+            continue
+        if not any(token in low for token in _POLICY_TEXT_TOKENS):
+            continue
+        key = low[:180]
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(s)
+        if len(selected) >= 16:
+            break
+
+    if selected:
+        return selected
+
+    # Fallback to general substantive prose for campaign pages with sparse issue keywords.
+    for segment in segments:
+        s = re.sub(r"\s+", " ", segment).strip()
+        if len(s) < 60:
+            continue
+        low = s.lower()
+        if any(marker in low for marker in _LOW_SIGNAL_PAGE_MARKERS):
+            continue
+        if any(marker in low for marker in _BOILERPLATE_SEGMENT_MARKERS):
+            continue
+        if s.count(",") > 20:
+            continue
+        if "skip to main content" in low:
+            continue
+        if low.startswith("login") or low.startswith("volunteer"):
+            continue
+        key = low[:180]
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(s)
+        if len(selected) >= 8:
+            break
+
+    if selected:
+        return selected
+
+    compact = re.sub(r"\s+", " ", cleaned)
+    compact = re.sub(
+        r"\b(skip to main content|volunteer|events|donate|login|home|learn more|created with nationbuilder|please check your email for a link to activate|lorem ipsum)\b",
+        " ",
+        compact,
+        flags=re.IGNORECASE,
+    )
+    compact = re.sub(r"\s+", " ", compact).strip()
+    compact_low = compact.lower()
+    if len(compact) >= 120 and not any(marker in compact_low for marker in _BOILERPLATE_SEGMENT_MARKERS):
+        selected.append(compact[:1200])
+
+    return selected
+
+
+async def _try_sitemap_policy_fallback(url: str, client: httpx.AsyncClient, failure_reasons: List[str]) -> Optional[str]:
+    if not _is_likely_policy_url(url):
+        return None
+
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
+
+    sitemap_urls = [
+        urljoin(base, "/sitemap.xml"),
+        urljoin(base, "/sitemap_index.xml"),
+    ]
+
+    discovered_pages: List[str] = []
+    homepage_url = urljoin(base, "/")
+    discovered_pages.append(homepage_url)
+    for sitemap_url in sitemap_urls:
+        try:
+            resp = await client.get(sitemap_url, headers=headers)
+            resp.raise_for_status()
+            discovered = _extract_sitemap_urls(resp.text, parsed.netloc)
+            for page_url in discovered:
+                if page_url not in discovered_pages:
+                    discovered_pages.append(page_url)
+        except Exception as exc:
+            failure_reasons.append(f"sitemap({sitemap_url}): {exc}")
+
+    if not discovered_pages:
+        return None
+
+    def _priority(page_url: str) -> tuple[int, int]:
+        lowered = page_url.lower()
+        if any(token in lowered for token in _NON_POLICY_PATH_TOKENS):
+            return (1000, len(page_url))
+        token_score = sum(1 for token in _POLICY_PATH_TOKENS if token in lowered)
+        return (-token_score, len(page_url))
+
+    ranked_candidates = sorted(discovered_pages, key=_priority)
+    candidates = [u for u in ranked_candidates if _priority(u)[0] < 1000][:8]
+    if not candidates:
+        candidates = [homepage_url]
+    recovered_segments: List[str] = []
+    source_urls: List[str] = []
+
+    for candidate_url in candidates:
+        try:
+            resp = await client.get(candidate_url, headers=headers)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "")
+            if "html" in content_type or "text" in content_type:
+                text = _strip_html(resp.text)
+            else:
+                text = resp.text or ""
+
+            if _is_unusable_page_text(text):
+                continue
+
+            segments = _extract_policy_segments(text)
+            if not segments:
+                continue
+
+            recovered_segments.extend(segments)
+            source_urls.append(candidate_url)
+            if len(recovered_segments) >= 12:
+                break
+        except Exception as exc:
+            failure_reasons.append(f"policy-page({candidate_url}): {exc}")
+
+    if not recovered_segments:
+        return None
+
+    unique_sources = source_urls[:4]
+    header = "Recovered issue-related content from campaign sitemap pages after direct/proxy issue URL fetch failed."
+    source_block = "\n".join(f"- {u}" for u in unique_sources)
+    content_block = "\n".join(f"- {s}" for s in recovered_segments[:12])
+    combined = f"{header}\nSources:\n{source_block}\n\nExtracted points:\n{content_block}"
+
+    if len(combined) > _PAGE_MAX_CHARS:
+        combined = combined[:_PAGE_MAX_CHARS] + f"\n\n[...truncated at {_PAGE_MAX_CHARS} chars]"
+    return combined
 
 
 def _is_unusable_page_text(text: str) -> bool:
@@ -288,9 +553,26 @@ def _is_unusable_page_text(text: str) -> bool:
     return False
 
 
+_POLICY_URL_PATH_TOKENS = [
+    "/issue",
+    "/policy",
+    "/polic",
+    "/platform",
+    "/priorit",
+    "/position",
+    "/stance",
+    "/agenda",
+    "/on-the-issues",
+    "/where-i-stand",
+    "/values",
+    "/beliefs",
+    "/stands",
+]
+
+
 def _is_likely_policy_url(url: str) -> bool:
     lowered = (url or "").lower()
-    return any(token in lowered for token in ["/issues", "/issue", "/policy", "/policies", "/platform"])
+    return any(token in lowered for token in _POLICY_URL_PATH_TOKENS)
 
 
 def _page_fetch_log_hint(url: str, page_text: str) -> Optional[str]:

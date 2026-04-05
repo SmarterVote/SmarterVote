@@ -21,6 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from pipeline_client.agent.agent import (
@@ -670,6 +671,77 @@ async def test_fetch_page_short_low_signal_content_prefers_proxy_text():
     assert requested_urls[0] == target_url
     assert expected_proxy_url in requested_urls
     assert "public option" in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_policy_url_uses_sitemap_fallback_when_direct_and_proxy_fail():
+    """When a policy URL is blocked and the proxy fails too, the fallback crawls the
+    site's sitemap to recover policy-relevant content. Works for any candidate site."""
+
+    HOST = "www.example-candidate.org"
+
+    class _Resp:
+        def __init__(self, text: str, status_code: int = 200, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.status_code = status_code
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    f"Client error '{self.status_code}'",
+                    request=httpx.Request("GET", f"https://{HOST}/issues"),
+                    response=httpx.Response(self.status_code),
+                )
+
+    target_url = f"https://{HOST}/issues"
+    proxy_url = f"https://r.jina.ai/{target_url}"
+    sitemap_xml = f"""
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://{HOST}/blog</loc></url>
+          <url><loc>https://{HOST}/about</loc></url>
+        </urlset>
+    """
+    blog_html = """
+        <html><body>
+          <p>On healthcare, I support transparent pricing and stronger rural care access.</p>
+          <p>On the economy, I support reducing inflation by limiting federal overspending.</p>
+          <p>This platform focuses on practical policy changes for working families, including affordability, opportunity, and accountable government.</p>
+          <p>These priorities are repeated across campaign materials to provide clarity for voters and avoid vague slogans.</p>
+        </body></html>
+    """
+    about_html = "<html><body><p>Lorem ipsum dolor sit amet.</p></body></html>"
+
+    async def _mock_get(url, headers=None):
+        if url == target_url:
+            return _Resp("<html><body>404 Not Found</body></html>", status_code=404)
+        if url == proxy_url:
+            return _Resp(
+                "Title: Just a moment... Warning: Target URL returned error 403: Forbidden", content_type="text/plain"
+            )
+        if url == f"https://{HOST}/sitemap.xml":
+            return _Resp(sitemap_xml, content_type="application/xml")
+        if url == f"https://{HOST}/sitemap_index.xml":
+            return _Resp("<sitemapindex></sitemapindex>", content_type="application/xml")
+        if url == f"https://{HOST}/blog":
+            return _Resp(blog_html)
+        if url == f"https://{HOST}/about":
+            return _Resp(about_html)
+        return _Resp("<html><body>Not Found</body></html>", status_code=404)
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=_mock_get)
+
+    with (
+        patch("pipeline_client.agent.agent._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.agent._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page(target_url)
+
+    assert "Recovered issue-related content" in result
+    assert "healthcare" in result.lower()
+    assert "economy" in result.lower()
+    assert "lorem ipsum" not in result.lower()
 
 
 # ---------------------------------------------------------------------------
