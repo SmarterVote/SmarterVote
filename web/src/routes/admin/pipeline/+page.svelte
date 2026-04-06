@@ -25,6 +25,7 @@
   import RacePanel from "$lib/components/admin/RacePanel.svelte";
   import BatchQueueModal from "$lib/components/admin/BatchQueueModal.svelte";
   import RunDetailPanel from "$lib/components/admin/RunDetailPanel.svelte";
+  import RunsTab from "$lib/components/admin/RunsTab.svelte";
 
   // Utilities
   import { debounce, safeJsonStringify } from "$lib/utils/pipelineUtils";
@@ -40,7 +41,7 @@
   let queuePollTimer: ReturnType<typeof setInterval> | null = null;
 
   // Tab state
-  let activeTab: "dashboard" | "races" = "dashboard";
+  let activeTab: "dashboard" | "races" | "runs" = "dashboard";
   let alertBadgeCount = 0;
 
   // Modal state
@@ -71,7 +72,7 @@
     if (!browser) return;
     const url = new URL(window.location.href);
     url.searchParams.set("run", runId);
-    url.searchParams.set("tab", "races");
+    url.searchParams.set("tab", activeTab === "runs" ? "runs" : "races");
     if (raceId) url.searchParams.set("race", raceId);
     else url.searchParams.delete("race");
     history.pushState({ runId, raceId }, "", url.pathname + url.search);
@@ -87,7 +88,7 @@
       url.searchParams.delete("race");
       history.replaceState(null, "", url.pathname + url.search);
     }
-    if (raceId) reopenRacePanel(raceId);
+    if (activeTab !== "runs" && raceId) reopenRacePanel(raceId);
   }
 
   async function reopenRacePanel(raceId: string) {
@@ -149,7 +150,7 @@
       // Restore tab and run detail from URL params
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "dashboard" || tabParam === "races") {
+      if (tabParam === "dashboard" || tabParam === "races" || tabParam === "runs") {
         activeTab = tabParam;
       }
       const runParam = params.get("run");
@@ -383,6 +384,20 @@
     openRunDetail(event.detail, selectedRace?.race_id ?? null);
   }
 
+  function handleRunsTabViewRun(event: CustomEvent<{ runId: string; raceId: string | null }>) {
+    openRunDetail(event.detail.runId, event.detail.raceId);
+  }
+
+  async function handleClearQueue() {
+    try {
+      const result = await apiService.clearPendingQueue();
+      addLog("info", `Cleared ${result.removed} pending item${result.removed !== 1 ? "s" : ""} from the queue`);
+      await refreshQueue();
+    } catch (e) {
+      addLog("error", `Failed to clear queue: ${e}`);
+    }
+  }
+
   function handleBatchQueued(event: CustomEvent<{ added: number; errors: string[] }>) {
     batchModalOpen = false;
     batchRaceIds = [];
@@ -473,7 +488,11 @@
   </div>
 
   <!-- Tab navigation -->
-  <AdminTabs bind:activeTab alertCount={alertBadgeCount} />
+  <AdminTabs
+    bind:activeTab
+    alertCount={alertBadgeCount}
+    runsBadgeCount={queueItems.filter((q) => q.status === "running" || q.status === "pending").length}
+  />
 
   <!-- Running banner (visible across tabs) — clickable to open run detail -->
   {#if pipeline.isExecuting}
@@ -551,6 +570,32 @@
           />
         </div>
       {/if}
+    {/if}
+  {/if}
+
+  <!-- Runs tab -->
+  {#if activeTab === "runs"}
+    {#if showingDetail && detailRunId}
+      <RunDetailPanel
+        runId={detailRunId}
+        isLive={pipeline.isExecuting && pipeline.currentRunId === detailRunId}
+        liveLogs={logs}
+        liveProgress={pipeline.progress}
+        liveProgressMessage={pipeline.progressMessage}
+        liveElapsed={pipeline.elapsedTime}
+        on:back={() => closeRunDetail()}
+        on:deleted={() => { closeRunDetail(); }}
+      />
+    {:else}
+      <RunsTab
+        runs={pipeline.runHistory ?? []}
+        {queueItems}
+        isRefreshing={pipeline.isRefreshing}
+        currentRunId={pipeline.currentRunId}
+        on:view-run={handleRunsTabViewRun}
+        on:refresh={debouncedRefresh}
+        on:clear-queue={handleClearQueue}
+      />
     {/if}
   {/if}
 </div>

@@ -6,7 +6,7 @@ import re
 import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -775,6 +775,104 @@ async def delete_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
     raise HTTPException(status_code=404, detail="Run not found")
 
 
+@app.get("/api/races/{race_id}/versions", dependencies=[Depends(verify_token)])
+async def list_race_versions(race_id: str) -> Dict[str, Any]:
+    """List retired (archived) versions for a race, newest first."""
+    _validate_race_id(race_id)
+    retired_dir = ROOT / "data" / "retired" / race_id
+    versions: List[Dict[str, Any]] = []
+
+    if retired_dir.exists():
+        for p in sorted(retired_dir.iterdir(), reverse=True):
+            if p.suffix != ".json":
+                continue
+            name = p.stem  # e.g. "20260405T123456Z-draft"
+            parts = name.rsplit("-", 1)
+            source = parts[-1] if len(parts) == 2 else "unknown"
+            # Parse timestamp from filename prefix (yyyymmddTHHMMSSZ)
+            ts_raw = parts[0] if len(parts) == 2 else name
+            try:
+                ts = datetime.strptime(ts_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                ts = None
+            versions.append(
+                {
+                    "filename": p.name,
+                    "source": source,
+                    "archived_at": ts,
+                    "size_bytes": p.stat().st_size,
+                }
+            )
+
+    # Also list GCS retired versions if bucket configured
+    gcs_bucket = settings.gcs_bucket
+    if gcs_bucket:
+        try:
+            from google.cloud import storage as gcs  # type: ignore
+
+            client = gcs.Client()
+            bucket = client.bucket(gcs_bucket)
+            prefix = f"retired/{race_id}/"
+            gcs_names = {v["filename"] for v in versions}
+            for blob in bucket.list_blobs(prefix=prefix):
+                fname = blob.name.split("/")[-1]
+                if not fname.endswith(".json") or fname in gcs_names:
+                    continue
+                stem = fname[:-5]
+                parts = stem.rsplit("-", 1)
+                source = parts[-1] if len(parts) == 2 else "unknown"
+                ts_raw = parts[0] if len(parts) == 2 else stem
+                try:
+                    ts = datetime.strptime(ts_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
+                except ValueError:
+                    ts = None
+                versions.append(
+                    {
+                        "filename": fname,
+                        "source": source,
+                        "archived_at": ts,
+                        "size_bytes": blob.size,
+                    }
+                )
+        except ImportError:
+            pass
+        except Exception as exc:
+            logging.warning("Failed to list GCS retired versions for %s: %s", race_id, exc)
+
+    versions.sort(key=lambda v: v.get("archived_at") or "", reverse=True)
+    return {"versions": versions, "count": len(versions)}
+
+
+@app.get("/api/races/{race_id}/versions/{filename}", dependencies=[Depends(verify_token)])
+async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
+    """Return JSON content of a specific retired version."""
+    _validate_race_id(race_id)
+    # Sanitize filename — must be a bare filename with no path separators
+    if "/" in filename or "\\" in filename or not filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Invalid version filename")
+    local_path = ROOT / "data" / "retired" / race_id / filename
+    if local_path.exists():
+        with local_path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    # Try GCS
+    gcs_bucket = settings.gcs_bucket
+    if gcs_bucket:
+        try:
+            from google.cloud import storage as gcs  # type: ignore
+
+            client = gcs.Client()
+            bucket = client.bucket(gcs_bucket)
+            blob = bucket.blob(f"retired/{race_id}/{filename}")
+            if blob.exists():
+                data = blob.download_as_text(encoding="utf-8")
+                return json.loads(data)
+        except ImportError:
+            pass
+        except Exception as exc:
+            logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+    raise HTTPException(status_code=404, detail="Version not found")
+
+
 @app.get("/api/races/{race_id}/data", dependencies=[Depends(verify_token)])
 async def get_race_data(race_id: str, draft: bool = False) -> Dict[str, Any]:
     """Get full race JSON content (published or draft). For export/download."""
@@ -874,6 +972,13 @@ async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
 async def clear_finished_queue() -> Dict[str, Any]:
     """Remove completed/failed/cancelled items from the queue."""
     removed = queue_manager.clear_finished()
+    return {"removed": removed}
+
+
+@app.delete("/queue/pending", dependencies=[Depends(verify_token)])
+async def clear_pending_queue() -> Dict[str, Any]:
+    """Remove all pending (not yet started) items from the queue."""
+    removed = queue_manager.clear_pending()
     return {"removed": removed}
 
 

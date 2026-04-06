@@ -50,38 +50,45 @@ You are a nonpartisan political research agent.
 DISCOVERY_USER = """\
 Research the U.S. election race "{race_id}".
 
-Search for:
-1. What office is this for? What state/district?
-2. Who are ALL the candidates? Search broadly across ALL parties — Democrat,
-   Republican, Libertarian, Green, Independent, and any other qualified parties.
-   Check Ballotpedia, the official state election authority, and recent news.
-   Do NOT limit to just the major-party candidates.
-   (name, party, incumbent status)
-3. Each candidate's official campaign website and social media.
-4. A brief 2-3 sentence nonpartisan summary of each candidate. Do NOT append inline "Sources: ..." text to the summary — put sources in the summary_sources array instead.
-5. Each candidate's career history (political offices held, major jobs).
-6. Each candidate's education (degrees, institutions).
-7. A direct image URL for each candidate's headshot. Use these strategies:
-   a) Search "<candidate name> wikipedia" — Wikipedia images are at
-      https://upload.wikimedia.org/wikipedia/commons/... (NOT commons.wikimedia.org/wiki/File:)
-   b) Search "<candidate name> official photo site:house.gov OR site:senate.gov"
-   c) Search "<candidate name> headshot site:ballotpedia.org" (Ballotpedia images are at
-      https://ballotpedia.org/wiki/images/...)
-   The URL MUST end in .jpg, .jpeg, .png, .gif, or .webp, or be from a known image CDN.
-   Do NOT use a Wikipedia/Commons page URL (commons.wikimedia.org/wiki/File:...) — that is a
-   gallery page, not an image file. Set to null if you cannot confirm a direct image file URL.
-8. A 3-4 sentence nonpartisan description of this race — what office is being
-   contested, why this race matters (e.g. open seat, competitive, national
-   implications), the political context (partisan lean, recent election history),
-   and the key themes or contrasts between the candidates.
-9. Recent opinion polls for this race. Search for "[state] [office] poll 2026"
-    or "[candidates] poll". Include up to 5 of the most recent polls with:
-    - Pollster name, date conducted, sample size
-    - Each candidate's percentage
-    - Source URL
-    Only include real polls from credible pollsters. Set polling to [] and
-    polling_note to a brief explanation if none are found (e.g. "No public polling
-    found for this race as of <date>.").
+## Step 1 — Get the authoritative candidate list (do this FIRST)
+Call `ballotpedia_election_lookup` with race_id="{race_id}". This fetches the
+official Ballotpedia election page which is the single most reliable source for
+who is actually on the ballot. Its candidate list is your starting roster.
+
+If `ballotpedia_election_lookup` returns found=false or candidates=[], then fall
+back to searching "site:ballotpedia.org {race_id}" and fetching the page directly,
+then search the official state election authority website.
+
+IMPORTANT: Do NOT add candidates to the final JSON that do not appear in the
+Ballotpedia roster or a corroborating official state source. Do NOT hallucinate
+candidates based on search snippets or speculation. If a search result mentions a
+name that is not on Ballotpedia, verify via the official state election authority
+before including them.
+
+## Step 2 — Gather details for each confirmed candidate
+For each candidate from Step 1:
+1. Call `ballotpedia_lookup` with their full name to get their bio, website, and image.
+2. Search for their official campaign website if not returned.
+3. Find a direct headshot image URL (strategies below).
+
+## Step 3 — Complete the race profile
+Gather:
+- What office is this for? What state/district?
+- Each candidate: summary (2-3 sentences), career history, education.
+- A 3-4 sentence nonpartisan description of this race — what office is being
+  contested, why this race matters, political context, and key contrasts.
+- Recent opinion polls. Search "[state] [office] poll 2026". Include up to 5
+  recent polls with pollster, date, sample size, percentages, and source URL.
+  Set polling to [] and polling_note to a brief explanation if none found.
+
+## Image URL strategy
+For each candidate's headshot, try:
+a) `ballotpedia_lookup` — returns a direct Ballotpedia CDN URL if available.
+b) Search "<candidate name> wikipedia" — Wikipedia images are at
+   https://upload.wikimedia.org/wikipedia/commons/... (NOT commons.wikimedia.org/wiki/File:).
+c) Search "<candidate name> official photo site:house.gov OR site:senate.gov".
+The URL MUST end in .jpg/.jpeg/.png/.gif/.webp or be from a known image CDN.
+Do NOT use a gallery page URL. Set to null if no direct image file is confirmed.
 
 Return JSON:
 {{

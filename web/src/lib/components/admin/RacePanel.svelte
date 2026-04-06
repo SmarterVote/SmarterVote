@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
   import { PipelineApiService } from "$lib/services/pipelineApiService";
+  import type { RaceVersion } from "$lib/services/pipelineApiService";
   import {
     applyReviewerModelOptions,
     createDefaultReviewerEnabled,
@@ -40,6 +41,11 @@
   let runsLoading = false;
   let runsError = "";
 
+  // Retired versions
+  let retiredVersions: RaceVersion[] = [];
+  let retiredLoading = false;
+  let retiredError = "";
+
   // Pipeline options
   let cheapMode = true;
   let forceFresh = false;
@@ -63,6 +69,19 @@
   $: if (open && race) {
     activeTab = "overview";
     loadRuns();
+    loadVersions();
+  }
+
+  async function loadVersions() {
+    retiredLoading = true;
+    retiredError = "";
+    try {
+      retiredVersions = await apiService.listRaceVersions(race.race_id);
+    } catch (e) {
+      retiredError = String(e);
+    } finally {
+      retiredLoading = false;
+    }
   }
 
   async function loadRuns() {
@@ -169,6 +188,15 @@
       downloadAsJson(data, `${race.race_id}-draft.json`);
     } catch (e) {
       error = `Export draft failed: ${e}`;
+    }
+  }
+
+  async function handleExportVersion(filename: string) {
+    try {
+      const data = await apiService.getRaceVersionData(race.race_id, filename);
+      downloadAsJson(data, `${race.race_id}-${filename}`);
+    } catch (e) {
+      error = `Export version failed: ${e}`;
     }
   }
 
@@ -482,6 +510,37 @@
 
               {#if !race.published_at && !hasDraft}
                 <p class="text-xs text-content-faint py-1">No versions yet — run the pipeline to generate a draft.</p>
+              {/if}
+
+              <!-- Retired versions -->
+              {#if retiredLoading}
+                <p class="text-xs text-content-faint py-1">Loading retired versions…</p>
+              {:else if retiredError}
+                <p class="text-xs text-red-500 py-1">{retiredError}</p>
+              {:else if retiredVersions.length > 0}
+                <details class="group">
+                  <summary class="cursor-pointer text-xs text-content-muted hover:text-content list-none flex items-center gap-1 py-1 select-none">
+                    <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Retired ({retiredVersions.length})
+                  </summary>
+                  <div class="mt-1 space-y-1">
+                    {#each retiredVersions as ver (ver.filename)}
+                      <div class="flex items-center justify-between rounded px-3 py-1.5 bg-surface-alt border border-stroke opacity-70 hover:opacity-100 transition-opacity">
+                        <div>
+                          <span class="text-xs font-medium text-content-muted capitalize">{ver.source}</span>
+                          <p class="text-xs text-content-faint">{ver.archived_at ? formatDate(ver.archived_at) : ver.filename}</p>
+                        </div>
+                        <button
+                          type="button"
+                          class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
+                          on:click={() => handleExportVersion(ver.filename)}
+                        >Export →</button>
+                      </div>
+                    {/each}
+                  </div>
+                </details>
               {/if}
             </div>
 

@@ -65,6 +65,13 @@ interface RaceRunsResponse {
   count: number;
 }
 
+export interface RaceVersion {
+  filename: string;
+  source: "draft" | "published" | string;
+  archived_at: string | null;
+  size_bytes: number;
+}
+
 export class PipelineApiService {
   constructor(private apiBase: string) {}
 
@@ -325,6 +332,17 @@ export class PipelineApiService {
     return await res.json();
   }
 
+  /**
+   * Clear all pending (not yet started) items from queue
+   */
+  async clearPendingQueue(): Promise<{ removed: number }> {
+    const res = await fetchWithAuth(`${this.apiBase}/queue/pending`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return await res.json();
+  }
+
   // -- Unified Race API (Phase 3) -----------------------------------------
 
   /**
@@ -520,6 +538,33 @@ export class PipelineApiService {
     const params = draft ? "?draft=true" : "";
     const res = await fetchWithAuth(
       `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/data${params}`,
+      {},
+      15000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return await res.json();
+  }
+
+  /**
+   * List retired (archived) versions for a race
+   */
+  async listRaceVersions(raceId: string): Promise<RaceVersion[]> {
+    const res = await fetchWithAuth(
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/versions`,
+      {},
+      10000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data: { versions: RaceVersion[]; count: number } = await res.json();
+    return data.versions || [];
+  }
+
+  /**
+   * Get JSON content of a specific retired version
+   */
+  async getRaceVersionData(raceId: string, filename: string): Promise<Record<string, unknown>> {
+    const res = await fetchWithAuth(
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/versions/${encodeURIComponent(filename)}`,
       {},
       15000
     );

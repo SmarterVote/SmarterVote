@@ -54,12 +54,13 @@ from .prompts import (
     UPDATE_META_USER,
 )
 from .review import compute_validation_grade, run_reviews
-from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup
+from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup, lookup_election_page as _ballotpedia_election_lookup
 from .tools import (
     ADD_CANDIDATE_TOOL,
     ADD_LINK_TOOL,
     ADD_POLL_TOOL,
     BACKGROUND_TOOLS,
+    BALLOTPEDIA_ELECTION_TOOL,
     BALLOTPEDIA_TOOL,
     CANDIDATE_TOOLS,
     FETCH_TOOL,
@@ -858,7 +859,7 @@ async def _agent_loop(
 
         if tools_mode:
             # In tools mode: search tools cut off at nudge_at, editing tools stay available
-            search_tools = [SEARCH_TOOL, FETCH_TOOL, BALLOTPEDIA_TOOL] if iteration < nudge_at else []
+            search_tools = [SEARCH_TOOL, FETCH_TOOL, BALLOTPEDIA_TOOL, BALLOTPEDIA_ELECTION_TOOL] if iteration < nudge_at else []
             tools_for_call = search_tools + _extra_tools if (search_tools or _extra_tools) else None
 
             if iteration == nudge_at and len(messages) > 2:
@@ -883,7 +884,7 @@ async def _agent_loop(
                 })
                 log("info", f"  [{phase_name}] nudging model to produce output (iteration {iteration + 1})")
 
-            base_tools = [SEARCH_TOOL, FETCH_TOOL, BALLOTPEDIA_TOOL] if iteration < nudge_at else []
+            base_tools = [SEARCH_TOOL, FETCH_TOOL, BALLOTPEDIA_TOOL, BALLOTPEDIA_ELECTION_TOOL] if iteration < nudge_at else []
             # Extra tools (editing) stay available past nudge in json mode too
             tools_for_call = (base_tools + _extra_tools) if (base_tools or _extra_tools) else None
 
@@ -958,6 +959,18 @@ async def _agent_loop(
                         "role": "tool",
                         "tool_call_id": tool_call.id,
                         "content": json.dumps(bp_data),
+                    })
+                elif fn.name == "ballotpedia_election_lookup":
+                    args = json.loads(fn.arguments)
+                    election_race_id = args.get("race_id", race_id or "")
+                    log("info", f"    🗳️  Ballotpedia election lookup: {election_race_id}")
+                    election_data = await _ballotpedia_election_lookup(election_race_id)
+                    n_found = len(election_data.get("candidates", []))
+                    log("debug", f"    🗳️  found={election_data.get('found')} candidates={n_found}")
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": json.dumps(election_data),
                     })
                 elif fn.name in _extra_handlers:
                     args = json.loads(fn.arguments)

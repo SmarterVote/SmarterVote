@@ -265,6 +265,20 @@ class QueueManager:
 
         return before - len(self._items)
 
+    def clear_pending(self) -> int:
+        """Remove all pending (not yet started) items from the queue. Returns count removed."""
+        pending_ids = [i.id for i in self._items if i.status == "pending"]
+        self._items = [i for i in self._items if i.status != "pending"]
+        if not self._use_firestore:
+            self._save_to_json()
+        if self._use_firestore:
+            try:
+                for item_id in pending_ids:
+                    self._delete_item_firestore(item_id)
+            except Exception:
+                logging.getLogger(__name__).exception("Failed to delete pending items from Firestore")
+        return len(pending_ids)
+
     def get_all(self) -> List[QueueItem]:
         return list(self._items)
 

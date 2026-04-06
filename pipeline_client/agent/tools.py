@@ -82,6 +82,30 @@ BALLOTPEDIA_TOOL: Dict = {
     },
 }
 
+BALLOTPEDIA_ELECTION_TOOL: Dict = {
+    "type": "function",
+    "function": {
+        "name": "ballotpedia_election_lookup",
+        "description": (
+            "Fetch the Ballotpedia election page for this race and return the authoritative list of "
+            "candidates. This is the single most reliable source for who is officially in the race — "
+            "call this FIRST in discovery before doing any web searches. "
+            "Returns: found (bool), page_url, candidates list [{name, party, incumbent}], "
+            "and a short description paragraph."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "race_id": {
+                    "type": "string",
+                    "description": "The race identifier (e.g. 'ar-senate-2026', 'ga-governor-2026').",
+                }
+            },
+            "required": ["race_id"],
+        },
+    },
+}
+
 # ---------------------------------------------------------------------------
 # Roster editing tools
 # ---------------------------------------------------------------------------
