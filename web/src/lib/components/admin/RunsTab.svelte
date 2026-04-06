@@ -123,6 +123,7 @@
       Refresh
     </button>
   </div>
+  </div>
 
   <!-- Active / running runs -->
   {#if activeRuns.length > 0}
