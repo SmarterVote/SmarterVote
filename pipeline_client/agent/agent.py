@@ -30,7 +30,9 @@ from .llm import (  # noqa: F401 â€” re-exported for backward compat
     CHEAP_MODEL,
     DEFAULT_MODEL,
     NANO_MODEL,
-    _agent_loop,    _call_openai,    _ensure_dict,
+    _agent_loop,
+    _call_openai,
+    _ensure_dict,
     _normalize_candidate,
 )
 from .phases import (  # noqa: F401 â€” re-exported for backward compat
@@ -69,8 +71,10 @@ from .tools import (  # noqa: F401 â€” re-exported for tests
 )
 from .utils import _extract_json, make_logger  # noqa: F401 â€” _extract_json re-exported for tests
 from .web_tools import (  # noqa: F401 â€” re-exported for backward compat
-    _fetch_page,    _get_fetch_client,
-    _get_search_cache,    _is_unusable_page_text,
+    _fetch_page,
+    _get_fetch_client,
+    _get_search_cache,
+    _is_unusable_page_text,
     _page_fetch_log_hint,
     _serper_search,
 )
@@ -151,7 +155,7 @@ async def run_agent(
     candidate_names : list[str], optional
         Exact candidate names to update/research (case-insensitive exact match).
     """
-    from .review import (
+    from .cost import (
         DEFAULT_CLAUDE_MODEL, CHEAP_CLAUDE_MODEL,
         DEFAULT_GEMINI_MODEL, CHEAP_GEMINI_MODEL,
         DEFAULT_GROK_MODEL, CHEAP_GROK_MODEL,
@@ -368,43 +372,6 @@ async def run_agent(
     if not isinstance(_candidates, list):
         raise ValueError(
             f"Agent output for '{race_id}' has no 'candidates' — looks like a partial "
-            f"LLM response was returned instead of the full race profile. "
-            f"Top-level keys present: {list(race_json.keys())}. Re-queue the race to retry."
-        )
-
-    return race_json
-    total_tokens = pt + ct
-    breakdown = _acc.get("model_breakdown", {})
-    total_cost = (
-        sum(
-            estimate_cost(m, bd.get("prompt_tokens", 0), bd.get("completion_tokens", 0))
-            for m, bd in breakdown.items()
-        )
-        if breakdown
-        else estimate_cost(model, pt, ct)
-    )
-    agent_metrics = {
-        "model": model,
-        "prompt_tokens": pt,
-        "completion_tokens": ct,
-        "total_tokens": total_tokens,
-        "estimated_usd": round(total_cost, 4),
-        "model_breakdown": breakdown,
-        "duration_s": round(elapsed, 1),
-    }
-    race_json["agent_metrics"] = agent_metrics
-    log(
-        "info",
-        f"âœ… Agent finished in {elapsed:.1f}s â€” "
-        f"${total_cost:.4f} estimated "
-        f"({pt:,} in + {ct:,} out = {total_tokens:,} tokens)",
-    )
-
-    # Sanity-check: reject partial LLM output (e.g. a stray polling entry)
-    _candidates = race_json.get("candidates")
-    if not isinstance(_candidates, list):
-        raise ValueError(
-            f"Agent output for '{race_id}' has no 'candidates' â€” looks like a partial "
             f"LLM response was returned instead of the full race profile. "
             f"Top-level keys present: {list(race_json.keys())}. Re-queue the race to retry."
         )

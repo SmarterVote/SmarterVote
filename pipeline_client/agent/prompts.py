@@ -8,20 +8,9 @@ The agent runs in phases:
 Optionally followed by multi-LLM **review** (Claude / Gemini).
 """
 
-CANONICAL_ISSUES = [
-    "Economy",
-    "Education",
-    "Healthcare",
-    "Reproductive Rights",
-    "Climate/Energy",
-    "Tech & AI",
-    "Immigration",
-    "Foreign Policy",
-    "Guns & Safety",
-    "Social Justice",
-    "Election Reform",
-    "Local Issues",
-]
+from shared.models import CanonicalIssue
+
+CANONICAL_ISSUES = [e.value for e in CanonicalIssue]
 
 # ------------------------------------------------------------------
 # Shared rules that apply to every prompt
@@ -157,45 +146,6 @@ Return JSON:
 }}"""
 
 # ------------------------------------------------------------------
-# Phase 2: Issue research prompt (one per issue group)
-# ------------------------------------------------------------------
-
-ISSUE_RESEARCH_SYSTEM = f"""\
-You are a nonpartisan political research agent specialising in policy positions.
-
-{_SHARED_RULES}"""
-
-ISSUE_RESEARCH_USER = """\
-You are researching the race "{race_id}".
-Candidates: {candidate_names}
-
-Research each candidate's positions on THESE issues ONLY:
-{issues_list}
-
-For EACH candidate and EACH issue, provide:
-- Their stated position (1-2 sentences)
-- Confidence level (high/medium/low)
-- Source URLs with titles
-
-IMPORTANT — stance field rules:
-- Write only the candidate's actual position, never process notes.
-- NEVER write stances like "Pending update", "Updating to reflect...", "Under review", or any text that describes the pipeline state.
-- If no information is found, set stance to "No public position found" and confidence to "low" with sources: [].
-
-Return JSON – an object keyed by candidate name:
-{{
-  "<Candidate Name>": {{
-    "<Issue>": {{
-      "stance": "<position>",
-      "confidence": "high|medium|low",
-      "sources": [
-        {{"url": "<url>", "type": "website|news|government|social_media", "title": "<title>"}}
-      ]
-    }}
-  }}
-}}"""
-
-# ------------------------------------------------------------------
 # Phase 3: Refinement prompt (enhanced)
 # ------------------------------------------------------------------
 
@@ -306,46 +256,6 @@ When you do find improvements, use your editing tools to record them:
 
 When you are done, reply with a short plain-text summary of what changed, or
 "No changes needed" if the profile is already up to date."""
-
-UPDATE_ISSUE_SYSTEM = f"""\
-You are a nonpartisan political research agent updating issue positions in an existing profile.
-
-{_SHARED_RULES}"""
-
-UPDATE_ISSUE_USER = """\
-Race: "{race_id}" — updating since {last_updated}
-Candidates: {candidate_names}
-
-Issues to update: {issues_list}
-
-Existing stances (for reference — only return better/corrected data):
-{existing_stances}
-
-Search for the LATEST positions on these issues. Focus on:
-- Statements, votes, or actions since {last_updated}
-- Filling any gaps where confidence is "low" or stance is missing
-
-IMPORTANT — only update if you find genuinely new or better data:
-- If the existing stance is already accurate and well-sourced, omit that candidate/issue from your response entirely.
-- If nothing meaningful has changed since {last_updated}, return an empty JSON object {{}} and briefly explain why no changes were made.
-- Do NOT rephrase existing stances just to return something — omit them instead.
-
-Stance field rules:
-- Write only the candidate's actual position, never process notes.
-- NEVER write stances like "Pending update", "Updating to reflect...", "Under review", or any text that describes the research or pipeline state.
-- If no new information is found for an issue, omit that issue from the response entirely — do not overwrite existing data with a placeholder.
-- If a stance is genuinely unknown, set it to "No public position found" with confidence "low" and sources: [].
-
-Return JSON keyed by candidate name (only include candidates/issues where you have new or better data):
-{{
-  "<Candidate Name>": {{
-    "<Issue>": {{
-      "stance": "<updated position>",
-      "confidence": "high|medium|low",
-      "sources": [{{"url": "<url>", "type": "website|news|government", "title": "<title>"}}]
-    }}
-  }}
-}}"""
 
 # ------------------------------------------------------------------
 # Image URL resolution prompt (standalone phase)

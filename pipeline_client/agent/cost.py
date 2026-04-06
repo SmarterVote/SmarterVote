@@ -16,6 +16,27 @@ from typing import Any, Dict, Optional
 _cost_ctx: ContextVar[Optional[Dict[str, Any]]] = ContextVar("_cost_ctx", default=None)
 
 # ---------------------------------------------------------------------------
+# Model name constants — single source of truth for all modules
+# ---------------------------------------------------------------------------
+
+# OpenAI research models
+DEFAULT_MODEL = "gpt-5.4"
+CHEAP_MODEL = "gpt-5.4-mini"
+NANO_MODEL = "gpt-5-nano"
+
+# Claude review models
+DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6"
+CHEAP_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+
+# Gemini review models (Flash is already cheap — same model for both modes)
+DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
+CHEAP_GEMINI_MODEL = "gemini-3-flash-preview"
+
+# Grok review models
+DEFAULT_GROK_MODEL = "grok-3"
+CHEAP_GROK_MODEL = "grok-3-mini"
+
+# ---------------------------------------------------------------------------
 # Approximate list prices per million tokens (USD, as of mid-2025)
 # ---------------------------------------------------------------------------
 

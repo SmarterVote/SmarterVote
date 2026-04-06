@@ -40,8 +40,6 @@ from pipeline_client.agent.prompts import (
     CANONICAL_ISSUES,
     DISCOVERY_SYSTEM,
     DISCOVERY_USER,
-    ISSUE_RESEARCH_SYSTEM,
-    ISSUE_RESEARCH_USER,
     ISSUE_SUBAGENT_SYSTEM,
     ISSUE_SUBAGENT_USER,
     ITERATE_USER,
@@ -51,8 +49,6 @@ from pipeline_client.agent.prompts import (
     ROSTER_SYNC_USER,
     UPDATE_ISSUE_SUBAGENT_SYSTEM,
     UPDATE_ISSUE_SUBAGENT_USER,
-    UPDATE_ISSUE_SYSTEM,
-    UPDATE_ISSUE_USER,
     UPDATE_META_SYSTEM,
     UPDATE_META_USER,
 )
@@ -74,7 +70,7 @@ def test_canonical_issues_no_duplicates():
 
 def test_canonical_issues_thematic_order():
     """Canonical issues are in the expected thematic order."""
-    assert CANONICAL_ISSUES[0] == "Economy"
+    assert CANONICAL_ISSUES[0] == "Healthcare"
     assert CANONICAL_ISSUES[-1] == "Local Issues"
 
 
@@ -84,15 +80,18 @@ def test_discovery_user_formats():
     assert "mo-senate-2024" in result
 
 
-def test_issue_research_user_formats():
-    """Issue research user prompt accepts all required variables."""
-    result = ISSUE_RESEARCH_USER.format(
+def test_issue_subagent_user_formats():
+    """Issue subagent user prompt accepts all required variables."""
+    result = ISSUE_SUBAGENT_USER.format(
         race_id="mo-senate-2024",
-        candidate_names="Alice, Bob",
-        issues_list="  - Healthcare\n  - Education",
+        candidate_name="Alice",
+        issue="Healthcare",
+        handoff_context="No prior context available.",
+        candidate_website="https://alice.example.com",
+        candidate_issue_urls="(none found)",
     )
     assert "mo-senate-2024" in result
-    assert "Alice, Bob" in result
+    assert "Alice" in result
     assert "Healthcare" in result
 
 
@@ -177,14 +176,14 @@ def test_update_prompt_mentions_donor_sources():
 
 def test_prompts_contain_rules():
     """All system prompts include shared rules."""
-    for prompt in [DISCOVERY_SYSTEM, ISSUE_RESEARCH_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SYSTEM]:
+    for prompt in [DISCOVERY_SYSTEM, ISSUE_SUBAGENT_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SUBAGENT_SYSTEM]:
         assert "nonpartisan" in prompt.lower()
         assert "web_search" in prompt
 
 
 def test_prompts_mention_confidence_levels():
     """All system prompts describe the confidence levels."""
-    for prompt in [DISCOVERY_SYSTEM, ISSUE_RESEARCH_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SYSTEM]:
+    for prompt in [DISCOVERY_SYSTEM, ISSUE_SUBAGENT_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SUBAGENT_SYSTEM]:
         assert "high" in prompt.lower()
         assert "medium" in prompt.lower()
         assert "low" in prompt.lower()

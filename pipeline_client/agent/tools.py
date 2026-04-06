@@ -106,6 +106,8 @@ BALLOTPEDIA_ELECTION_TOOL: Dict = {
     },
 }
 
+WEB_TOOLS: List[Dict] = [SEARCH_TOOL, FETCH_TOOL, BALLOTPEDIA_TOOL, BALLOTPEDIA_ELECTION_TOOL]
+
 # ---------------------------------------------------------------------------
 # Roster editing tools
 # ---------------------------------------------------------------------------
@@ -373,11 +375,12 @@ CLEAR_EDUCATION_TOOL: Dict = {
     },
 }
 
-BACKGROUND_TOOLS: List[Dict] = [
+BIO_TOOLS: List[Dict] = [
     ADD_CAREER_ENTRY_TOOL, REMOVE_CAREER_ENTRY_TOOL, UPDATE_CAREER_ENTRY_TOOL,
     ADD_EDUCATION_ENTRY_TOOL, UPDATE_EDUCATION_ENTRY_TOOL,
     SET_SOCIAL_MEDIA_TOOL, CLEAR_CAREER_TOOL, CLEAR_EDUCATION_TOOL,
 ]
+BACKGROUND_TOOLS = BIO_TOOLS  # backward-compat alias
 
 # ---------------------------------------------------------------------------
 # Issue stance tool

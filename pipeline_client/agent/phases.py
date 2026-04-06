@@ -1,7 +1,8 @@
 """Phase orchestration — discovery, issues, finance, refinement, iteration.
 
 Contains the per-candidate issue sub-agent, shared phase runner, fresh and
-update flow runners, patch/merge helpers, and review-iteration logic.
+update flow runners, and review-iteration logic.  Selection helpers live in
+``selection.py``; patch/merge helpers live in ``patches.py``.
 """
 
 import copy
@@ -12,6 +13,15 @@ from typing import Any, Dict, List, Optional
 from .handlers import _make_editing_handlers
 from .images import resolve_candidate_images
 from .llm import _agent_loop, _ensure_dict, _normalize_candidate, CHEAP_MODEL, DEFAULT_MODEL, NANO_MODEL
+from .patches import (  # noqa: F401 — re-exported for backward compat
+    _apply_candidate_patch,
+    _apply_finance_patch,
+    _apply_issue_patch,
+    _apply_meta_patch,
+    _apply_refine_patch,
+    _deduplicate_donors,
+    _summarize_existing_stances,
+)
 from .prompts import (
     CANONICAL_ISSUES,
     DISCOVERY_SYSTEM,
@@ -33,6 +43,13 @@ from .prompts import (
     UPDATE_META_SYSTEM,
     UPDATE_META_USER,
 )
+from .selection import (  # noqa: F401 — re-exported for backward compat
+    _candidate_info_score,
+    _candidate_source_hints,
+    _scale_iterations,
+    _select_candidates_for_research,
+    _select_target_candidates,
+)
 from .tools import (
     BACKGROUND_TOOLS,
     CANDIDATE_TOOLS,
@@ -44,140 +61,6 @@ from .tools import (
 )
 from .utils import make_logger
 from .web_tools import _get_search_cache
-
-
-# ---------------------------------------------------------------------------
-# Candidate selection helpers
-# ---------------------------------------------------------------------------
-
-
-def _scale_iterations(base: int, n_candidates: int, per_candidate: int, minimum: int = 12) -> int:
-    """Return an iteration budget scaled to the number of candidates."""
-    return max(base, n_candidates * per_candidate + minimum)
-
-
-def _candidate_info_score(candidate: Dict[str, Any]) -> int:
-    """Score a candidate by how much issue data they already have."""
-    issues = candidate.get("issues", {})
-    score = 0
-    for v in issues.values():
-        if isinstance(v, dict) and v.get("stance"):
-            score += 1
-    return score
-
-
-def _select_candidates_for_research(
-    candidate_names: List[str],
-    race_json: Dict[str, Any],
-    *,
-    max_candidates: Optional[int],
-    target_no_info: bool,
-    log: Any,
-) -> List[str]:
-    """Return the (possibly truncated) list of candidates to research.
-
-    Sorts candidates by existing info density.  When *target_no_info* is True
-    the least-informed candidates come first; otherwise the most-informed do.
-    """
-    if max_candidates is None and not target_no_info:
-        return candidate_names
-
-    cand_by_name: Dict[str, Dict[str, Any]] = {
-        c["name"]: c for c in race_json.get("candidates", []) if isinstance(c, dict)
-    }
-    scored = [(name, _candidate_info_score(cand_by_name.get(name, {}))) for name in candidate_names]
-    scored.sort(key=lambda t: t[1], reverse=not target_no_info)
-
-    selected = [name for name, _ in scored]
-    if max_candidates is not None and max_candidates < len(selected):
-        skipped = selected[max_candidates:]
-        selected = selected[:max_candidates]
-        log("info", f"  Candidate limit: researching {len(selected)} of {len(candidate_names)} "
-            f"(skipped: {', '.join(skipped)})")
-    return selected
-
-
-def _select_target_candidates(
-    available_names: List[str],
-    target_names: Optional[List[str]],
-    log: Any,
-) -> List[str]:
-    """Filter available candidates to an explicit target list, if provided."""
-    if not target_names:
-        return available_names
-
-    wanted = [n.strip() for n in target_names if isinstance(n, str) and n.strip()]
-    if not wanted:
-        return available_names
-
-    by_lower = {n.lower(): n for n in available_names}
-    selected: List[str] = []
-    missing: List[str] = []
-    for name in wanted:
-        match = by_lower.get(name.lower())
-        if match:
-            if match not in selected:
-                selected.append(match)
-        else:
-            missing.append(name)
-
-    if missing:
-        log("warning", f"  Candidate filter ignored unknown names: {', '.join(missing)}")
-    if not selected:
-        raise ValueError(
-            "No candidate names in candidate_names matched this race. "
-            f"Available: {', '.join(available_names)}"
-        )
-
-    log("info", f"  Candidate filter active: {', '.join(selected)}")
-    return selected
-
-
-def _candidate_source_hints(
-    race_json: Dict[str, Any],
-    candidate_name: str,
-) -> tuple[str, List[str]]:
-    """Return known website and likely issue/policy URLs for candidate prompts."""
-    candidate = next(
-        (c for c in race_json.get("candidates", []) if isinstance(c, dict) and c.get("name") == candidate_name),
-        None,
-    )
-    if not candidate:
-        return "(unknown)", []
-
-    website = candidate.get("website") or "(unknown)"
-    hints: List[str] = []
-
-    if isinstance(website, str) and website.startswith("http"):
-        base = website.rstrip("/")
-        hints.extend([
-            f"{base}/issues",
-            f"{base}/issue",
-            f"{base}/policy",
-            f"{base}/policies",
-            f"{base}/priorities",
-            f"{base}/platform",
-        ])
-
-    for link in candidate.get("links", []):
-        if not isinstance(link, dict):
-            continue
-        url = link.get("url")
-        if not isinstance(url, str) or not url.startswith("http"):
-            continue
-        lowered = url.lower()
-        if any(token in lowered for token in ("/issues", "/issue", "policy", "priorities", "platform")):
-            hints.append(url)
-
-    deduped: List[str] = []
-    seen: set[str] = set()
-    for url in hints:
-        if url in seen:
-            continue
-        deduped.append(url)
-        seen.add(url)
-
-    return website, deduped[:8]
 
 
 # ---------------------------------------------------------------------------
@@ -752,154 +635,6 @@ async def _run_update(
     )
 
     return race_json
-
-
-# ---------------------------------------------------------------------------
-# Patch / merge helpers
-# ---------------------------------------------------------------------------
-
-
-def _apply_meta_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any) -> None:
-    if "description" in patch and patch["description"]:
-        race_json["description"] = patch["description"]
-
-    if "polling" in patch and isinstance(patch["polling"], list) and patch["polling"]:
-        existing_polls = race_json.get("polling", [])
-        race_json["polling"] = patch["polling"] + existing_polls
-
-    if patch.get("polling_note"):
-        race_json["polling_note"] = patch["polling_note"]
-
-    patch_candidates = {c["name"]: c for c in patch.get("candidates", []) if isinstance(c, dict)}
-    for candidate in race_json.get("candidates", []):
-        name = candidate.get("name")
-        pc = patch_candidates.get(name)
-        if not pc:
-            continue
-        if pc.get("summary"):
-            candidate["summary"] = pc["summary"]
-        if pc.get("donor_summary"):
-            candidate["donor_summary"] = pc["donor_summary"]
-    log("info", f"  Meta patch applied — {len(patch_candidates)} candidates updated")
-
-
-def _apply_issue_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any) -> None:
-    """Merge an issue patch into race_json candidates in-place."""
-    updated = 0
-    candidates_by_name = {c["name"]: c for c in race_json.get("candidates", [])}
-    for cand_name, issues in patch.items():
-        if not isinstance(issues, dict) or cand_name not in candidates_by_name:
-            continue
-        candidate = candidates_by_name[cand_name]
-        candidate.setdefault("issues", {}).update(issues)
-        updated += 1
-    log("info", f"  Issue patch applied — {updated} candidates updated")
-
-
-def _summarize_existing_stances(candidates: List[Dict[str, Any]], issues: List[str]) -> str:
-    """Format existing stances for a set of issues as compact text for the prompt."""
-    lines = []
-    for c in candidates:
-        name = c.get("name", "?")
-        for issue in issues:
-            stance_data = c.get("issues", {}).get(issue)
-            if stance_data and isinstance(stance_data, dict):
-                stance = stance_data.get("stance", "")
-                conf = stance_data.get("confidence", "low")
-                lines.append(f"  {name} / {issue} [{conf}]: {stance[:120]}")
-            else:
-                lines.append(f"  {name} / {issue}: MISSING")
-    return "\n".join(lines) if lines else "  (no existing stances)"
-
-
-def _apply_candidate_patch(candidate: Dict[str, Any], patch: Dict[str, Any], log: Any) -> None:
-    """Merge a per-candidate patch dict into the candidate in-place."""
-    cname = candidate.get("name", "?")
-    for key in ("summary", "image_url", "website", "incumbent", "party",
-                "donor_summary", "donor_source_url", "voting_summary", "voting_source_url"):
-        if key in patch:
-            candidate[key] = patch[key]
-    for key in ("summary_sources", "career_history", "education"):
-        val = patch.get(key)
-        if isinstance(val, list) and val:
-            candidate[key] = val
-    new_links = patch.get("links")
-    if isinstance(new_links, list) and new_links:
-        existing_urls = {lnk.get("url") for lnk in candidate.get("links", [])}
-        for lnk in new_links:
-            if isinstance(lnk, dict) and lnk.get("url") not in existing_urls:
-                candidate.setdefault("links", []).append(lnk)
-                existing_urls.add(lnk.get("url"))
-    new_issues = patch.get("issues")
-    if isinstance(new_issues, dict) and new_issues:
-        candidate.setdefault("issues", {}).update(new_issues)
-    log("debug", f"  Candidate patch applied for {cname}")
-
-
-def _apply_refine_patch(race_json: Dict[str, Any], meta_patch: Dict[str, Any],
-                        candidate_patches: List[Dict[str, Any]], log: Any,
-                        iteration_notes: List[str]) -> None:
-    """Apply refine meta + per-candidate patches to race_json in-place."""
-    if meta_patch.get("description"):
-        race_json["description"] = meta_patch["description"]
-    if isinstance(meta_patch.get("polling"), list) and meta_patch["polling"]:
-        race_json["polling"] = meta_patch["polling"]
-    candidates_by_name = {c["name"]: c for c in race_json.get("candidates", [])}
-    for patch in candidate_patches:
-        name = patch.get("name")
-        if name and name in candidates_by_name:
-            _apply_candidate_patch(candidates_by_name[name], patch, log)
-            notes = patch.get("iteration_notes", [])
-            if isinstance(notes, list):
-                iteration_notes.extend(notes)
-
-
-def _apply_finance_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any) -> None:
-    """Merge finance/voting research results into race_json candidates in-place."""
-    candidates_by_name = {c["name"]: c for c in race_json.get("candidates", [])}
-    updated = 0
-    for cand_name, data in patch.items():
-        if not isinstance(data, dict) or cand_name not in candidates_by_name:
-            continue
-        candidate = candidates_by_name[cand_name]
-
-        if data.get("donor_summary"):
-            candidate["donor_summary"] = data["donor_summary"]
-        if data.get("donor_source_url"):
-            candidate["donor_source_url"] = data["donor_source_url"]
-        if data.get("voting_summary"):
-            candidate["voting_summary"] = data["voting_summary"]
-        if data.get("voting_source_url"):
-            candidate["voting_source_url"] = data["voting_source_url"]
-
-        new_links = data.get("links", [])
-        if isinstance(new_links, list) and new_links:
-            existing_urls = {lnk.get("url") for lnk in candidate.get("links", []) if isinstance(lnk, dict)}
-            for lnk in new_links:
-                if isinstance(lnk, dict) and lnk.get("url") not in existing_urls:
-                    candidate.setdefault("links", []).append(lnk)
-                    existing_urls.add(lnk.get("url"))
-
-        updated += 1
-    log("info", f"  Finance/voting patch applied — {updated} candidates updated")
-
-
-def _deduplicate_donors(donors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Kept for backward-compat with any update-run paths that may load old data."""
-    best: Dict[str, Dict[str, Any]] = {}
-    for d in donors:
-        key = d.get("name", "").strip().lower()
-        if not key:
-            continue
-        existing = best.get(key)
-        if existing is None:
-            best[key] = d
-        else:
-            new_amt = d.get("amount") or 0
-            old_amt = existing.get("amount") or 0
-            if new_amt > old_amt:
-                best[key] = d
-    return list(best.values())
 
 
 # ---------------------------------------------------------------------------

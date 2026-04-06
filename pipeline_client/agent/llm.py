@@ -8,7 +8,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup, lookup_election_page as _ballotpedia_election_lookup
-from .cost import accumulate
+from .cost import DEFAULT_MODEL, CHEAP_MODEL, NANO_MODEL, accumulate
 from .tools import (
     BALLOTPEDIA_ELECTION_TOOL,
     BALLOTPEDIA_TOOL,
@@ -19,14 +19,6 @@ from .utils import _extract_json, make_logger
 from .web_tools import _fetch_page, _page_fetch_log_hint, _serper_search
 
 logger = logging.getLogger("pipeline")
-
-# ---------------------------------------------------------------------------
-# Model configuration — defaults & cheap variants
-# ---------------------------------------------------------------------------
-
-DEFAULT_MODEL = "gpt-5.4"
-CHEAP_MODEL = "gpt-5.4-mini"
-NANO_MODEL = "gpt-5-nano"
 
 
 # ---------------------------------------------------------------------------
