@@ -9,6 +9,10 @@ LLM receives as the tool result.
 import json
 from typing import Any, Callable, Dict, Optional
 
+from pipeline_client.agent.prompts import CANONICAL_ISSUES
+
+_CANONICAL_ISSUE_SET = set(CANONICAL_ISSUES)
+
 
 def _make_editing_handlers(
     race_json: Dict[str, Any], log: Callable
@@ -137,6 +141,10 @@ def _make_editing_handlers(
 
     def set_issue_stance(args: Dict[str, Any]) -> str:
         name, issue = args["candidate_name"], args["issue"]
+        if issue not in _CANONICAL_ISSUE_SET:
+            close = [ci for ci in CANONICAL_ISSUES if issue.lower() in ci.lower() or ci.lower() in issue.lower()]
+            hint = f" Did you mean: {close[0]!r}?" if close else f" Valid issues: {', '.join(CANONICAL_ISSUES)}."
+            return f"ERROR: '{issue}' is not a canonical issue.{hint}"
         c = _find_candidate(name)
         if not c:
             return f"Candidate '{name}' not found."
@@ -164,6 +172,14 @@ def _make_editing_handlers(
             "end_year": args.get("end_year"),
             "description": args.get("description", ""),
         }
+        # Dedup: same org + overlapping years → skip
+        org_lower = args["organization"].lower()
+        start = args.get("start_year")
+        for existing in c.get("career_history", []):
+            same_org = org_lower in existing.get("organization", "").lower() or existing.get("organization", "").lower() in org_lower
+            same_start = existing.get("start_year") == start
+            if same_org and same_start:
+                return f"Career entry for '{args['organization']}' ({start}) already exists for '{name}' — skipping duplicate."
         c.setdefault("career_history", []).append(entry)
         log("info", f"    📝 Added career entry for {name}: {args['title']} at {args['organization']}")
         return f"Added career entry for '{name}': {args['title']} at {args['organization']}."
@@ -179,6 +195,13 @@ def _make_editing_handlers(
             "field": args.get("field"),
             "year": args.get("year"),
         }
+        # Dedup: same institution + degree → skip
+        inst_lower = args["institution"].lower()
+        deg_lower = args["degree"].lower()
+        for existing in c.get("education", []):
+            if (inst_lower in existing.get("institution", "").lower()
+                    and deg_lower in existing.get("degree", "").lower()):
+                return f"Education entry for '{args['institution']}' ({args['degree']}) already exists for '{name}' — skipping duplicate."
         c.setdefault("education", []).append(entry)
         log("info", f"    📝 Added education for {name}: {args['degree']} from {args['institution']}")
         return f"Added education for '{name}': {args['degree']} from {args['institution']}."
@@ -309,6 +332,10 @@ def _make_editing_handlers(
         }
         if args.get("sample_size"):
             poll["sample_size"] = args["sample_size"]
+        # Dedup: same pollster + date
+        for existing in race_json.get("polling", []):
+            if existing.get("pollster") == args["pollster"] and existing.get("date") == args["date"]:
+                return f"Poll from {args['pollster']} ({args['date']}) already exists — skipping duplicate."
         race_json.setdefault("polling", []).insert(0, poll)
         log("info", f"    📊 Added poll: {args['pollster']} ({args['date']})")
         return f"Added poll from {args['pollster']} ({args['date']})."

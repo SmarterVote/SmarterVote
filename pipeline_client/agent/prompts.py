@@ -277,20 +277,31 @@ Candidates: {candidate_names}
 Search for NEW information since {last_updated}:
 1. Any major news, announcements, or developments for each candidate.
 2. Updated or corrected candidate summaries (keep them 2-3 sentences, nonpartisan).
-3. Recent polls (last 90 days). Include pollster, date, sample size, percentages, source URL.
-   Set polling_note if no polls are found.
+3. Recent polls (published after {last_updated}). Include pollster, date, sample size,
+   percentages, source URL. Set polling_note if no polls are found.
 4. Updated race description (office context, why it matters, key contrasts).
 
-IMPORTANT — only make changes if you find genuinely new or better information:
-- If nothing meaningful has changed since {last_updated}, do NOT make edits. Just reply "No changes needed."
-- Do not update a field simply to rephrase it or because you could say it differently.
-- Do not add polls that predate {last_updated} or are already captured in the profile.
+WHAT COUNTS AS "NEW" — be precise:
+- A poll is new if its publication date is AFTER {last_updated}. Do not add polls
+  from before that date even if they were not in the profile.
+- A development is new if it appears in articles published AFTER {last_updated}:
+  new endorsements, policy announcements, primary results, candidate debates,
+  campaign finance filings, major funding milestones, significant controversy.
+- A summary is worth updating only if a notable new event changes the candidate's
+  story — not if you could merely rephrase the existing text differently.
+- Do not update a field just to add minor wording polish.
+
+WHEN TO MAKE NO CHANGES:
+- If nothing meaningful has changed since {last_updated}, reply exactly:
+  "No changes needed."
+- Do not add polls that predate {last_updated}.
+- Do not rephrase existing summaries without a substantive new reason.
 
 When you do find improvements, use your editing tools to record them:
 - update_race_field for description
-- add_poll for each new poll
-- set_candidate_summary for updated summaries
-- set_donor_summary if new funding/donor information is available
+- add_poll for each new poll (after {last_updated} only)
+- set_candidate_summary for updated summaries (new events only)
+- set_donor_summary if new funding milestone or FEC filing is available
 - set_candidate_field for other candidate fields
 
 When you are done, reply with a short plain-text summary of what changed, or
@@ -510,36 +521,56 @@ and a curated list of reference links.
 PART 1 — DONOR SUMMARY:
 Search for campaign finance data using at least 3 of these strategies:
   1. OpenSecrets: "<candidate name> opensecrets" → find their candidate page,
-     note top industries, top organizations, and total raised.
+     note top industries, top organizations, and total raised in dollars.
   2. FollowTheMoney: "<candidate name> followthemoney"
   3. FEC: "<candidate name> FEC contributions site:fec.gov"
-  4. State campaign finance portal (for state-level races)
-  5. News: "<candidate name> biggest donors 2026" or "<candidate name> fundraising"
+  4. State campaign finance portal (for state-level races — search
+     "<state> campaign finance disclosure <candidate name>")
+  5. News: "<candidate name> biggest donors 2026" or "<candidate name> fundraising 2026"
 
-Write a 2-3 sentence donor_summary describing who funds the candidate:
-  - What industries or sectors dominate their fundraising?
-  - What is the rough total raised / biggest disclosed amounts?
-  - Example: "Primarily funded by real-estate and financial-sector PACs, with
-    the top disclosed donors including [names] totaling approximately $X.
-    Full data is available via OpenSecrets."
+Write a 2-3 sentence donor_summary including:
+  - Which industries or sectors dominate (e.g., "real estate", "financial services",
+    "trial lawyers", "tech industry") — be specific, not generic.
+  - The approximate total raised and/or the largest disclosed amounts in dollars
+    where available (e.g., "$2.1M raised" or "top PAC contribution of $250K").
+  - Example good summary: "Raised approximately $3.2M, primarily from real-estate
+    and financial-sector donors. Top contributors include [Industry PAC name] ($150K)
+    and small-dollar grassroots donations through ActBlue. Full data via OpenSecrets."
+  - Example bad summary (too vague — avoid): "Supported by various business interests."
   If no finance data is found after multiple searches, write:
   "No campaign finance data found in public disclosures as of [date]."
 
 PART 2 — VOTING SUMMARY:
-For incumbents and former legislators, search:
-  1. VoteSmart: "<candidate name> votesmart"
-  2. GovTrack or Congress.gov: "<candidate name> voting record"
-  3. State legislature site: "<candidate name> [state] legislature votes"
-  4. News: "<candidate name> key votes 2025 2026"
+First, determine whether the candidate is an INCUMBENT LEGISLATOR, a FORMER LEGISLATOR,
+or a NON-LEGISLATOR (challenger, executive, business person, etc.):
 
-Write a 2-3 sentence voting_summary describing their overall pattern:
-  - What issues do they consistently support or oppose?
-  - Any notable bills sponsored or major votes?
-  - Example: "Voted with the Democratic caucus 94% of the time in the 2025
-    session. Key votes include support for Medicaid expansion and opposition
-    to school voucher legislation."
-  For non-legislators: note that no legislative voting record exists and
-  describe any comparable public positions found.
+  A) INCUMBENT or FORMER LEGISLATORS — search:
+     1. GovTrack or Congress.gov: "<candidate name> voting record"
+     2. VoteSmart: "<candidate name> votesmart"
+     3. State legislature site: "<candidate name> [state] legislature votes"
+     4. News: "<candidate name> key votes 2025 2026"
+     Write a 2-3 sentence voting_summary describing:
+     - Overall partisan alignment (e.g., "Voted with the Democratic caucus
+       94% of the time in the 2025 session.")
+     - 1-2 specific notable votes or sponsored bills that illustrate their
+       priorities (e.g., "Sponsored the Clean Energy Jobs Act; voted against
+       the 2024 border security package.").
+
+  B) NON-LEGISLATORS (challengers, executives, activists, business candidates) who have
+     NEVER held legislative office — there is no voting record to report. Instead search:
+     1. Any elected positions they DID hold (city council, school board, county commission)
+        and any votes taken there.
+     2. Budget decisions, executive orders, or official actions if they held executive office.
+     3. Public policy endorsements, signed pledges, or scoring from issue organizations.
+     4. Campaign policy statements or debate answers on key legislative priorities.
+     Write a 2-3 sentence voting_summary noting the absence of a legislative record
+     and what comparable evidence of their governing approach exists:
+     Example: "Has not held legislative office. As Mayor of Springfield (2018–2022),
+     signed the city's first climate action plan and vetoed a proposed public safety
+     spending cut. Has pledged to support federal paid-leave legislation."
+
+  If no relevant record exists for any category, write:
+  "No public legislative voting record. No prior elected or executive office found."
 
 PART 3 — REFERENCE LINKS:
 Using the pages you have already visited, collect the best reference links
@@ -557,9 +588,9 @@ or duplicate links.
 Return JSON keyed by candidate name:
 {{
   "<Candidate Name>": {{
-    "donor_summary": "<2-3 sentence summary of campaign finance>",
+    "donor_summary": "<2-3 sentence summary of campaign finance with specific amounts>",
     "donor_source_url": "<best URL for full donor data, e.g. OpenSecrets page or state portal>",
-    "voting_summary": "<2-3 sentence summary of voting patterns>",
+    "voting_summary": "<2-3 sentence summary of voting patterns or executive record>",
     "voting_source_url": "<best URL for full voting record — prefer VoteSmart > GovTrack > legislature>",
     "links": [
       {{"url": "<url>", "title": "<page title>", "type": "ballotpedia|wiki|finance|official|legislature|votesmart|govtrack|news|other"}}
@@ -633,26 +664,17 @@ For EACH flag above:
 4. If the flag identifies bias, rewrite the text to be neutral.
 5. If the flag is informational only (severity "info"), address if easily fixable.
 
-CAREER HISTORY flags: search for the specific organization + candidate + dates.
-If wrong dates/title: use update_career_entry to patch only the incorrect fields.
-If wholly fabricated (no source found): remove_career_entry to delete it.
-
-DONOR SUMMARY flags about wrong organization names: use fetch_page on the
-cited OpenSecrets/FEC URL and read the actual top-donor names from the page.
-
-CANDIDATE VALIDITY / ROSTER flags: if a reviewer indicates this profile may
-represent the wrong person, a duplicate alias, or someone not actually in this
-race, verify against official election authority pages, Ballotpedia race roster,
-and multiple credible recent reports.
-- If the person is clearly NOT a valid candidate in this race, call
-  remove_candidate with a specific, source-backed reason.
-- If it is only a naming issue, use rename_candidate instead.
-- Do NOT remove a candidate solely due to sparse issue data.
-
-CRITICAL — SOURCE-VERIFICATION RULE: A source must confirm the SPECIFIC DETAIL
-being questioned (exact dates, amounts, names) — not just the general topic.
-If the source only confirms the general fact but not the specific detail, that
-detail should be corrected or removed.
+SPECIAL CASES (see system prompt for full rules):
+- CAREER HISTORY flags: search for the specific organization + candidate + dates.
+  If wrong dates/title: use update_career_entry to patch only the incorrect fields.
+  If wholly fabricated (no source found): use remove_career_entry to delete it.
+- DONOR SUMMARY flags about wrong organization names: use fetch_page on the
+  cited OpenSecrets/FEC URL and read the actual top-donor names from the page.
+- CANDIDATE VALIDITY / ROSTER flags: verify against official election authority
+  pages, Ballotpedia race roster, and multiple credible recent reports.
+  Use remove_candidate only if the person is clearly NOT in this race with a
+  specific source-backed reason. Use rename_candidate for naming corrections.
+  Do NOT remove a candidate solely due to sparse issue data.
 
 Also ensure:
 - All canonical issues covered: {all_issues}
@@ -759,19 +781,34 @@ Known issue/policy URLs: {candidate_issue_urls}
 {handoff_context}
 
 Research this candidate's position on "{issue}". Look for:
-- Official campaign positions or policy pages
-- Voting record on relevant legislation
-- Public statements, interviews, debate answers
+- Official campaign positions or policy pages (most authoritative)
+- Voting record on relevant legislation (GovTrack, VoteSmart, Congress.gov)
+- Public statements, interviews, debate answers with direct quotes where possible
 - Endorsements or scorecards from issue-focused organizations
 
-Source prioritization:
-- Start with official campaign pages when available (especially issue/policy URLs above).
-- If a known issue URL appears relevant, fetch it directly before broader web searches.
-- Prefer sources that directly substantiate the stance for this issue.
+Source prioritization (highest to lowest):
+1. Official campaign policy page (fetch directly if URL known above)
+2. Legislative vote on a directly relevant bill (with bill name/number)
+3. Credible news quote from a named interview or debate
+4. Endorsement scorecard from a recognized issue organization
+5. Social media post or press release as last resort
+
+Before broad web searching, check if any of the known issue/policy URLs above
+are relevant to "{issue}" — if so, fetch that URL first.
+
+OBSCURE CANDIDATE RULE: If after 2-3 searches you find no web presence for
+this candidate (no campaign site, no news coverage, no Ballotpedia page),
+immediately call set_issue_stance with:
+  - stance: "No public position found"
+  - confidence: "low"
+  - sources: []
+Do not keep searching — absence of information is itself a valid finding.
 
 Then use the set_issue_stance tool to record:
-- stance: 1-2 sentence factual description of their position
-- confidence: "high" (multiple corroborating sources), "medium" (single credible source), "low" (inferred)
+- stance: 1-2 sentence description of their actual position in plain factual
+  language (NOT "The candidate has not commented" — write the position itself,
+  or "No public position found" if genuinely absent)
+- confidence: "high" (multiple corroborating sources), "medium" (single credible source), "low" (inferred or no source)
 - sources: array of source objects with url, type, title
 
 When you are done, reply briefly confirming what you found."""
@@ -803,17 +840,22 @@ Current stance:
 
 Search for NEWER information about this candidate's position on "{issue}"
 since {last_updated}. Focus on:
-- New statements, votes, or policy changes
+- New statements, votes, or policy changes published after {last_updated}
 - Better sources if current confidence is "low" or "medium"
 - Corrections if the current stance is inaccurate
 
-Source prioritization:
-- Start with official campaign pages when available (especially issue/policy URLs above).
-- If a known issue URL appears relevant, fetch it directly before broader web searches.
+Source prioritization (highest to lowest):
+1. Official campaign policy page (fetch directly if URL known above)
+2. Legislative vote on a directly relevant bill (with bill name/number)
+3. Credible news quote from a named interview or debate
+4. Endorsement scorecard from a recognized issue organization
 
-Use set_issue_stance ONLY if you find genuinely new or better data.
-If the existing stance is already accurate and well-sourced, reply with
-a short confirmation (no tool call needed)."""
+Before broad web searching, check if any of the known issue/policy URLs above
+are relevant to "{issue}" — if so, fetch that URL first.
+
+Use set_issue_stance ONLY if you find genuinely new or better data than the
+current stance. If the existing stance is already accurate and well-sourced,
+reply with a short confirmation and make no tool call."""
 
 
 # ------------------------------------------------------------------

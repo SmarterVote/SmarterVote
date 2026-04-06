@@ -393,8 +393,30 @@
       const result = await apiService.clearPendingQueue();
       addLog("info", `Cleared ${result.removed} pending item${result.removed !== 1 ? "s" : ""} from the queue`);
       await refreshQueue();
+      racesTabRef?.refresh();
     } catch (e) {
       addLog("error", `Failed to clear queue: ${e}`);
+    }
+  }
+
+  async function handleDeleteItem(event: CustomEvent<{ itemId?: string; runId?: string }>) {
+    try {
+      if (event.detail.itemId) {
+        await apiService.removeQueueItem(event.detail.itemId);
+      } else if (event.detail.runId) {
+        // For active/running runs, try to cancel via the queue item first
+        const queueMatch = queueItems.find((q) => q.run_id === event.detail.runId);
+        if (queueMatch) {
+          await apiService.removeQueueItem(queueMatch.id);
+        } else {
+          await apiService.deleteRun(event.detail.runId!);
+        }
+      }
+      await refreshQueue();
+      racesTabRef?.refresh();
+      debouncedRefresh();
+    } catch (e) {
+      addLog("error", `Failed to delete item: ${e}`);
     }
   }
 
@@ -548,7 +570,8 @@
         liveProgressMessage={pipeline.progressMessage}
         liveElapsed={pipeline.elapsedTime}
         on:back={() => closeRunDetail()}
-        on:deleted={() => { closeRunDetail(); racesTabRef?.refresh(); }}
+        on:deleted={() => { closeRunDetail(); racesTabRef?.refresh(); debouncedRefresh(); refreshQueue(); }}
+        on:cancelled={() => { closeRunDetail(); refreshQueue(); debouncedRefresh(); racesTabRef?.refresh(); }}
       />
     {:else}
       <RacesTab
@@ -584,7 +607,8 @@
         liveProgressMessage={pipeline.progressMessage}
         liveElapsed={pipeline.elapsedTime}
         on:back={() => closeRunDetail()}
-        on:deleted={() => { closeRunDetail(); }}
+        on:deleted={() => { closeRunDetail(); debouncedRefresh(); refreshQueue(); }}
+        on:cancelled={() => { closeRunDetail(); refreshQueue(); debouncedRefresh(); }}
       />
     {:else}
       <RunsTab
@@ -595,6 +619,7 @@
         on:view-run={handleRunsTabViewRun}
         on:refresh={debouncedRefresh}
         on:clear-queue={handleClearQueue}
+        on:delete-item={handleDeleteItem}
       />
     {/if}
   {/if}

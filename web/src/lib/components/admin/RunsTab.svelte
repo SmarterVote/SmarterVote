@@ -16,6 +16,7 @@
     "view-run": { runId: string; raceId: string | null };
     refresh: void;
     "clear-queue": void;
+    "delete-item": { itemId?: string; runId?: string };
   }>();
 
   let clearingQueue = false;
@@ -28,6 +29,11 @@
 
   function handleViewRun(runId: string, raceId: string | null = null) {
     dispatch("view-run", { runId, raceId });
+  }
+
+  function handleDeleteItem(id: string, type: "queue" | "run") {
+    if (type === "queue") dispatch("delete-item", { itemId: id });
+    else dispatch("delete-item", { runId: id });
   }
 
   function timeAgo(iso: string): string {
@@ -133,30 +139,42 @@
       </h3>
       <div class="card p-0 divide-y divide-stroke">
         {#each activeRuns as run}
-          <button
-            type="button"
-            class="w-full text-left px-4 py-3 hover:bg-surface-alt transition-colors {currentRunId === run.run_id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}"
-            on:click={() => handleViewRun(run.run_id, payloadRaceId(run))}
-          >
-            <div class="flex items-center gap-3">
-              {#if run.status === "running"}
-                <svg class="animate-spin h-4 w-4 text-blue-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          <div class="flex items-stretch hover:bg-surface-alt transition-colors {currentRunId === run.run_id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}">
+            <button
+              type="button"
+              class="flex-1 text-left px-4 py-3"
+              on:click={() => handleViewRun(run.run_id, payloadRaceId(run))}
+            >
+              <div class="flex items-center gap-3">
+                {#if run.status === "running"}
+                  <svg class="animate-spin h-4 w-4 text-blue-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                {/if}
+                <span class="font-mono text-sm font-medium text-content flex-1 truncate">{raceId(run)}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full border {getStatusClass(run.status)}">{run.status}</span>
+                <svg class="h-4 w-4 text-content-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
-              {/if}
-              <span class="font-mono text-sm font-medium text-content flex-1 truncate">{raceId(run)}</span>
-              <span class="text-xs px-2 py-0.5 rounded-full border {getStatusClass(run.status)}">{run.status}</span>
-              <svg class="h-4 w-4 text-content-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </div>
+              <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
+                <span>{timeAgo(run.started_at)}</span>
+                {#if run.last_step}<span>· {run.last_step}</span>{/if}
+                <span>· {modelLabel(run)}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              title="Cancel run"
+              on:click|stopPropagation={() => handleDeleteItem(run.run_id, 'run')}
+              class="px-3 text-content-faint hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
-            </div>
-            <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
-              <span>{timeAgo(run.started_at)}</span>
-              {#if run.last_step}<span>· {run.last_step}</span>{/if}
-              <span>· {modelLabel(run)}</span>
-            </div>
-          </button>
+            </button>
+          </div>
         {/each}
       </div>
     </section>
@@ -170,13 +188,23 @@
       </h3>
       <div class="card p-0 divide-y divide-stroke">
         {#each pendingQueue as item}
-          <div class="px-4 py-3 flex items-center gap-3">
+          <div class="px-4 py-3 flex items-center gap-3 hover:bg-surface-alt transition-colors">
             <svg class="h-4 w-4 text-content-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span class="font-mono text-sm font-medium text-content flex-1 truncate">{item.race_id}</span>
             <span class="text-xs px-2 py-0.5 rounded-full border {getStatusClass('pending')}">pending</span>
             <span class="text-xs text-content-faint">{timeAgo(item.created_at)}</span>
+            <button
+              type="button"
+              title="Remove from queue"
+              on:click={() => handleDeleteItem(item.id, 'queue')}
+              class="ml-1 p-1 text-content-faint hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors shrink-0"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         {/each}
       </div>
@@ -195,24 +223,36 @@
     {:else}
       <div class="card p-0 divide-y divide-stroke">
         {#each historicalRuns as run}
-          <button
-            type="button"
-            class="w-full text-left px-4 py-3 hover:bg-surface-alt transition-colors"
-            on:click={() => handleViewRun(run.run_id, payloadRaceId(run))}
-          >
-            <div class="flex items-center gap-3">
-              <span class="font-mono text-sm font-medium text-content flex-1 truncate">{raceId(run)}</span>
-              <span class="text-xs px-2 py-0.5 rounded-full border {getStatusClass(run.status)}">{run.status}</span>
-              <svg class="h-4 w-4 text-content-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          <div class="flex items-stretch hover:bg-surface-alt transition-colors">
+            <button
+              type="button"
+              class="flex-1 text-left px-4 py-3"
+              on:click={() => handleViewRun(run.run_id, payloadRaceId(run))}
+            >
+              <div class="flex items-center gap-3">
+                <span class="font-mono text-sm font-medium text-content flex-1 truncate">{raceId(run)}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full border {getStatusClass(run.status)}">{run.status}</span>
+                <svg class="h-4 w-4 text-content-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+              <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
+                <span>{timeAgo(run.started_at)}</span>
+                {#if run.duration_ms}<span>· {formatMs(run.duration_ms)}</span>{/if}
+                <span>· {modelLabel(run)}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              title="Delete run"
+              on:click|stopPropagation={() => handleDeleteItem(run.run_id, 'run')}
+              class="px-3 text-content-faint hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+            >
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
-            </div>
-            <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
-              <span>{timeAgo(run.started_at)}</span>
-              {#if run.duration_ms}<span>· {formatMs(run.duration_ms)}</span>{/if}
-              <span>· {modelLabel(run)}</span>
-            </div>
-          </button>
+            </button>
+          </div>
         {/each}
       </div>
     {/if}

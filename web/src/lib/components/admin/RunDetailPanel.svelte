@@ -12,7 +12,7 @@
   export let liveProgressMessage = "";
   export let liveElapsed = 0;
 
-  const dispatch = createEventDispatcher<{ back: void; deleted: string }>();
+  const dispatch = createEventDispatcher<{ back: void; deleted: string; cancelled: string }>();
   const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
   const apiService = new PipelineApiService(API_BASE);
 
@@ -30,6 +30,7 @@
   let logFilter: LogLevel = "all";
   let copiedRunId = false;
   let deleting = false;
+  let cancelling = false;
   let logsContainer: HTMLDivElement;
   let autoScrollLogs = true;
 
@@ -244,6 +245,21 @@
     } catch {}
   }
 
+  async function handleCancel() {
+    if (!run) return;
+    if (!confirm(`Cancel run for ${raceId}? The run will be marked as cancelled.`)) return;
+    cancelling = true;
+    try {
+      await apiService.cancelRace(raceId);
+      dispatch("cancelled", runId);
+      dispatch("back");
+    } catch (e) {
+      error = `Cancel failed: ${e}`;
+    } finally {
+      cancelling = false;
+    }
+  }
+
   async function handleDelete() {
     if (!run) return;
     const confirmMsg = isRunning
@@ -341,6 +357,28 @@
     </div>
     <!-- Action buttons -->
     <div class="flex items-center gap-2 shrink-0">
+      {#if run && isRunning}
+        <button
+          type="button"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 disabled:opacity-40 transition-colors"
+          on:click={handleCancel}
+          disabled={cancelling || deleting}
+          title="Stop this run (keeps the record)"
+        >
+          {#if cancelling}
+            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          {:else}
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+            </svg>
+          {/if}
+          {cancelling ? "Cancelling…" : "Cancel Run"}
+        </button>
+      {/if}
       {#if run}
         <button
           type="button"
