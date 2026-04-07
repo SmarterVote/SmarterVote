@@ -416,6 +416,20 @@
       racesTabRef?.refresh();
       debouncedRefresh();
     } catch (e) {
+      // Retry with force for stuck/broken items
+      try {
+        const itemId = event.detail.itemId ?? queueItems.find((q) => q.run_id === event.detail.runId)?.id;
+        if (itemId) {
+          await apiService.removeQueueItem(itemId, true);
+          await refreshQueue();
+          racesTabRef?.refresh();
+          debouncedRefresh();
+          addLog("warning", "Force-removed stuck queue item");
+          return;
+        }
+      } catch (_retryErr) {
+        // fall through to original error
+      }
       addLog("error", `Failed to delete item: ${e}`);
     }
   }

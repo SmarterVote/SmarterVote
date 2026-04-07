@@ -310,14 +310,11 @@ export class PipelineApiService {
   }
 
   /**
-   * Remove or cancel a queue item
+   * Remove or cancel a queue item. If force=true, skip graceful cancel and force-remove.
    */
-  async removeQueueItem(itemId: string): Promise<void> {
-    const res = await fetchWithAuth(
-      `${this.apiBase}/queue/${encodeURIComponent(itemId)}`,
-      { method: "DELETE" },
-      10000
-    );
+  async removeQueueItem(itemId: string, force = false): Promise<void> {
+    const url = `${this.apiBase}/queue/${encodeURIComponent(itemId)}${force ? "?force=true" : ""}`;
+    const res = await fetchWithAuth(url, { method: "DELETE" }, 10000);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
 
@@ -570,6 +567,18 @@ export class PipelineApiService {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
+  }
+
+  /**
+   * Restore a retired version as the active draft
+   */
+  async restoreVersionAsDraft(raceId: string, filename: string): Promise<void> {
+    const res = await fetchWithAuth(
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/versions/${encodeURIComponent(filename)}/restore`,
+      { method: "POST" },
+      15000
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
 
 }

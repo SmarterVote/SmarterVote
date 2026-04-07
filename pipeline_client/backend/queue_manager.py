@@ -216,6 +216,28 @@ class QueueManager:
                 return True
         return False
 
+    def force_remove(self, item_id: str) -> Optional[QueueItem]:
+        """Force-remove a queue item regardless of its status. Returns the removed item or None."""
+        for i, item in enumerate(self._items):
+            if item.id == item_id:
+                removed = self._items.pop(i)
+                # Cancel the associated run if it was active
+                if removed.status == "running" and removed.run_id:
+                    try:
+                        from .run_manager import run_manager
+                        run_manager.cancel_run(removed.run_id)
+                    except Exception:
+                        logging.getLogger(__name__).exception(f"Failed to cancel run {removed.run_id} during force-remove")
+                if self._use_firestore:
+                    try:
+                        self._delete_item_firestore(item_id)
+                    except Exception:
+                        logging.getLogger(__name__).exception(f"Failed to delete queue item {item_id} from Firestore")
+                else:
+                    self._save_to_json()
+                return removed
+        return None
+
     def cancel(self, item_id: str) -> bool:
         """Cancel a pending or running item.
 
@@ -265,9 +287,10 @@ class QueueManager:
 
         return before - len(self._items)
 
-    def clear_pending(self) -> int:
-        """Remove all pending (not yet started) items from the queue. Returns count removed."""
-        pending_ids = [i.id for i in self._items if i.status == "pending"]
+    def clear_pending(self) -> List[QueueItem]:
+        """Remove all pending (not yet started) items from the queue. Returns removed items."""
+        removed_items = [i for i in self._items if i.status == "pending"]
+        pending_ids = [i.id for i in removed_items]
         self._items = [i for i in self._items if i.status != "pending"]
         if not self._use_firestore:
             self._save_to_json()
@@ -277,7 +300,7 @@ class QueueManager:
                     self._delete_item_firestore(item_id)
             except Exception:
                 logging.getLogger(__name__).exception("Failed to delete pending items from Firestore")
-        return len(pending_ids)
+        return removed_items
 
     def get_all(self) -> List[QueueItem]:
         return list(self._items)

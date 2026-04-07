@@ -213,6 +213,7 @@
   let deletingDraft = false;
   let deletingRace = false;
   let deletingRunId: string | null = null;
+  let restoringVersion: string | null = null;
 
   async function handleDeleteDraft() {
     if (!confirm(`Delete the draft for "${race.race_id}"? The published version will not be affected.`)) return;
@@ -225,6 +226,21 @@
       error = `Delete draft failed: ${e}`;
     } finally {
       deletingDraft = false;
+    }
+  }
+
+  async function handleRestoreVersion(filename: string) {
+    if (!confirm(`Restore this retired version as the active draft? The current draft (if any) will be retired.`)) return;
+    restoringVersion = filename;
+    error = "";
+    try {
+      await apiService.restoreVersionAsDraft(race.race_id, filename);
+      await loadVersions();
+      dispatch("updated");
+    } catch (e) {
+      error = `Restore version failed: ${e}`;
+    } finally {
+      restoringVersion = null;
     }
   }
 
@@ -493,11 +509,12 @@
                     <p class="text-xs text-content-faint">{formatDate(race.draft_updated_at)}</p>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button
-                      type="button"
+                    <a
+                      href="/races/{race.race_id}?draft=true"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                      on:click={handleExportDraft}
-                    >Export draft →</button>
+                    >View draft →</a>
                     <button
                       type="button"
                       class="text-xs text-red-500 dark:text-red-400 hover:underline font-medium disabled:opacity-40"
@@ -532,11 +549,19 @@
                           <span class="text-xs font-medium text-content-muted capitalize">{ver.source}</span>
                           <p class="text-xs text-content-faint">{ver.archived_at ? formatDate(ver.archived_at) : ver.filename}</p>
                         </div>
-                        <button
-                          type="button"
-                          class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
-                          on:click={() => handleExportVersion(ver.filename)}
-                        >Export →</button>
+                        <div class="flex items-center gap-2">
+                          <button
+                            type="button"
+                            class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0 disabled:opacity-40"
+                            disabled={restoringVersion === ver.filename}
+                            on:click={() => handleRestoreVersion(ver.filename)}
+                          >{restoringVersion === ver.filename ? "Restoring…" : "Restore as draft"}</button>
+                          <button
+                            type="button"
+                            class="text-xs text-content-muted hover:underline font-medium shrink-0"
+                            on:click={() => handleExportVersion(ver.filename)}
+                          >Export</button>
+                        </div>
                       </div>
                     {/each}
                   </div>

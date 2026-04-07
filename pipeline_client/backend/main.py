@@ -391,6 +391,7 @@ async def delete_published_race(race_id: str) -> Dict[str, Any]:
         deleted = True
     if not deleted:
         raise HTTPException(status_code=404, detail="Race not found")
+    race_manager.unpublish_race(race_id)
     return {"message": f"Race {race_id} deleted", "id": race_id}
 
 
@@ -873,6 +874,72 @@ async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
     raise HTTPException(status_code=404, detail="Version not found")
 
 
+@app.post("/api/races/{race_id}/versions/{filename}/restore", dependencies=[Depends(verify_token)])
+async def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any]:
+    """Restore a retired version as the active draft, retiring the current draft if one exists."""
+    _validate_race_id(race_id)
+    if "/" in filename or "\\" in filename or not filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Invalid version filename")
+
+    # Load the retired version data
+    version_data = None
+    local_path = ROOT / "data" / "retired" / race_id / filename
+    if local_path.exists():
+        with local_path.open("r", encoding="utf-8") as f:
+            version_data = json.load(f)
+    else:
+        gcs_bucket = settings.gcs_bucket
+        if gcs_bucket:
+            try:
+                from google.cloud import storage as gcs  # type: ignore
+
+                client = gcs.Client()
+                bucket = client.bucket(gcs_bucket)
+                blob = bucket.blob(f"retired/{race_id}/{filename}")
+                if blob.exists():
+                    version_data = json.loads(blob.download_as_text(encoding="utf-8"))
+            except ImportError:
+                pass
+            except Exception as exc:
+                logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+
+    if version_data is None:
+        raise HTTPException(status_code=404, detail="Retired version not found")
+
+    # Retire the current draft if one exists
+    drafts_dir = ROOT / "data" / "drafts"
+    existing_draft = drafts_dir / f"{race_id}.json"
+    if existing_draft.exists():
+        _archive_race_local(existing_draft, race_id, "draft")
+    _archive_race_gcs(race_id, "drafts", "draft")
+
+    # Write the restored version as the new draft
+    drafts_dir.mkdir(parents=True, exist_ok=True)
+    draft_path = drafts_dir / f"{race_id}.json"
+    with draft_path.open("w", encoding="utf-8") as f:
+        json.dump(version_data, f, indent=2)
+
+    # Upload to GCS if configured
+    gcs_bucket = settings.gcs_bucket
+    if gcs_bucket:
+        try:
+            from google.cloud import storage as gcs  # type: ignore
+
+            client = gcs.Client()
+            bucket = client.bucket(gcs_bucket)
+            blob = bucket.blob(f"drafts/{race_id}.json")
+            blob.upload_from_string(json.dumps(version_data, indent=2), content_type="application/json")
+        except ImportError:
+            pass
+        except Exception as exc:
+            logging.warning("Failed to upload restored draft to GCS for %s: %s", race_id, exc)
+
+    # Update race metadata
+    race_manager.update_race_metadata(race_id, version_data, active_draft=True)
+
+    return {"message": f"Retired version restored as draft for {race_id}", "id": race_id, "restored_from": filename}
+
+
 @app.get("/api/races/{race_id}/data", dependencies=[Depends(verify_token)])
 async def get_race_data(race_id: str, draft: bool = False) -> Dict[str, Any]:
     """Get full race JSON content (published or draft). For export/download."""
@@ -978,18 +1045,36 @@ async def clear_finished_queue() -> Dict[str, Any]:
 @app.delete("/queue/pending", dependencies=[Depends(verify_token)])
 async def clear_pending_queue() -> Dict[str, Any]:
     """Remove all pending (not yet started) items from the queue."""
-    removed = queue_manager.clear_pending()
-    return {"removed": removed}
+    removed_items = queue_manager.clear_pending()
+    # Dequeue associated races so they don't stay stuck in "queued" status
+    for item in removed_items:
+        try:
+            race_manager.dequeue_race(item.race_id)
+        except Exception:
+            logging.exception("Failed to dequeue race %s after clearing pending queue", item.race_id)
+    return {"removed": len(removed_items)}
 
 
 @app.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
-async def remove_queue_item(item_id: str) -> Dict[str, Any]:
-    """Remove or cancel a queue item."""
-    if queue_manager.remove(item_id):
-        return {"ok": True, "action": "removed"}
-    if queue_manager.cancel(item_id):
-        return {"ok": True, "action": "cancelled"}
-    raise HTTPException(status_code=404, detail="Queue item not found or cannot be removed")
+async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
+    """Remove or cancel a queue item. Use force=true for stuck/broken items."""
+    if not force:
+        if queue_manager.remove(item_id):
+            return {"ok": True, "action": "removed"}
+        if queue_manager.cancel(item_id):
+            return {"ok": True, "action": "cancelled"}
+    # Force-remove as fallback for broken/stuck items
+    removed = queue_manager.force_remove(item_id)
+    if removed:
+        # Reconcile race status so it doesn't stay stuck
+        try:
+            race = race_manager.get_race(removed.race_id)
+            if race and race.status in ("queued", "running"):
+                race_manager.cancel_race(removed.race_id)
+        except Exception:
+            logging.exception("Failed to reconcile race %s after force-remove", removed.race_id)
+        return {"ok": True, "action": "force_removed"}
+    raise HTTPException(status_code=404, detail="Queue item not found")
 
 
 # ---------------------------------------------------------------------------
@@ -1104,6 +1189,10 @@ async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
         return {"message": "Run cancelled", "run_id": run_id}
     else:
         deleted = run_manager.delete_run(run_id)
+        # Also clean up from race_manager subcollection
+        race_id_from_payload = run_info.payload.get("race_id")
+        if race_id_from_payload:
+            race_manager.delete_run(race_id_from_payload, run_id)
         if not deleted:
             raise HTTPException(status_code=500, detail="Failed to delete run")
         return {"message": "Run deleted", "run_id": run_id}
