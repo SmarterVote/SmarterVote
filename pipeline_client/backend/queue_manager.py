@@ -160,21 +160,12 @@ class QueueManager:
             self._items = []
 
     def _save(self):
-        """Save queue state to Firestore or JSON file."""
-        if self._use_firestore:
-            self._save_to_firestore()
-        else:
-            self._save_to_json()
+        """Save full queue state to JSON file (local mode only).
 
-    def _save_to_firestore(self):
-        """Persist queue items to Firestore."""
-        try:
-            collection = self._get_collection()
-            # Write all items
-            for item in self._items:
-                collection.document(item.id).set(item.model_dump(mode="json"))
-        except Exception:
-            logger.exception("Failed to save queue to Firestore; data may be lost on restart")
+        Firestore mode uses per-item writes (_persist_item_firestore /
+        _delete_item_firestore) so this is only needed for the local JSON path.
+        """
+        self._save_to_json()
 
     def _save_to_json(self):
         """Persist queue items to local JSON file."""

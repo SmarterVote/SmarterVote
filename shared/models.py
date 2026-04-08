@@ -218,7 +218,7 @@ class PollEntry(BaseModel):
 
     pollster: str
     date: Optional[str] = None
-    sample_size: Optional[int] = None
+    sample_size: Optional[int] = Field(None, ge=0)
     matchups: List[PollMatchup] = Field(default_factory=list)
     source_url: Optional[str] = None
 

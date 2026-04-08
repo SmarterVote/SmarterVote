@@ -157,14 +157,14 @@ async def analytics_races(
     """Per-race request counts for the last *hours* hours."""
     _require_admin_key(x_admin_key)
     stats = await request.app.state.analytics.get_race_stats(hours=hours)
-    # Enrich with freshness metadata from the publish service
-    enriched = []
+    # Batch-load summaries once to avoid N+1 per-race lookups
+    summaries = publish_service.get_race_summaries()
+    summary_by_id = {s["id"]: s for s in summaries}
     for item in stats:
-        race_data = publish_service.get_race_data(item["race_id"])
-        item["updated_utc"] = race_data.get("updated_utc") if race_data else None
-        item["title"] = race_data.get("title") if race_data else None
-        enriched.append(item)
-    return {"races": enriched, "hours": hours}
+        summary = summary_by_id.get(item["race_id"])
+        item["updated_utc"] = summary.get("updated_utc") if summary else None
+        item["title"] = summary.get("title") if summary else None
+    return {"races": stats, "hours": hours}
 
 
 @app.get("/analytics/timeseries")

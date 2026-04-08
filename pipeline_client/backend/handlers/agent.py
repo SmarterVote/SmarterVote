@@ -300,9 +300,11 @@ class AgentHandler:
             return False
 
         try:
-            from google.cloud import storage  # type: ignore
+            from pipeline_client.backend.main import _get_gcs_client
 
-            client = storage.Client()
+            client = _get_gcs_client()
+            if client is None:
+                return False
             bucket = client.bucket(gcs_bucket)
             src_blob = bucket.blob(f"{src_prefix}/{race_id}.json")
             if not src_blob.exists():
@@ -319,8 +321,6 @@ class AgentHandler:
                 retired_blob.name,
             )
             return True
-        except ImportError:
-            logger.warning("google-cloud-storage not installed; skipping GCS archive")
         except Exception as e:
             logger.warning("Failed to archive %s from GCS %s/: %s", race_id, src_prefix, e)
         return False
@@ -339,15 +339,15 @@ class AgentHandler:
             return
 
         try:
-            from google.cloud import storage  # type: ignore
+            from pipeline_client.backend.main import _get_gcs_client
 
-            client = storage.Client()
+            client = _get_gcs_client()
+            if client is None:
+                return
             bucket = client.bucket(gcs_bucket)
             blob = bucket.blob(f"{prefix}/{race_id}.json")
             blob.upload_from_string(json_str, content_type="application/json")
             logger.info(f"Uploaded {race_id} to GCS: gs://{gcs_bucket}/{prefix}/{race_id}.json")
-        except ImportError:
-            logger.warning("google-cloud-storage not installed; skipping GCS upload")
         except Exception as e:
             logger.warning(f"Failed to upload {race_id} to GCS {prefix}/: {e}")
 
@@ -366,9 +366,11 @@ class AgentHandler:
             return None
 
         try:
-            from google.cloud import storage  # type: ignore
+            from pipeline_client.backend.main import _get_gcs_client
 
-            client = storage.Client()
+            client = _get_gcs_client()
+            if client is None:
+                return None
             bucket = client.bucket(gcs_bucket)
 
             # Try drafts first (latest agent output), then published
@@ -386,9 +388,6 @@ class AgentHandler:
                 logger.info(f"Loaded existing {race_id} from GCS {prefix}/ for update mode")
                 return data
 
-            return None
-        except ImportError:
-            logger.warning("google-cloud-storage not installed; cannot load existing race from GCS")
             return None
         except Exception as e:
             logger.warning(f"Failed to load existing {race_id} from GCS: {e}")

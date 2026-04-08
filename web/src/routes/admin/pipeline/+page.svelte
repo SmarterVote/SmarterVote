@@ -272,6 +272,7 @@
   }
 
   function startElapsedTimer() {
+    if (elapsedTimer) return;
     elapsedTimer = setInterval(() => {
       if (pipeline.runStartTime) {
         const elapsed = Math.floor((Date.now() - pipeline.runStartTime) / 1000);

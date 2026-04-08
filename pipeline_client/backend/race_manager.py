@@ -170,7 +170,7 @@ class RaceManager:
                         self._local_races[record.race_id] = record  # keep cache warm
                         races.append(record)
                     except Exception:
-                        pass
+                        logger.warning("Skipping corrupt Firestore race doc %s", doc.id, exc_info=True)
                 return sorted(races, key=lambda r: r.race_id)
             except Exception:
                 logger.exception("Firestore list_races failed — falling back to local cache")
@@ -361,11 +361,12 @@ class RaceManager:
             from .settings import settings
             gcs_bucket = settings.gcs_bucket
             if gcs_bucket:
-                from google.cloud import storage as _gcs  # type: ignore
-                client = _gcs.Client()
-                bucket = client.bucket(gcs_bucket)
-                has_gcs_draft = bucket.blob(f"drafts/{race_id}.json").exists()
-                has_gcs_published = bucket.blob(f"races/{race_id}.json").exists()
+                from pipeline_client.backend.main import _get_gcs_client
+                client = _get_gcs_client()
+                if client is not None:
+                    bucket = client.bucket(gcs_bucket)
+                    has_gcs_draft = bucket.blob(f"drafts/{race_id}.json").exists()
+                    has_gcs_published = bucket.blob(f"races/{race_id}.json").exists()
         except Exception:
             logger.debug("GCS check during recheck failed (non-fatal)", exc_info=True)
 
@@ -377,7 +378,7 @@ class RaceManager:
         has_any_draft = has_local_draft or has_gcs_draft
         if has_local_published or has_gcs_published:
             published_at = (race.published_at if race else None) or now
-            draft_at = (race.draft_updated_at if race else None) or (now if has_any_draft else None)
+            draft_at = ((race.draft_updated_at if race else None) or now) if has_any_draft else None
             return self.upsert_race(
                 race_id,
                 status="published",
@@ -536,7 +537,7 @@ class RaceManager:
                         self._local_runs.setdefault(race_id, {})[run.run_id] = run  # keep cache warm
                         runs.append(run)
                     except Exception:
-                        pass
+                        logger.warning("Skipping corrupt Firestore run doc %s/%s", race_id, doc.id, exc_info=True)
                 # Include any pending local writes not yet flushed to Firestore,
                 # excluding runs that have been deleted on this instance.
                 for run_id, run in self._local_runs.get(race_id, {}).items():
@@ -665,9 +666,12 @@ class RaceManager:
         now = _now_iso()
 
         try:
-            from google.cloud import storage as gcs  # type: ignore
+            from pipeline_client.backend.main import _get_gcs_client
 
-            client = gcs.Client()
+            client = _get_gcs_client()
+            if client is None:
+                logger.warning("google-cloud-storage not available; skipping GCS hydration")
+                return 0
             bucket = client.bucket(gcs_bucket)
             seen: Dict[str, Dict[str, Any]] = {}
 
@@ -724,8 +728,6 @@ class RaceManager:
                 count += 1
 
             logger.info("RaceManager: hydrated %d new race records from GCS", count)
-        except ImportError:
-            logger.warning("google-cloud-storage not installed; skipping GCS hydration")
         except Exception:
             logger.exception("GCS hydration failed")
 

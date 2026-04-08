@@ -47,6 +47,28 @@ if str(ROOT) not in sys.path:  # pragma: no cover
     sys.path.insert(0, str(ROOT))
 
 
+# ---------------------------------------------------------------------------
+# Lazy GCS client singleton — avoids re-creating HTTP sessions per call
+# ---------------------------------------------------------------------------
+
+_gcs_client = None
+
+
+def _get_gcs_client():
+    """Return a lazily-initialised GCS client, or None if the library is missing."""
+    global _gcs_client
+    if _gcs_client is not None:
+        return _gcs_client
+    try:
+        from google.cloud import storage as gcs  # type: ignore
+
+        _gcs_client = gcs.Client()
+        return _gcs_client
+    except ImportError:
+        logging.warning("google-cloud-storage not installed")
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -169,13 +191,13 @@ def _list_races_gcs(gcs_prefix: str) -> List[Dict[str, Any]] | None:
     gcs_bucket = settings.gcs_bucket
     if not gcs_bucket or not settings.is_cloud_run:
         return None
+    client = _get_gcs_client()
+    if client is None:
+        return None
     try:
-        from google.cloud import storage as gcs  # type: ignore
-
-        client = gcs.Client()
         bucket = client.bucket(gcs_bucket)
         races = []
-        for blob in bucket.list_blobs(prefix=f"{gcs_prefix}/"):
+        for blob in bucket.list_blobs(prefix=f"{gcs_prefix}/", timeout=30):
             if not blob.name.endswith(".json"):
                 continue
             try:
@@ -185,8 +207,6 @@ def _list_races_gcs(gcs_prefix: str) -> List[Dict[str, Any]] | None:
             except Exception:
                 logging.exception("Failed to read blob %s from GCS", blob.name)
         return sorted(races, key=lambda r: r.get("id", ""))
-    except ImportError:
-        logging.warning("google-cloud-storage not installed; falling back to local filesystem")
     except Exception:
         logging.exception("Failed to list %s from GCS; falling back to local filesystem", gcs_prefix)
     return None
@@ -211,15 +231,13 @@ def _get_race_gcs(race_id: str, gcs_prefix: str) -> Dict[str, Any] | None:
     gcs_bucket = settings.gcs_bucket
     if not gcs_bucket:
         return None
+    client = _get_gcs_client()
+    if client is None:
+        return None
     try:
-        from google.cloud import storage as gcs  # type: ignore
-
-        client = gcs.Client()
         blob = client.bucket(gcs_bucket).blob(f"{gcs_prefix}/{race_id}.json")
         if blob.exists():
             return json.loads(blob.download_as_text())
-    except ImportError:
-        logging.warning("google-cloud-storage not installed; cannot read from GCS")
     except Exception:
         logging.exception("Failed to fetch %s/%s from GCS", gcs_prefix, race_id)
     return None
@@ -230,17 +248,15 @@ def _delete_race_gcs(race_id: str, gcs_prefix: str) -> bool:
     gcs_bucket = settings.gcs_bucket
     if not gcs_bucket:
         return False
+    client = _get_gcs_client()
+    if client is None:
+        return False
     try:
-        from google.cloud import storage as gcs  # type: ignore
-
-        client = gcs.Client()
         blob = client.bucket(gcs_bucket).blob(f"{gcs_prefix}/{race_id}.json")
         if blob.exists():
             blob.delete()
             logging.info("Deleted %s from GCS: gs://%s/%s/%s.json", race_id, gcs_bucket, gcs_prefix, race_id)
             return True
-    except ImportError:
-        logging.warning("google-cloud-storage not installed; skipping GCS delete")
     except Exception as e:
         logging.warning("Failed to delete %s from GCS %s/: %s", race_id, gcs_prefix, e)
     return False
@@ -251,10 +267,10 @@ def _copy_race_gcs(race_id: str, src_prefix: str, dst_prefix: str) -> bool:
     gcs_bucket = settings.gcs_bucket
     if not gcs_bucket:
         return False
+    client = _get_gcs_client()
+    if client is None:
+        return False
     try:
-        from google.cloud import storage as gcs  # type: ignore
-
-        client = gcs.Client()
         bucket = client.bucket(gcs_bucket)
         src_blob = bucket.blob(f"{src_prefix}/{race_id}.json")
         if not src_blob.exists():
@@ -262,8 +278,6 @@ def _copy_race_gcs(race_id: str, src_prefix: str, dst_prefix: str) -> bool:
         bucket.copy_blob(src_blob, bucket, f"{dst_prefix}/{race_id}.json")
         logging.info("Copied %s from %s/ to %s/ in GCS", race_id, src_prefix, dst_prefix)
         return True
-    except ImportError:
-        logging.warning("google-cloud-storage not installed; skipping GCS copy")
     except Exception as e:
         logging.warning("Failed to copy %s from %s/ to %s/ in GCS: %s", race_id, src_prefix, dst_prefix, e)
     return False
@@ -291,10 +305,10 @@ def _archive_race_gcs(race_id: str, src_prefix: str, source: str) -> bool:
     gcs_bucket = settings.gcs_bucket
     if not gcs_bucket:
         return False
+    client = _get_gcs_client()
+    if client is None:
+        return False
     try:
-        from google.cloud import storage as gcs  # type: ignore
-
-        client = gcs.Client()
         bucket = client.bucket(gcs_bucket)
         src_blob = bucket.blob(f"{src_prefix}/{race_id}.json")
         if not src_blob.exists():
@@ -305,8 +319,6 @@ def _archive_race_gcs(race_id: str, src_prefix: str, source: str) -> bool:
         src_blob.delete()
         logging.info("Archived %s from GCS %s/ to gs://%s/%s", race_id, src_prefix, gcs_bucket, retired_name)
         return True
-    except ImportError:
-        logging.warning("google-cloud-storage not installed; skipping GCS archive")
     except Exception as e:
         logging.warning("Failed to archive %s from GCS %s/: %s", race_id, src_prefix, e)
     return False
@@ -326,18 +338,17 @@ def _publish_race_data(race_id: str, draft_data: Dict[str, Any], draft_path: Pat
 
     gcs_bucket = settings.gcs_bucket
     if gcs_bucket:
-        try:
-            from google.cloud import storage as gcs  # type: ignore
-
-            client = gcs.Client()
-            bucket = client.bucket(gcs_bucket)
-            existing_blob = bucket.blob(f"races/{race_id}.json")
-            if existing_blob.exists():
-                bucket.copy_blob(existing_blob, bucket, _retired_blob_name(race_id, "published"))
-            blob = bucket.blob(f"races/{race_id}.json")
-            blob.upload_from_string(json_str, content_type="application/json")
-        except Exception:
-            logging.exception("Failed to publish %s to GCS", race_id)
+        client = _get_gcs_client()
+        if client is not None:
+            try:
+                bucket = client.bucket(gcs_bucket)
+                existing_blob = bucket.blob(f"races/{race_id}.json")
+                if existing_blob.exists():
+                    bucket.copy_blob(existing_blob, bucket, _retired_blob_name(race_id, "published"))
+                blob = bucket.blob(f"races/{race_id}.json")
+                blob.upload_from_string(json_str, content_type="application/json")
+            except Exception:
+                logging.exception("Failed to publish %s to GCS", race_id)
 
     if draft_path and draft_path.exists():
         draft_path.unlink()
@@ -808,14 +819,13 @@ async def list_race_versions(race_id: str) -> Dict[str, Any]:
     # Also list GCS retired versions if bucket configured
     gcs_bucket = settings.gcs_bucket
     if gcs_bucket:
-        try:
-            from google.cloud import storage as gcs  # type: ignore
-
-            client = gcs.Client()
-            bucket = client.bucket(gcs_bucket)
-            prefix = f"retired/{race_id}/"
-            gcs_names = {v["filename"] for v in versions}
-            for blob in bucket.list_blobs(prefix=prefix):
+        client = _get_gcs_client()
+        if client is not None:
+            try:
+                bucket = client.bucket(gcs_bucket)
+                prefix = f"retired/{race_id}/"
+                gcs_names = {v["filename"] for v in versions}
+                for blob in bucket.list_blobs(prefix=prefix):
                 fname = blob.name.split("/")[-1]
                 if not fname.endswith(".json") or fname in gcs_names:
                     continue
@@ -835,10 +845,8 @@ async def list_race_versions(race_id: str) -> Dict[str, Any]:
                         "size_bytes": blob.size,
                     }
                 )
-        except ImportError:
-            pass
-        except Exception as exc:
-            logging.warning("Failed to list GCS retired versions for %s: %s", race_id, exc)
+            except Exception as exc:
+                logging.warning("Failed to list GCS retired versions for %s: %s", race_id, exc)
 
     versions.sort(key=lambda v: v.get("archived_at") or "", reverse=True)
     return {"versions": versions, "count": len(versions)}
@@ -858,19 +866,16 @@ async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
     # Try GCS
     gcs_bucket = settings.gcs_bucket
     if gcs_bucket:
-        try:
-            from google.cloud import storage as gcs  # type: ignore
-
-            client = gcs.Client()
-            bucket = client.bucket(gcs_bucket)
-            blob = bucket.blob(f"retired/{race_id}/{filename}")
-            if blob.exists():
-                data = blob.download_as_text(encoding="utf-8")
-                return json.loads(data)
-        except ImportError:
-            pass
-        except Exception as exc:
-            logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+        client = _get_gcs_client()
+        if client is not None:
+            try:
+                bucket = client.bucket(gcs_bucket)
+                blob = bucket.blob(f"retired/{race_id}/{filename}")
+                if blob.exists():
+                    data = blob.download_as_text(encoding="utf-8")
+                    return json.loads(data)
+            except Exception as exc:
+                logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
     raise HTTPException(status_code=404, detail="Version not found")
 
 
@@ -890,18 +895,15 @@ async def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any
     else:
         gcs_bucket = settings.gcs_bucket
         if gcs_bucket:
-            try:
-                from google.cloud import storage as gcs  # type: ignore
-
-                client = gcs.Client()
-                bucket = client.bucket(gcs_bucket)
-                blob = bucket.blob(f"retired/{race_id}/{filename}")
-                if blob.exists():
-                    version_data = json.loads(blob.download_as_text(encoding="utf-8"))
-            except ImportError:
-                pass
-            except Exception as exc:
-                logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+            client = _get_gcs_client()
+            if client is not None:
+                try:
+                    bucket = client.bucket(gcs_bucket)
+                    blob = bucket.blob(f"retired/{race_id}/{filename}")
+                    if blob.exists():
+                        version_data = json.loads(blob.download_as_text(encoding="utf-8"))
+                except Exception as exc:
+                    logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
 
     if version_data is None:
         raise HTTPException(status_code=404, detail="Retired version not found")
@@ -922,17 +924,14 @@ async def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any
     # Upload to GCS if configured
     gcs_bucket = settings.gcs_bucket
     if gcs_bucket:
-        try:
-            from google.cloud import storage as gcs  # type: ignore
-
-            client = gcs.Client()
-            bucket = client.bucket(gcs_bucket)
-            blob = bucket.blob(f"drafts/{race_id}.json")
-            blob.upload_from_string(json.dumps(version_data, indent=2), content_type="application/json")
-        except ImportError:
-            pass
-        except Exception as exc:
-            logging.warning("Failed to upload restored draft to GCS for %s: %s", race_id, exc)
+        client = _get_gcs_client()
+        if client is not None:
+            try:
+                bucket = client.bucket(gcs_bucket)
+                blob = bucket.blob(f"drafts/{race_id}.json")
+                blob.upload_from_string(json.dumps(version_data, indent=2), content_type="application/json")
+            except Exception as exc:
+                logging.warning("Failed to upload restored draft to GCS for %s: %s", race_id, exc)
 
     # Update race metadata
     race_manager.update_race_metadata(race_id, version_data, active_draft=True)

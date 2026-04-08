@@ -192,6 +192,9 @@ _serper_clients_by_loop: Dict[int, httpx.AsyncClient] = {}
 def _get_fetch_client() -> httpx.AsyncClient:
     """Return a per-event-loop AsyncClient for page fetches."""
     loop_id = id(asyncio.get_running_loop())
+    # Prune entries for closed clients / defunct event loops
+    for k in [k for k, v in _fetch_clients_by_loop.items() if v.is_closed]:
+        del _fetch_clients_by_loop[k]
     client = _fetch_clients_by_loop.get(loop_id)
     if client is None or client.is_closed:
         client = httpx.AsyncClient(
@@ -206,6 +209,9 @@ def _get_fetch_client() -> httpx.AsyncClient:
 def _get_serper_client() -> httpx.AsyncClient:
     """Return a per-event-loop AsyncClient for Serper API calls."""
     loop_id = id(asyncio.get_running_loop())
+    # Prune entries for closed clients / defunct event loops
+    for k in [k for k, v in _serper_clients_by_loop.items() if v.is_closed]:
+        del _serper_clients_by_loop[k]
     client = _serper_clients_by_loop.get(loop_id)
     if client is None or client.is_closed:
         client = httpx.AsyncClient(timeout=15)
