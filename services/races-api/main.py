@@ -7,6 +7,8 @@ individual race data stored as JSON files.
 
 import logging
 import os
+import re
+import secrets
 from contextlib import asynccontextmanager
 from typing import List
 
@@ -16,7 +18,7 @@ import schemas
 from analytics_middleware import AnalyticsMiddleware
 from analytics_store import AnalyticsStore
 from config import DATA_DIR
-from fastapi import FastAPI, Header, HTTPException, Query, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from simple_publish_service import SimplePublishService
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -30,12 +32,19 @@ publish_service = SimplePublishService(data_directory=DATA_DIR)
 limiter = Limiter(key_func=get_remote_address)
 
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+_RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
 
 
 def _require_admin_key(x_admin_key: str = Header(default="")) -> None:
     """Dependency: reject requests missing a valid X-Admin-Key header."""
-    if _ADMIN_API_KEY and x_admin_key != _ADMIN_API_KEY:
+    if _ADMIN_API_KEY and not secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key")
+
+
+def _validate_race_id(race_id: str) -> None:
+    """Reject race IDs that don't match the canonical format."""
+    if not _RACE_ID_RE.match(race_id):
+        raise HTTPException(status_code=400, detail="Invalid race_id format")
 
 
 @asynccontextmanager
@@ -57,32 +66,54 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "HEAD"],
     allow_headers=["*", "X-Admin-Key"],
 )
 
 
+# ---------------------------------------------------------------------------
+# Health endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health", include_in_schema=False)
+def health():
+    """Liveness probe — always returns OK if the process is up."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", include_in_schema=False)
+def readiness():
+    """Readiness probe — checks that the publish service can serve data."""
+    races = publish_service.get_published_races()
+    return {"ready": True, "race_count": len(races)}
+
+
 @app.get("/races", response_model=List[str])
 @limiter.limit("60/minute")
-def list_races(request: Request) -> List[str]:
+def list_races(request: Request, response: Response) -> List[str]:
     """List available race IDs."""
+    response.headers["Cache-Control"] = "public, max-age=300"
     return publish_service.get_published_races()
 
 
 @app.get("/races/summaries", response_model=List[schemas.RaceSummary])
 @limiter.limit("30/minute")
-def get_race_summaries(request: Request) -> List[schemas.RaceSummary]:
+def get_race_summaries(request: Request, response: Response) -> List[schemas.RaceSummary]:
     """Get summaries of all races for search and listing."""
+    response.headers["Cache-Control"] = "public, max-age=300"
     return publish_service.get_race_summaries()
 
 
 @app.get("/races/{race_id}")
 @limiter.limit("60/minute")
-def get_race(request: Request, race_id: str):
+def get_race(request: Request, response: Response, race_id: str):
     """Retrieve race data by ID."""
+    _validate_race_id(race_id)
     race_data = publish_service.get_race_data(race_id)
     if not race_data:
         raise HTTPException(status_code=404, detail="Race not found")
+    response.headers["Cache-Control"] = "public, max-age=300"
     return race_data
 
 

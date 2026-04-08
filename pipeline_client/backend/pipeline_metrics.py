@@ -13,7 +13,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pipeline")
 
 
 class PipelineMetricsStore:
@@ -148,7 +148,7 @@ class PipelineMetricsStore:
         if self._client is not None:
             await self._write_firestore(run_id, record)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._write_sqlite, record)
 
     async def _write_firestore(self, run_id: str, record: Dict[str, Any]) -> None:
@@ -199,7 +199,7 @@ class PipelineMetricsStore:
         """Return the most recent *limit* pipeline run records, newest first."""
         if self._client is not None:
             return await self._read_recent_firestore(limit)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._read_recent_sqlite, limit)
 
     async def _read_recent_firestore(self, limit: int) -> List[Dict[str, Any]]:
@@ -266,7 +266,7 @@ class PipelineMetricsStore:
         """Return aggregate stats across all recorded runs."""
         if self._client is not None:
             return await self._summary_firestore()
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._summary_sqlite)
 
     async def _summary_firestore(self) -> Dict[str, Any]:

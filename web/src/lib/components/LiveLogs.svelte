@@ -62,7 +62,7 @@
     </div>
   </div>
 
-  <div class="flex-1 overflow-auto custom-scrollbar bg-surface-alt">
+  <div class="flex-1 overflow-auto custom-scrollbar bg-surface-alt" role="log" aria-live="polite" aria-label="Pipeline execution logs">
     <div class="min-h-full">
       {#each filteredLogs as log}
         <div class="log-line {getLogClass(log.level)}">

@@ -170,3 +170,37 @@ resource "google_monitoring_alert_policy" "pipeline_error_spike" {
 
   depends_on = [google_monitoring_notification_channel.email, google_logging_metric.pipeline_errors]
 }
+
+# Alert: races-api p95 latency > 2 seconds sustained for 5 minutes
+resource "google_monitoring_alert_policy" "races_api_latency" {
+  count        = var.alert_email != "" ? 1 : 0
+  project      = var.project_id
+  display_name = "races-api High Latency (${var.environment})"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "p95 latency > 2s for 5 minutes"
+
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_revision\" AND resource.labels.service_name = \"races-api-${var.environment}\" AND metric.type = \"run.googleapis.com/request_latencies\""
+      duration        = "300s"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 2000
+
+      aggregations {
+        alignment_period     = "60s"
+        per_series_aligner   = "ALIGN_PERCENTILE_95"
+        cross_series_reducer = "REDUCE_MAX"
+        group_by_fields      = ["resource.labels.service_name"]
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email[0].id]
+
+  alert_strategy {
+    auto_close = "604800s"
+  }
+
+  depends_on = [google_monitoring_notification_channel.email]
+}

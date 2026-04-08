@@ -3,11 +3,12 @@ Core Pydantic models for SmarterVote data structures.
 RaceJSON v0.3 — Multi-phase AI Agent Design
 """
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +161,7 @@ class ValidationGrade(BaseModel):
 class Candidate(BaseModel):
     """Candidate information for RaceJSON v0.3."""
 
-    name: str
+    name: str = Field(..., min_length=1)
     party: Optional[str] = None
     incumbent: bool = False
     summary: str = ""
@@ -205,6 +206,12 @@ class PollMatchup(BaseModel):
     candidates: List[str] = Field(default_factory=list)
     percentages: List[float] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_parallel_arrays(self) -> "PollMatchup":
+        if self.candidates and self.percentages and len(self.candidates) != len(self.percentages):
+            raise ValueError("candidates and percentages must have the same length")
+        return self
+
 
 class PollEntry(BaseModel):
     """A single opinion poll for a race."""
@@ -224,8 +231,16 @@ class PollEntry(BaseModel):
 class RaceJSON(BaseModel):
     """RaceJSON v0.3 — Final output format."""
 
+    schema_version: str = Field(default="0.3", description="RaceJSON schema version")
     id: str = Field(..., description="Race slug like 'mo-senate-2024'")
     election_date: str = Field(..., description="Election date in YYYY-MM-DD or ISO format")
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, v: str) -> str:
+        if not re.match(r"^[a-z0-9][a-z0-9_-]{0,99}$", v):
+            raise ValueError("race id must match ^[a-z0-9][a-z0-9_-]{0,99}$")
+        return v
     candidates: List[Candidate]
     updated_utc: str = Field(..., description="Last updated timestamp in ISO format")
     generator: List[str] = Field(default_factory=list)
@@ -245,3 +260,6 @@ class RaceJSON(BaseModel):
     # Multi-LLM reviews
     reviews: List[AgentReview] = Field(default_factory=list)
     validation_grade: Optional[ValidationGrade] = None
+
+    # Post-run pipeline analysis (Gemini)
+    post_run_analysis: Optional[Dict[str, Any]] = None

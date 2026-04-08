@@ -137,6 +137,9 @@ resource "google_cloud_run_v2_service" "pipeline_client" {
       }
     }
 
+    # Pipeline runs can take 10-20 minutes for full research cycles
+    timeout = "1800s"
+
     scaling {
       min_instance_count = 0
       max_instance_count = 1

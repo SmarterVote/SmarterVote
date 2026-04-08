@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from fastapi import WebSocket
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pipeline")
 
 
 @dataclass
@@ -113,15 +113,16 @@ class LoggingManager:
                     asyncio.create_task(self.broadcast_log(log_entry))
 
                 main_loop.call_soon_threadsafe(schedule_broadcast)
-            else:
-                # Try to get current loop (might be main loop)
-                try:
-                    loop = asyncio.get_running_loop()
-                    if loop.is_running():
-                        asyncio.create_task(self.broadcast_log(log_entry))
-                except RuntimeError:
-                    # No loop available, logs will be sent when clients connect
-                    pass
+                return
+
+            # Fallback: try the current running loop (only if main_loop unavailable)
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    asyncio.create_task(self.broadcast_log(log_entry))
+            except RuntimeError:
+                # No loop available, logs will be sent when clients connect
+                pass
         except Exception:
             # Fail silently - logs will be available in buffer for new connections
             pass

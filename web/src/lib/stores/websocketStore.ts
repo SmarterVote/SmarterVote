@@ -1,7 +1,7 @@
 /**
  * WebSocket connection and message handling store
  */
-import { writable } from "svelte/store";
+import { get, writable } from "svelte/store";
 import { logger } from "$lib/utils/logger";
 import type { LogEntry } from "$lib/types";
 
@@ -196,12 +196,11 @@ export const websocketActions = {
   /**
    * Send message to WebSocket
    */
-  send: (message: any) => {
-    websocketStore.subscribe((state) => {
-      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify(message));
-      }
-    })();
+  send: (message: Record<string, unknown>) => {
+    const state = get(websocketStore);
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+      state.ws.send(JSON.stringify(message));
+    }
   },
 };
 

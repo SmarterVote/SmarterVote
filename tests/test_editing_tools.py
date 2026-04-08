@@ -1,0 +1,180 @@
+"""Tests for editing tool handlers, roster sync, candidate targeting, and search cache."""
+
+import tempfile
+
+from pipeline_client.agent.agent import _select_target_candidates
+
+# ---------------------------------------------------------------------------
+# Candidate targeting
+# ---------------------------------------------------------------------------
+
+
+def test_select_target_candidates_case_insensitive():
+    """Candidate targeting matches names case-insensitively and returns canonical names."""
+    selected = _select_target_candidates(
+        ["Tom Cotton", "Jeff Wadlin"],
+        ["jeff wadlin"],
+        log=lambda *_: None,
+    )
+    assert selected == ["Jeff Wadlin"]
+
+
+# ---------------------------------------------------------------------------
+# Editing tool schemas
+# ---------------------------------------------------------------------------
+
+
+def test_editing_tool_schemas_exist():
+    """All editing tool schemas are importable from agent module."""
+    from pipeline_client.agent.agent import (
+        ADD_CANDIDATE_TOOL,
+        ADD_LINK_TOOL,
+        ADD_POLL_TOOL,
+        CANDIDATE_TOOLS,
+        ISSUE_TOOLS,
+        RACE_TOOLS,
+        READ_PROFILE_TOOL,
+        RECORD_TOOLS,
+        REMOVE_CANDIDATE_TOOL,
+        RENAME_CANDIDATE_TOOL,
+        ROSTER_TOOLS,
+        SET_CANDIDATE_FIELD_TOOL,
+        SET_CANDIDATE_SUMMARY_TOOL,
+        SET_DONOR_SUMMARY_TOOL,
+        SET_ISSUE_STANCE_TOOL,
+        SET_VOTING_SUMMARY_TOOL,
+        UPDATE_RACE_FIELD_TOOL,
+    )
+
+    assert len(ROSTER_TOOLS) == 3
+    assert len(CANDIDATE_TOOLS) == 2
+    assert len(ISSUE_TOOLS) == 1
+    assert len(RECORD_TOOLS) == 3  # donor_summary, voting_summary, add_link
+    assert len(RACE_TOOLS) == 2
+    assert READ_PROFILE_TOOL["function"]["name"] == "read_profile"
+
+
+# ---------------------------------------------------------------------------
+# Editing handlers
+# ---------------------------------------------------------------------------
+
+
+def test_make_editing_handlers():
+    """_make_editing_handlers returns all expected handler functions."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"candidates": [], "polling": []}
+    log = lambda level, msg: None
+    handlers = _make_editing_handlers(race_json, log)
+
+    expected_names = {
+        "add_candidate",
+        "remove_candidate",
+        "rename_candidate",
+        "set_candidate_field",
+        "set_candidate_summary",
+        "set_issue_stance",
+        "set_donor_summary",
+        "set_voting_summary",
+        "add_candidate_link",
+        "add_poll",
+        "update_race_field",
+        "read_profile",
+        "add_education_entry",
+        "update_education_entry",
+        "add_career_entry",
+        "remove_career_entry",
+        "update_career_entry",
+        "set_social_media",
+        "clear_education",
+        "clear_career_history",
+    }
+    assert set(handlers.keys()) == expected_names
+
+
+def test_add_candidate_handler():
+    """add_candidate handler adds a candidate to race_json."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    result = handlers["add_candidate"]({"name": "Alice", "party": "Democratic"})
+    assert "Added" in result
+    assert len(race_json["candidates"]) == 1
+    assert race_json["candidates"][0]["name"] == "Alice"
+
+
+def test_remove_candidate_handler():
+    """remove_candidate handler soft-deletes a candidate (marks withdrawn, keeps in list)."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"candidates": [{"name": "Alice", "party": "D"}, {"name": "Bob", "party": "R"}]}
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    result = handlers["remove_candidate"]({"name": "Alice", "reason": "withdrew"})
+    assert "withdrawn" in result.lower()
+    # Soft-delete: candidate stays in the list but is flagged
+    assert len(race_json["candidates"]) == 2
+    alice = next(c for c in race_json["candidates"] if c["name"] == "Alice")
+    assert alice.get("withdrawn") is True
+    assert alice.get("withdrawal_reason") == "withdrew"
+
+
+def test_set_issue_stance_handler():
+    """set_issue_stance handler writes a stance to candidate issues."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"candidates": [{"name": "Alice", "issues": {}}]}
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    result = handlers["set_issue_stance"](
+        {
+            "candidate_name": "Alice",
+            "issue": "Healthcare",
+            "stance": "Supports universal coverage.",
+            "confidence": "high",
+            "sources": [{"url": "https://example.com", "type": "news", "title": "Article"}],
+        }
+    )
+    assert "Healthcare" in result
+    assert race_json["candidates"][0]["issues"]["Healthcare"]["stance"] == "Supports universal coverage."
+
+
+def test_read_profile_handler():
+    """read_profile handler returns JSON for different sections."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {
+        "id": "test",
+        "description": "A test race",
+        "candidates": [{"name": "Alice", "issues": {"Healthcare": {"stance": "Yes", "confidence": "high"}}}],
+        "polling": [],
+    }
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    meta = handlers["read_profile"]({"section": "meta"})
+    assert "test" in meta
+    assert "description" in meta
+
+    issues = handlers["read_profile"]({"section": "issues"})
+    assert "Healthcare" in issues
+
+
+# ---------------------------------------------------------------------------
+# Search cache
+# ---------------------------------------------------------------------------
+
+
+def test_search_cache_list_cached_for_race():
+    """SearchCache.list_cached_for_race returns cached queries."""
+    from pipeline_client.agent.search_cache import SearchCache
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cache = SearchCache(cache_dir=tmpdir, default_ttl_hours=168)
+        cache.set("test query", [{"title": "R", "snippet": "...", "url": "https://r.com"}], race_id="test-race")
+
+        result = cache.list_cached_for_race("test-race")
+        assert len(result["searches"]) == 1
+        assert result["searches"][0]["query"] == "test query"
+        assert "https://r.com" in result["searches"][0]["urls"]

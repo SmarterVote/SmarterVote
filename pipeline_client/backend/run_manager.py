@@ -29,7 +29,13 @@ from typing import Any, Dict, List, Optional
 
 from .models import RunInfo, RunOptions, RunRequest, RunStatus, RunStep
 
+logger = logging.getLogger("pipeline")
+
 _COLLECTION = "pipeline_runs"
+
+# Maximum completed runs kept in the local-dev in-memory history.
+# Prevents unbounded memory growth during long-running local sessions.
+_MAX_LOCAL_HISTORY = 200
 
 
 class RunManager:
@@ -64,20 +70,20 @@ class RunManager:
                     "Run history requires Firestore for durability. "
                     "Set FIRESTORE_PROJECT via Terraform/deployment scripts."
                 )
-            logging.getLogger(__name__).info("RunManager: FIRESTORE_PROJECT not set — using in-memory run history (local dev mode)")
+            logger.info("RunManager: FIRESTORE_PROJECT not set — using in-memory run history (local dev mode)")
             return
         try:
             from google.cloud import firestore  # type: ignore
             self._db = firestore.Client(project=project)
-            logging.getLogger(__name__).info("RunManager: using Firestore project=%s collection=%s", project, _COLLECTION)
+            logger.info("RunManager: using Firestore project=%s collection=%s", project, _COLLECTION)
         except ImportError:
             if is_cloud_run:
                 raise RuntimeError("Cloud Run detected but google-cloud-firestore not installed.")
-            logging.getLogger(__name__).warning("google-cloud-firestore not installed; using in-memory run history")
+            logger.warning("google-cloud-firestore not installed; using in-memory run history")
         except Exception as e:
             if is_cloud_run:
                 raise RuntimeError(f"Cloud Run detected but failed to initialize Firestore: {e}")
-            logging.getLogger(__name__).exception("Firestore init failed; using in-memory run history")
+            logger.exception("Firestore init failed; using in-memory run history")
 
     class RunLogHandler(logging.Handler):
         def __init__(self, run_manager, run_id):
@@ -250,7 +256,7 @@ class RunManager:
                 doc_ref.delete()
                 return True
             except Exception:
-                logging.getLogger(__name__).exception("Firestore delete failed for run %s", run_id)
+                logger.exception("Firestore delete failed for run %s", run_id)
                 return False
         else:
             if run_id in self._local_history:
@@ -269,7 +275,7 @@ class RunManager:
                     data = doc.to_dict() or {}
                     return RunInfo(**data)
             except Exception:
-                logging.getLogger(__name__).exception("Firestore get failed for run %s", run_id)
+                logger.exception("Firestore get failed for run %s", run_id)
         else:
             return self._local_history.get(run_id)
         return None
@@ -300,7 +306,7 @@ class RunManager:
                         except Exception:
                             pass
             except Exception:
-                logging.getLogger(__name__).exception("Firestore list_recent_runs query failed")
+                logger.exception("Firestore list_recent_runs query failed")
         else:
             for run_id, run_info in self._local_history.items():
                 if run_id not in active_ids:
@@ -354,8 +360,11 @@ class RunManager:
             data.pop("logs", None)  # logs are ephemeral; not stored in Firestore
             self._write_executor.submit(self._write_firestore_data, run_info.run_id, data)
         else:
-            # Local dev: store in-memory (ephemeral)
+            # Local dev: store in-memory (ephemeral), evict oldest when full
             self._local_history[run_info.run_id] = run_info
+            if len(self._local_history) > _MAX_LOCAL_HISTORY:
+                oldest_key = next(iter(self._local_history))
+                del self._local_history[oldest_key]
 
     def _write_firestore_data(self, run_id: str, data: dict) -> None:
         """Write a pre-serialized run snapshot to Firestore (runs inside the write executor)."""
@@ -364,7 +373,7 @@ class RunManager:
         try:
             self._db.collection(_COLLECTION).document(run_id).set(data)
         except Exception:
-            logging.getLogger(__name__).exception("Firestore write failed for run %s", run_id)
+            logger.exception("Firestore write failed for run %s", run_id)
 
     # sync_from_gcs is intentionally removed: Firestore is now the source of truth.
 

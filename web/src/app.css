@@ -20,6 +20,7 @@
   --sv-text-muted:   75  85  99;    /* gray-600 — secondary text     */
   --sv-text-subtle:  107 114 128;   /* gray-500 — tertiary text      */
   --sv-text-faint:   156 163 175;   /* gray-400 — placeholder / meta */
+  --sv-primary:      37  99  235;   /* blue-600 — accent / links     */
 }
 
 /* Dark mode — toggled by adding .dark to <html> */
@@ -32,6 +33,7 @@
   --sv-text-muted:   209 213 219;   /* gray-300 — secondary text     */
   --sv-text-subtle:  156 163 175;   /* gray-400 — tertiary text      */
   --sv-text-faint:   107 114 128;   /* gray-500 — placeholder / meta */
+  --sv-primary:      96  165 250;   /* blue-400 — accent / links     */
 }
 
 /* ─── Global base ───────────────────────────────────────────── */

@@ -117,7 +117,7 @@ class AnalyticsStore:
         if self._client is not None:
             await self._log_firestore(ts, path, race_id, status_code, response_ms, ip_hash, referer)
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(
                 None,
                 self._log_sqlite,
@@ -172,7 +172,7 @@ class AnalyticsStore:
         """Return aggregate stats for the last *hours* hours."""
         if self._client is not None:
             return await self._overview_firestore(hours)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._overview_sqlite, hours)
 
     async def _overview_firestore(self, hours: int) -> Dict[str, Any]:
@@ -203,7 +203,7 @@ class AnalyticsStore:
         """Return per-race request counts for the last *hours* hours."""
         if self._client is not None:
             return await self._race_stats_firestore(hours)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._race_stats_sqlite, hours)
 
     async def _race_stats_firestore(self, hours: int) -> List[Dict[str, Any]]:
@@ -235,7 +235,7 @@ class AnalyticsStore:
         """Return bucketed request counts for charting."""
         if self._client is not None:
             return await self._timeseries_firestore(hours, bucket_minutes)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._timeseries_sqlite, hours, bucket_minutes)
 
     async def _timeseries_firestore(self, hours: int, bucket_minutes: int) -> List[Dict[str, Any]]:

@@ -293,7 +293,9 @@ class AgentHandler:
     async def _archive_gcs_version(self, race_id: str, *, src_prefix: str, source: str) -> bool:
         """Move an active GCS object into retired/ if it exists."""
         logger = logging.getLogger("pipeline")
-        gcs_bucket = os.getenv("GCS_BUCKET_NAME") or os.getenv("GCS_BUCKET") or os.getenv("BUCKET_NAME")
+        from pipeline_client.backend.settings import settings
+
+        gcs_bucket = settings.gcs_bucket
         if not gcs_bucket:
             return False
 
@@ -330,7 +332,9 @@ class AgentHandler:
         (e.g. via .env), the pipeline always pushes to GCS.
         """
         logger = logging.getLogger("pipeline")
-        gcs_bucket = os.getenv("GCS_BUCKET_NAME") or os.getenv("GCS_BUCKET") or os.getenv("BUCKET_NAME")
+        from pipeline_client.backend.settings import settings
+
+        gcs_bucket = settings.gcs_bucket
         if not gcs_bucket:
             return
 
@@ -355,7 +359,9 @@ class AgentHandler:
         race doesn't exist in either prefix.
         """
         logger = logging.getLogger("pipeline")
-        gcs_bucket = os.getenv("GCS_BUCKET_NAME") or os.getenv("GCS_BUCKET") or os.getenv("BUCKET_NAME")
+        from pipeline_client.backend.settings import settings
+
+        gcs_bucket = settings.gcs_bucket
         if not gcs_bucket:
             return None
 

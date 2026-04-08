@@ -17,6 +17,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
+logger = logging.getLogger("pipeline")
+
 
 class QueueItemOptions(BaseModel):
     cheap_mode: bool = True
@@ -78,22 +80,22 @@ class QueueManager:
                     "Queue requires Firestore for durability across restarts. "
                     "Set FIRESTORE_PROJECT via Terraform/deployment scripts."
                 )
-            logging.getLogger(__name__).debug("QueueManager: FIRESTORE_PROJECT not set — using local JSON file (dev mode)")
+            logger.debug("QueueManager: FIRESTORE_PROJECT not set — using local JSON file (dev mode)")
             return
 
         try:
             from google.cloud import firestore  # type: ignore
             self._db = firestore.Client(project=project)
             self._use_firestore = True
-            logging.getLogger(__name__).info(f"QueueManager: using Firestore project={project} collection=pipeline_queue")
+            logger.info(f"QueueManager: using Firestore project={project} collection=pipeline_queue")
         except ImportError:
             if is_cloud_run:
                 raise RuntimeError("Cloud Run detected but google-cloud-firestore not installed. Install with: pip install google-cloud-firestore")
-            logging.getLogger(__name__).warning("google-cloud-firestore not installed; using local JSON file")
+            logger.warning("google-cloud-firestore not installed; using local JSON file")
         except Exception as e:
             if is_cloud_run:
                 raise RuntimeError(f"Cloud Run detected but failed to initialize Firestore: {e}")
-            logging.getLogger(__name__).exception("Firestore init failed; falling back to local JSON file")
+            logger.exception("Firestore init failed; falling back to local JSON file")
 
     # -- Persistence --------------------------------------------------------
 
@@ -134,9 +136,9 @@ class QueueManager:
                     # Save the failed state back to Firestore
                     collection.document(item.id).set(item.model_dump(mode="json"))
 
-            logging.getLogger(__name__).info(f"QueueManager: loaded {len(self._items)} items from Firestore")
+            logger.info(f"QueueManager: loaded {len(self._items)} items from Firestore")
         except Exception:
-            logging.getLogger(__name__).exception("Failed to load queue from Firestore; starting with empty queue")
+            logger.exception("Failed to load queue from Firestore; starting with empty queue")
             self._items = []
 
     def _load_from_json(self):
@@ -154,7 +156,7 @@ class QueueManager:
                     item.completed_at = datetime.now(timezone.utc).isoformat()
             self._save()
         except Exception:
-            logging.getLogger(__name__).exception("Failed to load queue state from JSON")
+            logger.exception("Failed to load queue state from JSON")
             self._items = []
 
     def _save(self):
@@ -172,7 +174,7 @@ class QueueManager:
             for item in self._items:
                 collection.document(item.id).set(item.model_dump(mode="json"))
         except Exception:
-            logging.getLogger(__name__).exception("Failed to save queue to Firestore; data may be lost on restart")
+            logger.exception("Failed to save queue to Firestore; data may be lost on restart")
 
     def _save_to_json(self):
         """Persist queue items to local JSON file."""
@@ -210,7 +212,7 @@ class QueueManager:
                     try:
                         self._delete_item_firestore(item_id)
                     except Exception:
-                        logging.getLogger(__name__).exception(f"Failed to delete queue item {item_id} from Firestore")
+                        logger.exception(f"Failed to delete queue item {item_id} from Firestore")
                 else:
                     self._save_to_json()
                 return True
@@ -227,12 +229,12 @@ class QueueManager:
                         from .run_manager import run_manager
                         run_manager.cancel_run(removed.run_id)
                     except Exception:
-                        logging.getLogger(__name__).exception(f"Failed to cancel run {removed.run_id} during force-remove")
+                        logger.exception(f"Failed to cancel run {removed.run_id} during force-remove")
                 if self._use_firestore:
                     try:
                         self._delete_item_firestore(item_id)
                     except Exception:
-                        logging.getLogger(__name__).exception(f"Failed to delete queue item {item_id} from Firestore")
+                        logger.exception(f"Failed to delete queue item {item_id} from Firestore")
                 else:
                     self._save_to_json()
                 return removed
@@ -260,10 +262,8 @@ class QueueManager:
                     try:
                         from .run_manager import run_manager
                         run_manager.cancel_run(run_id)
-                        logger = logging.getLogger(__name__)
                         logger.info(f"Queue: cancelled queue item {item_id}, also cancelled run {run_id}")
                     except Exception:
-                        logger = logging.getLogger(__name__)
                         logger.exception(f"Queue: failed to cancel run {run_id} for queue item {item_id}")
 
                 return True
@@ -283,7 +283,7 @@ class QueueManager:
                 for item_id in finished_ids:
                     self._delete_item_firestore(item_id)
             except Exception:
-                logging.getLogger(__name__).exception("Failed to delete finished items from Firestore")
+                logger.exception("Failed to delete finished items from Firestore")
 
         return before - len(self._items)
 
@@ -299,7 +299,7 @@ class QueueManager:
                 for item_id in pending_ids:
                     self._delete_item_firestore(item_id)
             except Exception:
-                logging.getLogger(__name__).exception("Failed to delete pending items from Firestore")
+                logger.exception("Failed to delete pending items from Firestore")
         return removed_items
 
     def get_all(self) -> List[QueueItem]:
@@ -385,7 +385,6 @@ class QueueManager:
         from .race_manager import race_manager
         from .run_manager import run_manager
 
-        logger = logging.getLogger("pipeline")
         logger.info(f"Queue: starting {item.race_id} (queue_id={item.id})")
 
         request = RunRequest(

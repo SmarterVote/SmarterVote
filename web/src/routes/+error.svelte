@@ -7,10 +7,11 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 py-12 max-w-4xl text-center">
-  <div class="bg-white rounded-lg shadow-sm p-12">
+  <div class="rounded-lg shadow-sm p-12" style="background-color: rgb(var(--sv-surface));">
     <div class="mb-8">
       <svg
-        class="w-24 h-24 text-gray-400 mx-auto mb-4"
+        class="w-24 h-24 mx-auto mb-4"
+        style="color: rgb(var(--sv-text-faint));"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -22,8 +23,8 @@
           d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.908-4.29-4.29C7.71 8.368 9.66 6.46 12 6.46s4.29 1.908 4.29 4.29A7.962 7.962 0 0112 15z"
         />
       </svg>
-      <h1 class="text-4xl font-bold text-gray-900 mb-4">Page Not Found</h1>
-      <p class="text-xl text-gray-600 mb-8">
+      <h1 class="text-4xl font-bold mb-4" style="color: rgb(var(--sv-text));">Page Not Found</h1>
+      <p class="text-xl mb-8" style="color: rgb(var(--sv-text-muted));">
         Sorry, we couldn't find the page you're looking for.
       </p>
     </div>
@@ -50,7 +51,7 @@
       </a>
     </div>
 
-    <div class="mt-8 text-sm text-gray-500">
+    <div class="mt-8 text-sm" style="color: rgb(var(--sv-text-subtle));">
       <p>
         If you think this is an error, please check the URL or try searching for
         the content you need.

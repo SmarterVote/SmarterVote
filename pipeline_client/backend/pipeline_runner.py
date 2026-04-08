@@ -14,8 +14,15 @@ from .step_registry import get_handler
 from .storage import new_artifact_id, save_artifact
 
 
-async def _run_and_save_post_analysis(run_id: str, race_id: str, logs: list) -> None:
-    """Run Gemini Flash post-run analysis, broadcast log lines, and save as artifact."""
+async def _run_and_save_post_analysis(
+    run_id: str, race_id: str, logs: list, *, output: Optional[Dict[str, Any]] = None
+) -> None:
+    """Run Gemini Flash post-run analysis, broadcast log lines, and save as artifact.
+
+    When *output* is provided (the race JSON result), it is included in the
+    Gemini context so the analysis covers data quality in addition to pipeline
+    execution.  The analysis text is also written back into the draft JSON.
+    """
     _log = logging.getLogger("pipeline")
 
     async def _emit(message: str, level: str = "info") -> None:
@@ -32,7 +39,7 @@ async def _run_and_save_post_analysis(run_id: str, race_id: str, logs: list) -> 
     try:
         from pipeline_client.agent.review import run_post_run_analysis
 
-        result = await run_post_run_analysis(run_id, race_id, logs)
+        result = await run_post_run_analysis(run_id, race_id, logs, artifact=output)
         if result.get("skipped"):
             _log.info(f"Post-run analysis skipped: {result.get('reason')}")
             return
@@ -56,7 +63,27 @@ async def _run_and_save_post_analysis(run_id: str, race_id: str, logs: list) -> 
         except Exception:
             _log.warning("Failed to save post-run analysis artifact", exc_info=True)
 
-        # 2. Emit each line to Python logger + WebSocket so it appears in Cloud Run logs
+        # 2. Write the analysis into the draft JSON so it persists with the artifact
+        if analysis_text and race_id:
+            try:
+                from pathlib import Path as _Path
+
+                draft_path = _Path(__file__).resolve().parents[1] / "data" / "drafts" / f"{race_id}.json"
+                if draft_path.exists():
+                    import json as _json
+
+                    draft_data = _json.loads(draft_path.read_text(encoding="utf-8"))
+                    draft_data["post_run_analysis"] = {
+                        "model": model,
+                        "analyzed_at": result.get("analyzed_at"),
+                        "analysis": analysis_text,
+                    }
+                    draft_path.write_text(_json.dumps(draft_data, indent=2, default=str), encoding="utf-8")
+                    _log.info(f"Post-run analysis written to draft {race_id}.json")
+            except Exception:
+                _log.warning("Failed to write post-run analysis to draft", exc_info=True)
+
+        # 3. Emit each line to Python logger + WebSocket so it appears in Cloud Run logs
         #    and in the UI log panel for any still-connected clients.
         await _emit(f"━━━ Post-run pipeline analysis ({model}) ━━━")
         for line in analysis_text.splitlines():
@@ -207,7 +234,7 @@ async def run_step_async(step: str, request: RunRequest, run_id: Optional[str] =
         # Run Gemini post-run analysis BEFORE broadcasting run_completed so the
         # frontend WebSocket is still subscribed and receives the log lines.
         race_id_for_analysis = request.payload.get("race_id", "unknown")
-        await _run_and_save_post_analysis(run_id, race_id_for_analysis, run_logs)
+        await _run_and_save_post_analysis(run_id, race_id_for_analysis, run_logs, output=output)
 
         await logging_manager.send_run_status(run_id, "completed", artifact_id=artifact_id, duration_ms=duration_ms)
 

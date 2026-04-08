@@ -27,17 +27,24 @@ _REVIEW_PROVIDERS = {
     "grok": ("XAI_API_KEY", DEFAULT_GROK_MODEL, CHEAP_GROK_MODEL),
 }
 
+# Singleton client caches — avoid creating a new client per call
+_anthropic_client = None
+_gemini_client = None
+_grok_client = None
+
 
 async def _call_anthropic(system: str, user: str, *, model: str = DEFAULT_CLAUDE_MODEL) -> str:
     """Call the Anthropic Messages API and return the text response."""
+    global _anthropic_client
     from anthropic import AsyncAnthropic
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY is not set")
 
-    client = AsyncAnthropic(api_key=api_key)
-    response = await client.messages.create(
+    if _anthropic_client is None:
+        _anthropic_client = AsyncAnthropic(api_key=api_key)
+    response = await _anthropic_client.messages.create(
         model=model,
         max_tokens=8192,
         system=system,
@@ -57,13 +64,15 @@ async def _call_gemini(system: str, user: str, *, model: str = DEFAULT_GEMINI_MO
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set")
 
+    global _gemini_client
     from google import genai  # type: ignore
 
-    client = genai.Client(api_key=api_key)
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=api_key)
     loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(
         None,
-        lambda: client.models.generate_content(
+        lambda: _gemini_client.models.generate_content(
             model=model,
             contents=f"{system}\n\n{user}",
         ),
@@ -78,14 +87,16 @@ async def _call_gemini(system: str, user: str, *, model: str = DEFAULT_GEMINI_MO
 
 async def _call_grok(system: str, user: str, *, model: str = DEFAULT_GROK_MODEL) -> str:
     """Call the xAI Grok API (OpenAI-compatible) and return the text response."""
+    global _grok_client
     from openai import AsyncOpenAI
 
     api_key = os.environ.get("XAI_API_KEY", "")
     if not api_key:
         raise RuntimeError("XAI_API_KEY is not set")
 
-    client = AsyncOpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=120)
-    response = await client.chat.completions.create(
+    if _grok_client is None:
+        _grok_client = AsyncOpenAI(api_key=api_key, base_url="https://api.x.ai/v1", timeout=120)
+    response = await _grok_client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system},
@@ -233,10 +244,12 @@ async def run_post_run_analysis(
     race_id: str,
     logs: List[Dict[str, Any]],
     *,
+    artifact: Optional[Dict[str, Any]] = None,
     model: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Call Gemini Flash with the full run logs + system prompts and ask for
-    improvement suggestions.  Returns a dict suitable for JSON serialisation."""
+    """Call Gemini Flash with the full run logs, system prompts, and the output
+    artifact, then ask for improvement suggestions.  Returns a dict suitable
+    for JSON serialisation."""
     from .prompts import (
         DISCOVERY_SYSTEM,
         FINANCE_VOTING_SYSTEM,
@@ -274,6 +287,14 @@ async def run_post_run_analysis(
         log_count=len(logs),
         logs_text=logs_text,
     )
+
+    # Append the output artifact so Gemini can review the actual data quality
+    if artifact:
+        artifact_text = json.dumps(artifact, indent=2, default=str)
+        # Cap artifact size to ~100k chars to stay within budget
+        if len(artifact_text) > 100_000:
+            artifact_text = artifact_text[:100_000] + "\n... (truncated)"
+        user_prompt += f"\n\n## Output Artifact (RaceJSON)\n\n```json\n{artifact_text}\n```"
 
     logger.info(f"Post-run analysis: sending {len(logs)} log entries to {effective_model}")
     try:

@@ -270,7 +270,7 @@ def _copy_race_gcs(race_id: str, src_prefix: str, dst_prefix: str) -> bool:
 
 
 def _retired_blob_name(race_id: str, source: str) -> str:
-    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"retired/{race_id}/{stamp}-{source}.json"
 
 
@@ -280,7 +280,7 @@ def _archive_race_local(path: Path, race_id: str, source: str) -> Path | None:
         return None
     retired_dir = ROOT / "data" / "retired" / race_id
     retired_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     retired_path = retired_dir / f"{stamp}-{source}.json"
     path.replace(retired_path)
     return retired_path
@@ -980,6 +980,7 @@ async def run_agent_endpoint(request: AgentRequest) -> Dict[str, Any]:
     candidates and produce a complete RaceJSON profile. If a published
     profile already exists for this race, the agent will update it.
     """
+    _validate_race_id(request.race_id)
     run_request = RunRequest(
         payload={"race_id": request.race_id},
         options=request.options,
@@ -1023,6 +1024,7 @@ async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
         race_id = race_id.strip()
         if not race_id:
             continue
+        _validate_race_id(race_id)
         try:
             item = queue_manager.add(race_id, options)
             added.append(item.model_dump(mode="json"))

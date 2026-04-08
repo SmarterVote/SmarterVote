@@ -2,7 +2,7 @@ import os
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     app_name: str = "SmarterVote Pipeline Client"
     artifacts_dir: Path = Path(__file__).resolve().parents[1] / "artifacts"
     storage_mode: str = "local"  # "local" or "gcp"
-    gcs_bucket: str | None = None
+    gcs_bucket: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GCS_BUCKET", "GCS_BUCKET_NAME", "BUCKET_NAME"),
+    )
     firestore_project: str | None = None
     allowed_origins: str = "*"  # comma-separated string — parsed in main.py
     auth0_domain: str | None = None

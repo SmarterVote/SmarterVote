@@ -1,0 +1,284 @@
+"""Tests for web tools: Serper search, page fetching, and content analysis."""
+
+import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
+
+from pipeline_client.agent.agent import _fetch_page, _is_unusable_page_text, _page_fetch_log_hint, _serper_search
+
+# ---------------------------------------------------------------------------
+# Serper search tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_serper_search_no_api_key():
+    """_serper_search returns error when SERPER_API_KEY is not set."""
+    env = os.environ.copy()
+    env.pop("SERPER_API_KEY", None)
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+    ):
+        results = await _serper_search("test query")
+    assert len(results) == 1
+    assert "error" in results[0]
+
+
+@pytest.mark.asyncio
+async def test_serper_search_uses_cache():
+    """_serper_search returns cached results when available."""
+    mock_cache = MagicMock()
+    mock_cache.get.return_value = {"results": [{"title": "Cached", "snippet": "...", "url": "https://cached.com"}]}
+
+    with patch("pipeline_client.agent.web_tools._get_search_cache", return_value=mock_cache):
+        results = await _serper_search("test query", race_id="my-race")
+
+    assert results == [{"title": "Cached", "snippet": "...", "url": "https://cached.com"}]
+    mock_cache.get.assert_called_once_with("test query", "my-race")
+
+
+# ---------------------------------------------------------------------------
+# Page content analysis tests
+# ---------------------------------------------------------------------------
+
+
+def test_is_unusable_page_text_detects_block_pages():
+    """Blocked placeholder content is treated as unusable."""
+    blocked = "Please enable JavaScript to continue. Attention required by security check."
+    assert _is_unusable_page_text(blocked) is True
+
+
+def test_page_fetch_log_hint_reports_failed_fetch_strings():
+    url = "https://www.jeffwadlin.com/issues"
+    page_text = "[Failed to fetch https://www.jeffwadlin.com/issues: 403 forbidden]"
+
+    hint = _page_fetch_log_hint(url, page_text)
+
+    assert hint is not None
+    assert "fetch failed" in hint
+    assert "jeffwadlin.com/issues" in hint
+
+
+def test_page_fetch_log_hint_flags_short_policy_pages():
+    url = "https://www.jeffwadlin.com/issues"
+    page_text = "Wadlin for Senate This request returned 403 Forbidden."
+
+    hint = _page_fetch_log_hint(url, page_text)
+
+    assert hint is not None
+    assert "short policy-page content" in hint or "blocked/unusable" in hint
+
+
+# ---------------------------------------------------------------------------
+# Page fetching tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_uses_proxy_fallback_when_primary_unusable():
+    """_fetch_page falls back to proxy when direct fetch is too short/useless."""
+
+    class _Resp:
+        def __init__(self, text: str, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            return None
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(
+        side_effect=[
+            _Resp("<html><body>Please enable JavaScript</body></html>"),
+            _Resp("<html><body>Please enable JavaScript</body></html>"),
+            _Resp("Proxy recovered page text " + ("x" * 500), "text/plain"),
+        ]
+    )
+
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page("https://www.example.com/issues")
+
+    assert "Proxy recovered page text" in result
+    assert "[Failed to fetch" not in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_attempts_jeff_wadlin_issues_url():
+    """_fetch_page issues a direct request to the exact Wadlin issues URL."""
+
+    class _Resp:
+        def __init__(self, text: str, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            return None
+
+    target_url = "https://www.jeffwadlin.com/issues"
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(return_value=_Resp("Valid issue content " + ("x" * 500)))
+
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page(target_url)
+
+    requested_urls = [call.args[0] for call in mock_client.get.call_args_list if call.args]
+    assert requested_urls[0] == target_url, "First HTTP call must be directly to the Wadlin issues URL"
+    assert "Valid issue content" in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_jeff_wadlin_blocked_falls_back_to_proxy_with_correct_url():
+    """When jeffwadlin.com returns a JS stub (~214 chars), _fetch_page retries via jina proxy
+    using the original https:// URL (not a downgraded http:// version)."""
+
+    class _Resp:
+        def __init__(self, text: str, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            return None
+
+    target_url = "https://www.jeffwadlin.com/issues"
+    expected_proxy_url = f"https://r.jina.ai/{target_url}"
+    proxy_content = "Healthcare: I support a universal 80/20 Medicare-for-all option. " + ("x" * 400)
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(
+        side_effect=[
+            # Both direct header profiles return a tiny JS shell (~214 chars after stripping)
+            _Resp("<html><body>Please enable JavaScript</body></html>"),
+            _Resp("<html><body>Please enable JavaScript</body></html>"),
+            # Jina proxy returns real content
+            _Resp(proxy_content, "text/plain"),
+        ]
+    )
+
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page(target_url)
+
+    requested_urls = [call.args[0] for call in mock_client.get.call_args_list if call.args]
+    assert requested_urls[0] == target_url, "First call must be the direct Wadlin issues URL"
+    assert expected_proxy_url in requested_urls, f"Proxy call must use the original https:// URL \u2014 got: {requested_urls}"
+    assert "Medicare-for-all" in result
+    assert "[Failed to fetch" not in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_short_low_signal_content_prefers_proxy_text():
+    """Short low-signal content should trigger proxy probe and prefer richer proxy text."""
+
+    class _Resp:
+        def __init__(self, text: str, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            return None
+
+    target_url = "https://www.example.com/issues"
+    expected_proxy_url = f"https://r.jina.ai/{target_url}"
+    short_primary = "Issue overview page with minimal content and no detailed policy text." + ("x" * 340)
+    rich_proxy = "Healthcare section: supports public option and PBM reform. " + ("y" * 2200)
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(
+        side_effect=[
+            _Resp(short_primary),
+            _Resp(rich_proxy, "text/plain"),
+        ]
+    )
+
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page(target_url)
+
+    requested_urls = [call.args[0] for call in mock_client.get.call_args_list if call.args]
+    assert requested_urls[0] == target_url
+    assert expected_proxy_url in requested_urls
+    assert "public option" in result
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_policy_url_uses_sitemap_fallback_when_direct_and_proxy_fail():
+    """When a policy URL is blocked and the proxy fails too, the fallback crawls the
+    site's sitemap to recover policy-relevant content. Works for any candidate site."""
+
+    HOST = "www.example-candidate.org"
+
+    class _Resp:
+        def __init__(self, text: str, status_code: int = 200, content_type: str = "text/html; charset=utf-8"):
+            self.text = text
+            self.status_code = status_code
+            self.headers = {"content-type": content_type}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise httpx.HTTPStatusError(
+                    f"Client error '{self.status_code}'",
+                    request=httpx.Request("GET", f"https://{HOST}/issues"),
+                    response=httpx.Response(self.status_code),
+                )
+
+    target_url = f"https://{HOST}/issues"
+    proxy_url = f"https://r.jina.ai/{target_url}"
+    sitemap_xml = f"""
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://{HOST}/blog</loc></url>
+          <url><loc>https://{HOST}/about</loc></url>
+        </urlset>
+    """
+    blog_html = """
+        <html><body>
+          <p>On healthcare, I support transparent pricing and stronger rural care access.</p>
+          <p>On the economy, I support reducing inflation by limiting federal overspending.</p>
+          <p>This platform focuses on practical policy changes for working families, including affordability, opportunity, and accountable government.</p>
+          <p>These priorities are repeated across campaign materials to provide clarity for voters and avoid vague slogans.</p>
+        </body></html>
+    """
+    about_html = "<html><body><p>Lorem ipsum dolor sit amet.</p></body></html>"
+
+    async def _mock_get(url, headers=None):
+        if url == target_url:
+            return _Resp("<html><body>404 Not Found</body></html>", status_code=404)
+        if url == proxy_url:
+            return _Resp(
+                "Title: Just a moment... Warning: Target URL returned error 403: Forbidden", content_type="text/plain"
+            )
+        if url == f"https://{HOST}/sitemap.xml":
+            return _Resp(sitemap_xml, content_type="application/xml")
+        if url == f"https://{HOST}/sitemap_index.xml":
+            return _Resp("<sitemapindex></sitemapindex>", content_type="application/xml")
+        if url == f"https://{HOST}/blog":
+            return _Resp(blog_html)
+        if url == f"https://{HOST}/about":
+            return _Resp(about_html)
+        return _Resp("<html><body>Not Found</body></html>", status_code=404)
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=_mock_get)
+
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_fetch_client", return_value=mock_client),
+    ):
+        result = await _fetch_page(target_url)
+
+    assert "Recovered issue-related content" in result
+    assert "healthcare" in result.lower()
+    assert "economy" in result.lower()
+    assert "lorem ipsum" not in result.lower()

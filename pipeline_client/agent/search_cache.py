@@ -24,11 +24,11 @@ import json
 import logging
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pipeline")
 
 
 class SearchCache:
@@ -135,7 +135,7 @@ class SearchCache:
                 SELECT * FROM search_cache
                 WHERE query_hash = ? AND expires_at > ?
                 """,
-                (query_hash, datetime.utcnow().isoformat()),
+                (query_hash, datetime.now(timezone.utc).isoformat()),
             )
             row = cursor.fetchone()
 
@@ -184,7 +184,7 @@ class SearchCache:
         """
         query_hash = self._query_hash(query_text, race_id)
         ttl = ttl_hours or self.default_ttl_hours
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(hours=ttl)
 
         try:
@@ -228,7 +228,7 @@ class SearchCache:
             conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT content FROM page_cache WHERE url_hash = ? AND expires_at > ?",
-                (url_hash, datetime.utcnow().isoformat()),
+                (url_hash, datetime.now(timezone.utc).isoformat()),
             ).fetchone()
             if row:
                 conn.execute(
@@ -244,7 +244,7 @@ class SearchCache:
     def set_page(self, url: str, content: str, ttl_hours: int = 24) -> bool:
         """Cache stripped page text content. TTL defaults to 24h (pages change faster than searches)."""
         url_hash = hashlib.sha256(url.encode()).hexdigest()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_at = now + timedelta(hours=ttl_hours)
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -272,7 +272,7 @@ class SearchCache:
             # Active (non-expired) entries
             active = conn.execute(
                 "SELECT COUNT(*) FROM search_cache WHERE expires_at > ?",
-                (datetime.utcnow().isoformat(),),
+                (datetime.now(timezone.utc).isoformat(),),
             ).fetchone()[0]
 
             # Total hits
@@ -298,7 +298,7 @@ class SearchCache:
 
     def cleanup_expired(self) -> int:
         """Remove expired cache entries from both search and page caches."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             search_cursor = conn.execute(
                 "DELETE FROM search_cache WHERE expires_at <= ?",
@@ -339,7 +339,7 @@ class SearchCache:
         Returns ``{"searches": [{"query": ..., "urls": [...]}], "page_urls": [...]}``
         containing only non-expired entries.
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         searches: List[Dict[str, Any]] = []
         with sqlite3.connect(self.db_path) as conn:
             rows = conn.execute(

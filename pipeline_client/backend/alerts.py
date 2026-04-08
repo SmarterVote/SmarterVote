@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pipeline")
 
 ROOT = Path(__file__).resolve().parents[2]
 ACKNOWLEDGED_FILE = Path(__file__).parent.parent / "acknowledged_alerts.json"

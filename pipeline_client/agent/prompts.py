@@ -786,7 +786,9 @@ Focus on:
    produced low-confidence / poorly sourced results?
 4. Search strategy — Are the Serper search queries effective? Any patterns of
    wasted or redundant queries?
-5. Output quality — What would make the final RaceJSON richer or more reliable?
+5. Output quality — Review the output RaceJSON artifact (if provided) for
+   completeness, accuracy signals, source quality, and any missing or weak data.
+   What would make the final RaceJSON richer or more reliable?
 
 Be specific. Cite log entries or prompt text when making recommendations.
 Organize your response with clear section headings and bullet points."""

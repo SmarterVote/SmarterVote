@@ -1,0 +1,255 @@
+"""Tests for pipeline agent prompt templates and formatting."""
+
+from pipeline_client.agent.prompts import (
+    CANONICAL_ISSUES,
+    DISCOVERY_SYSTEM,
+    DISCOVERY_USER,
+    ISSUE_SUBAGENT_SYSTEM,
+    ISSUE_SUBAGENT_USER,
+    ITERATE_USER,
+    REFINE_SYSTEM,
+    REFINE_USER,
+    ROSTER_SYNC_SYSTEM,
+    ROSTER_SYNC_USER,
+    UPDATE_ISSUE_SUBAGENT_SYSTEM,
+    UPDATE_ISSUE_SUBAGENT_USER,
+    UPDATE_META_SYSTEM,
+    UPDATE_META_USER,
+)
+
+# ---------------------------------------------------------------------------
+# Canonical issues
+# ---------------------------------------------------------------------------
+
+
+def test_canonical_issues_count():
+    """All canonical issues are defined."""
+    assert len(CANONICAL_ISSUES) == 12
+
+
+def test_canonical_issues_no_duplicates():
+    """No duplicate canonical issues."""
+    assert len(CANONICAL_ISSUES) == len(set(CANONICAL_ISSUES))
+
+
+def test_canonical_issues_thematic_order():
+    """Canonical issues are in the expected thematic order."""
+    assert CANONICAL_ISSUES[0] == "Healthcare"
+    assert CANONICAL_ISSUES[-1] == "Local Issues"
+
+
+# ---------------------------------------------------------------------------
+# Prompt formatting
+# ---------------------------------------------------------------------------
+
+
+def test_discovery_user_formats():
+    """Discovery user prompt accepts race_id."""
+    result = DISCOVERY_USER.format(race_id="mo-senate-2024")
+    assert "mo-senate-2024" in result
+
+
+def test_issue_subagent_user_formats():
+    """Issue subagent user prompt accepts all required variables."""
+    result = ISSUE_SUBAGENT_USER.format(
+        race_id="mo-senate-2024",
+        candidate_name="Alice",
+        issue="Healthcare",
+        handoff_context="No prior context available.",
+        candidate_website="https://alice.example.com",
+        candidate_issue_urls="(none found)",
+    )
+    assert "mo-senate-2024" in result
+    assert "Alice" in result
+    assert "Healthcare" in result
+
+
+def test_refine_user_formats():
+    """Refine user prompt accepts race_id, candidate_name, candidate_json, and other params."""
+    result = REFINE_USER.format(
+        race_id="mo-senate-2024",
+        candidate_name="Jane Doe",
+        candidate_website="https://janedoe.com",
+        candidate_issue_urls="https://janedoe.com/issues, https://janedoe.com/platform",
+        candidate_json='{"name": "Jane Doe"}',
+        race_description="A senate race.",
+        other_candidates="John Smith",
+        all_issues="Healthcare, Economy",
+    )
+    assert "mo-senate-2024" in result
+    assert "Jane Doe" in result
+    assert "Healthcare, Economy" in result
+    assert "https://janedoe.com/issues" in result
+
+
+def test_update_meta_user_formats():
+    """Update meta prompt accepts race_id, candidate_names, and last_updated."""
+    result = UPDATE_META_USER.format(
+        race_id="mo-senate-2024",
+        candidate_names="Alice, Bob",
+        last_updated="2024-01-01T00:00:00Z",
+    )
+    assert "mo-senate-2024" in result
+    assert "2024-01-01" in result
+
+
+def test_iterate_user_formats():
+    """Iterate prompt accepts candidate source hints and review flags."""
+    result = ITERATE_USER.format(
+        race_id="mo-senate-2024",
+        candidate_name="Jane Doe",
+        candidate_website="https://janedoe.com",
+        candidate_issue_urls="https://janedoe.com/issues, https://janedoe.com/platform",
+        candidate_json='{"name": "Jane Doe"}',
+        review_flags="[WARNING] issues.Healthcare: weak sourcing",
+        all_issues="Healthcare, Economy",
+    )
+    assert "mo-senate-2024" in result
+    assert "Jane Doe" in result
+    assert "https://janedoe.com/issues" in result
+    assert "weak sourcing" in result
+
+
+def test_roster_sync_prompt_formats():
+    """Roster sync prompt accepts race_id, last_updated, candidate_names."""
+    result = ROSTER_SYNC_USER.format(
+        race_id="ga-senate-2026",
+        last_updated="2025-01-01T00:00:00Z",
+        candidate_names="Alice, Bob",
+    )
+    assert "ga-senate-2026" in result
+    assert "Alice, Bob" in result
+    assert "add_candidate" in result
+
+
+def test_issue_subagent_prompt_formats():
+    """Issue sub-agent prompt accepts required variables."""
+    result = ISSUE_SUBAGENT_USER.format(
+        candidate_name="Jane Doe",
+        race_id="mi-senate-2026",
+        issue="Healthcare",
+        candidate_website="https://example.com/",
+        candidate_issue_urls="https://example.com/issues",
+        handoff_context="No prior context available.",
+    )
+    assert "Jane Doe" in result
+    assert "Healthcare" in result
+    assert "https://example.com/issues" in result
+    assert "set_issue_stance" in result
+
+
+def test_update_issue_subagent_prompt_formats():
+    """Update issue sub-agent prompt accepts required variables."""
+    result = UPDATE_ISSUE_SUBAGENT_USER.format(
+        candidate_name="Jane Doe",
+        race_id="mi-senate-2026",
+        issue="Healthcare",
+        last_updated="2025-01-01T00:00:00Z",
+        existing_stance="  Stance: Supports ACA.\n  Confidence: high",
+        candidate_website="https://example.com/",
+        candidate_issue_urls="https://example.com/issues",
+        handoff_context="No prior context available.",
+    )
+    assert "Jane Doe" in result
+    assert "Healthcare" in result
+    assert "Supports ACA" in result
+    assert "https://example.com/issues" in result
+
+
+# ---------------------------------------------------------------------------
+# Prompt content checks
+# ---------------------------------------------------------------------------
+
+
+def test_discovery_prompt_mentions_donor_sources():
+    """Discovery prompt tells the model to include donor summary and links."""
+    result = DISCOVERY_USER.format(race_id="mo-senate-2024")
+    assert "donor_summary" in result
+    assert "links" in result
+
+
+def test_refine_prompt_mentions_donor_sources():
+    """Refine prompt asks agent to fill donor_summary using set_donor_summary."""
+    result = REFINE_USER.format(
+        race_id="mo-senate-2024",
+        candidate_name="Jane Doe",
+        candidate_website="https://janedoe.com",
+        candidate_issue_urls="https://janedoe.com/issues",
+        candidate_json='{"name": "Jane Doe"}',
+        race_description="A senate race.",
+        other_candidates="John Smith",
+        all_issues="Healthcare, Economy",
+    )
+    assert "set_donor_summary" in result
+
+
+def test_update_prompt_mentions_donor_sources():
+    """Update meta prompt uses donor_summary instead of top_donors."""
+    result = UPDATE_META_USER.format(
+        race_id="mo-senate-2024",
+        candidate_names="Alice, Bob",
+        last_updated="2024-01-01T00:00:00Z",
+    )
+    assert "donor_summary" in result
+    assert "top_donors" not in result
+
+
+def test_prompts_contain_rules():
+    """All system prompts include shared rules."""
+    for prompt in [DISCOVERY_SYSTEM, ISSUE_SUBAGENT_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SUBAGENT_SYSTEM]:
+        assert "nonpartisan" in prompt.lower()
+        assert "web_search" in prompt
+
+
+def test_prompts_mention_confidence_levels():
+    """All system prompts describe the confidence levels."""
+    for prompt in [DISCOVERY_SYSTEM, ISSUE_SUBAGENT_SYSTEM, REFINE_SYSTEM, UPDATE_META_SYSTEM, UPDATE_ISSUE_SUBAGENT_SYSTEM]:
+        assert "high" in prompt.lower()
+        assert "medium" in prompt.lower()
+        assert "low" in prompt.lower()
+
+
+def test_roster_sync_system_restricts_to_roster_tools_only():
+    """Roster sync prompt explicitly restricts edits to roster tools."""
+    assert "add_candidate" in ROSTER_SYNC_SYSTEM
+    assert "remove_candidate" in ROSTER_SYNC_SYSTEM
+    assert "rename_candidate" in ROSTER_SYNC_SYSTEM
+    assert "Do NOT call any non-roster editing tools" in ROSTER_SYNC_SYSTEM
+
+
+def test_iterate_prompt_allows_candidate_removal_for_invalid_roster_entries():
+    """Iteration prompt allows removing clearly invalid candidates with evidence."""
+    assert "CANDIDATE VALIDITY / ROSTER flags" in ITERATE_USER
+    assert "remove_candidate" in ITERATE_USER
+    assert "Do NOT remove a candidate solely due to sparse issue data" in ITERATE_USER
+
+
+def test_review_prompt_exists():
+    """Review prompts are defined and contain expected content."""
+    from pipeline_client.agent.prompts import REVIEW_SYSTEM, REVIEW_USER
+
+    assert "fact-checking" in REVIEW_SYSTEM.lower()
+    assert "{race_id}" in REVIEW_USER
+    assert "{profile_json}" in REVIEW_USER
+    assert "verdict" in REVIEW_USER
+
+
+def test_discovery_prompt_asks_for_career():
+    """Discovery prompt includes career history request."""
+    assert "career" in DISCOVERY_USER.lower()
+    assert "career_history" in DISCOVERY_USER
+
+
+def test_discovery_prompt_asks_for_education():
+    """Discovery prompt includes education request."""
+    assert "education" in DISCOVERY_USER.lower()
+
+
+def test_discovery_prompt_asks_for_image():
+    """Discovery prompt includes image/headshot request."""
+    assert "image_url" in DISCOVERY_USER or "photo" in DISCOVERY_USER.lower()
+
+
+def test_refine_prompt_asks_for_image():
+    """Refine prompt includes image filling."""
+    assert "image_url" in REFINE_USER or "headshot" in REFINE_USER.lower()

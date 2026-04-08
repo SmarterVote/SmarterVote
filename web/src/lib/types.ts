@@ -127,6 +127,7 @@ export interface PollEntry {
 }
 
 export interface Race {
+  schema_version?: string;
   id: string;
   election_date: string;
   candidates: Candidate[];
@@ -142,6 +143,7 @@ export interface Race {
   polling_note?: string;
   reviews?: AgentReview[];
   validation_grade?: ValidationGrade;
+  post_run_analysis?: { model: string; analyzed_at: string; analysis: string };
   agent_metrics?: AgentMetrics;
 }
 

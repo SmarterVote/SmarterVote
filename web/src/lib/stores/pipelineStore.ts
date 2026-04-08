@@ -3,6 +3,12 @@
  */
 import { writable, derived } from "svelte/store";
 import { logger } from "$lib/utils/logger";
+import {
+  MAX_LOG_ENTRIES,
+  OUTPUT_TOO_LARGE_BYTES,
+  OUTPUT_DISPLAY_MAX_BYTES,
+  LARGE_OBJECT_KEY_THRESHOLD,
+} from "$lib/config/constants";
 import type {
   RunStatus,
   RunStep,
@@ -76,7 +82,7 @@ export const outputTooLarge = derived(pipelineStore, ($pipeline) => {
   if ($pipeline.output === null || $pipeline.output === undefined) return false;
   try {
     const jsonString = JSON.stringify($pipeline.output, null, 2);
-    return jsonString.length > 5000000;
+    return jsonString.length > OUTPUT_TOO_LARGE_BYTES;
   } catch {
     return true;
   }
@@ -88,13 +94,13 @@ export const safeOutputDisplay = derived(pipelineStore, ($pipeline) => {
   try {
     if (typeof $pipeline.output === "object" && $pipeline.output !== null) {
       const keys = Object.keys($pipeline.output);
-      if (keys.length > 1000) {
+      if (keys.length > LARGE_OBJECT_KEY_THRESHOLD) {
         return `[LARGE OBJECT DETECTED]\nObject has ${keys.length} top-level keys\nUse "Download" to get complete output`;
       }
     }
 
     const jsonString = JSON.stringify($pipeline.output, null, 2);
-    const maxDisplaySize = 500000;
+    const maxDisplaySize = OUTPUT_DISPLAY_MAX_BYTES;
 
     if (jsonString.length > maxDisplaySize) {
       const truncated = jsonString.substring(0, maxDisplaySize);
@@ -155,8 +161,8 @@ export const pipelineActions = {
   addLog: (log: LogEntry) => {
     pipelineStore.update((state) => {
       const newLogs =
-        state.logs.length >= 500
-          ? [...state.logs.slice(-499), log]
+        state.logs.length >= MAX_LOG_ENTRIES
+          ? [...state.logs.slice(-(MAX_LOG_ENTRIES - 1)), log]
           : [...state.logs, log];
       return { ...state, logs: newLogs };
     });

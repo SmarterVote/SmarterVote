@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -26,7 +27,7 @@ from pydantic import BaseModel
 
 from .models import RunInfo, RunStatus
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pipeline")
 
 _COLLECTION = "races"
 ROOT = Path(__file__).resolve().parents[2]
@@ -109,6 +110,7 @@ class RaceManager:
         self._local_races: Dict[str, RaceRecord] = {}
         self._local_runs: Dict[str, Dict[str, RunInfo]] = {}  # race_id -> {run_id: RunInfo}
         self._deleted_run_ids: set = set()  # track deleted runs to prevent ghost Firestore writes
+        self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="race-mgr")
         self._init_store()
 
     def _init_store(self) -> None:
@@ -372,16 +374,18 @@ class RaceManager:
         has_local_published = pub_path.exists()
 
         now = _now_iso()
+        has_any_draft = has_local_draft or has_gcs_draft
         if has_local_published or has_gcs_published:
             published_at = (race.published_at if race else None) or now
+            draft_at = (race.draft_updated_at if race else None) or (now if has_any_draft else None)
             return self.upsert_race(
                 race_id,
                 status="published",
                 published_at=published_at,
-                draft_updated_at=(race.draft_updated_at if race else None) or now,
+                draft_updated_at=draft_at,
                 current_run_id=None,
             )
-        if has_local_draft or has_gcs_draft:
+        if has_any_draft:
             return self.upsert_race(
                 race_id,
                 status="draft",
@@ -470,8 +474,6 @@ class RaceManager:
             "quality_score": quality,
             "freshness": freshness,
         }
-        if updated_utc:
-            changes["draft_updated_at"] = updated_utc
 
         data.update({k: v for k, v in changes.items() if v is not None})
         record = RaceRecord(**data)
@@ -487,11 +489,7 @@ class RaceManager:
         if self._db is not None:
             data = run_info.model_dump(mode="json")
             data.pop("logs", None)
-            threading.Thread(
-                target=self._write_run_firestore,
-                args=(race_id, run_info.run_id, data),
-                daemon=True,
-            ).start()
+            self._executor.submit(self._write_run_firestore, race_id, run_info.run_id, data)
 
     def get_run(self, race_id: str, run_id: str) -> Optional[RunInfo]:
         # Check local cache first
@@ -740,11 +738,7 @@ class RaceManager:
         # are consistent even though the Firestore write is asynchronous.
         self._local_races[record.race_id] = record
         if self._db is not None:
-            threading.Thread(
-                target=self._write_race_firestore,
-                args=(record,),
-                daemon=True,
-            ).start()
+            self._executor.submit(self._write_race_firestore, record)
 
     def _flush_race_to_firestore(self, record: RaceRecord) -> None:
         """Synchronously write a race record to Firestore.
