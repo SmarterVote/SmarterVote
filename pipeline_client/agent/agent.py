@@ -376,4 +376,14 @@ async def run_agent(
             f"Top-level keys present: {list(race_json.keys())}. Re-queue the race to retry."
         )
 
+    # Full schema validation against RaceJSON — soft check so later phases
+    # (refinement, iteration) can still fix issues.  Log every validation
+    # error but never hard-fail here.
+    try:
+        from shared.models import RaceJSON as _RaceJSONModel
+        _RaceJSONModel.model_validate(race_json)
+        log("info", "Schema validation passed — output conforms to RaceJSON v0.3")
+    except Exception as schema_exc:
+        log("warning", f"Schema validation warnings (non-fatal): {schema_exc}")
+
     return race_json

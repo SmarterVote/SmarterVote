@@ -242,12 +242,31 @@ class RunManager:
             self.detach_run_logger(run_id)
             self._persist_background(run_info)
             return run_info
+        # The run may have already left active_runs (agent task finished or
+        # crashed) but still be sitting in local cache / Firestore with a
+        # stale "running" or "pending" status.  Update it so the UI can
+        # proceed to delete it.
+        run_info = self._local_history.get(run_id)
+        if run_info is None and self._db is not None:
+            try:
+                doc = self._db.collection(_COLLECTION).document(run_id).get()
+                if doc.exists:
+                    run_info = RunInfo(**(doc.to_dict() or {}))
+            except Exception:
+                logger.exception("Firestore get failed during cancel fallback for run %s", run_id)
+        if run_info and run_info.status in (RunStatus.PENDING, RunStatus.RUNNING):
+            run_info.status = RunStatus.CANCELLED
+            run_info.completed_at = datetime.now(timezone.utc)
+            self._persist_background(run_info)
+            return run_info
         return None
 
     def delete_run(self, run_id: str) -> bool:
         """Delete a completed/failed/cancelled run from history. Returns True if deleted."""
         if run_id in self.active_runs:
             return False  # Cannot delete an active run; cancel it first
+        # Always evict from local cache so get_run() stops returning it
+        self._local_history.pop(run_id, None)
         if self._db is not None:
             try:
                 doc_ref = self._db.collection(_COLLECTION).document(run_id)
@@ -259,15 +278,18 @@ class RunManager:
                 logger.exception("Firestore delete failed for run %s", run_id)
                 return False
         else:
-            if run_id in self._local_history:
-                del self._local_history[run_id]
-                return True
-            return False
+            # local-only mode: cache eviction above was the delete
+            return True
 
     def get_run(self, run_id: str) -> Optional[RunInfo]:
         """Get run information."""
         if run_id in self.active_runs:
             return self.active_runs[run_id]
+        # Check local cache first — covers the window between active_runs
+        # removal and the async Firestore write completing.
+        cached = self._local_history.get(run_id)
+        if cached is not None:
+            return cached
         if self._db is not None:
             try:
                 doc = self._db.collection(_COLLECTION).document(run_id).get()
@@ -276,8 +298,6 @@ class RunManager:
                     return RunInfo(**data)
             except Exception:
                 logger.exception("Firestore get failed for run %s", run_id)
-        else:
-            return self._local_history.get(run_id)
         return None
 
     def list_active_runs(self) -> List[RunInfo]:
@@ -355,16 +375,17 @@ class RunManager:
 
     def _persist_background(self, run_info: RunInfo) -> None:
         """Fire-and-forget: persist a completed/failed/cancelled run to Firestore (or local dict)."""
+        # Always cache locally so get_run() can find the run immediately
+        # (before the async Firestore write finishes).
+        self._local_history[run_info.run_id] = run_info
+        if len(self._local_history) > _MAX_LOCAL_HISTORY:
+            oldest_key = next(iter(self._local_history))
+            del self._local_history[oldest_key]
+
         if self._db is not None:
             data = run_info.model_dump(mode="json")
             data.pop("logs", None)  # logs are ephemeral; not stored in Firestore
             self._write_executor.submit(self._write_firestore_data, run_info.run_id, data)
-        else:
-            # Local dev: store in-memory (ephemeral), evict oldest when full
-            self._local_history[run_info.run_id] = run_info
-            if len(self._local_history) > _MAX_LOCAL_HISTORY:
-                oldest_key = next(iter(self._local_history))
-                del self._local_history[oldest_key]
 
     def _write_firestore_data(self, run_id: str, data: dict) -> None:
         """Write a pre-serialized run snapshot to Firestore (runs inside the write executor)."""

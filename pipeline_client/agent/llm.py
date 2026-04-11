@@ -245,6 +245,8 @@ async def _agent_loop(
     nudge_at = max(int(max_iterations / 1.5), 3)
     _extra_tools = extra_tools or []
     _extra_handlers = extra_tool_handlers or {}
+    _json_parse_failures = 0
+    _MAX_JSON_RETRIES = 3
 
     for iteration in range(max_iterations):
         log("info", f"  [{phase_name}] iteration {iteration + 1}/{max_iterations} — calling {model}...")
@@ -408,7 +410,13 @@ async def _agent_loop(
             log("info", f"  [{phase_name}] JSON parsed OK")
             return parsed
         except (json.JSONDecodeError, ValueError) as exc:
-            log("warning", f"  [{phase_name}] bad JSON ({exc}) — retrying")
+            _json_parse_failures += 1
+            if _json_parse_failures >= _MAX_JSON_RETRIES:
+                raise RuntimeError(
+                    f"[{phase_name}] failed to produce valid JSON after "
+                    f"{_json_parse_failures} attempts. Last error: {exc}"
+                )
+            log("warning", f"  [{phase_name}] bad JSON ({exc}) — retry {_json_parse_failures}/{_MAX_JSON_RETRIES}")
             messages.append(message.model_dump())
             messages.append({
                 "role": "user",

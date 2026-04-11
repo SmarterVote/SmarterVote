@@ -156,9 +156,8 @@ class LoggingManager:
 
     async def broadcast_log(self, log_entry: LogEntry):
         """Broadcast a log entry to relevant WebSocket connections."""
-        # Add to buffer
-        with self.lock:
-            self.log_buffer.append(log_entry)
+        # NOTE: Do NOT append to log_buffer here — add_log_to_queue() already
+        # buffers the entry before scheduling this coroutine.
 
         # Determine which connections should receive this log
         target_connections = set()

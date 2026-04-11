@@ -13,7 +13,7 @@
   export let startStep = "";
   export let endStep = "";
   export let selectedRun: RunHistoryItem | null = null;
-  export let selectedRunId = "";
+  export let selectedRunId: string | null = null;
   export let runHistory: RunHistoryItem[] = [];
   export let isExecuting = false;
   export let currentStep: string | null = null;
@@ -81,7 +81,7 @@
             bind:value={selectedRunId}
             on:change={handleRunSelect}
           >
-            <option value="" selected>Select existing run...</option>
+            <option value={null} selected>Select existing run...</option>
             {#each runHistory as run}
               <option value={run.run_id}>
                 Run {run.display_id} · {run.last_step || "Unknown Step"} ·

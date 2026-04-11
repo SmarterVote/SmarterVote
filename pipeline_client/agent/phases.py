@@ -67,9 +67,6 @@ from .web_tools import _get_search_cache
 # Per-candidate, per-issue sub-agent
 # ---------------------------------------------------------------------------
 
-_HANDOFF_WINDOW = 2
-
-
 def _build_handoff_context(
     handoffs: List[Dict[str, Any]],
     cached_info: Dict[str, Any] | None,
@@ -77,7 +74,7 @@ def _build_handoff_context(
     """Build a handoff context string for the issue sub-agent."""
     parts: List[str] = []
 
-    recent = handoffs[-_HANDOFF_WINDOW:] if handoffs else []
+    recent = handoffs if handoffs else []
     if recent:
         parts.append("Previous stances already written for this candidate:")
         for h in recent:
@@ -186,8 +183,17 @@ async def _run_issue_research_for_candidate(
                 log(
                     "error",
                     f"    Issue sub-agent skipped for {candidate_name}/{issue} "
-                    f"due to OpenAI policy violation (prompt flagged as inappropriate)"
+                    f"due to OpenAI policy violation — setting low-confidence placeholder"
                 )
+                # Set a low-confidence placeholder so the gap is visible and
+                # fixable in later phases (refinement / iteration).
+                handlers["set_issue_stance"]({
+                    "candidate_name": candidate_name,
+                    "issue": issue,
+                    "stance": "No public position found (research blocked by content policy)",
+                    "confidence": "low",
+                    "sources": [],
+                })
             else:
                 log("warning", f"    Issue sub-agent failed for {candidate_name}/{issue}: {exc}")
         except Exception as exc:

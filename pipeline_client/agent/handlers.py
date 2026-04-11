@@ -7,6 +7,7 @@ LLM receives as the tool result.
 """
 
 import json
+from difflib import get_close_matches
 from typing import Any, Callable, Dict, Optional
 
 from pipeline_client.agent.prompts import CANONICAL_ISSUES
@@ -81,7 +82,7 @@ def _make_editing_handlers(
         }
         has_data_fix_signal = any(kw in reason_lower for kw in _DATA_FIX_KEYWORDS)
 
-        if has_data_fix_signal or (reason and not has_withdrawal_signal):
+        if has_data_fix_signal and not has_withdrawal_signal:
             log(
                 "warning",
                 f"    ⚠️ remove_candidate('{name}') BLOCKED — reason does not confirm "
@@ -142,7 +143,7 @@ def _make_editing_handlers(
     def set_issue_stance(args: Dict[str, Any]) -> str:
         name, issue = args["candidate_name"], args["issue"]
         if issue not in _CANONICAL_ISSUE_SET:
-            close = [ci for ci in CANONICAL_ISSUES if issue.lower() in ci.lower() or ci.lower() in issue.lower()]
+            close = get_close_matches(issue, CANONICAL_ISSUES, n=1, cutoff=0.4)
             hint = f" Did you mean: {close[0]!r}?" if close else f" Valid issues: {', '.join(CANONICAL_ISSUES)}."
             return f"ERROR: '{issue}' is not a canonical issue.{hint}"
         c = _find_candidate(name)
@@ -353,9 +354,9 @@ def _make_editing_handlers(
     def read_profile(args: Dict[str, Any]) -> str:
         section = args.get("section", "full")
         if section == "full":
-            return json.dumps(race_json, indent=2, default=str)[:16000]
+            return json.dumps(race_json, indent=2, default=str)
         if section == "candidates":
-            return json.dumps(race_json.get("candidates", []), indent=2, default=str)[:16000]
+            return json.dumps(race_json.get("candidates", []), indent=2, default=str)
         if section == "issues":
             compact = {}
             for c in race_json.get("candidates", []):
@@ -369,7 +370,7 @@ def _make_editing_handlers(
                 compact[c.get("name", "?")] = issues
             return json.dumps(compact, indent=2)
         if section == "polling":
-            return json.dumps(race_json.get("polling", []), indent=2, default=str)[:8000]
+            return json.dumps(race_json.get("polling", []), indent=2, default=str)
         if section == "meta":
             return json.dumps(
                 {k: race_json.get(k) for k in

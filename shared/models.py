@@ -210,6 +210,9 @@ class PollMatchup(BaseModel):
     def validate_parallel_arrays(self) -> "PollMatchup":
         if self.candidates and self.percentages and len(self.candidates) != len(self.percentages):
             raise ValueError("candidates and percentages must have the same length")
+        for pct in self.percentages:
+            if not (0 <= pct <= 100):
+                raise ValueError(f"percentage {pct} out of range 0-100")
         return self
 
 

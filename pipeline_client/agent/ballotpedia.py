@@ -150,7 +150,7 @@ async def lookup_candidate_data(candidate_name: str) -> Dict[str, Any]:
             }
 
     except Exception as exc:
-        logger.debug("Ballotpedia lookup failed for %r: %s", candidate_name, exc)
+        logger.warning("Ballotpedia lookup failed for %r: %s", candidate_name, exc)
         return empty
 
 

@@ -4,7 +4,7 @@
   import { getStatusClass } from "$lib/utils/pipelineUtils";
 
   export let runHistory: RunHistoryItem[] = [];
-  export let selectedRunId = "";
+  export let selectedRunId: string | null = null;
   export let isRefreshing = false;
 
   const dispatch = createEventDispatcher<{

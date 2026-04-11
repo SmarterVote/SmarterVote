@@ -37,7 +37,7 @@ interface PipelineState {
   logs: LogEntry[];
   runHistory: RunHistoryItem[];
   selectedRun: RunHistoryItem | null;
-  selectedRunId: string;
+  selectedRunId: string | null;
 
   // UI state
   logFilter: "all" | "debug" | "info" | "warning" | "error";
@@ -62,7 +62,7 @@ const initialState: PipelineState = {
   logs: [],
   runHistory: [],
   selectedRun: null,
-  selectedRunId: "",
+  selectedRunId: null,
 
   logFilter: "all",
   isRefreshing: false,
@@ -180,7 +180,7 @@ export const pipelineActions = {
     pipelineStore.update((state) => ({ ...state, runHistory }));
   },
 
-  setSelectedRun: (run: RunHistoryItem | null, runId: string = "") => {
+  setSelectedRun: (run: RunHistoryItem | null, runId: string | null = null) => {
     pipelineStore.update((state) => ({
       ...state,
       selectedRun: run,
@@ -207,13 +207,25 @@ export const pipelineActions = {
   ) => {
     pipelineStore.update((state) => {
       if (!state.selectedRun) return state;
+      const updatedSteps = state.selectedRun.steps.map((s) =>
+        s.name === stepName ? { ...s, status, ...extras } : s
+      );
       const updatedSelectedRun = {
         ...state.selectedRun,
-        steps: state.selectedRun.steps.map((s) =>
-          s.name === stepName ? { ...s, status, ...extras } : s
-        ),
+        steps: updatedSteps,
       };
-      return { ...state, selectedRun: updatedSelectedRun };
+      // Also update the matching runHistory entry so re-selecting
+      // the run from history doesn't revert to stale step data.
+      const updatedRunHistory = state.runHistory.map((r) =>
+        r.run_id === state.selectedRun!.run_id
+          ? { ...r, steps: updatedSteps }
+          : r
+      );
+      return {
+        ...state,
+        selectedRun: updatedSelectedRun,
+        runHistory: updatedRunHistory,
+      };
     });
   },
 };

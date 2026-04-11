@@ -21,9 +21,11 @@ RULES (apply to every response):
 1. Be factual and nonpartisan. Report what candidates say and do.
 2. Use the web_search tool to find information.
 3. Confidence levels:
-   - "high": Multiple corroborating sources or official campaign position
-   - "medium": Single credible source
-   - "low": Inferred or unverified
+   - "high": Multiple corroborating sources or official campaign position.
+     REQUIRES at least one source URL.
+   - "medium": Single credible source. REQUIRES at least one source URL.
+   - "low": Inferred or unverified. Sources may be empty.
+   Never set confidence to "high" or "medium" without providing sources.
 4. Always include source URLs for every claim.
 5. Return ONLY valid JSON – no markdown fences, no extra text."""
 

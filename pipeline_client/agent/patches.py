@@ -9,7 +9,9 @@ def _apply_meta_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any
 
     if "polling" in patch and isinstance(patch["polling"], list) and patch["polling"]:
         existing_polls = race_json.get("polling", [])
-        race_json["polling"] = patch["polling"] + existing_polls
+        seen = {(p.get("source"), p.get("date")) for p in existing_polls if isinstance(p, dict)}
+        deduped_new = [p for p in patch["polling"] if isinstance(p, dict) and (p.get("source"), p.get("date")) not in seen]
+        race_json["polling"] = deduped_new + existing_polls
 
     if patch.get("polling_note"):
         race_json["polling_note"] = patch["polling_note"]
@@ -20,9 +22,9 @@ def _apply_meta_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any
         pc = patch_candidates.get(name)
         if not pc:
             continue
-        if pc.get("summary"):
+        if pc.get("summary") is not None:
             candidate["summary"] = pc["summary"]
-        if pc.get("donor_summary"):
+        if pc.get("donor_summary") is not None:
             candidate["donor_summary"] = pc["donor_summary"]
     log("info", f"  Meta patch applied — {len(patch_candidates)} candidates updated")
 

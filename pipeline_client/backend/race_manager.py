@@ -425,7 +425,10 @@ class RaceManager:
         """Remove published status. Race becomes draft if draft exists, else empty."""
         race = self.get_race(race_id)
         new_status = "draft" if (race and race.draft_updated_at) else "empty"
-        return self.upsert_race(race_id, status=new_status, published_at=None)
+        record = self.upsert_race(race_id, status=new_status, published_at=None)
+        # Flush synchronously so all Cloud Run instances see the change immediately
+        self._flush_race_to_firestore(record)
+        return record
 
     def update_race_metadata(self, race_id: str, race_data: Dict[str, Any], *, active_draft: bool = True) -> RaceRecord:
         """Update race metadata from RaceJSON content (e.g. after agent run or on hydration)."""
