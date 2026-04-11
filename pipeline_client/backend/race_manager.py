@@ -57,6 +57,7 @@ class RaceRecord(BaseModel):
     # Quality
     candidate_count: int = 0
     quality_score: Optional[int] = None
+    quality_grade: Optional[str] = None  # A | B | C | D | F
     freshness: Optional[str] = None  # fresh | recent | aging | stale
 
     # Pipeline / Queue
@@ -437,6 +438,8 @@ class RaceManager:
         quality = _compute_quality(candidate_count)
         updated_utc = race_data.get("updated_utc")
         freshness = _compute_freshness(updated_utc)
+        vg = race_data.get("validation_grade")
+        quality_grade = vg.get("grade") if isinstance(vg, dict) else None
 
         fields: Dict[str, Any] = {
             "title": race_data.get("title"),
@@ -445,6 +448,7 @@ class RaceManager:
             "election_date": race_data.get("election_date"),
             "candidate_count": candidate_count,
             "quality_score": quality,
+            "quality_grade": quality_grade,
             "freshness": freshness,
         }
         if active_draft:
@@ -468,6 +472,9 @@ class RaceManager:
         updated_utc = race_data.get("updated_utc")
         freshness = _compute_freshness(updated_utc)
 
+        vg = race_data.get("validation_grade")
+        quality_grade = vg.get("grade") if isinstance(vg, dict) else None
+
         data = existing.model_dump()
         changes: Dict[str, Any] = {
             "title": race_data.get("title"),
@@ -476,6 +483,7 @@ class RaceManager:
             "election_date": race_data.get("election_date"),
             "candidate_count": candidate_count,
             "quality_score": quality,
+            "quality_grade": quality_grade,
             "freshness": freshness,
         }
 
@@ -634,6 +642,8 @@ class RaceManager:
             data = info["data"]
             candidates = data.get("candidates", [])
             updated_utc = data.get("updated_utc")
+            vg = data.get("validation_grade")
+            quality_grade = vg.get("grade") if isinstance(vg, dict) else None
 
             status = "published" if info["published"] else "draft"
             record = RaceRecord(
@@ -647,6 +657,7 @@ class RaceManager:
                 draft_updated_at=updated_utc if info["draft"] else None,
                 candidate_count=len(candidates),
                 quality_score=_compute_quality(len(candidates)),
+                quality_grade=quality_grade,
                 freshness=_compute_freshness(updated_utc),
                 created_at=now,
                 updated_at=now,
@@ -710,6 +721,8 @@ class RaceManager:
                 data = info["data"]
                 candidates = data.get("candidates", [])
                 updated_utc = data.get("updated_utc")
+                vg = data.get("validation_grade")
+                quality_grade = vg.get("grade") if isinstance(vg, dict) else None
                 status = "published" if info["published"] else "draft"
 
                 record = RaceRecord(
@@ -723,6 +736,7 @@ class RaceManager:
                     draft_updated_at=updated_utc if info.get("draft") else None,
                     candidate_count=len(candidates),
                     quality_score=_compute_quality(len(candidates)),
+                    quality_grade=quality_grade,
                     freshness=_compute_freshness(updated_utc),
                     created_at=now,
                     updated_at=now,

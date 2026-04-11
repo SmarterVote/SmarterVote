@@ -187,13 +187,14 @@
     }
   }
 
-  function freshnessBadgeClass(f?: string) {
-    switch (f) {
-      case "fresh": return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200";
-      case "recent": return "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200";
-      case "aging": return "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200";
-      case "stale": return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200";
-      default: return "bg-surface-alt text-content-muted";
+  function gradeBadgeClass(g: string) {
+    switch (g) {
+      case "A": return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-200";
+      case "B": return "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-200";
+      case "C": return "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border-orange-200";
+      case "D": return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-200";
+      case "F": return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-200";
+      default: return "bg-surface-alt text-content-muted border-stroke";
     }
   }
 
@@ -320,7 +321,6 @@
               <th class="px-3 py-3 text-left font-medium text-content-muted cursor-pointer hover:text-content whitespace-nowrap" on:click={() => toggleSort("draft_updated_at")}>
                 Updated {sortIcon("draft_updated_at")}
               </th>
-              <th class="px-3 py-3 text-left font-medium text-content-muted whitespace-nowrap">Freshness</th>
               <th class="px-3 py-3 text-left font-medium text-content-muted cursor-pointer hover:text-content whitespace-nowrap" on:click={() => toggleSort("status")}>
                 Status {sortIcon("status")}
               </th>
@@ -368,13 +368,6 @@
                 <td class="px-3 py-3 text-content-muted text-center font-mono">{row.candidate_count || "—"}</td>
                 <td class="px-3 py-3 text-content-muted whitespace-nowrap">{formatDate(row.draft_updated_at)}</td>
                 <td class="px-3 py-3">
-                  {#if row.freshness}
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium {freshnessBadgeClass(row.freshness)}">{row.freshness}</span>
-                  {:else}
-                    <span class="text-content-faint">—</span>
-                  {/if}
-                </td>
-                <td class="px-3 py-3">
                   <div class="flex items-center gap-1.5">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium {statusBadgeClass(row.status)}">
                       {row.status}
@@ -394,7 +387,11 @@
                 </td>
                 <td class="px-3 py-3 text-content-muted text-center font-mono">{row.total_runs}</td>
                 <td class="px-3 py-3">
-                  {#if row.quality_score != null}
+                  {#if row.quality_grade}
+                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full border {gradeBadgeClass(row.quality_grade)}">
+                      {row.quality_grade}
+                    </span>
+                  {:else if row.quality_score != null}
                     <QualityBadge score={row.quality_score} />
                   {:else}
                     <span class="text-content-faint">—</span>

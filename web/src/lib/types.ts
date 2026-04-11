@@ -385,6 +385,7 @@ export interface RaceRecord {
 
   candidate_count: number;
   quality_score?: number;
+  quality_grade?: "A" | "B" | "C" | "D" | "F";
   freshness?: string;
 
   queue_position?: number;

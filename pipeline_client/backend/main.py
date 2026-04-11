@@ -1173,11 +1173,12 @@ async def get_run(run_id: str) -> RunInfo:
 
 @app.delete("/runs/{run_id}", dependencies=[Depends(verify_token)])
 async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run or delete a completed/failed/cancelled run from history."""
+    """Cancel an active run and/or delete it from history."""
     run_info = run_manager.get_run(run_id)
     if not run_info:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    # Cancel first if still active
     if run_info.status in ["pending", "running"]:
         run_manager.cancel_run(run_id)
         await logging_manager.send_run_status(run_id, "cancelled")
@@ -1187,16 +1188,13 @@ async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
             race = race_manager.get_race(race_id_from_payload)
             if race and race.status in ("running", "queued"):
                 race_manager.cancel_race(race_id_from_payload)
-        return {"message": "Run cancelled", "run_id": run_id}
-    else:
-        deleted = run_manager.delete_run(run_id)
-        # Also clean up from race_manager subcollection
-        race_id_from_payload = run_info.payload.get("race_id")
-        if race_id_from_payload:
-            race_manager.delete_run(race_id_from_payload, run_id)
-        if not deleted:
-            raise HTTPException(status_code=500, detail="Failed to delete run")
-        return {"message": "Run deleted", "run_id": run_id}
+
+    # Always delete after cancellation (or if already completed/failed/cancelled)
+    race_id_from_payload = run_info.payload.get("race_id")
+    if race_id_from_payload:
+        race_manager.delete_run(race_id_from_payload, run_id)
+    run_manager.delete_run(run_id)
+    return {"message": "Run deleted", "run_id": run_id}
 
 
 @app.get("/artifacts", dependencies=[Depends(verify_token)])
