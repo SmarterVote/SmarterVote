@@ -101,7 +101,14 @@ class QueueManager:
     def _load(self):
         """Load queue state from Firestore or local JSON file."""
         if self._use_firestore:
-            self._load_from_firestore()
+            self._load_from_firestore(mark_interrupted_running=True)
+        else:
+            self._load_from_json()
+
+    def refresh(self) -> None:
+        """Refresh queue state from the backing store without recovery side effects."""
+        if self._use_firestore:
+            self._load_from_firestore(mark_interrupted_running=False)
         else:
             self._load_from_json()
 
@@ -116,8 +123,12 @@ class QueueManager:
     def _delete_item_firestore(self, item_id: str) -> None:
         self._get_collection().document(item_id).delete()
 
-    def _load_from_firestore(self):
-        """Load all queue items from Firestore."""
+    def _load_from_firestore(self, *, mark_interrupted_running: bool):
+        """Load all queue items from Firestore.
+
+        Startup uses interruption recovery; runtime refreshes must not rewrite
+        live running items from other instances.
+        """
         try:
             collection = self._get_collection()
             docs = collection.stream()
@@ -126,14 +137,14 @@ class QueueManager:
                 data = doc.to_dict()
                 self._items.append(QueueItem(**data))
 
-            # Mark interrupted runs as failed on restart
-            for item in self._items:
-                if item.status == "running":
-                    item.status = "failed"
-                    item.error = "Server restarted during processing"
-                    item.completed_at = datetime.now(timezone.utc).isoformat()
-                    # Save the failed state back to Firestore
-                    collection.document(item.id).set(item.model_dump(mode="json"))
+            if mark_interrupted_running:
+                # Mark interrupted runs as failed on startup.
+                for item in self._items:
+                    if item.status == "running":
+                        item.status = "failed"
+                        item.error = "Server restarted during processing"
+                        item.completed_at = datetime.now(timezone.utc).isoformat()
+                        collection.document(item.id).set(item.model_dump(mode="json"))
 
             logger.info(f"QueueManager: loaded {len(self._items)} items from Firestore")
         except Exception:

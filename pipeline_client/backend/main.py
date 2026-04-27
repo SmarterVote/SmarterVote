@@ -243,6 +243,61 @@ def _get_race_gcs(race_id: str, gcs_prefix: str) -> Dict[str, Any] | None:
     return None
 
 
+def _prefer_cloud_storage() -> bool:
+    return bool(settings.is_cloud_run and settings.gcs_bucket)
+
+
+def _load_race_local(path: Path) -> Dict[str, Any] | None:
+    if not path.exists():
+        return None
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _load_race_json(race_id: str, *, gcs_prefix: str, local_dir: Path) -> Dict[str, Any] | None:
+    """Load race JSON using cloud-first precedence on Cloud Run."""
+    local_path = local_dir / f"{race_id}.json"
+    if _prefer_cloud_storage():
+        data = _get_race_gcs(race_id, gcs_prefix)
+        return data if data is not None else _load_race_local(local_path)
+    data = _load_race_local(local_path)
+    return data if data is not None else _get_race_gcs(race_id, gcs_prefix)
+
+
+def _load_retired_version_json(race_id: str, filename: str) -> Dict[str, Any] | None:
+    """Load retired version JSON using cloud-first precedence on Cloud Run."""
+    local_path = ROOT / "data" / "retired" / race_id / filename
+    if _prefer_cloud_storage():
+        gcs_bucket = settings.gcs_bucket
+        if gcs_bucket:
+            client = _get_gcs_client()
+            if client is not None:
+                try:
+                    bucket = client.bucket(gcs_bucket)
+                    blob = bucket.blob(f"retired/{race_id}/{filename}")
+                    if blob.exists():
+                        return json.loads(blob.download_as_text(encoding="utf-8"))
+                except Exception as exc:
+                    logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+        return _load_race_local(local_path)
+
+    data = _load_race_local(local_path)
+    if data is not None:
+        return data
+    gcs_bucket = settings.gcs_bucket
+    if gcs_bucket:
+        client = _get_gcs_client()
+        if client is not None:
+            try:
+                bucket = client.bucket(gcs_bucket)
+                blob = bucket.blob(f"retired/{race_id}/{filename}")
+                if blob.exists():
+                    return json.loads(blob.download_as_text(encoding="utf-8"))
+            except Exception as exc:
+                logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+    return None
+
+
 def _delete_race_gcs(race_id: str, gcs_prefix: str) -> bool:
     """Delete a race from GCS. Returns True if deleted."""
     gcs_bucket = settings.gcs_bucket
@@ -376,13 +431,7 @@ async def list_published_races() -> Dict[str, Any]:
 async def get_published_race(race_id: str) -> Dict[str, Any]:
     """Get full published race data for export/download."""
     _validate_race_id(race_id)
-    # Local first (dev), then GCS (cloud)
-    published_dir = ROOT / "data" / "published"
-    path = published_dir / f"{race_id}.json"
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    data = _get_race_gcs(race_id, "races")
+    data = _load_race_json(race_id, gcs_prefix="races", local_dir=ROOT / "data" / "published")
     if data:
         return data
     raise HTTPException(status_code=404, detail="Race not found")
@@ -424,12 +473,7 @@ async def list_draft_races() -> Dict[str, Any]:
 async def get_draft_race(race_id: str) -> Dict[str, Any]:
     """Get full draft race data."""
     _validate_race_id(race_id)
-    drafts_dir = ROOT / "data" / "drafts"
-    path = drafts_dir / f"{race_id}.json"
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    data = _get_race_gcs(race_id, "drafts")
+    data = _load_race_json(race_id, gcs_prefix="drafts", local_dir=ROOT / "data" / "drafts")
     if data:
         return data
     raise HTTPException(status_code=404, detail="Draft not found")
@@ -440,16 +484,9 @@ async def publish_draft(race_id: str) -> Dict[str, Any]:
     """Promote a draft to published and retire any replaced published version."""
     _validate_race_id(race_id)
 
-    # Load the draft data
-    draft_data = None
     drafts_dir = ROOT / "data" / "drafts"
     draft_path = drafts_dir / f"{race_id}.json"
-    if draft_path.exists():
-        with draft_path.open("r", encoding="utf-8") as f:
-            draft_data = json.load(f)
-
-    if draft_data is None:
-        draft_data = _get_race_gcs(race_id, "drafts")
+    draft_data = _load_race_json(race_id, gcs_prefix="drafts", local_dir=drafts_dir)
 
     if draft_data is None:
         raise HTTPException(status_code=404, detail="Draft not found")
@@ -596,15 +633,21 @@ async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
 async def cancel_race_queue(race_id: str) -> Dict[str, Any]:
     """Cancel a queued or running race."""
     _validate_race_id(race_id)
+    queue_manager.refresh()
     race = race_manager.get_race(race_id)
     if not race or race.status not in ("queued", "running"):
         raise HTTPException(status_code=404, detail="Race is not queued or running")
 
-    # Cancel in queue_manager
+    # Cancel in queue_manager (handles queued items with active runs)
     for item in queue_manager.get_all():
         if item.race_id == race_id and item.status in ("pending", "running"):
             queue_manager.cancel(item.id)
             break
+
+    # Cancel the run in run_manager so it no longer shows as "running"
+    if race.current_run_id:
+        run_manager.cancel_run(race.current_run_id)
+        await logging_manager.send_run_status(race.current_run_id, "cancelled")
 
     record = race_manager.cancel_race(race_id)
     return {"message": f"Race {race_id} cancelled", "race": record.model_dump(mode="json") if record else None}
@@ -826,25 +869,25 @@ async def list_race_versions(race_id: str) -> Dict[str, Any]:
                 prefix = f"retired/{race_id}/"
                 gcs_names = {v["filename"] for v in versions}
                 for blob in bucket.list_blobs(prefix=prefix):
-                fname = blob.name.split("/")[-1]
-                if not fname.endswith(".json") or fname in gcs_names:
-                    continue
-                stem = fname[:-5]
-                parts = stem.rsplit("-", 1)
-                source = parts[-1] if len(parts) == 2 else "unknown"
-                ts_raw = parts[0] if len(parts) == 2 else stem
-                try:
-                    ts = datetime.strptime(ts_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
-                except ValueError:
-                    ts = None
-                versions.append(
-                    {
-                        "filename": fname,
-                        "source": source,
-                        "archived_at": ts,
-                        "size_bytes": blob.size,
-                    }
-                )
+                    fname = blob.name.split("/")[-1]
+                    if not fname.endswith(".json") or fname in gcs_names:
+                        continue
+                    stem = fname[:-5]
+                    parts = stem.rsplit("-", 1)
+                    source = parts[-1] if len(parts) == 2 else "unknown"
+                    ts_raw = parts[0] if len(parts) == 2 else stem
+                    try:
+                        ts = datetime.strptime(ts_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).isoformat()
+                    except ValueError:
+                        ts = None
+                    versions.append(
+                        {
+                            "filename": fname,
+                            "source": source,
+                            "archived_at": ts,
+                            "size_bytes": blob.size,
+                        }
+                    )
             except Exception as exc:
                 logging.warning("Failed to list GCS retired versions for %s: %s", race_id, exc)
 
@@ -859,23 +902,9 @@ async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
     # Sanitize filename — must be a bare filename with no path separators
     if "/" in filename or "\\" in filename or not filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Invalid version filename")
-    local_path = ROOT / "data" / "retired" / race_id / filename
-    if local_path.exists():
-        with local_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    # Try GCS
-    gcs_bucket = settings.gcs_bucket
-    if gcs_bucket:
-        client = _get_gcs_client()
-        if client is not None:
-            try:
-                bucket = client.bucket(gcs_bucket)
-                blob = bucket.blob(f"retired/{race_id}/{filename}")
-                if blob.exists():
-                    data = blob.download_as_text(encoding="utf-8")
-                    return json.loads(data)
-            except Exception as exc:
-                logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+    data = _load_retired_version_json(race_id, filename)
+    if data is not None:
+        return data
     raise HTTPException(status_code=404, detail="Version not found")
 
 
@@ -886,24 +915,7 @@ async def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any
     if "/" in filename or "\\" in filename or not filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Invalid version filename")
 
-    # Load the retired version data
-    version_data = None
-    local_path = ROOT / "data" / "retired" / race_id / filename
-    if local_path.exists():
-        with local_path.open("r", encoding="utf-8") as f:
-            version_data = json.load(f)
-    else:
-        gcs_bucket = settings.gcs_bucket
-        if gcs_bucket:
-            client = _get_gcs_client()
-            if client is not None:
-                try:
-                    bucket = client.bucket(gcs_bucket)
-                    blob = bucket.blob(f"retired/{race_id}/{filename}")
-                    if blob.exists():
-                        version_data = json.loads(blob.download_as_text(encoding="utf-8"))
-                except Exception as exc:
-                    logging.warning("Failed to fetch GCS retired version %s/%s: %s", race_id, filename, exc)
+    version_data = _load_retired_version_json(race_id, filename)
 
     if version_data is None:
         raise HTTPException(status_code=404, detail="Retired version not found")
@@ -945,22 +957,12 @@ async def get_race_data(race_id: str, draft: bool = False) -> Dict[str, Any]:
     _validate_race_id(race_id)
 
     if draft:
-        drafts_dir = ROOT / "data" / "drafts"
-        path = drafts_dir / f"{race_id}.json"
-        if path.exists():
-            with path.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        data = _get_race_gcs(race_id, "drafts")
+        data = _load_race_json(race_id, gcs_prefix="drafts", local_dir=ROOT / "data" / "drafts")
         if data:
             return data
         raise HTTPException(status_code=404, detail="Draft not found")
 
-    published_dir = ROOT / "data" / "published"
-    path = published_dir / f"{race_id}.json"
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    data = _get_race_gcs(race_id, "races")
+    data = _load_race_json(race_id, gcs_prefix="races", local_dir=ROOT / "data" / "published")
     if data:
         return data
     raise HTTPException(status_code=404, detail="Race data not found")
@@ -1004,6 +1006,7 @@ async def run_agent_endpoint(request: AgentRequest) -> Dict[str, Any]:
 @app.get("/queue", dependencies=[Depends(verify_token)])
 async def get_queue() -> Dict[str, Any]:
     """Get all queue items with their status."""
+    queue_manager.refresh()
     items = queue_manager.get_all()
     return {
         "items": [item.model_dump(mode="json") for item in items],
@@ -1015,6 +1018,7 @@ async def get_queue() -> Dict[str, Any]:
 @app.post("/queue", dependencies=[Depends(verify_token)])
 async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
     """Add one or more races to the processing queue."""
+    queue_manager.refresh()
     added = []
     errors = []
     options = request.options.model_dump(exclude_unset=True) if request.options else {}
@@ -1039,6 +1043,7 @@ async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
 @app.delete("/queue/finished", dependencies=[Depends(verify_token)])
 async def clear_finished_queue() -> Dict[str, Any]:
     """Remove completed/failed/cancelled items from the queue."""
+    queue_manager.refresh()
     removed = queue_manager.clear_finished()
     return {"removed": removed}
 
@@ -1046,6 +1051,7 @@ async def clear_finished_queue() -> Dict[str, Any]:
 @app.delete("/queue/pending", dependencies=[Depends(verify_token)])
 async def clear_pending_queue() -> Dict[str, Any]:
     """Remove all pending (not yet started) items from the queue."""
+    queue_manager.refresh()
     removed_items = queue_manager.clear_pending()
     # Dequeue associated races so they don't stay stuck in "queued" status
     for item in removed_items:
@@ -1059,6 +1065,7 @@ async def clear_pending_queue() -> Dict[str, Any]:
 @app.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
 async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
     """Remove or cancel a queue item. Use force=true for stuck/broken items."""
+    queue_manager.refresh()
     if not force:
         if queue_manager.remove(item_id):
             return {"ok": True, "action": "removed"}
@@ -1396,3 +1403,302 @@ async def get_pipeline_metrics_summary() -> Dict[str, Any]:
         return await get_pipeline_metrics_store().get_summary()
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Pipeline metrics unavailable: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Admin chat endpoint
+# ---------------------------------------------------------------------------
+
+_ADMIN_CHAT_SYSTEM = """\
+You are an AI assistant embedded in the SmarterVote admin dashboard. You help administrators:
+
+1. Review and understand existing races (published and draft state, quality, recency).
+2. Decide which races need to be re-run or updated.
+3. Kick off new pipeline runs with the right settings.
+
+## Quality Grades
+- **A** (score ≥ 80): Comprehensive research, strong candidate coverage.
+- **B** (score ≥ 60): Good coverage, minor gaps.
+- **C** (score ≥ 40): Moderate coverage; consider a re-run.
+- **D** (score ≥ 20): Sparse data; likely needs a full re-run.
+- **F** (score < 20): Essentially empty; run required.
+
+## Freshness
+- **fresh**: Updated within the last 7 days.
+- **recent**: Updated within the last 30 days.
+- **aging**: Updated within the last 90 days.
+- **stale**: Not updated in 90+ days; strongly consider a refresh.
+
+## Available Run Options
+- cheap_mode (bool, default true): Use cheaper/faster models. Set false for higher quality output.
+- force_fresh (bool, default false): Ignore existing data, start the pipeline from scratch.
+- enabled_steps (list): Which steps to run: discovery, images, issues, finance, refinement, review, iteration. Null or omit = all steps.
+- research_model (str): Override the OpenAI research model (e.g. "gpt-4o", "gpt-4o-mini").
+- claude_model (str): Claude model for the review phase (e.g. "claude-opus-4-5").
+- max_candidates (int): Limit how many candidates to research in depth.
+- candidate_names (list[str]): Only research specific named candidates.
+- note (str): A short label attached to the run for easy identification.
+
+## When to suggest a run
+- When a user explicitly asks to run, update, refresh, or research a race.
+- When a race is stale or aging and the user asks about quality.
+- When the user asks for a high-quality or comprehensive run (suggest cheap_mode=false).
+
+## Inspecting a race in detail
+If the user asks detailed questions about a specific race (e.g. "what does the race say about issue X?",
+"show me candidate Y's bio", "what is the full content?"), append an INSPECT block at the END of your
+reply so the system can fetch the full race data and you can answer precisely in a follow-up:
+
+INSPECT:{"race_ids":["race-id-1","race-id-2"]}
+
+Rules for INSPECT:
+- Maximum 3 races per INSPECT block.
+- Only use race IDs from the list below.
+- Do not use both ACTION and INSPECT in the same reply — pick the most relevant one.
+- Do not wrap it in markdown code fences.
+
+## Producing actions
+When you want to queue a pipeline run, append ONE action block at the VERY END of your reply (nothing after it):
+
+ACTION:{"type":"queue_run","race_ids":["race-id"],"options":{"cheap_mode":true},"description":"One-line description of what this run will do"}
+
+Rules for ACTION:
+- Only one ACTION block per reply.
+- race_ids must be exact race IDs from the race list below.
+- If you are not triggering a run, omit the ACTION block entirely.
+- Do not wrap the ACTION block in markdown code fences.
+
+## Formatting
+- Use concise markdown: headers (##/###), bullet lists, **bold** for key terms.
+- Keep responses focused; avoid unnecessary padding.
+
+Current races in the system:
+"""
+
+
+class _AdminChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class _AdminChatRequest(BaseModel):
+    messages: List[_AdminChatMessage]
+
+
+def _build_race_context() -> str:
+    """Build a compact text summary of all known races for LLM context, enriched with race_manager metadata."""
+    published = _list_races_gcs("races")
+    if published is None:
+        published = _list_races_local(ROOT / "data" / "published")
+    drafts = _list_races_gcs("drafts")
+    if drafts is None:
+        drafts = _list_races_local(ROOT / "data" / "drafts")
+
+    # Build race_manager index for enrichment
+    rm_index: Dict[str, RaceRecord] = {}
+    try:
+        for rec in race_manager.list_races():
+            rm_index[rec.race_id] = rec
+    except Exception:
+        pass
+
+    def _race_line(r: Dict[str, Any], source: str) -> str:
+        rid = r["id"]
+        cands = ", ".join(
+            f"{c['name']} ({c.get('party', '?')})" for c in r.get("candidates", [])
+        )
+        updated = (r.get("updated_utc") or "")[:10]
+        rec = rm_index.get(rid)
+        grade = rec.quality_grade if rec else None
+        score = rec.quality_score if rec else None
+        freshness = rec.freshness if rec else None
+        runs = rec.requests_24h if rec else 0
+        last_run = (rec.last_run_at or "")[:10] if rec else ""
+        parts = [f"- [{source}] {rid}: {r.get('title', '?')}"]
+        parts.append(f"  Candidates: {cands or 'none'}")
+        parts.append(f"  Updated: {updated or 'unknown'}")
+        if grade:
+            parts.append(f"  Grade: {grade}" + (f" ({score})" if score is not None else ""))
+        if freshness:
+            parts.append(f"  Freshness: {freshness}")
+        if last_run:
+            parts.append(f"  Last run: {last_run}")
+        if runs:
+            parts.append(f"  Requests/24h: {runs}")
+        return " | ".join(parts)
+
+    lines: List[str] = ["### Published Races"]
+    for r in published:
+        lines.append(_race_line(r, "published"))
+    if not published:
+        lines.append("(none)")
+
+    lines.append("")
+    lines.append("### Draft Races")
+    for r in drafts:
+        lines.append(_race_line(r, "draft"))
+    if not drafts:
+        lines.append("(none)")
+
+    # Races known to race_manager but not in files (queued/running/failed)
+    known_ids = {r["id"] for r in published} | {r["id"] for r in drafts}
+    other = [rec for rid, rec in rm_index.items() if rid not in known_ids and rec.status not in ("empty",)]
+    if other:
+        lines.append("")
+        lines.append("### Other Known Races (queued/running/failed)")
+        for rec in other:
+            lines.append(
+                f"- {rec.race_id}: {rec.title or '?'} | Status: {rec.status}"
+                + (f" | Grade: {rec.quality_grade}" if rec.quality_grade else "")
+            )
+
+    return "\n".join(lines)
+
+
+def _load_full_race(race_id: str) -> Dict[str, Any] | None:
+    """Load the full race JSON for inspection. Tries published, then draft, then GCS."""
+    data = _get_race_gcs(race_id, "races")
+    if data:
+        return data
+    data = _get_race_gcs(race_id, "drafts")
+    if data:
+        return data
+    for local_dir in [ROOT / "data" / "published", ROOT / "data" / "drafts"]:
+        candidate = local_dir / f"{race_id}.json"
+        if candidate.exists():
+            try:
+                with open(candidate) as f:
+                    return json.load(f)
+            except Exception:
+                pass
+    return None
+
+
+async def _call_admin_llm(
+    system: str,
+    messages: List[Dict[str, str]],
+    max_tokens: int = 4096,
+) -> str:
+    """Call Anthropic (primary) or OpenAI (fallback) and return the reply text."""
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+
+    reply_text = ""
+    if anthropic_key:
+        try:
+            import anthropic as _anthropic  # type: ignore
+        except ImportError:
+            _anthropic = None  # type: ignore
+
+        if _anthropic is not None:
+            client = _anthropic.Anthropic(api_key=anthropic_key)
+            resp = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.messages.create(
+                    model="claude-haiku-4-5",
+                    max_tokens=max_tokens,
+                    system=system,
+                    messages=messages,
+                ),
+            )
+            reply_text = resp.content[0].text
+
+    if not reply_text and openai_key:
+        try:
+            import openai as _openai  # type: ignore
+        except ImportError as exc:
+            raise HTTPException(status_code=503, detail="openai package not installed") from exc
+
+        client = _openai.AsyncOpenAI(api_key=openai_key)
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            max_tokens=max_tokens,
+            messages=[{"role": "system", "content": system}] + messages,  # type: ignore[arg-type]
+        )
+        reply_text = resp.choices[0].message.content or ""
+
+    if not reply_text:
+        raise HTTPException(
+            status_code=503,
+            detail="No AI API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)",
+        )
+    return reply_text
+
+
+@app.post("/api/admin-chat", dependencies=[Depends(verify_token)])
+async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
+    """Chat with an AI assistant about races and pipeline runs."""
+    race_context = _build_race_context()
+    system_prompt = _ADMIN_CHAT_SYSTEM + race_context
+
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    try:
+        reply_text = await _call_admin_llm(system_prompt, messages)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("Admin chat LLM call failed")
+        raise HTTPException(status_code=503, detail=f"AI service error: {exc}") from exc
+
+    # Handle INSPECT directive — second LLM pass with full race data
+    inspect_match = re.search(r"\nINSPECT:(\{[^\n]+\})\s*$", reply_text)
+    if inspect_match:
+        try:
+            inspect_data = json.loads(inspect_match.group(1))
+            inspect_ids: List[str] = (inspect_data.get("race_ids") or [])[:3]
+            reply_text = reply_text[: inspect_match.start()].rstrip()
+
+            if inspect_ids:
+                race_details: List[str] = []
+                for rid in inspect_ids:
+                    full = _load_full_race(rid)
+                    if full:
+                        snippet = json.dumps(full)[:12000]  # cap at ~12KB per race
+                        race_details.append(f"=== {rid} ===\n{snippet}")
+                    else:
+                        race_details.append(f"=== {rid} ===\n(not found)")
+
+                inspect_system = system_prompt + "\n\n## Full Race Data\n" + "\n\n".join(race_details)
+                inspect_messages = messages + [{"role": "assistant", "content": reply_text}] if reply_text else messages
+                try:
+                    reply_text = await _call_admin_llm(inspect_system, inspect_messages)
+                except Exception:
+                    pass  # fall back to the partial reply already set
+        except (json.JSONDecodeError, ValueError, KeyError):
+            pass
+
+    # Parse optional ACTION block appended by the model
+    action: Dict[str, Any] | None = None
+    action_match = re.search(r"\nACTION:(\{[^\n]+\})\s*$", reply_text)
+    if action_match:
+        try:
+            action = json.loads(action_match.group(1))
+            reply_text = reply_text[: action_match.start()].rstrip()
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Build race_records for the action's races so the UI can show enriched cards
+    race_records: List[Dict[str, Any]] = []
+    if action and action.get("type") == "queue_run":
+        for rid in action.get("race_ids") or []:
+            rec = race_manager.get_race(rid)
+            if rec:
+                race_records.append(
+                    {
+                        "race_id": rec.race_id,
+                        "title": rec.title,
+                        "status": rec.status,
+                        "quality_grade": rec.quality_grade,
+                        "quality_score": rec.quality_score,
+                        "freshness": rec.freshness,
+                        "candidate_count": rec.candidate_count,
+                        "last_run_at": rec.last_run_at,
+                        "last_run_status": rec.last_run_status,
+                        "requests_24h": rec.requests_24h,
+                        "published_at": rec.published_at,
+                        "draft_updated_at": rec.draft_updated_at,
+                    }
+                )
+
+    return {"reply": reply_text, "action": action, "race_records": race_records}

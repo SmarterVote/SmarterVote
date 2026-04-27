@@ -16,6 +16,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .settings import settings
+
 logger = logging.getLogger("pipeline")
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,7 +88,25 @@ def acknowledge_alert(alert_id: str) -> bool:
 
 
 def _load_races(races_dir: Path) -> List[Dict[str, Any]]:
-    """Load all published race JSON files from the local data directory."""
+    """Load all published race JSON files from GCS in cloud mode or local disk."""
+    if settings.is_cloud_run and settings.gcs_bucket:
+        try:
+            from google.cloud import storage as gcs  # type: ignore
+
+            client = gcs.Client()
+            bucket = client.bucket(settings.gcs_bucket)
+            races = []
+            for blob in bucket.list_blobs(prefix="races/", timeout=30):
+                if not blob.name.endswith(".json"):
+                    continue
+                try:
+                    races.append(json.loads(blob.download_as_text()))
+                except Exception:
+                    logger.debug("Could not load race blob %s", blob.name, exc_info=True)
+            return races
+        except Exception:
+            logger.debug("Could not load published races from GCS", exc_info=True)
+
     races = []
     if not races_dir.exists():
         return races

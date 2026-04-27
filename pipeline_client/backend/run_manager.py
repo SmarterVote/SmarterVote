@@ -2,8 +2,8 @@
 Run management service for tracking pipeline executions.
 
 Storage strategy:
-- Active (pending/running) runs are kept in-memory only — Cloud Run is single-instance,
-  so this is safe and fast for hot-path updates.
+- Active (pending/running) runs are updated in-memory for the hot path and also
+    snapshotted to Firestore so other instances can serve fresh admin reads.
 - Completed/failed/cancelled runs are persisted to Firestore (collection: "pipeline_runs")
   via a single-threaded background writer so the hot path is never blocked.
 - Local dev (no FIRESTORE_PROJECT env var): completed runs live in an in-memory dict and
@@ -301,8 +301,40 @@ class RunManager:
         return None
 
     def list_active_runs(self) -> List[RunInfo]:
-        """List all active runs."""
-        return list(self.active_runs.values())
+        """List all active runs.
+
+        In Cloud Run, merge local hot-path state with Firestore snapshots so admin
+        reads stay consistent across instances.
+        """
+        runs: List[RunInfo] = list(self.active_runs.values())
+        active_ids = set(self.active_runs.keys())
+
+        if self._db is not None:
+            try:
+                docs = self._db.collection(_COLLECTION).stream()
+                for doc in docs:
+                    data = doc.to_dict() or {}
+                    run_id = data.get("run_id")
+                    status = data.get("status")
+                    if run_id in active_ids or status not in (RunStatus.PENDING, RunStatus.RUNNING, "pending", "running"):
+                        continue
+                    try:
+                        runs.append(RunInfo(**data))
+                    except Exception:
+                        logger.warning("Skipping corrupt active run doc %s", doc.id, exc_info=True)
+            except Exception:
+                logger.exception("Firestore list_active_runs query failed")
+
+        def _sort_key(r: RunInfo):
+            dt = r.started_at
+            if dt is None:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
+        runs.sort(key=_sort_key, reverse=True)
+        return runs
 
     def list_recent_runs(self, limit: int = 50) -> List[RunInfo]:
         """List recent runs (active in memory + history from Firestore)."""

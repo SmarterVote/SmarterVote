@@ -1,7 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
 
-  export let activeTab: "dashboard" | "races" | "runs" = "dashboard";
+  export let activeTab: "dashboard" | "races" | "runs" | "agent" = "dashboard";
   export let alertCount: number = 0;
   export let runsBadgeCount: number = 0;
 
@@ -9,6 +9,7 @@
     { id: "dashboard", label: "Dashboard" },
     { id: "races", label: "Races" },
     { id: "runs", label: "Runs" },
+    { id: "agent", label: "Agent" },
   ] as const;
 
   type TabId = typeof tabs[number]["id"];

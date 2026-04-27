@@ -32,7 +32,7 @@ jobs:
 
     - name: Run pipeline tests
       run: |
-        PYTHONPATH=. python -m pytest tests/test_pipeline.py -v
+        PYTHONPATH=. python -m pytest tests -v
 
   test-apis:
     name: Test API Services

@@ -504,10 +504,6 @@ class RaceManager:
             self._executor.submit(self._write_run_firestore, race_id, run_info.run_id, data)
 
     def get_run(self, race_id: str, run_id: str) -> Optional[RunInfo]:
-        # Check local cache first
-        cached = self._local_runs.get(race_id, {}).get(run_id)
-        if cached is not None:
-            return cached
         if self._db is not None:
             try:
                 doc = (
@@ -523,8 +519,9 @@ class RaceManager:
                     return run
             except Exception:
                 logger.exception("Firestore get_run failed for %s/%s", race_id, run_id)
-            return None
-        return None
+                return self._local_runs.get(race_id, {}).get(run_id)
+            return self._local_runs.get(race_id, {}).get(run_id)
+        return self._local_runs.get(race_id, {}).get(run_id)
 
     def list_runs(self, race_id: str, limit: int = 20) -> List[RunInfo]:
         if self._db is not None:

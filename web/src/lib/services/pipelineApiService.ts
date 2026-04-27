@@ -9,6 +9,40 @@ import {
 } from "$lib/config/constants";
 import type { RunInfo, Artifact, RunOptions, RunHistoryItem, RaceRecord } from "$lib/types";
 
+export interface AdminChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AdminChatAction {
+  type: string; // "queue_run"
+  race_ids?: string[];
+  options?: Record<string, unknown>;
+  description?: string;
+}
+
+/** Lightweight race metadata returned alongside a chat action */
+export interface AdminChatRaceRecord {
+  race_id: string;
+  title?: string;
+  status: string;
+  quality_grade?: string;
+  quality_score?: number;
+  freshness?: string;
+  candidate_count: number;
+  last_run_at?: string;
+  last_run_status?: string;
+  requests_24h: number;
+  published_at?: string;
+  draft_updated_at?: string;
+}
+
+export interface AdminChatResponse {
+  reply: string;
+  action: AdminChatAction | null;
+  race_records?: AdminChatRaceRecord[];
+}
+
 interface RunsResponse {
   runs: RunInfo[];
 }
@@ -584,6 +618,31 @@ export class PipelineApiService {
       API_TIMEOUT_DEFAULT
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+
+  // -- Admin chat ---------------------------------------------------------
+
+  /**
+   * Send a chat message to the admin AI assistant.
+   * Returns the assistant reply and an optional action to confirm.
+   */
+  async adminChat(
+    messages: AdminChatMessage[]
+  ): Promise<AdminChatResponse> {
+    const res = await fetchWithAuth(
+      `${this.apiBase}/api/admin-chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages }),
+      },
+      60_000 // allow up to 60 s for LLM response
+    );
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "Unknown error");
+      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
+    }
+    return await res.json();
   }
 
 }

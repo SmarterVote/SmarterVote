@@ -26,6 +26,7 @@
   import BatchQueueModal from "$lib/components/admin/BatchQueueModal.svelte";
   import RunDetailPanel from "$lib/components/admin/RunDetailPanel.svelte";
   import RunsTab from "$lib/components/admin/RunsTab.svelte";
+  import AdminChatTab from "$lib/components/admin/AdminChatTab.svelte";
 
   // Utilities
   import { debounce, safeJsonStringify } from "$lib/utils/pipelineUtils";
@@ -41,7 +42,7 @@
   let queuePollTimer: ReturnType<typeof setInterval> | null = null;
 
   // Tab state
-  let activeTab: "dashboard" | "races" | "runs" = "dashboard";
+  let activeTab: "dashboard" | "races" | "runs" | "agent" = "dashboard";
   let alertBadgeCount = 0;
 
   // Modal state
@@ -150,7 +151,7 @@
       // Restore tab and run detail from URL params
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab");
-      if (tabParam === "dashboard" || tabParam === "races" || tabParam === "runs") {
+      if (tabParam === "dashboard" || tabParam === "races" || tabParam === "runs" || tabParam === "agent") {
         activeTab = tabParam;
       }
       const runParam = params.get("run");
@@ -609,6 +610,11 @@
         </div>
       {/if}
     {/if}
+  {/if}
+
+  <!-- Agent chat tab -->
+  {#if activeTab === "agent"}
+    <AdminChatTab {apiService} />
   {/if}
 
   <!-- Runs tab -->

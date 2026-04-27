@@ -64,9 +64,9 @@ try {
         }
     }
 
-    Invoke-Step "Pipeline tests (tests/test_pipeline.py)" {
+    Invoke-Step "Pipeline tests (tests/)" {
         $env:PYTHONPATH = "."
-        Invoke-Expression "$python -m pytest tests/test_pipeline.py -v"
+        Invoke-Expression "$python -m pytest tests -v"
     }
 
     Invoke-Step "Races API tests" {

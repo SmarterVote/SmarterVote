@@ -1,0 +1,153 @@
+from pipeline_client.backend.models import RunInfo, RunStatus
+from pipeline_client.backend.queue_manager import QueueItem, QueueManager
+from pipeline_client.backend.run_manager import RunManager
+
+
+def test_refresh_from_firestore_does_not_fail_running_items(monkeypatch):
+    manager = QueueManager()
+    manager._use_firestore = True
+    manager._db = object()
+
+    running_item = QueueItem(
+        id="item-1",
+        race_id="ga-senate-2026",
+        status="running",
+        run_id="run-1",
+        created_at="2026-04-26T00:00:00+00:00",
+        started_at="2026-04-26T00:01:00+00:00",
+    )
+
+    writes: list[tuple[str, dict]] = []
+
+    class FakeDoc:
+        def __init__(self, data):
+            self._data = data
+
+        def to_dict(self):
+            return self._data
+
+    class FakeDocRef:
+        def __init__(self, item_id: str):
+            self.item_id = item_id
+
+        def set(self, data):
+            writes.append((self.item_id, data))
+
+    class FakeCollection:
+        def stream(self):
+            return [FakeDoc(running_item.model_dump(mode="json"))]
+
+        def document(self, item_id: str):
+            return FakeDocRef(item_id)
+
+    monkeypatch.setattr(manager, "_get_collection", lambda: FakeCollection())
+
+    manager.refresh()
+
+    assert [item.status for item in manager.get_all()] == ["running"]
+    assert writes == []
+
+
+def test_startup_load_marks_interrupted_running_items_failed(monkeypatch):
+    manager = QueueManager()
+    manager._use_firestore = True
+    manager._db = object()
+
+    running_item = QueueItem(
+        id="item-1",
+        race_id="ga-senate-2026",
+        status="running",
+        run_id="run-1",
+        created_at="2026-04-26T00:00:00+00:00",
+        started_at="2026-04-26T00:01:00+00:00",
+    )
+
+    writes: list[tuple[str, dict]] = []
+
+    class FakeDoc:
+        def __init__(self, data):
+            self._data = data
+
+        def to_dict(self):
+            return self._data
+
+    class FakeDocRef:
+        def __init__(self, item_id: str):
+            self.item_id = item_id
+
+        def set(self, data):
+            writes.append((self.item_id, data))
+
+    class FakeCollection:
+        def stream(self):
+            return [FakeDoc(running_item.model_dump(mode="json"))]
+
+        def document(self, item_id: str):
+            return FakeDocRef(item_id)
+
+    monkeypatch.setattr(manager, "_get_collection", lambda: FakeCollection())
+
+    manager._load_from_firestore(mark_interrupted_running=True)
+
+    assert manager.get_all()[0].status == "failed"
+    assert writes
+    assert writes[0][0] == "item-1"
+    assert writes[0][1]["status"] == "failed"
+
+
+def test_list_active_runs_merges_firestore_active_snapshots():
+    manager = RunManager()
+    manager._db = object()
+
+    local_active = RunInfo(
+        run_id="local-run",
+        status=RunStatus.RUNNING,
+        payload={"race_id": "ga-senate-2026"},
+        options={},
+        started_at="2026-04-26T00:02:00+00:00",
+        steps=[],
+    )
+    manager.active_runs = {local_active.run_id: local_active}
+
+    remote_active = RunInfo(
+        run_id="remote-run",
+        status=RunStatus.PENDING,
+        payload={"race_id": "az-senate-2026"},
+        options={},
+        started_at="2026-04-26T00:01:00+00:00",
+        steps=[],
+    )
+    remote_completed = RunInfo(
+        run_id="done-run",
+        status=RunStatus.COMPLETED,
+        payload={"race_id": "mi-senate-2026"},
+        options={},
+        started_at="2026-04-26T00:00:00+00:00",
+        steps=[],
+    )
+
+    class FakeDoc:
+        def __init__(self, data, doc_id: str):
+            self._data = data
+            self.id = doc_id
+
+        def to_dict(self):
+            return self._data
+
+    class FakeCollection:
+        def stream(self):
+            return [
+                FakeDoc(remote_active.model_dump(mode="json"), remote_active.run_id),
+                FakeDoc(remote_completed.model_dump(mode="json"), remote_completed.run_id),
+            ]
+
+    class FakeDb:
+        def collection(self, name: str):
+            assert name == "pipeline_runs"
+            return FakeCollection()
+
+    manager._db = FakeDb()
+
+    active_runs = manager.list_active_runs()
+
+    assert [run.run_id for run in active_runs] == ["local-run", "remote-run"]
