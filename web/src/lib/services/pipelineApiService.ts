@@ -42,6 +42,8 @@ export interface AdminChatResponse {
   reply: string;
   action: AdminChatAction | null;
   race_records?: AdminChatRaceRecord[];
+  question?: string | null;
+  thinking_steps?: string[];
 }
 
 interface RunsResponse {

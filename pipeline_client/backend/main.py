@@ -1454,7 +1454,23 @@ You are an AI assistant embedded in the SmarterVote admin dashboard. You help ad
 - claude_model (str): Claude model for the review phase (e.g. "claude-opus-4-5").
 - max_candidates (int): Limit how many candidates to research in depth.
 - candidate_names (list[str]): Only research specific named candidates.
+- target_no_info (bool, default false): Prioritise candidates with least existing issue data.
 - note (str): A short label attached to the run for easy identification.
+
+## Targeted Completion Runs
+When a race has `⚠ PARTIAL` or `⚠ NO ISSUE DATA` annotations, use targeted runs to fill gaps efficiently
+instead of re-running the full pipeline:
+
+- **Partial race — specific candidates missing**: Use `enabled_steps: ["issues", "refinement"]` +
+  `candidate_names: ["Name 1", "Name 2"]` to only research the missing candidates while skipping those
+  that are already complete.
+- **All candidates missing issues**: Use `enabled_steps: ["issues", "finance", "refinement"]` +
+  `target_no_info: true` to research the full roster without a fresh discovery pass.
+- **Single candidate deep-dive**: Pass `candidate_names: ["Name"]` with no `enabled_steps` restriction
+  for a full update of just that person.
+
+Example for a partial race where "Jordan Koteras" is missing:
+ACTION:{"type":"queue_run","race_ids":["nv-governor-2026"],"options":{"enabled_steps":["issues","refinement"],"candidate_names":["Jordan Koteras"],"note":"Fill missing issues"},"description":"Fill issue stances for Jordan Koteras"}
 
 ## When to suggest a run
 - When a user explicitly asks to run, update, refresh, or research a race.
@@ -1474,6 +1490,17 @@ Rules for INSPECT:
 - Do not use both ACTION and INSPECT in the same reply — pick the most relevant one.
 - Do not wrap it in markdown code fences.
 
+## Clarifying questions
+If you need more information before suggesting a run (e.g. quality level preference, which candidates, force-fresh vs update),
+ask the user first. Append a QUESTION block at the VERY END of your reply:
+
+QUESTION:{"text":"Do you want high-quality mode (cheap_mode: false) or the default fast mode?"}
+
+Rules for QUESTION:
+- Only include a QUESTION block when you genuinely need an answer before producing an ACTION.
+- Do not use QUESTION and ACTION in the same reply.
+- Do not wrap it in markdown code fences.
+
 ## Producing actions
 When you want to queue a pipeline run, append ONE action block at the VERY END of your reply (nothing after it):
 
@@ -1482,6 +1509,7 @@ ACTION:{"type":"queue_run","race_ids":["race-id"],"options":{"cheap_mode":true},
 Rules for ACTION:
 - Only one ACTION block per reply.
 - race_ids must be exact race IDs from the race list below.
+- Always include `cheap_mode` explicitly in options (default: true). Set false only if user asks for high quality.
 - If you are not triggering a run, omit the ACTION block entirely.
 - Do not wrap the ACTION block in markdown code fences.
 
@@ -1555,6 +1583,20 @@ def _build_race_context() -> str:
         last_run_opts = rec.last_run_options if rec else None
         if _is_discovery_only(active_opts) or _is_discovery_only(last_run_opts):
             parts.append("  ⚠ DISCOVERY ONLY — candidates found but no research/issues/finance yet")
+        # Flag candidates actually missing issue data (regardless of run options)
+        all_cands = r.get("candidates", [])
+        missing_issues = [
+            c["name"] for c in all_cands
+            if not any(v and v.get("stance") for v in c.get("issues", {}).values())
+        ]
+        if missing_issues and not (_is_discovery_only(active_opts) or _is_discovery_only(last_run_opts)):
+            if len(missing_issues) == len(all_cands):
+                parts.append(f"  ⚠ NO ISSUE DATA — all {len(missing_issues)} candidates need issue research")
+            else:
+                names_str = ", ".join(missing_issues[:6])
+                if len(missing_issues) > 6:
+                    names_str += f" (+{len(missing_issues) - 6} more)"
+                parts.append(f"  ⚠ PARTIAL — {len(missing_issues)} candidate(s) missing issues: {names_str}")
         return " | ".join(parts)
 
     lines: List[str] = ["### Published Races"]
@@ -1698,6 +1740,17 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
         except (json.JSONDecodeError, ValueError, KeyError):
             pass
 
+    # Parse optional QUESTION block appended by the model
+    question: str | None = None
+    question_match = re.search(r"\nQUESTION:(\{[^\n]+\})\s*$", reply_text)
+    if question_match:
+        try:
+            q_data = json.loads(question_match.group(1))
+            question = q_data.get("text") or None
+            reply_text = reply_text[: question_match.start()].rstrip()
+        except (json.JSONDecodeError, ValueError):
+            pass
+
     # Parse optional ACTION block appended by the model
     action: Dict[str, Any] | None = None
     action_match = re.search(r"\nACTION:(\{[^\n]+\})\s*$", reply_text)
@@ -1705,6 +1758,9 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
         try:
             action = json.loads(action_match.group(1))
             reply_text = reply_text[: action_match.start()].rstrip()
+            # Ensure cheap_mode is always present (never None/missing)
+            if action.get("type") == "queue_run" and "options" in action:
+                action["options"].setdefault("cheap_mode", True)
         except (json.JSONDecodeError, ValueError):
             pass
 
@@ -1732,4 +1788,13 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
                     }
                 )
 
-    return {"reply": reply_text, "action": action, "race_records": race_records}
+    # Build thinking_steps list so the UI can show what happened
+    thinking_steps: List[str] = []
+    if inspect_match:
+        thinking_steps.append("Fetched full race data for inspection")
+    if action:
+        thinking_steps.append(f"Prepared run for {len(action.get('race_ids') or [])} race(s)")
+    if question:
+        thinking_steps.append("Needs clarification before queuing")
+
+    return {"reply": reply_text, "action": action, "race_records": race_records, "question": question, "thinking_steps": thinking_steps}

@@ -14,6 +14,7 @@
     role: "user" | "assistant" | "system";
     content: string;
     ts: number;
+    thinkingSteps?: string[];
   }
 
   // ---- constants -----------------------------------------------------------
@@ -23,7 +24,7 @@
   const SUGGESTIONS = [
     "Which races are stale or haven\u2019t been updated recently?",
     "Show me races with a low quality grade",
-    "Run a thorough refresh on all draft races",
+    "Which races have candidates missing issue data? Suggest targeted completion runs.",
     "What candidates are in the GA governor race?",
   ];
 
@@ -52,6 +53,7 @@
 
   let input = "";
   let sending = false;
+  let thinkingLabel = "Thinking\u2026";
 
   // Pending action waiting for user confirmation
   let pendingAction: AdminChatAction | null = null;
@@ -59,6 +61,15 @@
   let pendingRaceRecords: AdminChatRaceRecord[] = [];
   let confirmingAction = false;
   let actionResult = "";
+
+  // Pending question from AI
+  let pendingQuestion: string | null = null;
+
+  // Editable action options (shown in approval card)
+  let editCheapMode = true;
+  let editCandidateNames = "";
+  let editNote = "";
+  let showAdvancedEdit = false;
 
   let scrollEl: HTMLElement;
   let userScrolledUp = false;
@@ -88,6 +99,10 @@
     }
     if (opts.research_model) parts.push(`model: ${opts.research_model}`);
     if (opts.max_candidates) parts.push(`max candidates: ${opts.max_candidates}`);
+    if (Array.isArray(opts.candidate_names) && opts.candidate_names.length) {
+      parts.push(`candidates: ${(opts.candidate_names as string[]).join(", ")}`);
+    }
+    if (opts.target_no_info) parts.push("target no-info candidates");
     if (opts.note) parts.push(`note: \u201c${opts.note}\u201d`);
     return parts.length ? parts.join(" \u00b7 ") : "default options";
   }
@@ -215,6 +230,22 @@
     return out.join("");
   }
 
+  // ---- build final options for queuing ------------------------------------
+  function buildFinalOptions(): Record<string, unknown> {
+    const base = { ...(pendingAction?.options ?? {}) };
+    base.cheap_mode = editCheapMode;
+    const names = editCandidateNames
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (names.length) base.candidate_names = names;
+    else delete base.candidate_names;
+    const note = editNote.trim();
+    if (note) base.note = note;
+    else delete base.note;
+    return base;
+  }
+
   // ---- send message --------------------------------------------------------
   async function sendMessage(text?: string) {
     const msg = (text ?? input).trim();
@@ -226,23 +257,46 @@
     await scrollToBottom(true);
 
     sending = true;
+    thinkingLabel = "Thinking\u2026";
     pendingAction = null;
+    pendingQuestion = null;
     pendingRaceRecords = [];
     actionResult = "";
+    showAdvancedEdit = false;
 
     try {
       const history: AdminChatMessage[] = messages
         .filter((m) => m.role === "user" || m.role === "assistant")
         .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-      const res = await apiService.adminChat(history);
+      // Show a brief "fetching race data" label update after a short pause
+      const labelTimer = setTimeout(() => {
+        thinkingLabel = "Fetching race data\u2026";
+      }, 800);
 
-      messages = [...messages, { role: "assistant", content: res.reply, ts: Date.now() }];
+      const res = await apiService.adminChat(history);
+      clearTimeout(labelTimer);
+
+      const thinkingSteps = res.thinking_steps ?? [];
+
+      messages = [...messages, {
+        role: "assistant",
+        content: res.reply,
+        ts: Date.now(),
+        thinkingSteps: thinkingSteps.length ? thinkingSteps : undefined,
+      }];
 
       if (res.action?.type === "queue_run") {
         pendingAction = res.action;
         pendingActionDescription = res.action.description || "Queue a pipeline run";
         pendingRaceRecords = res.race_records ?? [];
+        editCheapMode = res.action.options?.cheap_mode !== false;
+        editCandidateNames = Array.isArray(res.action.options?.candidate_names)
+          ? (res.action.options!.candidate_names as string[]).join(", ")
+          : "";
+        editNote = typeof res.action.options?.note === "string" ? res.action.options.note : "";
+      } else if (res.question) {
+        pendingQuestion = res.question;
       }
     } catch (e) {
       messages = [
@@ -251,6 +305,7 @@
       ];
     } finally {
       sending = false;
+      thinkingLabel = "Thinking\u2026";
       await scrollToBottom();
     }
   }
@@ -268,7 +323,8 @@
     confirmingAction = true;
     actionResult = "";
     try {
-      await apiService.queueRaces(pendingAction.race_ids ?? [], pendingAction.options ?? {});
+      const finalOpts = buildFinalOptions();
+      await apiService.queueRaces(pendingAction.race_ids ?? [], finalOpts);
       actionResult = "\u2713 Queued";
       messages = [
         ...messages,
@@ -283,6 +339,7 @@
         pendingAction = null;
         actionResult = "";
         pendingRaceRecords = [];
+        showAdvancedEdit = false;
       }, 2000);
     } catch (e) {
       actionResult = `Failed: ${e}`;
@@ -295,15 +352,22 @@
     pendingAction = null;
     actionResult = "";
     pendingRaceRecords = [];
+    showAdvancedEdit = false;
+  }
+
+  function dismissQuestion() {
+    pendingQuestion = null;
   }
 
   function clearConversation() {
     messages = [{ ...INITIAL_MESSAGE, ts: Date.now() }];
     pendingAction = null;
+    pendingQuestion = null;
     actionResult = "";
     pendingRaceRecords = [];
     input = "";
     userScrolledUp = false;
+    showAdvancedEdit = false;
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
     scrollToBottom(true);
   }
@@ -365,6 +429,18 @@
             </svg>
           </div>
           <div class="max-w-[78%] flex flex-col gap-1">
+            {#if msg.thinkingSteps && msg.thinkingSteps.length}
+              <div class="flex flex-wrap gap-1 mb-0.5">
+                {#each msg.thinkingSteps as step}
+                  <span class="text-[10px] text-content-subtle border border-stroke rounded-full px-2 py-0.5 bg-surface flex items-center gap-1">
+                    <svg class="w-2.5 h-2.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {step}
+                  </span>
+                {/each}
+              </div>
+            {/if}
             <div
               class="bg-surface border border-stroke rounded-2xl rounded-bl-none px-4 py-2.5 text-sm text-content shadow-sm leading-relaxed"
               title={formatTs(msg.ts)}
@@ -412,12 +488,13 @@
             <circle cx="10" cy="10" r="4"/>
           </svg>
         </div>
-        <div class="bg-surface border border-stroke rounded-2xl rounded-bl-none px-4 py-3">
+        <div class="bg-surface border border-stroke rounded-2xl rounded-bl-none px-4 py-3 flex items-center gap-2">
           <span class="inline-flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-content-subtle animate-bounce" style="animation-delay:0ms"></span>
             <span class="w-1.5 h-1.5 rounded-full bg-content-subtle animate-bounce" style="animation-delay:150ms"></span>
             <span class="w-1.5 h-1.5 rounded-full bg-content-subtle animate-bounce" style="animation-delay:300ms"></span>
           </span>
+          <span class="text-xs text-content-subtle">{thinkingLabel}</span>
         </div>
       </div>
     {/if}
@@ -441,36 +518,14 @@
   <!-- Pending action card -->
   {#if pendingAction}
     <div class="rounded-xl border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-3">
-      <div class="flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-0.5">Suggested run</p>
-          <p class="text-sm text-blue-700 dark:text-blue-300">{pendingActionDescription}</p>
-        </div>
-        <div class="flex gap-2 flex-shrink-0">
-          {#if actionResult}
-            <span class="text-sm font-medium {actionResult.startsWith('\u2713') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
-              {actionResult}
-            </span>
-          {:else}
-            <button
-              type="button"
-              class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
-              on:click={confirmAction}
-              disabled={confirmingAction}
-            >
-              {confirmingAction ? "Queuing\u2026" : "Queue run"}
-            </button>
-            <button
-              type="button"
-              class="px-3 py-1.5 text-sm font-medium rounded-lg border border-stroke hover:bg-surface-alt text-content transition-colors"
-              on:click={dismissAction}
-              disabled={confirmingAction}
-            >
-              Dismiss
-            </button>
-          {/if}
-        </div>
+      <!-- Header -->
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <p class="text-sm font-semibold text-blue-900 dark:text-blue-100">Awaiting your approval</p>
       </div>
+      <p class="text-sm text-blue-700 dark:text-blue-300">{pendingActionDescription}</p>
 
       <!-- Race metadata cards -->
       {#if pendingRaceRecords.length > 0}
@@ -483,7 +538,7 @@
               {/if}
               <div class="flex flex-wrap gap-1">
                 {#if rec.discovery_only}
-                  <span class="rounded px-1.5 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700" title="Only discovery step was run — no research/issues/finance yet">
+                  <span class="rounded px-1.5 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
                     discovery only
                   </span>
                 {/if}
@@ -505,7 +560,6 @@
           {/each}
         </div>
       {:else}
-        <!-- Fallback: just show race ID chips -->
         <div class="flex flex-wrap gap-1.5">
           {#each (pendingAction.race_ids ?? []) as raceId}
             <span class="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded px-1.5 py-0.5 border border-blue-200 dark:border-blue-800">
@@ -515,12 +569,129 @@
         </div>
       {/if}
 
-      <!-- Options summary -->
-      {#if pendingAction.options && Object.keys(pendingAction.options).length}
-        <p class="text-xs text-blue-600 dark:text-blue-400">
-          {formatOptions(pendingAction.options)}
-        </p>
-      {/if}
+      <!-- Editable run options -->
+      <div class="border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-blue-950/10 divide-y divide-blue-100 dark:divide-blue-900">
+        <!-- cheap_mode toggle — always shown -->
+        <label class="flex items-center justify-between px-3 py-2.5 gap-3 cursor-pointer select-none">
+          <div>
+            <span class="text-xs font-medium text-content">Quality mode</span>
+            <p class="text-[10px] text-content-subtle mt-0.5">
+              {editCheapMode ? "Fast & cheap (default) — good for most cases" : "High quality — slower, uses better models, costs more"}
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 flex-shrink-0">
+            <span class="text-[10px] text-content-subtle">{editCheapMode ? "Fast" : "High-Q"}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!editCheapMode}
+              class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 {!editCheapMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}"
+              on:click={() => editCheapMode = !editCheapMode}
+            >
+              <span class="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform {!editCheapMode ? 'translate-x-4' : 'translate-x-0.5'}"></span>
+            </button>
+          </div>
+        </label>
+
+        <!-- Expand for more options -->
+        <button
+          type="button"
+          class="w-full flex items-center justify-between px-3 py-2 text-xs text-content-subtle hover:text-content hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+          on:click={() => showAdvancedEdit = !showAdvancedEdit}
+        >
+          <span>Advanced options</span>
+          <svg class="w-3.5 h-3.5 transition-transform {showAdvancedEdit ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        {#if showAdvancedEdit}
+          <div class="px-3 py-2.5 space-y-2.5">
+            <div>
+              <label class="block text-[10px] font-medium text-content-subtle mb-1">
+                Candidate names (comma-separated, leave blank for all)
+              </label>
+              <input
+                type="text"
+                bind:value={editCandidateNames}
+                placeholder="e.g. Jordan Koteras, Paul Berry III"
+                class="w-full text-xs bg-surface border border-stroke rounded-lg px-2.5 py-1.5 text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-medium text-content-subtle mb-1">Note</label>
+              <input
+                type="text"
+                bind:value={editNote}
+                placeholder="Short label for this run"
+                class="w-full text-xs bg-surface border border-stroke rounded-lg px-2.5 py-1.5 text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+            {#if pendingAction.options && Object.keys(pendingAction.options).length}
+              <p class="text-[10px] text-content-subtle">
+                Other options from AI: {formatOptions(pendingAction.options)}
+              </p>
+            {/if}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex items-center gap-2">
+        {#if actionResult}
+          <span class="text-sm font-medium {actionResult.startsWith('\u2713') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+            {actionResult}
+          </span>
+        {:else}
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            on:click={confirmAction}
+            disabled={confirmingAction}
+          >
+            {#if confirmingAction}
+              <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              Queuing\u2026
+            {:else}
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Approve &amp; queue
+            {/if}
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm font-medium rounded-lg border border-stroke hover:bg-surface-alt text-content transition-colors"
+            on:click={dismissAction}
+            disabled={confirmingAction}
+          >
+            Cancel
+          </button>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Pending question card -->
+  {#if pendingQuestion}
+    <div class="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+      <div class="flex items-start gap-2">
+        <svg class="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01"/>
+        </svg>
+        <p class="text-sm text-amber-900 dark:text-amber-100">{pendingQuestion}</p>
+      </div>
+      <button
+        type="button"
+        class="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+        on:click={dismissQuestion}
+      >
+        Dismiss
+      </button>
     </div>
   {/if}
 
