@@ -15,7 +15,7 @@
   "office": "Governor of Arkansas",
   "jurisdiction": "Arkansas",
   "election_date": "2026-11-03",
-  "description": "The 2026 Arkansas gubernatorial election will decide the state’s chief executive, who oversees the budget, executive agencies, and implementation of state law. Incumbent Republican Gov. Sarah Huckabee Sanders is seeking a second term, Democrat Fred Love won his party’s March 3 primary, and Libertarian Colt Shelby was nominated at his party’s February convention. The race matters because Arkansas remains a Republican-leaning state, but the candidates are offering different approaches on education, health care, taxes, criminal justice, and the role of state government.",
+  "description": "Arkansas’s 2026 gubernatorial election will decide the state’s next governor. Incumbent Republican Sarah Huckabee Sanders is seeking a second term against Democratic nominee Fred Love and Libertarian nominee Colt Shelby; the race is notable for contrasting Sanders’ first-term record and fundraising advantage with Love’s legislative profile and Shelby’s third-party challenge.",
   "polling": [
     {
       "pollster": "No public polling located in sources reviewed",
@@ -469,7 +469,7 @@
       "name": "Fred Love",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Fred Love is a Democratic Arkansas state senator and former state representative who won his party’s 2026 gubernatorial nomination on March 3. His campaign says he is running on education, health care, public safety, criminal justice reform, and economic development, drawing on a background that includes legislative service and community work in central Arkansas.",
+      "summary": "Fred Love won the Democratic nomination for Arkansas governor on March 3, 2026, after serving in the Arkansas Senate since 2011. In the general election, he is running on a platform that includes eliminating the state’s private-school voucher program, increasing teacher pay, expanding literacy and mental health services, and boosting early childhood funding.",
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Rep_Fredrick_J_Love.jpg/500px-Rep_Fredrick_J_Love.jpg",
       "website": "https://www.fredloveforarkansas.com/",
       "social_media": {
@@ -852,19 +852,14 @@
       ],
       "summary_sources": [
         {
-          "url": "https://katv.com/news/local/fred-love-wins-democratic-nomination-for-governor-looks-to-unseat-huckabee-sanders",
-          "type": "news",
-          "title": "KATV: Fred Love wins Democratic nomination for Governor"
-        },
-        {
-          "url": "https://www.fredloveforarkansas.com/",
-          "type": "campaign",
-          "title": "Fred Love for Governor home"
+          "url": "https://arkansasadvocate.com/2026/03/03/love-wins-democratic-nomination-for-arkansas-governor/",
+          "title": "Love wins Democratic nomination for Arkansas governor",
+          "type": "news"
         },
         {
           "url": "https://ballotpedia.org/Fredrick_Love",
-          "type": "reference",
-          "title": "Ballotpedia: Fredrick Love"
+          "title": "Fredrick Love",
+          "type": "ballotpedia"
         }
       ],
       "voting_summary": "As an Arkansas state senator and former state representative, Love has an established legislative voting record. Vote Smart's key-vote page shows him frequently voting against 2025 Republican-backed measures on DEI restrictions, bathroom restrictions, anti-canvasser changes, and fetal-development curriculum mandates, while supporting some health and consumer measures such as doula certification and PBM restrictions; the Arkansas Senate bio also highlights his sponsorship of 'Lux's Law' and a bill requiring warning labels for hair relaxers containing potentially harmful chemicals. Confidence: high.",
@@ -918,25 +913,25 @@
       "name": "Colt Shelby",
       "party": "Libertarian",
       "incumbent": false,
-      "summary": "Colt Shelby is the Libertarian nominee for Arkansas governor in 2026 after advancing from the party’s February 22 convention. Public race listings identify him as a Franklin County resident and gubernatorial candidate, but detailed campaign policy materials were limited in the sources reviewed.",
+      "summary": "Colt Shelby was nominated by the Libertarian Party of Arkansas on February 23, 2026, after previously suing the state over the timing of a special election in Senate District 26. He is running as the Libertarian nominee for governor and has framed the race around opposition to the state’s prison plan in Franklin County and a broader limited-government message.",
       "summary_sources": [
         {
+          "url": "https://arkansasadvocate.com/briefs/libertarian-party-of-arkansas-nominates-2026-general-election-candidates/",
+          "title": "Libertarian Party of Arkansas nominates 2026 general election candidates",
+          "type": "news"
+        },
+        {
+          "url": "https://independentarkansas.com/libertarian-shelby/",
+          "title": "Libertarians choose Colt Shelby as nominee for governor",
+          "type": "news"
+        },
+        {
           "url": "https://ballotpedia.org/Colt_Shelby",
-          "type": "reference",
-          "title": "Ballotpedia: Colt Shelby"
-        },
-        {
-          "url": "https://ballotpedia.org/Arkansas_gubernatorial_election,_2026",
-          "type": "reference",
-          "title": "Ballotpedia: Arkansas gubernatorial election, 2026"
-        },
-        {
-          "url": "https://www.arkansasonline.com/news/2026/feb/23/colt-shelby-opponent-of-franklin-county-prison/",
-          "type": "news",
-          "title": "Arkansas Online: Colt Shelby opponent of Franklin County prison becomes Libertarian nominee"
+          "title": "Colt Shelby",
+          "type": "ballotpedia"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Colt_Shelby_20260226_045137.png",
       "website": "https://www.colt4arkansas.org/",
       "social_media": {},
       "career_history": [],
@@ -1132,10 +1127,10 @@
       ]
     }
   ],
-  "updated_utc": "2026-04-02T00:14:58.603253+00:00",
+  "updated_utc": "2026-04-06T16:44:20.290177+00:00",
   "generator": [
-    "gpt-5.4",
-    "gpt-5.4-mini"
+    "gpt-5.4-mini",
+    "gpt-5-nano"
   ],
   "reviews": [
     {
@@ -1284,22 +1279,23 @@
     }
   ],
   "agent_metrics": {
-    "model": "gpt-5.4",
-    "prompt_tokens": 174523,
-    "completion_tokens": 4896,
-    "total_tokens": 179419,
-    "estimated_usd": 0.3803,
+    "model": "gpt-5.4-mini",
+    "prompt_tokens": 193897,
+    "completion_tokens": 5145,
+    "total_tokens": 199042,
+    "estimated_usd": 0.0263,
     "model_breakdown": {
-      "gpt-5.4-mini": {
-        "prompt_tokens": 42484,
-        "completion_tokens": 544
+      "gpt-5-nano": {
+        "prompt_tokens": 101793,
+        "completion_tokens": 4099
       },
-      "gpt-5.4": {
-        "prompt_tokens": 132039,
-        "completion_tokens": 4352
+      "gpt-5.4-mini": {
+        "prompt_tokens": 92104,
+        "completion_tokens": 1046
       }
     },
-    "duration_s": 111.0
+    "duration_s": 78.8
   },
-  "polling_note": "No new reliable public general-election polls for the 2026 Arkansas governor’s race were found in sources reviewed since 2026-03-31. Sources checked included Ballotpedia’s race page and broad web searches for recent Arkansas governor polling."
+  "polling_note": "No new reliable public general-election polls for the 2026 Arkansas governor’s race were found in sources reviewed since 2026-03-31. Sources checked included Ballotpedia’s race page and broad web searches for recent Arkansas governor polling.",
+  "validation_grade": null
 }

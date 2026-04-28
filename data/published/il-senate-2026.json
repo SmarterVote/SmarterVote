@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Illinois",
   "election_date": "2026-11-03",
-  "description": "Illinois is holding a regular U.S. Senate election for the Class II seat currently held by Dick Durbin, who announced he would not seek re-election. The race matters because it is an open seat in a large, reliably Democratic state, making the Democratic primary the decisive contest and giving the winner a strong advantage in the general election. The campaign has centered on experience, party leadership, and how aggressively to confront the Trump administration, with candidates also emphasizing affordability, health care, and labor issues. The general election is expected to reflect Illinois\u2019s partisan lean, while the primary highlighted different styles of Democratic leadership and coalition-building.",
+  "description": "Illinois is holding a regular U.S. Senate election for the Class II seat currently held by Dick Durbin, who announced he would not seek re-election. The race matters because it is an open seat in a large, reliably Democratic state, making the Democratic primary the decisive contest and giving the winner a strong advantage in the general election. The campaign has centered on experience, party leadership, and how aggressively to confront the Trump administration, with candidates also emphasizing affordability, health care, and labor issues. The general election is expected to reflect Illinois’s partisan lean, while the primary highlighted different styles of Democratic leadership and coalition-building.",
   "polling": [
     {
       "pollster": "Emerson College Polling / WGN-TV",
@@ -41,7 +41,7 @@
       "name": "Juliana Stratton",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Juliana Stratton is the lieutenant governor of Illinois and a former member of the Illinois House of Representatives. She ran for the open U.S. Senate seat in 2026 and won the Democratic nomination, positioning herself as a continuation of the Pritzker administration\u2019s agenda and a progressive voice on issues such as health care and economic fairness.",
+      "summary": "Juliana Stratton is the lieutenant governor of Illinois and a former member of the Illinois House of Representatives. She ran for the open U.S. Senate seat in 2026 and won the Democratic nomination, positioning herself as a continuation of the Pritzker administration’s agenda and a progressive voice on issues such as health care and economic fairness.",
       "summary_sources": [
         {
           "url": "https://en.wikipedia.org/wiki/Juliana_Stratton",
@@ -56,7 +56,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Juliana_Stratton_20180807_%28040%29.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Juliana_Stratton.jpg",
       "website": "https://www.julianastratton.com/",
       "social_media": {
         "x": "https://x.com/JulianaStratton",
@@ -69,7 +69,7 @@
           "organization": "State of Illinois",
           "start_year": 2019,
           "end_year": null,
-          "description": "Serves as Illinois\u2019s 48th lieutenant governor, elected on the Pritzker ticket."
+          "description": "Serves as Illinois’s 48th lieutenant governor, elected on the Pritzker ticket."
         },
         {
           "title": "Member",
@@ -118,7 +118,7 @@
       "name": "Raja Krishnamoorthi",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Raja Krishnamoorthi is a U.S. representative from Illinois\u2019s 8th congressional district and a former state and federal policy aide. He ran for the Senate in 2026, emphasizing his congressional experience, anti-corruption and oversight work, and a message focused on working families, affordability, and opposition to Donald Trump\u2019s policies.",
+      "summary": "Raja Krishnamoorthi is a U.S. representative from Illinois’s 8th congressional district and a former state and federal policy aide. He ran for the Senate in 2026, emphasizing his congressional experience, anti-corruption and oversight work, and a message focused on working families, affordability, and opposition to Donald Trump’s policies.",
       "summary_sources": [
         {
           "url": "https://en.wikipedia.org/wiki/Raja_Krishnamoorthi",
@@ -133,7 +133,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Raja_Krishnamoorthi_official_photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Raja_Krishnamoorthi.jpg",
       "website": null,
       "social_media": {
         "x": "https://x.com/RajaForIL",
@@ -146,14 +146,14 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2017,
           "end_year": null,
-          "description": "Represents Illinois\u2019s 8th congressional district."
+          "description": "Represents Illinois’s 8th congressional district."
         },
         {
           "title": "Special Assistant Attorney General",
           "organization": "State of Illinois",
           "start_year": 2000,
           "end_year": 2006,
-          "description": "Helped start the state\u2019s anti-corruption unit under the Illinois attorney general."
+          "description": "Helped start the state’s anti-corruption unit under the Illinois attorney general."
         },
         {
           "title": "Deputy State Treasurer",
@@ -195,7 +195,7 @@
       "name": "Robin Kelly",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Robin Kelly is a U.S. representative from Illinois\u2019s 2nd congressional district and previously served in the Illinois House and in state and county government. She ran for the Senate in 2026, presenting herself as an experienced legislator focused on health care, gun violence prevention, and economic issues, with an emphasis on representing diverse urban, suburban, and rural constituencies.",
+      "summary": "Robin Kelly is a U.S. representative from Illinois’s 2nd congressional district and previously served in the Illinois House and in state and county government. She ran for the Senate in 2026, presenting herself as an experienced legislator focused on health care, gun violence prevention, and economic issues, with an emphasis on representing diverse urban, suburban, and rural constituencies.",
       "summary_sources": [
         {
           "url": "https://en.wikipedia.org/wiki/Robin_Kelly",
@@ -210,7 +210,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Robin_Kelly_official_photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Robin_Kelly_official_photo.jpg",
       "website": null,
       "social_media": {
         "x": "https://x.com/RepRobinKelly",
@@ -223,7 +223,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2013,
           "end_year": null,
-          "description": "Represents Illinois\u2019s 2nd congressional district."
+          "description": "Represents Illinois’s 2nd congressional district."
         },
         {
           "title": "Chair",
@@ -244,7 +244,7 @@
           "organization": "Illinois State Treasurer Alexi Giannoulias",
           "start_year": 2007,
           "end_year": 2010,
-          "description": "Worked in the state treasurer\u2019s office after leaving the Illinois House."
+          "description": "Worked in the state treasurer’s office after leaving the Illinois House."
         },
         {
           "title": "Member",
@@ -280,9 +280,27 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Don Tracy",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/dtracy.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:47:27.937362+00:00",
+  "updated_utc": "2026-04-06T18:09:34.101020+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -290,16 +308,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 97669,
-    "completion_tokens": 2653,
-    "total_tokens": 100322,
-    "estimated_usd": 0.0162,
+    "prompt_tokens": 194479,
+    "completion_tokens": 16093,
+    "total_tokens": 210572,
+    "estimated_usd": 0.0312,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 93187,
+        "completion_tokens": 14932
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 97669,
-        "completion_tokens": 2653
+        "prompt_tokens": 101292,
+        "completion_tokens": 1161
       }
     },
-    "duration_s": 29.8
-  }
+    "duration_s": 184.2
+  },
+  "validation_grade": null
 }

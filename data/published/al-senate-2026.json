@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Alabama",
   "election_date": "2026-11-03",
-  "description": "Alabama\u2019s 2026 U.S. Senate race is for the Class II Senate seat representing the state, with the incumbent not seeking reelection because Tommy Tuberville is running for governor instead. Ballotpedia rates the general election as safely or solidly Republican, so the main competition is in the Republican primary, where several candidates are vying for the nomination. The race has drawn attention because of Trump\u2019s endorsement of Barry Moore, Steve Marshall\u2019s statewide profile as attorney general, and Jared Hudson\u2019s outsider campaign, while Democrats are fielding a smaller primary field in a heavily Republican state.",
+  "description": "Alabama’s 2026 U.S. Senate race is for the Class II Senate seat representing the state, with the incumbent not seeking reelection because Tommy Tuberville is running for governor instead. Ballotpedia rates the general election as safely or solidly Republican, so the main competition is in the Republican primary, where several candidates are vying for the nomination. The race has drawn attention because of Trump’s endorsement of Barry Moore, Steve Marshall’s statewide profile as attorney general, and Jared Hudson’s outsider campaign, while Democrats are fielding a smaller primary field in a heavily Republican state.",
   "polling": [
     {
       "pollster": "The Alabama Poll",
@@ -139,7 +139,7 @@
       "name": "Dakarai Larriett",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Dakarai Larriett is running in Alabama\u2019s Democratic primary for U.S. Senate in 2026. His campaign website describes him as a community leader and entrepreneur focused on issues such as healthcare, education, jobs, and safety. Ballotpedia lists him as a Democratic candidate on the ballot in the May 19, 2026 primary.",
+      "summary": "Dakarai Larriett is running in Alabama’s Democratic primary for U.S. Senate in 2026. His campaign website describes him as a community leader and entrepreneur focused on issues such as healthcare, education, jobs, and safety. Ballotpedia lists him as a Democratic candidate on the ballot in the May 19, 2026 primary.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Dakarai_Larriett",
@@ -160,7 +160,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Dakarai_Larriett_20250520_043429.jpeg",
       "website": "https://dakarailarriett.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/61576962442678/",
@@ -191,7 +191,7 @@
       "name": "Kyle Sweetser",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Kyle Sweetser is one of the Democrats running in Alabama\u2019s 2026 U.S. Senate primary. Ballotpedia lists him as a candidate in the Democratic primary, but the sources gathered here did not provide enough reliable biographical detail to summarize his background beyond his candidacy. His campaign website and social media were not confirmed in the searches completed for this request.",
+      "summary": "Kyle Sweetser is one of the Democrats running in Alabama’s 2026 U.S. Senate primary. Ballotpedia lists him as a candidate in the Democratic primary, but the sources gathered here did not provide enough reliable biographical detail to summarize his background beyond his candidacy. His campaign website and social media were not confirmed in the searches completed for this request.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Alabama,_2026_(May_19_Democratic_primary)",
@@ -200,7 +200,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Kyle_Sweetser_20250527_055621.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -216,7 +216,7 @@
       "name": "Everett Wess",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Everett Wess is running in Alabama\u2019s 2026 Democratic primary for U.S. Senate. The available sources confirm his candidacy, but the searches completed here did not surface enough reliable public biographical information to provide a fuller nonpartisan profile. No official campaign website or social media account was confirmed in the searches completed for this request.",
+      "summary": "Everett Wess is running in Alabama’s 2026 Democratic primary for U.S. Senate. The available sources confirm his candidacy, but the searches completed here did not surface enough reliable public biographical information to provide a fuller nonpartisan profile. No official campaign website or social media account was confirmed in the searches completed for this request.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Alabama,_2026_(May_19_Democratic_primary)",
@@ -225,7 +225,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Everett_Wess.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -241,7 +241,7 @@
       "name": "Mark Wheeler II",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Mark Wheeler II is a Democratic candidate in Alabama\u2019s 2026 U.S. Senate primary. Ballotpedia lists him among the candidates on the ballot, but the searches completed here did not yield enough reliable biographical detail to summarize his career or education. No official campaign website or social media account was confirmed in the searches completed for this request.",
+      "summary": "Mark Wheeler II is a Democratic candidate in Alabama’s 2026 U.S. Senate primary. Ballotpedia lists him among the candidates on the ballot, but the searches completed here did not yield enough reliable biographical detail to summarize his career or education. No official campaign website or social media account was confirmed in the searches completed for this request.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Alabama,_2026_(May_19_Democratic_primary)",
@@ -250,7 +250,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mark_Wheeler_20250204_044605.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -266,7 +266,7 @@
       "name": "Jared Hudson",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Jared Hudson is a Republican candidate in Alabama\u2019s 2026 U.S. Senate primary and is running as an outsider with a law-enforcement and military background. His campaign emphasizes support for Donald Trump, border security, conservative social issues, and a message of fighting the political establishment. Ballotpedia notes that he previously ran for Jefferson County sheriff in 2022 and that he leads Covenant Rescue Group and The Shooting Institute.",
+      "summary": "Jared Hudson is a Republican candidate in Alabama’s 2026 U.S. Senate primary and is running as an outsider with a law-enforcement and military background. His campaign emphasizes support for Donald Trump, border security, conservative social issues, and a message of fighting the political establishment. Ballotpedia notes that he previously ran for Jefferson County sheriff in 2022 and that he leads Covenant Rescue Group and The Shooting Institute.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Jared_Hudson",
@@ -287,7 +287,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jared_Hudson_20251007_041146.jpg",
       "website": "https://hudsonforalabama.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/p/Jared-Hudson-for-Alabama-61576962442678/",
@@ -351,7 +351,7 @@
       "name": "Steve Marshall",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Steve Marshall is Alabama\u2019s attorney general and a Republican candidate for U.S. Senate in 2026. Before becoming attorney general, he served as district attorney in Marshall County and worked as a private practice lawyer, prosecutor, municipal attorney, and legislative legal analyst. His campaign says he is running on his record as attorney general and on a conservative platform.",
+      "summary": "Steve Marshall is Alabama’s attorney general and a Republican candidate for U.S. Senate in 2026. Before becoming attorney general, he served as district attorney in Marshall County and worked as a private practice lawyer, prosecutor, municipal attorney, and legislative legal analyst. His campaign says he is running on his record as attorney general and on a conservative platform.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Steve_Marshall",
@@ -372,7 +372,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Steve_MarshallAG.jpg",
       "website": "https://stevemarshallforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SteveMarshall.gop/",
@@ -386,7 +386,7 @@
           "organization": "State of Alabama",
           "start_year": 2017,
           "end_year": null,
-          "description": "Appointed in 2017 and serving as the state\u2019s attorney general."
+          "description": "Appointed in 2017 and serving as the state’s attorney general."
         },
         {
           "title": "District Attorney",
@@ -449,7 +449,7 @@
       "name": "Barry Moore",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Barry Moore is a Republican member of the U.S. House from Alabama and a candidate for U.S. Senate in 2026. He previously served in the Alabama House and in the U.S. House representing Alabama\u2019s 2nd District before winning Alabama\u2019s 1st District in 2024. His campaign presents him as a conservative, small-business owner, veteran, and early Trump supporter.",
+      "summary": "Barry Moore is a Republican member of the U.S. House from Alabama and a candidate for U.S. Senate in 2026. He previously served in the Alabama House and in the U.S. House representing Alabama’s 2nd District before winning Alabama’s 1st District in 2024. His campaign presents him as a conservative, small-business owner, veteran, and early Trump supporter.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Barry_Moore_(Alabama_U.S._representative)",
@@ -460,7 +460,7 @@
         {
           "url": "https://barrymooreforalabama.com/about/",
           "type": "website",
-          "title": "About \u2013 Barry Moore for Alabama",
+          "title": "About – Barry Moore for Alabama",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -470,7 +470,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Barry_Moore_117th_U.S_Congress.jpg/440px-Barry_Moore_117th_U.S_Congress.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Rep._Barry_Moore_official_photo.jpg/500px-Rep._Barry_Moore_official_photo.jpg",
       "website": "https://barrymooreforalabama.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/BarryMooreforSenate/",
@@ -483,14 +483,14 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2025,
           "end_year": null,
-          "description": "Represents Alabama\u2019s 1st Congressional District."
+          "description": "Represents Alabama’s 1st Congressional District."
         },
         {
           "title": "U.S. Representative",
           "organization": "U.S. House of Representatives",
           "start_year": 2021,
           "end_year": 2025,
-          "description": "Previously represented Alabama\u2019s 2nd Congressional District."
+          "description": "Previously represented Alabama’s 2nd Congressional District."
         },
         {
           "title": "Member",
@@ -534,9 +534,63 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Rodney Walker",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Dale Shelton Deas Jr.",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Dale_Shelton_Deas_20260303_044000.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Seth Burton",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/SethBurton2026.jpeg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:38:10.908877+00:00",
+  "updated_utc": "2026-04-06T18:34:48.204222+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -544,16 +598,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 414958,
-    "completion_tokens": 4783,
-    "total_tokens": 419741,
-    "estimated_usd": 0.0651,
+    "prompt_tokens": 153930,
+    "completion_tokens": 8926,
+    "total_tokens": 162856,
+    "estimated_usd": 0.0234,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 69157,
+        "completion_tokens": 7814
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 414958,
-        "completion_tokens": 4783
+        "prompt_tokens": 84773,
+        "completion_tokens": 1112
       }
     },
-    "duration_s": 53.0
-  }
+    "duration_s": 147.0
+  },
+  "validation_grade": null
 }

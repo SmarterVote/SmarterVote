@@ -1,0 +1,1782 @@
+{
+  "id": "az-01-house-2026",
+  "title": "2026 U.S. House race for Arizona's 1st Congressional District",
+  "office": "U.S. House of Representatives",
+  "jurisdiction": "Arizona's 1st Congressional District, United States",
+  "state": "Arizona",
+  "district": "1st Congressional District",
+  "election_date": "2026-11-03",
+  "description": "Arizona's 1st Congressional District is a U.S. House seat in the Phoenix metropolitan area that became an open-seat race after incumbent David Schweikert entered the 2026 governor's race. The district is widely viewed as one of Arizona's most competitive House contests, with both parties expected to invest heavily. The race's partisan balance and the crowded Democratic field make candidate quality, fundraising, and turnout in the primary especially important. General-election messaging is likely to focus on suburban voter concerns, including cost of living, health care, and federal policy priorities. Gina Swoboda ended her congressional campaign on Feb. 13, 2026, to run for Arizona secretary of state instead.",
+  "polling": [
+    {
+      "pollster": "HighGround, Inc.",
+      "date": "2026-02-25",
+      "matchups": [
+        {
+          "candidates": [
+            "Amish Shah",
+            "Marlene Gal\u00e1n-Woods",
+            "Mark Robert Gordon",
+            "Rick McCartney",
+            "Jonathan Treble",
+            "Other"
+          ],
+          "percentages": [
+            33,
+            11,
+            2,
+            2,
+            2,
+            50
+          ]
+        }
+      ],
+      "source_url": "https://www.270towin.com/2026-house-polls/arizona/district-1",
+      "sample_size": 400
+    },
+    {
+      "pollster": "HighGround, Inc.",
+      "date": "2026-03-01",
+      "sample_size": 600,
+      "matchups": [
+        {
+          "candidates": [
+            "Amish Shah",
+            "Jonathan Treble",
+            "Angie Montoya",
+            "David Redkey",
+            "Jason Duey"
+          ],
+          "percentages": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "source_url": "https://azhighground.com/shah-dominates-cd1-primary-with-3-to-1-lead/"
+    },
+    {
+      "pollster": "270toWin (poll aggregation page)",
+      "date": "2026-03-01",
+      "sample_size": null,
+      "matchups": [
+        {
+          "candidates": [
+            "Amish Shah",
+            "Marlene Gal\u00e1n-Woods",
+            "Jonathan Treble",
+            "Angie Montoya",
+            "Rick McCartney"
+          ],
+          "percentages": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "source_url": "https://www.270towin.com/2026-house-polls/arizona/district-1"
+    }
+  ],
+  "polling_note": "I found a primary polling article and an aggregation page, but the accessible snippets did not provide full numeric results, sample size, or complete methodology details for a reliable poll table. No clearly documented general-election poll was found in the available sources. Gina Swoboda later exited the congressional race to run for Arizona secretary of state, so any polling references to her should be treated as historical.",
+  "candidates": [
+    {
+      "name": "Amish Shah",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Amish Shah is a Democratic candidate for Arizona\u2019s 1st Congressional District and a former Arizona state representative. He is an emergency physician who previously served in the Arizona House and ran for the district in 2024.",
+      "summary_sources": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Amish_Shah",
+          "type": "website",
+          "title": "Amish Shah - Wikipedia"
+        },
+        {
+          "url": "https://www.amishforarizona.com/about",
+          "type": "campaign_site",
+          "title": "About \u2014 Amish for Arizona"
+        }
+      ],
+      "image_url": "https://www.amishforarizona.com/",
+      "website": "https://www.amishforarizona.com/",
+      "social_media": {},
+      "career_history": [
+        {
+          "title": "Emergency physician",
+          "organization": "Private practice / medical field",
+          "start_year": null,
+          "end_year": null,
+          "description": "Arizona emergency medicine physician; campaign and official biography describe him as board certified in emergency medicine and sports medicine."
+        },
+        {
+          "title": "Member of the Arizona House of Representatives",
+          "organization": "Arizona House of Representatives",
+          "start_year": 2019,
+          "end_year": 2024,
+          "description": "Served in the Arizona House, first in District 24 and later District 5."
+        }
+      ],
+      "education": [
+        {
+          "institution": "Northwestern University",
+          "degree": "Bachelor of Arts",
+          "field": "Economics",
+          "year": null
+        },
+        {
+          "institution": "Northwestern University Feinberg School of Medicine",
+          "degree": "Doctor of Medicine",
+          "field": null,
+          "year": null
+        },
+        {
+          "institution": "University of California, Berkeley",
+          "degree": "Master of Public Health",
+          "field": null,
+          "year": null
+        }
+      ],
+      "donor_summary": "Public federal and state disclosures show Amish Shah\u2019s fundraising was substantial and broad-based, with his 2026 FEC committee listed as active and his prior congressional run reported at about $6.3M total raised. OpenSecrets and FEC-linked pages indicate notable support from health-care-related donors, including Cancer & Blood Specialists of Arizona ($20,000) and Genpact ($43,696 in 2024 corporate giving), suggesting a mix of medical, professional-services, and small-dollar support. Sources: https://www.fec.gov/data/candidate/H4AZ01194/ ; https://www.opensecrets.org/joint-fundraising-committees-jfcs/amish-shah-victory-fund/C00886630/2024/donors ; https://www.whofundscongress.com/member/shah-amish-dr-az/ ; https://www.followthemoney.org/entity-details?eid=42115311&default=candidate",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H4AZ01194/",
+      "voting_summary": "Amish Shah is a former Arizona state representative, so he has a legislative voting record. Ballotpedia and Vote Smart identify him as a former legislator; campaign materials and news coverage describe him as having a 100% pro-choice voting record and as having supported tribal infrastructure funding in the state budget. Sources: https://ballotpedia.org/Amish_Shah ; https://justfacts.votesmart.org/candidate/184622/amish-shah ; https://www.amishforarizona.com/homeprimary ; https://srpmic-nsn.gov/wp-content/uploads/2024/10/Amish-Shah-CD1.pdf",
+      "voting_source_url": "https://justfacts.votesmart.org/candidate/184622/amish-shah",
+      "links": [
+        "https://ballotpedia.org/Amish_Shah",
+        {
+          "url": "https://ballotpedia.org/Amish_Shah",
+          "title": "Amish Shah - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Amish_Shah",
+          "title": "Amish Shah - Wikipedia",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H4AZ01194/",
+          "title": "SHAH, AMISH DR. - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.followthemoney.org/entity-details?eid=42115311&default=candidate",
+          "title": "SHAH, AMISH - FollowTheMoney.org",
+          "type": "finance"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/184622/amish-shah",
+          "title": "Amish Shah - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "https://www.amishforarizona.com/",
+          "title": "Amish for Arizona",
+          "type": "official"
+        },
+        {
+          "url": "https://www.amishforarizona.com/about",
+          "title": "About \u2014 Amish for Arizona",
+          "type": "official"
+        },
+        {
+          "url": "https://www.amishforarizona.com/homeprimary",
+          "title": "Home Primary \u2014 Amish for Arizona",
+          "type": "official"
+        },
+        {
+          "url": "https://srpmic-nsn.gov/wp-content/uploads/2024/10/Amish-Shah-CD1.pdf",
+          "title": "Amish Shah CD1 PDF",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Shah says he will expand coverage, protect Medicare, and lower prescription drug prices. His campaign also says he supports reproductive freedom and describes him as a champion of universal healthcare.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "Shah has not published a detailed climate or energy plan on his campaign issues page. His campaign materials emphasize lowering costs and protecting families rather than a specific climate policy agenda.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "Shah says he wants to reduce gun violence, fully fund police, and stop the flow of fentanyl across the border. His campaign frames public safety as a mix of gun-violence prevention and support for first responders.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Shah says he will defend democratic institutions, combat partisan gerrymandering, and eliminate dark money from politics. His campaign also links these themes to protecting voting rights and civil rights.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Shah says he will protect democratic institutions, oppose partisan gerrymandering, and defend voting rights and fair elections.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Shah\u2019s campaign says he will focus on lowering costs, protecting Social Security and Medicare, improving public safety, and supporting education and health care for Arizona families.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Shah says he will focus on lowering costs for Arizonans, including groceries, housing, and health care, and he opposes tariffs he says raise prices for families and small businesses.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "Shah says he believes medical decisions should be made by a woman and her provider, and his campaign says he will protect abortion rights and codify Roe v. Wade.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Shah says he will defend the Department of Education, increase funding for public schools, improve teacher pay, and lower the cost of higher education.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.amishforarizona.com/issues",
+              "type": "campaign_policy",
+              "title": "Issues \u2014 Amish for Arizona",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Andres Barraza",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Andres Barraza is a Democratic candidate for Arizona\u2019s 1st Congressional District and serves on the Tempe Union High School District governing board. Public campaign materials currently provide limited policy detail, and the campaign website is largely a placeholder with a \"Coming Soon\" message.",
+      "summary_sources": [
+        {
+          "url": "https://barrazaforcongress.com/",
+          "type": "official",
+          "title": "Barraza for US Congress - Arizona District 01"
+        },
+        {
+          "url": "https://www.tempeunion.org/about-tuhsd/governing-board/governing-board-members",
+          "type": "official",
+          "title": "Governing Board Members - Tempe Union High School District"
+        },
+        {
+          "url": "https://ballotpedia.org/Andres_Barraza",
+          "type": "reference",
+          "title": "Andres Barraza - Ballotpedia"
+        }
+      ],
+      "image_url": null,
+      "website": "https://barrazaforcongress.com/",
+      "social_media": {},
+      "career_history": [
+        {
+          "title": "Governing board member",
+          "organization": "Tempe Union High School District",
+          "start_year": null,
+          "end_year": null,
+          "description": "Serves on the Tempe Union High School District governing board."
+        }
+      ],
+      "education": [],
+      "donor_summary": "Andres Barraza\u2019s public federal finance record is still limited, and the campaign website includes a donation link but little additional fundraising detail. Available filings indicate early-stage fundraising rather than a large established donor base.",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ01470/",
+      "voting_summary": "Andres Barraza has no legislative voting record because he has not held state or federal legislative office. He does have an elected school-board record as a Tempe Union High School District governing board member, but that is not a legislative voting record.",
+      "voting_source_url": "https://www.tempeunion.org/about-tuhsd/governing-board/governing-board-members",
+      "links": [
+        "https://ballotpedia.org/Andres_Barraza",
+        {
+          "url": "https://ballotpedia.org/Andres_Barraza",
+          "title": "Andres Barraza - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01470/",
+          "title": "BARRAZA, ANDRES ADAN - Candidate overview | FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://barrazaforcongress.com/",
+          "title": "Andres Barraza",
+          "type": "official"
+        },
+        {
+          "url": "https://secure.actblue.com/donate/barrazaforcongress?refcode=directory",
+          "title": "Andres Barraza \u2014 Donate via ActBlue",
+          "type": "official"
+        },
+        {
+          "url": "https://www.tempeunion.org/about-tuhsd/governing-board/governing-board-members",
+          "title": "Governing Board Members - Tempe Union High School District",
+          "type": "legislature"
+        },
+        {
+          "url": "https://www.ahwatukee.com/news/tempe-union-board-president-steps-down-triggering-tension/article_b53f6f06-606b-4810-b6c5-90f2c5225406.html",
+          "title": "Tempe Union Board president steps down, triggering tension",
+          "type": "news"
+        },
+        {
+          "url": "https://azld12dems.org/2025/09/andres-barraza/",
+          "title": "Andres Barraza - LD12 Democrats",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "campaign_site",
+              "title": "Barraza for US Congress - Arizona District 01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ballotpedia.org/Andres_Barraza",
+              "type": "reference",
+              "title": "Andres Barraza - Ballotpedia",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "No explicit economy policy page or detailed stance published; campaign materials focus on addressing rising costs for working families and concerns about the cost of living.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "campaign_website",
+              "title": "Barraza for US Congress - Arizona District 01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://secure.actblue.com/donate/barrazaforcongress?refcode=directory",
+              "type": "fundraising_page",
+              "title": "Barraza for Congress AZ 1 - ActBlue Donate",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "No explicit climate/energy policy position identified in publicly available credible sources.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Andres_Barraza",
+              "type": "web",
+              "title": "Andres Barraza - Ballotpedia",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No publicly documented position on reproductive rights has been identified; no credible campaign policy page, voting record, or public statement found.",
+          "confidence": "low"
+        },
+        "Immigration": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Guns & Safety": {
+          "stance": "No publicly documented position on guns and safety has been identified for Andres Barraza.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "official_campaign_site",
+              "title": "Barraza for US Congress - Arizona District 01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ballotpedia.org/Andres_Barraza",
+              "type": "reference",
+              "title": "Andres Barraza - Ballotpedia",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No publicly posted position on foreign policy is available from Andres Barraza.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "campaign_website",
+              "title": "Barraza for Congress - AZ-01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "No publicly documented position on Social Justice is available; campaign materials do not publish a policy page or credible reporting detailing a stance on social justice issues.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "campaign",
+              "title": "Barraza for US Congress - Campaign Website",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ01470/",
+              "type": "official",
+              "title": "FEC Candidate Profile \u2013 H6AZ01470 (Andres Adan Barraza)",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ballotpedia.org/Andres_Barraza",
+              "type": "news",
+              "title": "Ballotpedia: Andres Barraza",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "No public position found on Education.",
+          "confidence": "low"
+        },
+        "Tech & AI": {
+          "stance": "No public position on Tech & AI has been published by the campaign; the official site currently lists 'Coming Soon' with no policy page.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "campaign_site",
+              "title": "Barraza for US Congress - Arizona District 01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ballotpedia.org/Andres_Barraza",
+              "type": "ballotpedia",
+              "title": "Andres Barraza - Ballotpedia",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "No public position on Election Reform has been published by Andres Barraza or his campaign; available sources show no policy page or statements on this issue.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://barrazaforcongress.com/",
+              "type": "official",
+              "title": "Barraza for US Congress - Arizona District 01",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Angie Montoya",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Angie Montoya is a Democratic candidate for Arizona's 1st Congressional District. Her campaign describes her as a Phoenix Valley resident, a mother of three, and a product manager with a master's degree in Social Justice & Human Rights from Arizona State University.",
+      "summary_sources": [
+        {
+          "url": "https://www.angiemontoya-az.com/about",
+          "type": "official_campaign_about_page",
+          "title": "About \u2014 angiemontoya-az"
+        },
+        {
+          "url": "https://ballotpedia.org/Angie_Montoya",
+          "type": "website",
+          "title": "Angie Montoya - Ballotpedia"
+        }
+      ],
+      "image_url": "https://run.imgix.net/aa7e7d40-418c-475b-8566-dc99c98e60c7/5958c32a-fc86-4528-a0d2-130c8ea84c0b/5958c32a-fc86-4528-a0d2-130c8ea84c0b.jpeg?ixlib=js-3.8.0&bri=0&con=0&sat=0&high=0&shad=0&usm=0&rect=0%2C747%2C3820%2C3820&auto=compress%2Cformat&fit=fillmax&w=2048&q=75",
+      "website": null,
+      "social_media": {},
+      "career_history": [
+        {
+          "title": "Product Manager",
+          "organization": "Private sector",
+          "start_year": null,
+          "end_year": null,
+          "description": "Campaign biography says she works as a product manager."
+        }
+      ],
+      "education": [
+        {
+          "institution": "Arizona State University",
+          "degree": "Master's in Social Justice & Human Rights",
+          "field": "Social Justice & Human Rights",
+          "year": null
+        }
+      ],
+      "donor_summary": "Angie Montoya\u2019s federal committee is active, but public finance details available in search results are sparse and do not yet show a large disclosed haul. The clearest public evidence is her FEC committee registration and campaign donation page; no reliable public source in the search results provided a total raised or major donor list. Sources: https://www.fec.gov/data/committee/C00918805/?cycle=2026 ; https://www.angiemontoya-az.com/donate ; https://www.angiemontoya-az.com/",
+      "donor_source_url": "https://www.fec.gov/data/committee/C00918805/?cycle=2026",
+      "voting_summary": "Angie Montoya has not held legislative office, so there is no legislative voting record to report. No prior elected or executive office was found in the sources reviewed; her public record in the search results is primarily campaign-policy material and candidate biography pages. Sources: https://ballotpedia.org/Angie_Montoya ; https://www.angiemontoya-az.com/about ; https://www.angiemontoya-az.com/policy",
+      "voting_source_url": "https://ballotpedia.org/Angie_Montoya",
+      "links": [
+        "https://ballotpedia.org/Angie_Montoya",
+        {
+          "url": "https://ballotpedia.org/Angie_Montoya",
+          "title": "Angie Montoya - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.angiemontoya-az.com/",
+          "title": "Angie Montoya for Arizona CD01",
+          "type": "official"
+        },
+        {
+          "url": "https://www.angiemontoya-az.com/about",
+          "title": "About \u2014 angiemontoya-az",
+          "type": "official"
+        },
+        {
+          "url": "https://www.angiemontoya-az.com/policy",
+          "title": "Policy \u2014 angiemontoya-az",
+          "type": "official"
+        },
+        {
+          "url": "https://www.angiemontoya-az.com/donate",
+          "title": "Donate \u2014 angiemontoya-az",
+          "type": "official"
+        },
+        {
+          "url": "https://www.fec.gov/data/committee/C00918805/?cycle=2026",
+          "title": "ANGIE MONTOYA FOR CONGRESS - committee overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.angiemontoya-az.com/social",
+          "title": "Social \u2014 angiemontoya-az",
+          "type": "official"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Supports expanding access to quality mental health care and reducing stigma around seeking help, with particular emphasis on veterans, service members, and Indigenous communities.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Says immigrants help keep the U.S. economy turning; otherwise, no broader economic policy position is publicly stated on the campaign site.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Supports immigration reform that emphasizes human dignity, access to basic human rights, and due process; her campaign says immigrants help keep the U.S. economy turning.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Frames social justice around human rights and civil rights, and says her campaign priorities include women's and children's rights, mental health care, literacy, and immigration reform.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.angiemontoya-az.com/about",
+              "type": "official_campaign_about_page",
+              "title": "About \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Prioritizes literacy and reading comprehension as core education issues and says they are critical for community and national progress.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "No public position found",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Focuses on local concerns such as mental health care access, literacy, women's and children's rights, and immigration reform in Arizona's 1st District.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.angiemontoya-az.com/policy",
+              "type": "official_campaign_policy_page",
+              "title": "Policy \u2014 angiemontoya-az",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "David Redkey",
+      "party": "Green",
+      "incumbent": false,
+      "summary": "David Redkey is a certified teacher and Green Party candidate for Arizona\u2019s 1st Congressional District. His campaign website says he has lived in Arizona for nearly four decades and is running on a platform he calls \u201cFoundation Economics,\u201d along with health care, reproductive rights, education, and ethics-related reforms.",
+      "summary_sources": [
+        {
+          "url": "https://www.davidredkey4congress.com/",
+          "type": "official_campaign",
+          "title": "David Redkey"
+        },
+        {
+          "url": "https://www.davidredkey4congress.com/what-is-foundation-economics",
+          "type": "official_campaign",
+          "title": "What is Foundation Economics? - David Redkey"
+        },
+        {
+          "url": "https://www.davidredkey4congress.com/fights-for-reproductive-rights",
+          "type": "official_campaign",
+          "title": "Fights for Reproductive Rights - David Redkey"
+        }
+      ],
+      "image_url": null,
+      "website": "https://www.davidredkey4congress.com/",
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": "David Redkey\u2019s federal campaign finance presence is still limited, with an active FEC candidate filing and committee record. Publicly available sources in the materials reviewed did not provide a reliable total raised or a detailed donor breakdown.",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ01322/",
+      "voting_summary": "David Redkey has not held legislative office, so there is no legislative voting record to report. Available public sources describe him as a teacher and candidate rather than a current or former elected official.",
+      "voting_source_url": "https://ballotpedia.org/David_Redkey",
+      "links": [
+        "https://ballotpedia.org/David_Redkey",
+        {
+          "url": "https://ballotpedia.org/David_Redkey",
+          "title": "David Redkey - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.davidredkey4congress.com/",
+          "title": "David Redkey",
+          "type": "official"
+        },
+        {
+          "url": "https://www.davidredkey4congress.com/undo-the-harm-of-trump",
+          "title": "Undo the Harm of Trump - David Redkey",
+          "type": "official"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01322/",
+          "title": "REDKEY, DAVID WAYNE MR. - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.fec.gov/data/committee/C00913558/",
+          "title": "FRIENDS OF DAVID REDKEY - committee overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.linkedin.com/in/david-wayne-redkey",
+          "title": "David Redkey, M.Ed. - U.S. House of Representatives | LinkedIn",
+          "type": "other"
+        },
+        {
+          "url": "https://www.instagram.com/davidredkey/",
+          "title": "David Redkey (@davidredkey) \u2022 Instagram photos and videos",
+          "type": "other"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Supports a universal single-payer-style system called TriCare Prime for All, with automatic enrollment and no co-pays, deductibles, or medical bills. He frames health care as a public service and a national security issue.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/tricare-prime-for-all",
+              "type": "official_campaign",
+              "title": "TriCare Prime for All - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Advocates \u201cFoundation Economics,\u201d which uses very high marginal tax rates on ultra-high incomes and concentrated profits, plus wage credits and childcare support, to redirect resources toward working families and public investment.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/what-is-foundation-economics",
+              "type": "official_campaign",
+              "title": "What is Foundation Economics? - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/economic-bill-of-rights",
+              "type": "official_campaign",
+              "title": "Economic Bill of Rights - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "Supports reproductive rights and says the pregnant person should decide what happens to their own body, health, and future without political or governmental interference.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/fights-for-reproductive-rights",
+              "type": "official_campaign",
+              "title": "Fights for Reproductive Rights - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Supports federal funding for school funding and says every person has a right to a good education. His campaign also says public education should be funded with federal monies.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/economic-bill-of-rights",
+              "type": "official_campaign",
+              "title": "Economic Bill of Rights - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "Supports ending U.S. support for the war in Gaza and says \u201cFree Palestine\u201d on his campaign site.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/",
+              "type": "official_campaign",
+              "title": "David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/free-palestine",
+              "type": "official_campaign",
+              "title": "Free Palestine - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Supports the Equal Rights Amendment and describes his campaign as focused on dignity, equality, and protecting fundamental rights.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/ratify-the-equal-rights-amendment",
+              "type": "official_campaign",
+              "title": "Ratify the Equal Rights Amendment - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/economic-bill-of-rights",
+              "type": "official_campaign",
+              "title": "Economic Bill of Rights - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Supports a hard ban on congressional stock trading and calls for government integrity reforms, including a proposal to ratify the Equal Rights Amendment and amend the Supreme Court structure.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.davidredkey4congress.com/prevent-stock-trading-by-congress",
+              "type": "official_campaign",
+              "title": "Prevent Stock Trading by Congress - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/ratify-the-equal-rights-amendment",
+              "type": "official_campaign",
+              "title": "Ratify the Equal Rights Amendment - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://www.davidredkey4congress.com/u-s-supreme-court-amendment",
+              "type": "official_campaign",
+              "title": "U.S. Supreme Court Amendment - David Redkey",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Jonathan Treble",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Jonathan Treble is a Democratic candidate running in Arizona\u2019s 1st Congressional District in 2026. He is a small-business owner and father who says he entered the race after a personal experience navigating health insurance during a serious medical issue.",
+      "summary_sources": [
+        {
+          "url": "https://trebleforaz.com/meet-jonathan/",
+          "type": "official",
+          "title": "Meet Jonathan | Jonathan Treble for Congress"
+        },
+        {
+          "url": "https://ballotpedia.org/Jonathan_Treble",
+          "type": "ballotpedia",
+          "title": "Jonathan Treble - Ballotpedia"
+        }
+      ],
+      "image_url": "https://trebleforaz.com/",
+      "website": "https://trebleforaz.com/",
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": "Jonathan Treble\u2019s 2026 fundraising appears comparatively strong for the race, with State Affairs reporting he had raised over $1.7 million. Public finance pages also show an active FEC committee, and campaign coverage plus Track AIPAC indicate some support from pro-Israel donors and related PAC money, though the exact industry mix is not fully visible in the search results. Sources: https://pro.stateaffairs.com/az/yellow-sheet/elections/treble-leads-arizona-democrats ; https://www.fec.gov/data/candidate/H6AZ01298/ ; https://www.trackaipac.com/candidates ; https://trebleforaz.com/",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ01298/",
+      "voting_summary": "Jonathan Treble has not held legislative office, so there is no legislative voting record to report. No prior elected or executive office was found in the sources reviewed; the available record is campaign biography and issue statements emphasizing health care, small business, and family policy. Sources: https://ballotpedia.org/Jonathan_Treble ; https://trebleforaz.com/meet-jonathan/ ; https://trebleforaz.com/issues/",
+      "voting_source_url": "https://ballotpedia.org/Jonathan_Treble",
+      "links": [
+        "https://ballotpedia.org/Jonathan_Treble",
+        {
+          "url": "https://ballotpedia.org/Jonathan_Treble",
+          "title": "Jonathan Treble - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01298/",
+          "title": "TREBLE, JONATHAN - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://trebleforaz.com/",
+          "title": "Jonathan Treble for Congress",
+          "type": "official"
+        },
+        {
+          "url": "https://trebleforaz.com/meet-jonathan/",
+          "title": "Meet Jonathan | Jonathan Treble for Congress",
+          "type": "official"
+        },
+        {
+          "url": "https://trebleforaz.com/issues/",
+          "title": "Issues | Jonathan Treble for Congress",
+          "type": "official"
+        },
+        {
+          "url": "https://trebleforaz.com/endorsements/",
+          "title": "Endorsements | Jonathan Treble for Congress",
+          "type": "official"
+        },
+        {
+          "url": "https://pro.stateaffairs.com/az/yellow-sheet/elections/treble-leads-arizona-democrats",
+          "title": "Treble's $1.7M fundraising tops CD 1 Democratic race - State Affairs",
+          "type": "news"
+        },
+        {
+          "url": "https://www.azcentral.com/story/news/politics/elections/2025/04/02/democrat-jonathan-treble-seeks-cd-1-seat-of-rep-david-schweikert/82765003007/",
+          "title": "Democrat Jonathan Treble wants to beat Rep. David Schweikert in Arizona's 1st District",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Treble says he supports universal healthcare, strengthening the Affordable Care Act, restoring Medicaid, lowering premiums, protecting coverage for preexisting conditions, and investing in mental health services and rural clinics while preserving private options.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Healthcare \u2013 No One Should Go Broke to Stay Alive",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Treble says the economy should work for people rather than corporations. He opposes further tax cuts for the wealthy and says he would restore cut programs, ensure billionaires pay their fair share, and work to lower prices and expand opportunity.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "The Economy \u2013 Building Fairness and Abundance",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "Treble says Arizona must balance development with conservation and protect water, air, wildlife, and public lands. He says he has taken the No Fossil Fuel Money pledge and would restore environmental programs such as the Greenhouse Gas Reduction Fund and the Methane Emissions Reduction Program.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "The Environment \u2013 Defending What Sustains Us",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "Treble says decisions about pregnancy should be made by patients and doctors, not politicians. He supports restoring Roe v. Wade protections nationwide and protecting access to abortion, contraception, IVF, and accurate medical information.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Reproductive Rights \u2013 Because It\u2019s Your Life, Not Theirs",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Treble says the U.S. needs a secure border and a functional, humane immigration system. He supports modernizing legal immigration, protecting Dreamers, and investing in smart border technology while opposing what he describes as the cruelty and chaos of current federal policy.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Immigration \u2013 Practical, Decent, Done Right",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Issues | Jonathan Treble for Congress",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Issues | Jonathan Treble for Congress",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Treble says he supports protecting voting rights, updating the Voting Rights Act coverage formula, backing the Freedom to Vote Act, and expanding early voting and mail-in ballot access. He also ties social equity to reproductive rights and access to affordable health care.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Democracy \u2013 Protecting the Vote and our Freedom",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Reproductive Rights \u2013 Because It\u2019s Your Life, Not Theirs",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Treble says he would fully fund Title I and II and IDEA, expand access to Pell Grants and career training, protect the Department of Education\u2019s role, and support safe, modern classrooms with fair teacher pay.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Education \u2013 Investing in the Next Generation",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "Treble says he supports responsible AI development, real AI safety standards, guardrails on social media, and investment in clean energy, semiconductors, and biotechnology. He also says he supports smart rules for emerging technologies and the CHIPS and Science Act.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Innovation \u2013 Building a Future-Focused Economy",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Treble says he supports modernizing election infrastructure, expanding early voting and mail-in ballot access, restoring the Voting Rights Act by updating its coverage formula, backing the Freedom to Vote Act, and opposing restrictive measures like the SAVE Act.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Democracy \u2013 Protecting the Vote and our Freedom",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Treble\u2019s local priorities include lowering health care costs, protecting rural hospitals and clinics, preserving Arizona\u2019s water and public lands, and supporting tribal sovereignty and infrastructure. He also emphasizes education funding, voting access, and clean energy as district-level concerns.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://trebleforaz.com/issues/",
+              "type": "campaign_policy_page",
+              "title": "Issues | Jonathan Treble for Congress",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Jason Duey",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Jason Duey is a Republican candidate for Arizona's 1st Congressional District in the 2026 election. Public filings and candidate listings identify him as a Republican running for the open seat in the district.",
+      "summary_sources": [
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01397/",
+          "type": "official",
+          "title": "DUEY, JASON S. - Candidate overview - FEC"
+        },
+        {
+          "url": "https://ballotpedia.org/Jason_Duey",
+          "type": "website",
+          "title": "Jason Duey - Ballotpedia"
+        },
+        {
+          "url": "https://azcapitoltimes.com/news/2025/11/20/crowded-contest-shaping-up-in-1st-congressional-district/",
+          "type": "news",
+          "title": "Crowded contest shaping up in Arizona\u2019s 1st Congressional District"
+        }
+      ],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": "Jason Duey\u2019s public federal finance record is active, but the search results did not surface a reliable total raised or a detailed donor breakdown. The clearest finance-related evidence is his FEC candidate page and a campaign/committee presence, with no corroborated public source in the results showing major industries or top contributors. Sources: https://www.fec.gov/data/candidate/H6AZ01397/ ; https://www.fec.gov/data/committee/C00932665/ ; https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ01397/",
+      "voting_summary": "Jason Duey has not held legislative office, so there is no legislative voting record to report. No prior elected or executive office was found in the sources reviewed; the available public record describes him as a former federal prosecutor, state prosecutor, federal agent, and retired military officer, which is professional background rather than a voting record. Sources: https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey ; https://www.linkedin.com/in/jason-duey-4b534513 ; https://fox8.com/business/press-releases/ein-presswire/865042393/combat-veteran-and-former-federal-prosecutor-jason-duey-announces-run-for-congress-in-arizonas-cd1",
+      "voting_source_url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey",
+      "links": [
+        "https://ballotpedia.org/Jason_Duey",
+        {
+          "url": "https://ballotpedia.org/Jason_Duey",
+          "title": "Jason Duey - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01397/",
+          "title": "DUEY, JASON S. - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey",
+          "title": "Jason Duey - OpenCampaign Politician Profile",
+          "type": "other"
+        },
+        {
+          "url": "https://www.linkedin.com/in/jason-duey-4b534513",
+          "title": "Jason Duey - Former Candidate for Congress (AZ-01) - LinkedIn",
+          "type": "other"
+        },
+        {
+          "url": "https://fox8.com/business/press-releases/ein-presswire/865042393/combat-veteran-and-former-federal-prosecutor-jason-duey-announces-run-for-congress-in-arizonas-cd1",
+          "title": "Combat Veteran and Former Federal Prosecutor Jason Duey Announces Run for Congress in Arizona's CD1",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.opencampaign.com/politicians-in-united-states/198391/jason-duey/issue-positions",
+              "type": "other",
+              "title": "Jason Duey - Issue Positions on Key Topics and Policies",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Gina Swoboda",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Gina Swoboda is a Republican political operative and former chair of the Arizona Republican Party. She launched a 2026 campaign for Arizona's 1st Congressional District but ended that bid in February 2026 to run for Arizona secretary of state.",
+      "summary_sources": [
+        {
+          "url": "https://www.azcentral.com/story/news/politics/elections/2026/02/13/gina-swoboda-switches-campaigns-arizona/88664594007/",
+          "type": "news",
+          "title": "Gina Swoboda quits congressional race to run for secretary of state"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01405/",
+          "type": "official",
+          "title": "SWOBODA, GINA - Candidate overview - FEC"
+        }
+      ],
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Gina_Swoboda_%2853511540208%29.jpg",
+      "website": "https://ginaforsos.com/",
+      "social_media": {},
+      "career_history": [
+        {
+          "title": "Chair",
+          "organization": "Arizona Republican Party",
+          "start_year": 2024,
+          "end_year": 2026,
+          "description": "Led the Arizona Republican Party from January 2024 until January 2026, before ending her congressional campaign to run for Arizona secretary of state."
+        }
+      ],
+      "education": [
+        {
+          "institution": "Arizona State University",
+          "degree": "Bachelor of Arts",
+          "field": null,
+          "year": null
+        }
+      ],
+      "donor_summary": "Gina Swoboda's federal campaign committee reported $201,755 in receipts and $54,482.33 in disbursements for the period ending December 31, 2025, with most receipts coming from individual contributions. The FEC candidate page provides the underlying filing and committee data, but the available public summary does not identify a dominant industry donor base.",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ01405/",
+      "voting_summary": "Gina Swoboda has not held legislative office, so there is no legislative voting record to report. Her public record instead centers on party leadership and election-administration commentary.",
+      "voting_source_url": "https://en.wikipedia.org/wiki/Gina_Swoboda",
+      "links": [
+        "https://ballotpedia.org/Gina_Swoboda",
+        {
+          "url": "https://ballotpedia.org/Gina_Swoboda",
+          "title": "Gina Swoboda - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Gina_Swoboda",
+          "title": "Gina Swoboda - Wikipedia",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ01405/",
+          "title": "SWOBODA, GINA - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://ginaforsos.com/",
+          "title": "Gina Swoboda for AZ Secretary of State",
+          "type": "official"
+        },
+        {
+          "url": "https://azgop.com/chair-swoboda-and-azgop-certify-arizonas-eleven-electoral-votes-for-trump-and-vance-after-landmark-election/",
+          "title": "Chair Swoboda and AZGOP Certify Arizona's Eleven Electoral Votes for Trump and Vance After Landmark Election",
+          "type": "news"
+        },
+        {
+          "url": "https://azmirror.com/briefs/azgop-chair-gina-swoboda-jumps-into-congressional-race-with-trumps-backing/",
+          "title": "AZGOP Chair Gina Swoboda jumps into congressional race with Trump's backing",
+          "type": "news"
+        },
+        {
+          "url": "https://www.azcentral.com/story/news/politics/elections/2026/02/13/gina-swoboda-switches-campaigns-arizona/88664594007/",
+          "title": "Gina Swoboda quits congressional race to run for secretary of state",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Election Reform": {
+          "stance": "Swoboda has emphasized election administration, voter-roll maintenance, and election integrity in her public remarks and party work. She has also criticized some election-overhaul proposals and argued for using judge-signed warrants in immigration enforcement to better protect civil liberties.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://azgop.com/chair-swoboda-and-azgop-certify-arizonas-eleven-electoral-votes-for-trump-and-vance-after-landmark-election/",
+              "type": "news",
+              "title": "Chair Swoboda and AZGOP Certify Arizona\u2019s Eleven Electoral Votes for Trump and Vance After Landmark Election",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ktar.com/immigration/gina-swoboda-trump-lost-immigration/5813808/",
+              "type": "news",
+              "title": "Gina Swoboda says President Trump has politically lost the argument on immigration enforcement",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            },
+            {
+              "url": "https://ktar.com/arizona-election-news/swoboda-kolodin-mail-voting/5840943/",
+              "type": "news",
+              "title": "Swoboda: Kolodin admitted bill targets mail voting",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Swoboda supports immigration enforcement but has said the Trump administration has 'politically lost the argument' on some enforcement tactics. She said enforcement should rely on warrants signed by a judge and argued that current tactics have gone too far.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://ktar.com/immigration/gina-swoboda-trump-lost-immigration/5813808/",
+              "type": "news",
+              "title": "Gina Swoboda says President Trump has politically lost the argument on immigration enforcement",
+              "last_accessed": "2026-04-07T03:41:34.015138+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Healthcare": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Economy": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Climate/Energy": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Guns & Safety": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Foreign Policy": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Social Justice": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Tech & AI": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Local Issues": {
+          "stance": "No public position found",
+          "confidence": "low"
+        }
+      }
+    }
+  ],
+  "updated_utc": "2026-04-07T03:43:05.691683+00:00",
+  "generator": [
+    "gpt-5.4-mini",
+    "gpt-5-nano",
+    "claude-haiku-4-5-20251001",
+    "gemini-3-flash-preview",
+    "grok-3-mini"
+  ],
+  "reviews": [
+    {
+      "model": "claude-haiku-4-5-20251001",
+      "reviewed_at": "2026-04-07T03:43:28.002317+00:00",
+      "verdict": "approved",
+      "score": 87,
+      "flags": [
+        {
+          "field": "candidates[1].website",
+          "concern": "The website field is set to 'https://barrazaforcongress.com/' but the summary notes that the campaign site is 'largely a placeholder with a \"Coming Soon\" message.' This suggests the site exists but offers minimal substantive content. The field is not inaccurate, but a note on the site's limited utility would improve transparency.",
+          "suggestion": "Either add a note in the summary_sources or career_history explaining that the campaign site lacks detailed policy information, or consider adding a metadata flag that the website is placeholder-stage.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[3].image_url",
+          "concern": "Angie Montoya's image_url field contains a full campaign image URL (ending in a UUID), but the field is correctly populated. No error here, but note that this is robust.",
+          "suggestion": null,
+          "severity": "info"
+        },
+        {
+          "field": "candidates[4].career_history",
+          "concern": "David Redkey's career_history array is empty, and his education array is also empty. The summary describes him as a 'certified teacher' but this is not documented in career_history. The Wikipedia or Ballotpedia sources should be checked to confirm whether his teaching background is publicly verified.",
+          "suggestion": "Add career_history entry for his teaching position (organization, years if available). If the sources do not confirm teaching credentials, update the summary to match only what is verifiable.",
+          "severity": "warning"
+        },
+        {
+          "field": "candidates[5].career_history",
+          "concern": "Jonathan Treble's career_history array is empty, yet the summary describes him as a 'small-business owner.' The available sources (campaign site, Ballotpedia) should clarify his business background; this is missing from the structured data.",
+          "suggestion": "Populate career_history with his small-business ownership details, including organization name and years if available from campaign or news sources.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[6].career_history and candidates[6].education",
+          "concern": "Jason Duey's career_history and education arrays are empty. However, the voting_summary references his background as a 'former federal prosecutor, state prosecutor, federal agent, and retired military officer.' These professional qualifications are documented in sources but not structured in the candidate object.",
+          "suggestion": "Populate career_history and education arrays with his prosecutorial, federal agent, and military service records, sourced from LinkedIn, OpenCampaign, and the press release cited.",
+          "severity": "info"
+        },
+        {
+          "field": "polling[1].matchups[0].percentages",
+          "concern": "The second HighGround poll (2026-03-01) has all percentages set to null. The polling_note correctly flags this as a data-retrieval limitation ('accessible snippets did not provide full numeric results'). This is appropriately documented, but the user should be aware the poll exists but is not fully populated.",
+          "suggestion": "The current handling is correct \u2014 the null values and the polling_note jointly communicate that the data was not fully accessible. No change needed, but users should rely on the first poll (2026-02-25) for concrete numbers.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].donor_summary",
+          "concern": "Amish Shah's donor_summary mentions 'Genpact ($43,696 in 2024 corporate giving)' as evidence of his donor base, but the claim is framed as a corporate contribution. This is stated without clarifying whether Genpact is a PAC, corporate committee, or individual donors within the company. The sources (FEC, OpenSecrets, Who Funds Congress) should be verified to confirm the nature and legality of this contribution.",
+          "suggestion": "Clarify the donor type (individual vs. corporate vs. PAC) and verify the contribution amount and year are accurate per FEC records. Consider linking directly to the relevant FEC filing.",
+          "severity": "info"
+        },
+        {
+          "field": "race-level description",
+          "concern": "The description states that David Schweikert 'entered the 2026 governor's race.' This is a significant claim about an incumbent's decision. The description does not provide a source URL for this statement. While this may be correct, it should be verified against a news source or official announcement.",
+          "suggestion": "Add a source URL for Schweikert's entry into the gubernatorial race, either to a news article or official campaign announcement.",
+          "severity": "warning"
+        },
+        {
+          "field": "candidates[7].career_history",
+          "concern": "Gina Swoboda's career_history shows her as Chair of the Arizona Republican Party from 2024\u20132026, but the sources do not clearly document her end date as 2026 or clarify whether she stepped down before or after announcing her secretary-of-state campaign. The AZ GOP press release is from after her announcement, so timing should be verified.",
+          "suggestion": "Verify the exact end date of her AZGOP chair tenure against news coverage of her transition to the SOS race.",
+          "severity": "info"
+        }
+      ],
+      "summary": "Strong profile with well-sourced candidate information and transparent documentation of research gaps. All six candidates have credible primary sources (FEC filings, official campaign sites, news coverage, and reference databases like Ballotpedia and Vote Smart). The profile appropriately applies low-confidence labels to underdeveloped issue positions and accurately documents when candidates have not published policy details. Background information is consistently cited and candidate party affiliations are verified. Polling data is correctly flagged as incomplete where sources did not yield full numeric results. The race-level description is well-grounded in sourced reporting about the open seat, competitiveness, and Gina Swoboda's strategic pivot to the secretary-of-state race. Minor areas for enhancement noted below."
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "reviewed_at": "2026-04-07T03:43:20.605410+00:00",
+      "verdict": "approved",
+      "score": 96,
+      "flags": [
+        {
+          "field": "candidates[5].career_history",
+          "concern": "The candidate's background as a 'former federal prosecutor, state prosecutor, federal agent, and retired military officer' is documented in the voting_summary, but the career_history array itself is empty.",
+          "suggestion": "Populate the career_history array with the professional roles mentioned in the voting_summary to ensure data structure consistency.",
+          "severity": "info"
+        },
+        {
+          "field": "polling",
+          "concern": "Two polling entries contain null values for percentages. While the polling_note explains that full numeric results were not accessible in snippets, these entries provide little value to the dataset without the numbers.",
+          "severity": "info",
+          "suggestion": "If full data is unavailable, consider prioritizing entries that include numeric results or clearly labeling them as 'Participation/Inclusion Only' records."
+        },
+        {
+          "field": "candidates[0].donor_summary",
+          "concern": "The donor summary mentions 'Genpact ($43,696 in 2024 corporate giving)'. My training data suggests that corporate entities generally cannot give directly to federal candidates; this likely refers to a PAC or employees of that corporation. Human reviewers should verify the specific entity type at the OpenSecrets source provided.",
+          "suggestion": "Clarify if the contribution came from a Corporate PAC or individual employees associated with the company.",
+          "severity": "info"
+        }
+      ],
+      "summary": "This is an exceptionally high-quality research profile that demonstrates a sophisticated understanding of the Arizona political landscape for the 2026 cycle. The agent correctly identified the 'open seat' status of the district and meticulously tracked the candidacy of Gina Swoboda, including her exit and pivot to the Secretary of State race. Sourcing is robust, utilizing a professional mix of FEC filings, official campaign sites, and specialized local outlets like the Yellow Sheet/State Affairs and Arizona Capitol Times. The inclusion of the Green Party candidate and detailed fundraising figures for Jonathan Treble shows deep research effort."
+    },
+    {
+      "model": "grok-3-mini",
+      "reviewed_at": "2026-04-07T03:43:14.562436+00:00",
+      "verdict": "approved",
+      "score": 95,
+      "flags": [],
+      "summary": "This profile is a model of thorough and balanced research, with strong sourcing from credible outlets like FEC filings, official campaign websites, Ballotpedia, and news articles, ensuring accurate representation of candidates' backgrounds, issues, and polling. It handles gaps transparently, such as for less-documented candidates, while maintaining neutral language throughout, making it a reliable resource for the 2026 AZ-01 race."
+    }
+  ],
+  "validation_grade": {
+    "grade": "A",
+    "score": 93,
+    "passed": true,
+    "summary": "Validated by 3/3 reviewers with an average score of 93/100."
+  },
+  "agent_metrics": {
+    "model": "gpt-5.4-mini",
+    "prompt_tokens": 3763494,
+    "completion_tokens": 348742,
+    "total_tokens": 4112236,
+    "estimated_usd": 0.6313,
+    "model_breakdown": {
+      "gpt-5.4-mini": {
+        "prompt_tokens": 1131974,
+        "completion_tokens": 23861
+      },
+      "gpt-5-nano": {
+        "prompt_tokens": 2499776,
+        "completion_tokens": 319803
+      },
+      "grok-3-mini": {
+        "prompt_tokens": 38554,
+        "completion_tokens": 199
+      },
+      "gemini-3-flash-preview": {
+        "prompt_tokens": 47394,
+        "completion_tokens": 895
+      },
+      "claude-haiku-4-5-20251001": {
+        "prompt_tokens": 45796,
+        "completion_tokens": 3984
+      }
+    },
+    "duration_s": 3273.5
+  }
+}

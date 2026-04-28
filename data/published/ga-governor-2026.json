@@ -152,7 +152,7 @@
           "title": "Chris Carr for Governor"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Chris_Carruthers_05-04-2010_1.jpg/500px-Chris_Carruthers_05-04-2010_1.jpg",
       "website": "https://carrforgeorgia.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/attorneygeneralchriscarr/",
@@ -1491,7 +1491,7 @@
       "links": []
     }
   ],
-  "updated_utc": "2026-04-01T06:13:29.151620+00:00",
+  "updated_utc": "2026-04-06T16:53:10.478684+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -1637,20 +1637,21 @@
   "polling_note": "Recent public polling in the last 90 days was limited in the sources reviewed; one Emerson College poll referenced Georgia governor primary dynamics but the accessible summary did not provide full matchup percentages in the search results.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 327578,
-    "completion_tokens": 6962,
-    "total_tokens": 334540,
-    "estimated_usd": 0.0491,
+    "prompt_tokens": 194276,
+    "completion_tokens": 3707,
+    "total_tokens": 197983,
+    "estimated_usd": 0.0277,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 64061,
-        "completion_tokens": 5296
+        "prompt_tokens": 67265,
+        "completion_tokens": 1704
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 263517,
-        "completion_tokens": 1666
+        "prompt_tokens": 127011,
+        "completion_tokens": 2003
       }
     },
-    "duration_s": 116.5
-  }
+    "duration_s": 72.5
+  },
+  "validation_grade": null
 }

@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Tennessee",
   "election_date": "2026-11-03",
-  "description": "This race is for Tennessee\u2019s Class II seat in the U.S. Senate, currently held by Republican Bill Hagerty. Tennessee is a strongly Republican state in recent federal elections, and most forecasters rate the seat as safely or solidly Republican, but the contest still matters because Senate control can hinge on a small number of seats. The main contrast is between Hagerty\u2019s incumbent Republican record and a Democratic field trying to make the race competitive in a state that has not elected a Democrat to the U.S. Senate since 1990.",
+  "description": "This race is for Tennessee’s Class II seat in the U.S. Senate, currently held by Republican Bill Hagerty. Tennessee is a strongly Republican state in recent federal elections, and most forecasters rate the seat as safely or solidly Republican, but the contest still matters because Senate control can hinge on a small number of seats. The main contrast is between Hagerty’s incumbent Republican record and a Democratic field trying to make the race competitive in a state that has not elected a Democrat to the U.S. Senate since 1990.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://www.hagerty.senate.gov/wp-content/uploads/2021/01/Bill-Hagerty-Official-Photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Bill-Hagerty.PNG",
       "website": "https://teamhagerty.com/",
       "social_media": {
         "x": "https://x.com/BillHagertyTN",
@@ -89,7 +89,7 @@
       "name": "Marquita Bradshaw",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Marquita Bradshaw is a Memphis-based environmental justice advocate and the Democratic nominee in Tennessee\u2019s 2020 U.S. Senate race. She is running again in 2026 and has centered her campaign on affordability, environmental justice, and public accountability.",
+      "summary": "Marquita Bradshaw is a Memphis-based environmental justice advocate and the Democratic nominee in Tennessee’s 2020 U.S. Senate race. She is running again in 2026 and has centered her campaign on affordability, environmental justice, and public accountability.",
       "summary_sources": [
         {
           "url": "https://www.marquitabradshaw.com/meet-marquita",
@@ -110,7 +110,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Marquita_Bradshaw_2020.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/80182230_marquita_head_shot_1.jpg",
       "website": "https://www.marquitabradshaw.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/BradshawforTN/",
@@ -173,7 +173,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Maria_E._Brewer%2C_U.S._Ambassador.jpg/500px-Maria_E._Brewer%2C_U.S._Ambassador.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -225,7 +225,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Civil_Miller-Watkins.jpg",
       "website": "https://www.youtube.com/@civilforsenate",
       "social_media": {
         "youtube": "https://www.youtube.com/@civilforsenate"
@@ -280,7 +280,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Diana-Onyejiaka.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -308,7 +308,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:05:57.163124+00:00",
+  "updated_utc": "2026-04-06T17:09:45.179733+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -316,16 +316,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 132915,
-    "completion_tokens": 3171,
-    "total_tokens": 136086,
-    "estimated_usd": 0.0218,
+    "prompt_tokens": 151116,
+    "completion_tokens": 5482,
+    "total_tokens": 156598,
+    "estimated_usd": 0.0232,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 35917,
+        "completion_tokens": 4832
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 132915,
-        "completion_tokens": 3171
+        "prompt_tokens": 115199,
+        "completion_tokens": 650
       }
     },
-    "duration_s": 35.9
-  }
+    "duration_s": 88.8
+  },
+  "validation_grade": null
 }

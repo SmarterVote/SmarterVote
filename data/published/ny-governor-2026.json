@@ -4,8 +4,54 @@
   "office": "Governor of New York",
   "jurisdiction": "New York",
   "election_date": "2026-11-03",
-  "description": "This race is for governor of New York, the state\u2019s top executive office. It is a high-profile contest in a large, heavily Democratic state, and the 2026 race is drawing attention because the incumbent governor is seeking reelection while major party challengers are trying to define the race around affordability, public safety, and the direction of state government. Ballotpedia rates the general election as Solid Democratic by The Cook Political Report, Likely Democratic by Inside Elections, and Safe Democratic by Sabato\u2019s Crystal Ball, reflecting New York\u2019s recent Democratic lean and the state\u2019s 2022 gubernatorial result. The main contrast so far is between Governor Kathy Hochul\u2019s record in office and challengers\u2019 arguments for change, with both parties also navigating primary contests.",
+  "description": "The 2026 New York governor’s race will decide control of the state’s executive branch in a large, heavily Democratic state where the governor shapes the budget, housing, transit, public safety, and responses to federal policy. The contest is notable for a Democratic incumbent, Kathy Hochul, facing a primary challenge from Lt. Gov. Antonio Delgado and a potential Republican challenge from Nassau County Executive Bruce Blakeman, with affordability, crime, immigration, and state-federal conflict likely to be central themes.",
   "polling": [
+    {
+      "pollster": "Siena College Research Institute",
+      "date": "2026-02-03",
+      "matchups": [
+        {
+          "candidates": [
+            "Kathy Hochul",
+            "Bruce Blakeman"
+          ],
+          "percentages": [
+            54,
+            28
+          ]
+        },
+        {
+          "candidates": [
+            "Kathy Hochul",
+            "Antonio Delgado"
+          ],
+          "percentages": [
+            64,
+            11
+          ]
+        }
+      ],
+      "source_url": "https://sri.siena.edu/2026/02/03/hochul-with-her-best-ever-favorability-rating-49-40-continues-to-hold-commanding-leads-over-blakeman-54-28-among-dems-delgado-64-11/",
+      "sample_size": 802
+    },
+    {
+      "pollster": "Siena College Research Institute",
+      "date": "2026-03-31",
+      "matchups": [
+        {
+          "candidates": [
+            "Kathy Hochul",
+            "Bruce Blakeman"
+          ],
+          "percentages": [
+            47,
+            34
+          ]
+        }
+      ],
+      "source_url": "https://sri.siena.edu/2026/03/31/hochul-lead-over-still-largely-unknown-blakeman-drops-7-points-to-47-34-from-51-31-her-favorability-approval-ratings-unchanged-in-last-month/",
+      "sample_size": 802
+    },
     {
       "pollster": "Marist University",
       "date": "2026-02-19",
@@ -85,28 +131,20 @@
       "name": "Kathy Hochul",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Kathy Hochul is the incumbent governor of New York and the state\u2019s first female governor. She has emphasized affordability, public safety, and state investment in areas such as housing, child care, and mental health, while her campaign frames the race as a choice between continuing her agenda and a Republican alternative.",
+      "summary": "Kathy Hochul is the incumbent governor of New York and has centered her recent agenda on affordability, public safety, housing, childcare, and transit. In April 2025, she announced agreement on the FY 2026 state budget, highlighting tax cuts, inflation refund checks, expanded child tax credits, and new spending on childcare, schools, and subway safety.",
       "summary_sources": [
         {
-          "url": "https://www.governor.ny.gov/about-governor-hochul",
-          "type": "government",
-          "title": "About - Governor Kathy Hochul - NY.Gov",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.governor.ny.gov/news/governor-hochul-announces-agreement-fy-2026-state-budget",
+          "type": "official",
+          "title": "Governor Hochul Announces Agreement on FY 2026 State Budget"
         },
         {
-          "url": "https://kathyhochul.com/about/",
-          "type": "website",
-          "title": "About - Kathy Hochul",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/New_York_gubernatorial_and_lieutenant_gubernatorial_election,_2026",
-          "type": "website",
-          "title": "New York gubernatorial and lieutenant gubernatorial election, 2026",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://sri.siena.edu/2026/02/03/hochul-with-her-best-ever-favorability-rating-49-40-continues-to-hold-commanding-leads-over-blakeman-54-28-among-dems-delgado-64-11/",
+          "type": "news",
+          "title": "Siena Research Institute poll release"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Kathy_Hochul_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ad05paDl_400x400.jpg",
       "website": "https://kathyhochul.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/KathyHochul",
@@ -176,28 +214,20 @@
       "name": "Antonio Delgado",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Antonio Delgado is New York\u2019s lieutenant governor and a former member of Congress. His campaign has centered on progressive themes including housing affordability, child care, health care, climate policy, and economic fairness, presenting him as a challenger from the party\u2019s left flank.",
+      "summary": "Antonio Delgado is New York’s lieutenant governor and is challenging Kathy Hochul for the Democratic nomination for governor. In a July 2025 interview, he said he entered the race because he believed Hochul had not used him in the role as promised and because he wanted new leadership in Albany.",
       "summary_sources": [
         {
-          "url": "https://delgadoforny.com/meet-antonio/",
-          "type": "website",
-          "title": "Meet Antonio - Antonio Delgado for New York",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://delgadoforny.com/what-lt-gov-antonio-delgado-says-led-to-him-challenging-hochul-in-2026/",
+          "type": "official",
+          "title": "What Lt. Gov. Antonio Delgado says led to him challenging Hochul in 2026"
         },
         {
-          "url": "https://www.governor.ny.gov/lt-governor-antonio-delgado",
-          "type": "government",
-          "title": "Antonio Delgado - Governor Kathy Hochul - NY.Gov",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Antonio_Delgado_(New_York)",
-          "type": "website",
-          "title": "Antonio Delgado (New York) - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://sri.siena.edu/2026/02/03/hochul-with-her-best-ever-favorability-rating-49-40-continues-to-hold-commanding-leads-over-blakeman-54-28-among-dems-delgado-64-11/",
+          "type": "news",
+          "title": "Siena Research Institute poll release"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Antonio_Delgado_official_portrait.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/LG_Antonio_Delgado_Portrait.jpg/500px-LG_Antonio_Delgado_Portrait.jpg",
       "website": "https://delgadoforny.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/AntonioDelgadoNY",
@@ -266,22 +296,20 @@
       "name": "Bruce Blakeman",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Bruce Blakeman is the Nassau County executive and a Republican candidate for governor. His campaign has focused on crime, taxes, and criticism of Democratic leadership in Albany, positioning him as a conservative alternative in a state that still leans Democratic statewide.",
+      "summary": "Bruce Blakeman is the Nassau County executive and a potential Republican contender in the 2026 New York governor’s race. Recent Siena polling has shown him trailing Hochul by a wide margin and remaining relatively unfamiliar to many statewide voters.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/New_York_gubernatorial_and_lieutenant_gubernatorial_election,_2026",
-          "type": "website",
-          "title": "New York gubernatorial and lieutenant gubernatorial election, 2026",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://sri.siena.edu/2026/02/03/hochul-with-her-best-ever-favorability-rating-49-40-continues-to-hold-commanding-leads-over-blakeman-54-28-among-dems-delgado-64-11/",
+          "type": "news",
+          "title": "Siena Research Institute poll release"
         },
         {
-          "url": "https://www.cityandstateny.com/politics/2026/01/candidates-governor-begin-charting-course-june-and-november/410457/",
+          "url": "https://sri.siena.edu/2026/03/31/hochul-lead-over-still-largely-unknown-blakeman-drops-7-points-to-47-34-from-51-31-her-favorability-approval-ratings-unchanged-in-last-month/",
           "type": "news",
-          "title": "Candidates for governor begin charting course for June and November",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Siena Research Institute poll release"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Bruce_Blakeman_2023.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Bruce_Blakeman.jpg",
       "website": "https://blakemanforny.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/BruceBlakemanNY",
@@ -341,7 +369,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:00:33.477817+00:00",
+  "updated_utc": "2026-04-06T17:27:45.043351+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -349,16 +377,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 98853,
-    "completion_tokens": 2865,
-    "total_tokens": 101718,
-    "estimated_usd": 0.0165,
+    "prompt_tokens": 224001,
+    "completion_tokens": 6357,
+    "total_tokens": 230358,
+    "estimated_usd": 0.0333,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 65306,
+        "completion_tokens": 4385
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 98853,
-        "completion_tokens": 2865
+        "prompt_tokens": 158695,
+        "completion_tokens": 1972
       }
     },
-    "duration_s": 27.5
-  }
+    "duration_s": 72.7
+  },
+  "validation_grade": null
 }

@@ -4,8 +4,45 @@
   "office": "U.S. Senate",
   "jurisdiction": "Maine",
   "election_date": "2026-11-03",
-  "description": "Maine voters will elect one U.S. senator in 2026 for the Class II seat held by Republican Susan Collins. The race matters because Collins is seeking another term in a state that has voted Democratic in recent presidential elections, while Democrats are still sorting out a nominee in a competitive primary. The general election is shaping up around contrasts between Collins’ long incumbency and bipartisan image and Democrats’ effort to nominate a candidate who can win statewide on affordability, health care, and other pocketbook issues.",
+  "description": "Maine’s 2026 U.S. Senate race is for an open-seat-style general election contest in which Republican incumbent Susan Collins seeks another term against a Democratic field led by Gov. Janet Mills and Graham Platner. The race matters because Collins is one of the GOP’s most durable incumbents in a state that often splits tickets, making Maine a top Democratic pickup target. Democrats are weighing a more established statewide figure in Mills against Platner, a newer candidate who has drawn strong early primary and general-election interest. The general election is likely to hinge on Collins’s long record and crossover appeal versus Democrats’ argument that the state is ready for change.",
   "polling": [
+    {
+      "pollster": "University of New Hampshire Survey Center",
+      "date": "2026-04-03",
+      "matchups": [
+        {
+          "candidates": [
+            "Graham Platner",
+            "Janet Mills"
+          ],
+          "percentages": [
+            46,
+            39
+          ]
+        },
+        {
+          "candidates": [
+            "Graham Platner",
+            "Susan Collins"
+          ],
+          "percentages": [
+            47,
+            44
+          ]
+        },
+        {
+          "candidates": [
+            "Janet Mills",
+            "Susan Collins"
+          ],
+          "percentages": [
+            45,
+            43
+          ]
+        }
+      ],
+      "source_url": "https://scholars.unh.edu/cgi/viewcontent.cgi?article=1929&context=survey_center_polls"
+    },
     {
       "pollster": "Emerson College Polling",
       "date": "2026-03-26",
@@ -144,22 +181,22 @@
       "name": "Susan Collins",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Susan Collins is the Republican incumbent U.S. senator from Maine and is seeking another term in 2026. Recent campaign coverage has focused on her long tenure, her bipartisan brand, and her argument that experience and seniority help her deliver for Maine. She has also said that if reelected, the next term would be her last.",
+      "summary": "Susan Collins is the Republican senior U.S. senator from Maine and has served in the Senate since 1997. She is running for reelection in 2026 and has said that, if reelected, the next term would be her last.",
       "summary_sources": [
         {
-          "url": "https://www.congress.gov/member/susan-collins/C001035",
-          "type": "government",
-          "title": "Senator Susan M. Collins - Congress.gov"
+          "url": "https://www.reuters.com/world/us/republican-us-senator-susan-collins-announces-bid-re-election-2026-02-10/",
+          "title": "Republican US Senator Susan Collins announces bid for re-election",
+          "type": "news"
         },
         {
           "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/senator-susan-collins-maine-next-term-will-be-her-last/97-b14b5a4e-9a1f-491f-a99d-2d7ac1c768c4",
-          "type": "news",
-          "title": "Sen. Susan Collins says if she wins in November, it'll be her last term"
+          "title": "Sen. Susan Collins says if she wins in November, it'll be her last term",
+          "type": "news"
         },
         {
-          "url": "https://www.collins.senate.gov/",
-          "type": "government",
-          "title": "Home | U.S. Senator Susan Collins"
+          "url": "https://bioguide.congress.gov/search/bio/c001035",
+          "title": "COLLINS, Susan Margaret - Bioguide Search",
+          "type": "official"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Senator_Susan_Collins_2014_official_portrait.jpg/500px-Senator_Susan_Collins_2014_official_portrait.jpg",
@@ -411,251 +448,317 @@
       ],
       "issues": {
         "Healthcare": {
-          "stance": "Collins has generally supported bipartisan health-care legislation and emphasizes lowering costs, protecting access, and preserving Medicare and rural health services. Her public Senate materials also highlight work on prescription drug costs and health-related appropriations.",
+          "stance": "Collins says the health care system needs substantial reform and has backed bipartisan efforts to lower prescription drug costs and expand access to coverage. Her Senate issue page highlights support for reforming health care while addressing affordability concerns.",
           "confidence": "high",
           "sources": [
             {
-              "url": "https://www.collins.senate.gov/newsroom/icymi-senator-collins-discusses-national-emergency-declaration-reducing-cost-prescription",
+              "url": "https://www.collins.senate.gov/issues/health-care",
+              "title": "Health Care | U.S. Senator Susan Collins",
               "type": "website",
-              "title": "ICYMI: Senator Collins Discusses National Emergency Declaration, Reducing Cost Prescription",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/",
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-championed-5-of-15-health-care-bills-signed-into-law-in-118th-congress",
+              "title": "Senator Collins Championed 5 of 15 Health Care Bills Signed into Law in the 118th Congress",
               "type": "website",
-              "title": "Home | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Economy": {
-          "stance": "Collins’ campaign presents her as a pro-growth, pro-small-business senator who has worked to improve the economy and grow jobs in Maine. Her site emphasizes bipartisan leadership, support for Maine jobs and workforce development, and a record of helping small businesses thrive.",
-          "confidence": "medium",
+          "stance": "Collins emphasizes infrastructure investment, workforce development, and support for small businesses as drivers of economic growth. Her office says she has used her appropriations role to secure federal funding for Maine projects and jobs.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://susancollins.com/",
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-champions-65-million-for-maines-rural-infrastructure",
+              "title": "Senator Collins Champions $65 Million for Maine’s Rural Infrastructure",
               "type": "website",
-              "title": "Susan Collins for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/",
+              "url": "https://www.collins.senate.gov/issues/economy",
+              "title": "Jobs & Economy | U.S. Senator Susan Collins",
               "type": "website",
-              "title": "Home | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Climate/Energy": {
-          "stance": "Collins says she has worked to reduce greenhouse gas emissions and create clean energy jobs while preserving manufacturing jobs. Her Senate issue page emphasizes reasonable environmental protection and notes concern about high energy costs for Maine households and businesses.",
+          "stance": "Collins says she supports reasonable environmental protections, reducing greenhouse gas emissions, and expanding clean energy jobs while also keeping energy costs manageable for Maine households and businesses. Her issue page stresses balancing environmental goals with manufacturing and affordability concerns.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://www.collins.senate.gov/issues/energy-and-environment",
-              "type": "website",
               "title": "Energy & Environment | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Reproductive Rights": {
-          "stance": "Collins has described herself as supportive of abortion rights in principle while also backing some restrictions and bipartisan compromise. Her record is often characterized as moderate relative to her party, but she has not aligned with the most expansive abortion-rights positions.",
-          "confidence": "medium",
+          "stance": "Collins has supported legislation to codify Roe v. Wade and Planned Parenthood v. Casey, while also describing herself as open to some abortion restrictions and bipartisan compromise. Her public record is generally viewed as more moderate than many Republicans on abortion policy.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://www.reuters.com/world/us/republican-us-senator-susan-collins-announces-bid-re-election-2026-02-10/",
-              "type": "news",
-              "title": "Republican US Senator Susan Collins announces bid for re-election",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-joins-bipartisan-effort-to-codify-roe-v-wade",
+              "title": "Senator Collins Joins Bipartisan Effort to Codify Roe v. Wade",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/",
+              "url": "https://www.collins.senate.gov/newsroom/senators-collins-and-murkowski-introduce-bill-to-codify-supreme-court-decisions-on-reproductive-rights_roe-v-wade-and-planned-parenthood-v-casey",
+              "title": "Senators Collins and Murkowski Introduce Bill to Codify Supreme Court Decisions on Reproductive Rights",
               "type": "website",
-              "title": "Home | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-statement-on-scotus-dobbs-decision",
+              "title": "Senator Collins' Statement on SCOTUS' Dobbs Decision",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Immigration": {
-          "stance": "Collins has generally backed stricter border enforcement while also supporting targeted immigration measures, including bipartisan efforts to reduce red tape for foreign-born religious workers and funding to help Portland cope with asylum-related costs. Her recent public comments also show concern about ICE operations in Maine and a willingness to engage DHS on enforcement issues.",
-          "confidence": "medium",
+          "stance": "Collins supports border security and immigration enforcement, and her office has highlighted efforts to require DHS reporting on border issues and to address ICE operations in Maine. She has also urged a more measured approach to enforcement in some cases.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://www.kaine.senate.gov/press-releases/kaine-collins-and-risch-welcome-policy-change-to-cut-red-tape-for-foreign-born-religious-workers",
+              "url": "https://www.collins.senate.gov/issues/homeland-security",
+              "title": "Homeland Security | U.S. Senator Susan Collins",
               "type": "website",
-              "title": "Kaine, Collins & Risch Welcome Policy Change to Cut Red Tape for Foreign-Born Religious Workers",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/newsroom/senate-appropriations-committee-advances-30-million-help-cities-portland-cope-asylum",
+              "url": "https://www.collins.senate.gov/newsroom/collins-sponsored-bill-to-require-dhs-to-report-data-on-border-crisis-passes-senate",
+              "title": "Collins-Sponsored Bill to Require DHS to Report Data on Border Crisis Passes Senate",
               "type": "website",
-              "title": "Senate Appropriations Committee Advances $30 million to Help Cities Like Portland Cope with Asylum",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.politico.com/live-updates/2026/01/26/congress/susan-collins-speaks-with-noem-about-immigration-enforcement-00747915",
-              "type": "news",
-              "title": "Susan Collins speaks with Noem about immigration enforcement",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-statement-on-ice-operations-in-maine",
+              "title": "Senator Collins' Statement on ICE Operations in Maine",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Guns & Safety": {
-          "stance": "Collins has backed bipartisan gun-safety legislation, including the 2022 Senate package negotiated with other senators, and has publicly explored compromise on red-flag measures. Her record suggests support for targeted gun-safety steps rather than sweeping gun bans.",
+          "stance": "Collins supports bipartisan gun-safety measures, including red-flag style interventions and crisis-intervention policies. She has backed legislation such as the Bipartisan Safer Communities Act and related proposals aimed at preventing gun violence while preserving lawful gun ownership.",
           "confidence": "high",
           "sources": [
             {
-              "url": "https://www.collins.senate.gov/newsroom/senate-passes-bipartisan-gun-safety-legislation-negotiated-by-senator-collins-and-11-colleagues",
+              "url": "https://www.collins.senate.gov/newsroom/senators-collins-king-reintroduce-red-flag-bill-prevent-gun-violence-while-protecting",
+              "title": "Senators Collins, King Reintroduce Red Flag Bill to Prevent Gun Violence While Protecting",
               "type": "website",
-              "title": "Senate Passes Bipartisan Gun Safety Legislation Negotiated by Senator Collins and 11 Colleagues",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.pressherald.com/2022/05/26/collins-exploring-bipartisan-compromise-on-red-flag-gun-safety-measures/",
-              "type": "news",
-              "title": "Collins exploring bipartisan compromise on red flag gun safety measures",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.collins.senate.gov/newsroom/from-the-senate-floor-collins-urges-colleagues-to-support-armed-forces-crisis-intervention-notification-act",
+              "title": "From the Senate Floor: Collins Urges Colleagues to Support Armed Forces Crisis Intervention Notification Act",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Foreign Policy": {
-          "stance": "Collins is a mainstream Republican foreign-policy voice who has supported U.S. engagement on security issues and bipartisan cooperation on international matters. Publicly available recent material in this search set is limited, but her Senate work and committee role indicate support for active U.S. leadership rather than isolationism.",
-          "confidence": "low",
+          "stance": "Collins is a mainstream Republican on foreign policy and national security who has emphasized U.S. engagement, intelligence oversight, and support for allies and security partnerships. Her Senate committee roles and public statements point to an active international posture rather than isolationism.",
+          "confidence": "medium",
           "sources": [
             {
-              "url": "https://www.collins.senate.gov/newsroom/press-releases",
+              "url": "https://www.collins.senate.gov/issues/defense-and-national-security",
+              "title": "Defense & National Security | U.S. Senator Susan Collins",
               "type": "website",
-              "title": "Press Releases | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/newsroom/icymi-senator-collins-discusses-national-emergency-declaration-reducing-cost-prescription",
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-makes-case-for-national-security-supplemental",
+              "title": "Senator Collins Makes Case for National Security Supplemental",
               "type": "website",
-              "title": "ICYMI: Senator Collins Discusses National Emergency Declaration, Reducing Cost Prescription",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Social Justice": {
-          "stance": "Collins’ official Senate site emphasizes bipartisan governance and does not present a detailed social-justice platform on the campaign site. Based on her public Senate record and issue pages, her approach appears more incremental and institution-focused than movement-oriented on civil-rights or equity issues.",
-          "confidence": "low",
+          "stance": "Collins has supported bipartisan measures on civil rights and anti-discrimination, including marriage equality legislation and criminal justice reform efforts. Her public record suggests an incremental, bipartisan approach rather than a broad social-justice platform.",
+          "confidence": "medium",
           "sources": [
             {
-              "url": "https://www.collins.senate.gov/",
+              "url": "https://www.collins.senate.gov/download/respect-for-marriage-act-floor-speech?download=1",
+              "title": "Respect for Marriage Act Floor Speech",
               "type": "website",
-              "title": "Home | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/newsroom/senator-collins-statement-on-tuberville-amendment-to-protect-women-and-girls-sports",
+              "url": "https://www.collins.senate.gov/newsroom/senator-collins-joins-bipartisan-group-introducing-national-criminal-justice-commission-act",
+              "title": "Senator Collins Joins Bipartisan Group Introducing National Criminal Justice Commission Act",
               "type": "website",
-              "title": "Senator Collins' Statement on Tuberville Amendment to Protect Women and Girls' Sports",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://www.collins.senate.gov/imo/media/doc/6.1.20%20Sen.%20Collins%27%20Floor%20Remarks%20on%20George%20Floyd.pdf",
+              "title": "Sen. Susan M. Collins George Floyd statement June 1, 2020",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Education": {
-          "stance": "Collins has a long record of supporting federal education funding and says she has worked on issues affecting Maine students and schools. Her campaign materials do not present a detailed education agenda, but education is part of her broader record of constituent-focused federal work.",
-          "confidence": "medium",
+          "stance": "Collins says she supports early childhood education, K-12 schools, and making higher education more affordable. Her office says she has used her appropriations role to secure funding for Maine schools, universities, and student support programs.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://susancollins.com/",
+              "url": "https://www.collins.senate.gov/issues/education",
+              "title": "Education | U.S. Senator Susan Collins",
               "type": "website",
-              "title": "Susan Collins for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.collins.senate.gov/",
-              "type": "website",
-              "title": "Home | U.S. Senator Susan Collins",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Tech & AI": {
-          "stance": "Collins supports regulating harmful uses of AI, especially deceptive election content and AI voice robocalls. She has backed bipartisan legislation to ban materially deceptive AI-generated political ads and said Congress should carefully address AI challenges while protecting First Amendment rights.",
+          "stance": "Collins supports limits on deceptive uses of artificial intelligence, especially in elections and robocalls. She has backed bipartisan proposals to provide AI guidance for election offices and to ban AI-generated robocalls.",
           "confidence": "high",
           "sources": [
             {
-              "url": "https://www.collins.senate.gov/newsroom/senator-collins-bipartisan-group-introduce-bill-to-ban-deceptive-ai-generated-content-in-elections",
+              "url": "https://www.collins.senate.gov/newsroom/senators-collins-klobuchar-introduce-bipartisan-bill-to-provide-ai-guidelines-for-election-offices",
+              "title": "Senators Collins, Klobuchar Introduce Bipartisan Bill to Provide AI Guidelines for Election Offices",
               "type": "website",
-              "title": "Senator Collins, Bipartisan Group Introduce Bill to Ban Deceptive AI-Generated Content in Elections",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://www.collins.senate.gov/newsroom/senator-collins-statement-on-fcc-declaring-ai-generated-robocalls-illegal",
-              "type": "website",
               "title": "Senator Collins Statement on FCC Declaring AI-Generated Robocalls Illegal",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Election Reform": {
-          "stance": "Collins has publicly backed stricter voting rules, including a nationwide voter ID requirement and proof-of-citizenship registration standards tied to the SAVE Act. Her stated rationale is to prevent fraud and strengthen election integrity, though critics argue the measures would restrict access.",
+          "stance": "Collins has backed stricter voting rules, including voter ID and proof-of-citizenship requirements tied to the SAVE Act. She says these measures are intended to prevent fraud and strengthen election integrity.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://www.newscentermaine.com/article/news/politics/national-politics/maine-senator-susan-collins-support-for-republican-voting-reform-bill-save-america-act/97-d1a22a85-451b-4e8a-8190-587a6be230dc",
-              "type": "news",
               "title": "In Maine, Sen. Collins explains support for Republican voting reform bill",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "news",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://www.mainepublic.org/politics/2026-02-17/susan-collins-backs-gops-strict-voting-bill-driven-by-trumps-fraud-claims",
-              "type": "news",
               "title": "Susan Collins backs GOP's strict voting bill driven by Trump's fraud claims",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "news",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://www.pressherald.com/2026/02/16/sen-collins-supports-voter-id-requirements-approved-by-u-s-house/",
-              "type": "news",
               "title": "Sen. Collins supports voter ID requirements approved by US House",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "news",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Local Issues": {
-          "stance": "Collins emphasizes Maine-specific economic and coastal priorities, especially protecting the lobster and fishing industries. She says she has secured federal funding and research language to help Maine lobstermen, working waterfronts, and sustainable fisheries.",
+          "stance": "Collins emphasizes Maine-specific priorities such as protecting the lobster and fishing industries, working waterfronts, and coastal economies. She has highlighted federal funding and legislation aimed at supporting Maine fishermen and seafood businesses.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://www.collins.senate.gov/newsroom/bill-to-support-maines-lobster-industry-heads-to-presidents-desk",
-              "type": "website",
               "title": "Bill to Support Maine’s Lobster Industry Heads to President’s Desk",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.collins.senate.gov/newsroom/senator-collins-attends-fishermens-forum-dinner",
+              "url": "https://www.collins.senate.gov/newsroom/protecting-our-waterfronts",
+              "title": "Protecting Our Waterfronts",
               "type": "website",
-              "title": "Senator Collins Attends Fishermen’s Forum Dinner",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://www.collins.senate.gov/newsroom/maine-delegation-secures-171-million-to-support-jobs-in-maines-lobster-industry",
+              "title": "Maine Delegation Secures $17.1 Million to Support Jobs in Maine’s Lobster Industry",
+              "type": "website",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         }
       },
-      "donor_summary": null,
-      "links": []
+      "donor_summary": "OpenSecrets shows Susan Collins’ 2019–2024 Senate cycle fundraising is dominated by traditional Washington donor sectors, with top industry support including pro-Israel, finance/insurance, health professionals, and defense-related interests. Her campaign reported roughly $29.8M raised in the 2020 cycle, and later 2026 reporting/news coverage indicated more than $8M cash on hand and about $1.6M in a recent quarter; the best full donor data source is OpenSecrets. Sources: https://www.opensecrets.org/members-of-congress/susan-collins/summary?cid=N00000491 ; https://www.opensecrets.org/members-of-congress/susan-collins/industries?cid=N00000491&cycle=2024&type=P ; https://www.opensecrets.org/members-of-congress/susan-collins/elections?cid=N00000491&cycle=2024 ; https://www.newscentermaine.com/article/news/local/senator-susan-collins-led-democratic-challengers-in-fundraising-entering-2026/97-32582488-380f-48af-8827-8812275ad02a ; https://www.quiverquant.com/news/Fundraising+Update%3A+Senator+Susan+M.+Collins+just+disclosed+%241.6M+of+new+fundraising",
+      "links": [
+        {
+          "url": "https://www.ballotpedia.org/Susan_Collins",
+          "title": "Susan Collins - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Susan_Collins",
+          "title": "Susan Collins - Wikipedia",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.opensecrets.org/members-of-congress/susan-collins/summary?cid=N00000491",
+          "title": "Sen. Susan Collins - Campaign Finance Summary - OpenSecrets",
+          "type": "finance"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/key-votes/379/susan-collins",
+          "title": "Susan Collins' Voting Records - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "https://www.govtrack.us/congress/members/susan_collins/300025",
+          "title": "Susan Collins - GovTrack",
+          "type": "govtrack"
+        },
+        {
+          "url": "https://susancollins.com/",
+          "title": "Susan Collins for Maine",
+          "type": "official"
+        },
+        {
+          "url": "https://www.collins.senate.gov/about/voting-record",
+          "title": "Voting Record | U.S. Senator Susan Collins",
+          "type": "legislature"
+        },
+        {
+          "url": "https://www.congress.gov/member/susan-collins/C001035",
+          "title": "Senator Susan M. Collins - Congress.gov",
+          "type": "legislature"
+        },
+        {
+          "url": "https://ballotpedia.org/Susan_Collins_(Maine)",
+          "title": "Susan Collins (Maine) - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://bioguide.congress.gov/search/bio/c001035",
+          "title": "COLLINS, Susan Margaret - Bioguide Search",
+          "type": "official"
+        }
+      ],
+      "donor_source_url": "https://www.opensecrets.org/members-of-congress/susan-collins/summary?cid=N00000491",
+      "voting_summary": "Susan Collins is an incumbent U.S. senator and has served in Congress since 1997. Vote Smart and GovTrack show a long Senate voting record; her public record is generally aligned with the Republican caucus, though she has also broken with her party on some high-profile votes. Sources: https://www.govtrack.us/congress/members/susan_collins/300025 ; https://justfacts.votesmart.org/candidate/key-votes/379/susan-collins ; https://www.collins.senate.gov/about/voting-record ; https://www.congress.gov/member/susan-collins/C001035",
+      "voting_source_url": "https://justfacts.votesmart.org/candidate/key-votes/379/susan-collins"
     },
     {
       "name": "Janet T. Mills",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Janet T. Mills is the Democratic governor of Maine and a candidate for the U.S. Senate in 2026. Her campaign has emphasized affordability, child care, and other state-level policy priorities, while recent coverage has highlighted her direct criticism of rival Graham Platner in the Democratic primary. Mills is running as a high-profile statewide Democrat against Republican incumbent Susan Collins.",
+      "summary": "Janet T. Mills is the Democratic governor of Maine and a former state attorney general and legislator. She is running for the U.S. Senate in 2026, challenging Republican incumbent Susan Collins.",
       "summary_sources": [
         {
-          "url": "https://www.maine.gov/governor/mills/news/biddeford-governor-mills-signs-child-care-affordability-legislation-law-2026-03-23",
-          "type": "government",
-          "title": "In Biddeford, Governor Mills Signs Child Care Affordability Legislation into Law"
+          "url": "http://www.maine.gov/governor/mills/about",
+          "type": "official",
+          "title": "About the Governor | Office of Governor Janet T. Mills - Maine.gov"
         },
         {
-          "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/maine-governor-janet-mills-graham-platner-democrat-primary-us-senate-candidate/97-a9bd0c8c-d11d-4e10-9fea-f4588cae02f1",
-          "type": "news",
-          "title": "Gov. Mills critical of rival Graham Platner as race for US Senate heats up"
+          "url": "https://ballotpedia.org/Janet_T._Mills",
+          "type": "ballotpedia",
+          "title": "Janet T. Mills - Ballotpedia"
         },
         {
-          "url": "https://www.mainepublic.org/politics/2025-10-15/what-janet-mills-entrance-means-for-the-senate-race-in-maine",
-          "type": "news",
-          "title": "What Janet Mills' entrance means for the Senate race in Maine"
+          "url": "https://janetmills.com/",
+          "type": "official",
+          "title": "Janet Mills for Maine"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Maine_congressional_delegation_meets_with_Gov_Janet_Mills_%28cropped%29.jpg/500px-Maine_congressional_delegation_meets_with_Gov_Janet_Mills_%28cropped%29.jpg",
@@ -892,257 +995,288 @@
       ],
       "issues": {
         "Healthcare": {
-          "stance": "Mills says she has prioritized lowering health-care costs, protecting access to care, and strengthening Maine’s health system. Her gubernatorial record includes support for public health investments and access-oriented policies.",
+          "stance": "Mills says she wants to expand affordable, high-quality health care and has highlighted her record of expanding coverage in Maine. Her campaign materials and governor biography emphasize health care access as a core priority.",
           "confidence": "high",
           "sources": [
             {
-              "url": "http://www.maine.gov/governor/mills/issues",
-              "type": "government",
-              "title": "Issues | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://janetmills.com/",
+              "type": "official",
+              "title": "Janet Mills for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://janetmills.com/",
-              "type": "website",
-              "title": "Janet Mills for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "http://www.maine.gov/governor/mills/about",
+              "type": "official",
+              "title": "About the Governor | Office of Governor Janet T. Mills - Maine.gov",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Economy": {
-          "stance": "Mills says her administration is focused on building a stronger economy through job growth, business investment, workforce programs, broadband expansion, childcare, housing, and balanced budgets. Her state page emphasizes economic recovery, support for small businesses, and attracting high-value industries to Maine.",
+          "stance": "Mills emphasizes a pro-middle-class economic agenda centered on jobs, housing, childcare, broadband, and workforce development. Her campaign and governor biography describe her as focused on good-paying jobs and affordability.",
           "confidence": "high",
           "sources": [
             {
-              "url": "http://www.maine.gov/governor/mills/about/issues/economy",
-              "type": "government",
-              "title": "The Economy | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://janetmills.com/",
+              "type": "official",
+              "title": "Janet Mills for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://janetmills.com/",
-              "type": "website",
-              "title": "Janet Mills for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "http://www.maine.gov/governor/mills/about",
+              "type": "official",
+              "title": "About the Governor | Office of Governor Janet T. Mills - Maine.gov",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Climate/Energy": {
-          "stance": "Mills has positioned Maine as an active climate-policy state, joining the U.S. Climate Alliance and committing to policies that reduce carbon pollution and promote clean energy deployment. As governor, she also said Maine would pursue major renewable-energy targets and create a Climate Council to reduce greenhouse-gas emissions.",
+          "stance": "Mills supports Maine's climate and clean-energy agenda and has backed state efforts to expand renewable electricity and electrification. Her administration has framed climate policy as part of broader economic and energy planning.",
           "confidence": "high",
           "sources": [
             {
-              "url": "https://usclimatealliance.org/press-releases/maine-joins-alliance-feb-2019/",
-              "type": "website",
-              "title": "Maine Governor Janet Mills Joins U.S. Climate Alliance",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "http://www.maine.gov/governor/mills/issues/energy-environment-climate-change",
+              "type": "official",
+              "title": "Energy, Environment, and Climate Change - Maine.gov",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "http://www.maine.gov/governor/mills/news/governor-mills-signs-executive-order-establishing-task-force-artificial-intelligence-2024-12",
-              "type": "website",
-              "title": "Governor Mills Signs Executive Order Establishing Task Force on Artificial Intelligence | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.mainepublic.org/climate/2024-11-21/mills-announces-new-maine-climate-action-plan",
+              "type": "news",
+              "title": "Mills announces new Maine climate action plan",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Reproductive Rights": {
-          "stance": "Mills has supported abortion access and signed legislation expanding and protecting reproductive health care in Maine. Her public record places her firmly on the abortion-rights side of the issue.",
+          "stance": "Mills supports abortion access and has signed legislation protecting reproductive health care in Maine. Her public record places her on the abortion-rights side of the issue.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://www.aclumaine.org/press-releases/bill-expand-abortion-access-signed-into-law/",
               "type": "news",
               "title": "Gov. Mills Signs Bill to Expand and Protect Abortion Access",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://janetmills.com/",
-              "type": "website",
+              "type": "official",
               "title": "Janet Mills for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Immigration": {
-          "stance": "Mills has publicly defended immigrants and refugees in Maine, including condemning anti-Somali rhetoric and emphasizing that people coming to the U.S. seek freedom, safety, and opportunity. Her administration has also allowed a Maine law limiting police cooperation with ICE to take effect, which suggests a more immigrant-protective posture than aggressive enforcement.",
+          "stance": "Mills has defended immigrants and refugees in Maine and has opposed broad local cooperation with federal immigration enforcement. She has said Maine will not be intimidated by federal immigration operations.",
           "confidence": "high",
           "sources": [
-            {
-              "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-presidents-comments-about-somali-immigrants-2025-12-04",
-              "type": "government",
-              "title": "Governor Mills Statement on President's Comments About Somali Immigrants",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.wabi.tv/2025/12/15/gov-mills-will-allow-bill-that-limits-police-cooperation-with-ice-become-law/",
-              "type": "news",
-              "title": "Gov. Mills will allow bill that limits police cooperation with ICE to become law",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
             {
               "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-federal-law-enforcement-operations-maine-2026-01-22",
               "type": "government",
               "title": "Governor Mills Statement on Federal Law Enforcement Operations in Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://www.politico.com/news/2026/01/27/janet-mills-ice-raids-state-address-00751216",
+              "type": "news",
+              "title": "Janet Mills: Maine 'will not be intimidated' amid ongoing immigration enforcement",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Guns & Safety": {
-          "stance": "Mills has called for practical, common-sense measures to keep people safe after the Lewiston mass shooting and has said Maine needs a robust conversation about gun safety. Her public posture indicates support for stronger gun-safety laws and related reforms.",
+          "stance": "Mills has called for common-sense gun-safety measures after the Lewiston mass shooting and has said Maine needs a serious conversation about preventing gun violence. Her public posture supports stronger gun-safety laws and related reforms.",
           "confidence": "high",
           "sources": [
             {
               "url": "http://www.maine.gov/governor/mills/news/radio_address/practical-common-sense-measures-keep-maine-people-safe-2024-05-03",
               "type": "government",
               "title": "Practical, Common-Sense Measures to Keep Maine People Safe",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://themainemonitor.org/mills-ready-to-hear-proposals-to-further-gun-safety/",
               "type": "news",
               "title": "Gov. Janet Mills ready to hear proposals to further gun safety",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Foreign Policy": {
-          "stance": "Mills does not have a clearly defined Senate foreign-policy record in the sources found here. The available material is mostly about domestic law-enforcement issues, so any foreign-policy position would be speculative rather than well documented.",
-          "confidence": "low",
+          "stance": "Mills has criticized unilateral military action and said Congress should authorize decisions to go to war. She has also condemned recent strikes on Iran as unconstitutional and illegal.",
+          "confidence": "medium",
           "sources": [
             {
-              "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-potential-federal-law-enforcement-operations-maine-2026-01-14",
-              "type": "government",
-              "title": "Governor Mills' Statement on Potential Federal Law Enforcement Operations in Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-federal-law-enforcement-operations-maine-2026-01-22",
-              "type": "government",
-              "title": "Governor Mills Statement on Federal Law Enforcement Operations in Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://bangordailynews.com/2026/03/02/politics/state-politics/janet-mills-iran-strikes-unconstitutional-illegal/",
+              "type": "news",
+              "title": "Janet Mills says Iran strikes unconstitutional, illegal",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Social Justice": {
-          "stance": "Mills’ campaign and gubernatorial record emphasize protecting rights and expanding opportunity, and her administration has supported abortion access and opposed federal actions she frames as threatening Maine residents. That points to a broadly pro-civil-rights, pro-equality posture, though her campaign site does not yet lay out a detailed social-justice agenda.",
-          "confidence": "medium",
+          "stance": "Mills has emphasized reproductive rights and LGBTQ equality in her public record. She has opposed efforts she says would restrict transgender rights and has framed her agenda around rights and opportunity for all Mainers.",
+          "confidence": "high",
           "sources": [
-            {
-              "url": "https://janetmills.com/",
-              "type": "website",
-              "title": "Janet Mills for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
             {
               "url": "https://www.aclumaine.org/press-releases/bill-expand-abortion-access-signed-into-law/",
               "type": "news",
               "title": "Gov. Mills Signs Bill to Expand and Protect Abortion Access",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-potential-federal-law-enforcement-operations-maine-2026-01-14",
-              "type": "government",
-              "title": "Governor Mills' Statement on Potential Federal Law Enforcement Operations in Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/maine-governor-opposes-referendum-ban-transgender-girls-high-school-sports/97-070ee97a-d2d6-4e9a-869f-0fede2b2b8e5",
+              "type": "news",
+              "title": "Maine Gov. Mills Opposes Referendum That Would Ban Transgender Girls From High School Sports",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Education": {
-          "stance": "Mills says she has prioritized fully funding K-12 education, making community college tuition-free for recent graduates, expanding student debt relief, raising teacher pay, and investing in school construction, pre-K, child care, and career and technical education. Her education page frames these steps as part of strengthening public education and supporting teachers and students.",
+          "stance": "Mills supports fully funding K-12 education, raising teacher pay, and keeping community college tuition-free for recent high school graduates. She also backs early childhood education, child care, school construction, and career and technical education.",
           "confidence": "high",
           "sources": [
             {
               "url": "http://www.maine.gov/governor/mills/issues/education",
               "type": "government",
               "title": "Education | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://janetmills.com/",
-              "type": "website",
-              "title": "Janet Mills for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.mainepublic.org/politics/2026-02-04/in-final-budget-gov-mills-proposes-tapping-more-than-300-million-from-rainy-day-fund",
+              "type": "news",
+              "title": "In final budget, Gov. Mills proposes tapping more than $300 million from rainy day fund",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Tech & AI": {
-          "stance": "Mills has taken a cautious, pro-governance approach to AI. She created a state task force to study AI’s opportunities and risks, including privacy, bias, disclosure requirements, workforce impacts, and public-sector uses.",
+          "stance": "Mills has taken a governance-focused approach to artificial intelligence, creating a state AI task force and backing recommendations on AI literacy, privacy, transparency, and responsible deployment. Her administration presents AI policy as a mix of innovation and safeguards.",
           "confidence": "high",
           "sources": [
             {
               "url": "http://www.maine.gov/governor/mills/news/governor-mills-signs-executive-order-establishing-task-force-artificial-intelligence-2024-12",
               "type": "website",
-              "title": "Governor Mills Signs Executive Order Establishing Task Force on Artificial Intelligence | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Governor Mills Signs Executive Order Establishing Task Force on Artificial Intelligence",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "http://www.maine.gov/future/artificial-intelligence-task-force",
+              "type": "website",
+              "title": "AI Task Force | Office of Policy Innovation & Future - Maine.gov",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Election Reform": {
-          "stance": "Mills opposes voter-ID-style election restrictions and says Maine should preserve high-turnout, absentee-friendly elections. After Question 1 was rejected, she said Mainers affirmed their faith in free, fair, and secure elections and rejected an attempt to restrict voting rights.",
+          "stance": "Mills opposes voter-ID-style election restrictions and has defended Maine's absentee-friendly election system. After a 2025 ballot measure failed, she said Mainers rejected an attempt to restrict voting rights.",
           "confidence": "high",
           "sources": [
             {
               "url": "http://www.maine.gov/governor/mills/news/governor-mills-statement-rejection-question-1-2025-11-05",
               "type": "government",
               "title": "Governor Mills Statement on Rejection of Question 1",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
               "url": "https://wgme.com/news/local/its-ridiculous-governor-janet-mills-speaks-out-against-republican-backed-save-act-maine-president-donald-trump",
               "type": "news",
               "title": "Gov. Mills speaks out against Republican-backed SAVE Act",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://mainemorningstar.com/2025/10/10/mills-urges-voters-to-reject-voter-id-and-other-election-law-changes-on-nov-4-ballot/",
-              "type": "news",
-              "title": "Mills urges voters to reject voter ID and other election law changes on Nov. 4 ballot",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Local Issues": {
-          "stance": "Mills’ local agenda centers on affordability for Maine residents, including housing, utilities, health care, and community college. Her office says she is focused on building more housing and defending Maine people from higher costs.",
+          "stance": "Mills' local agenda centers on affordability, including housing expansion, relief for households, lower utility and education costs, and continued access to free community college. She has also proposed using state reserves to finance new housing and provide direct relief.",
           "confidence": "high",
           "sources": [
             {
-              "url": "http://www.maine.gov/governor/mills/issues",
-              "type": "government",
-              "title": "Issues | Office of Governor Janet T. Mills",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.maine.gov/governor/mills/sites/maine.gov.governor.mills/files/files/AffordabilityAgenda.pdf",
+              "type": "official",
+              "title": "Affordability Agenda – Governor Mills (PDF)",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "http://www.maine.gov/governor/mills/news/final-state-state-governor-mills-unveils-affordability-agenda-pledges-defend-maine-people",
+              "url": "https://www.maine.gov/governor/mills/news/final-state-state-governor-mills-unveils-affordability-agenda-pledges-defend-maine-people",
               "type": "government",
               "title": "In Final State of the State, Governor Mills Unveils Affordability Agenda",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         }
       },
-      "donor_summary": null,
-      "links": []
+      "donor_summary": "Janet T. Mills’ public finance footprint is primarily from state-level disclosures and gubernatorial fundraising, not a long federal donor record. OpenSecrets and FollowTheMoney show her state-officeholder profile, while campaign reporting indicates her Senate campaign raised about $2.7M in its first quarter and later about $2.7M in a subsequent quarter; the best full donor data source is FollowTheMoney or her campaign/FEC filings. Sources: https://www.followthemoney.org/entity-details?eid=9941379 ; https://www.opensecrets.org/officeholders/janet-t-mills/summary?cycle=2021&id=9941379 ; https://janetmills.com/governor-janet-mills-campaign-for-u-s-senate-raises-2-7-million-in-first-fundraising-quarter-of-candidacy/ ; https://www.mainepublic.org/politics/2025-07-15/gubernatorial-and-congressional-campaigns-rake-in-cash-as-2026-elections-ramp-up",
+      "links": [
+        {
+          "url": "https://www.ballotpedia.org/Janet_T._Mills",
+          "title": "Janet T. Mills - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Janet_Mills",
+          "title": "Janet Mills - Wikipedia",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.followthemoney.org/entity-details?eid=9941379",
+          "title": "MILLS, JANET T - FollowTheMoney.org",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.opensecrets.org/officeholders/janet-t-mills/summary?cycle=2021&id=9941379",
+          "title": "Janet T Mills Money Profile - OpenSecrets",
+          "type": "finance"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/key-votes/36856/janet-mills",
+          "title": "Janet Mills' Voting Records - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "http://www.maine.gov/governor/mills/",
+          "title": "Office of Governor Janet T. Mills - Maine.gov",
+          "type": "legislature"
+        },
+        {
+          "url": "https://janetmills.com/",
+          "title": "Janet Mills for Maine",
+          "type": "official"
+        },
+        {
+          "url": "https://janetmills.com/news/",
+          "title": "Latest News | Janet Mills for Maine",
+          "type": "news"
+        },
+        {
+          "url": "https://ballotpedia.org/Janet_T._Mills",
+          "title": "Janet T. Mills - Ballotpedia",
+          "type": "ballotpedia"
+        }
+      ],
+      "donor_source_url": "https://www.followthemoney.org/entity-details?eid=9941379",
+      "voting_summary": "Janet T. Mills has not held federal legislative office, but she has extensive executive and state-legislative experience: governor of Maine, former attorney general, and former Maine House member. Her comparable governing record includes signing state legislation such as medical-debt protections and other policy actions as governor; Vote Smart also tracks her issue positions and state-level record. Sources: http://www.maine.gov/governor/mills/ ; http://www.maine.gov/governor/mills/about ; https://justfacts.votesmart.org/candidate/key-votes/36856/janet-mills ; https://justfacts.votesmart.org/candidate/biography/36856/janet-mills",
+      "voting_source_url": "https://justfacts.votesmart.org/candidate/key-votes/36856/janet-mills"
     },
     {
       "name": "Graham Platner",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Graham Platner is a Democratic candidate for the U.S. Senate in Maine and an oyster farmer and Marine Corps veteran from Hancock County. He has emerged as a leading challenger to Janet Mills in the Democratic primary and has drawn national attention, including endorsements from prominent Democrats. Recent coverage has also noted scrutiny over his campaign and personal background as the race has intensified.",
+      "summary": "Graham Platner is a Democratic candidate for U.S. Senate in Maine, where he is running in the 2026 primary. He is an oyster farmer and military veteran, and his campaign has emphasized economic populism, health care, and opposition to corporate influence in politics.",
       "summary_sources": [
         {
-          "url": "https://www.mainepublic.org/politics/2026-02-24/poll-shows-graham-platner-with-large-lead-over-gov-mills-in-democratic-senate-primary",
-          "type": "news",
-          "title": "Poll shows Graham Platner with large lead over Gov. Mills in Democratic Senate primary"
+          "url": "https://www.grahamforsenate.com/platform",
+          "type": "official",
+          "title": "Platform — Graham Platner | Democrat for U.S. Senate"
         },
         {
-          "url": "https://www.washingtonpost.com/politics/2026/03/02/platner-maine-mills-collins-senate/",
-          "type": "news",
-          "title": "Graham Platner picks up second senator endorsement in crucial Maine Senate race"
+          "url": "https://www.ballotpedia.org/Graham_Platner",
+          "type": "ballotpedia",
+          "title": "Graham Platner - Ballotpedia"
         },
         {
-          "url": "https://www.newscentermaine.com/video/news/politics/maine-politics/senate-candidate-graham-platner-bares-his-chest-amid-tattoo-scandal/97-e2cc705c-35a3-42f2-acfe-ea6b109ffd9d",
+          "url": "https://www.mainepublic.org/politics/2025-08-21/who-is-graham-platner-and-why-is-he-everywhere-right-now",
           "type": "news",
-          "title": "Senate candidate Graham Platner bares his chest amid tattoo scandal"
+          "title": "Who is Graham Platner and why is he everywhere right now?"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Platner_headshot.jpg/500px-Platner_headshot.jpg",
@@ -1194,7 +1328,7 @@
       "education": [
         {
           "institution": "George Washington University",
-          "degree": null,
+          "degree": "Attended",
           "field": null,
           "year": null
         }
@@ -1237,20 +1371,26 @@
       ],
       "issues": {
         "Healthcare": {
-          "stance": "Platner says rural Mainers should be able to get care close to home and supports a more affordable, publicly oriented health-care system. His campaign has emphasized protecting local hospitals and clinics and reducing the burden of medical costs on working families.",
-          "confidence": "medium",
+          "stance": "Platner advocates universal health coverage by implementing Medicare for All and moving away from the for-profit health-insurance model; he also emphasizes expanding access to mental health care and protecting rural hospitals. He supports government negotiation of prescription drug prices and breaking up health-care monopolies to reduce costs for working Mainers.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://www.wgme.com/news/beyond-the-podium/senate-candidate-graham-platner-pitches-fully-funded-care-to-maine-voters-politics-susan-collins-janet-mills-democratic-primary-medicare-for-all",
+              "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/us-senate-candidate-graham-platner-health-care-reform-platform/97-1693f362-01a9-48f9-bf7f-e2d0219b01f6",
               "type": "news",
-              "title": "Senate candidate Graham Platner pitches fully funded care to Maine voters",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "U.S. Senate candidate Graham Platner lays out health care reforms (NewsCenterMaine)",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.mainepublic.org/politics/2025-11-19/graham-platner-is-sharing-more-about-post-combat-struggles-has-it-made-his-campaign-more-resilient",
+              "url": "https://wgme.com/news/local/senate-candidate-graham-platner-pitches-fully-funded-care-to-maine-voters-politics-susan-collins-janet-mills-democratic-primary-medicare-for-all",
               "type": "news",
-              "title": "Graham Platner is sharing more about post-combat struggles. Has it made his campaign more resilient",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Senate candidate Graham Platner pitches fully funded care to Maine voters (WGME)",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://bangordailynews.com/2026/03/30/politics/elections/graham-platner-raised-money-lobbyists-before-fundraising-pledge-joam40zk0w/",
+              "type": "news",
+              "title": "Platner raised money with health care lobbyists before fundraising pledge (Bangor Daily News)",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
@@ -1279,20 +1419,14 @@
           ]
         },
         "Reproductive Rights": {
-          "stance": "Platner has aligned himself with abortion-rights supporters and has criticized efforts to restrict reproductive freedom. His campaign presents reproductive rights as part of a broader defense of personal liberty and bodily autonomy.",
-          "confidence": "medium",
+          "stance": "Platner supports a strong federal guarantee of the right to choose and says government should stay out of private reproductive decisions. His platform explicitly backs abortion rights rather than restrictions.",
+          "confidence": "high",
           "sources": [
             {
               "url": "https://www.grahamforsenate.com/platform",
-              "type": "website",
+              "type": "official",
               "title": "Platform — Graham Platner | Democrat for U.S. Senate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.politico.com/news/2026/02/22/maine-senate-graham-platner-janet-mills-susan-collins-00791784",
-              "type": "news",
-              "title": "Why Graham Platner's meteoric rise is so unexpected",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
@@ -1315,146 +1449,164 @@
           ]
         },
         "Guns & Safety": {
-          "stance": "Platner’s campaign materials surfaced in reporting as containing controversial past comments about guns, but I did not find an official, detailed campaign gun-safety position in the available sources. On the evidence found, his current stance is not clearly documented.",
-          "confidence": "low",
-          "sources": [
-            {
-              "url": "https://www.newsweek.com/graham-platners-resurfaced-posts-guns-communism-spark-backlash-10896327",
-              "type": "news",
-              "title": "Graham Platner's resurfaced posts on guns and communism spark backlash",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.pbs.org/newshour/politics/maines-graham-platner-thinks-voters-will-overlook-his-past-to-support-a-new-type-of-candidate",
-              "type": "news",
-              "title": "Maine's Graham Platner thinks voters will overlook his past to support a new type of candidate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            }
-          ]
+          "stance": "No public position found",
+          "confidence": "low"
         },
         "Foreign Policy": {
-          "stance": "Platner has publicly criticized U.S. support for Israel and said the U.S. should cut off aid, while also describing U.S.-Israeli military action as dangerous or a misadventure. That points to a more anti-interventionist and sharply critical stance on Middle East policy.",
-          "confidence": "medium",
+          "stance": "Platner takes a sharply anti-interventionist stance and has criticized U.S. support for Israel, including calling the war in Gaza a genocide and urging the U.S. to use its leverage to end it. He also opposed U.S.-Israeli military action against Iran and framed it as dangerous escalation.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://jewishinsider.com/2026/03/graham-platner-israel-cnn-genocide-iran-war/",
-              "type": "news",
-              "title": "Graham Platner doubles down on anti-Israel rhetoric",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://www.grahamforsenate.com/platform",
+              "type": "official",
+              "title": "Platform — Graham Platner | Democrat for U.S. Senate",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://www.facebook.com/wmtwtv/videos/these-things-dont-end-well-senate-candidate-platner-critical-of-us-israeli-attac/895752573380288/",
-              "type": "social_media",
-              "title": "These things don't end well': Senate candidate Platner critical of US-Israeli attacks on Iran",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://wgme.com/news/local/senate-candidate-graham-platner-joins-portland-anti-war-rally",
+              "type": "news",
+              "title": "Senate candidate Graham Platner joins Portland anti-war rally",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://www.newscentermaine.com/article/news/local/protests/graham-platner-protest-iran-military-action-senator-susan-collins-portland-office-maine/97-e51223b5-4a34-41b0-9967-3ff5dfb90e50",
+              "type": "news",
+              "title": "Graham Platner, others protest Iran military action outside Sen. Susan Collins' Portland office",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Social Justice": {
-          "stance": "Platner is described in reporting as aligned with the progressive wing of the Democratic Party, and coverage notes his campaign has drawn support from that side. His public messaging also emphasizes fighting bigotry and defending equality, though his campaign site does not provide a detailed social-justice platform.",
-          "confidence": "medium",
-          "sources": [
-            {
-              "url": "https://thehill.com/homenews/campaign/5567179-who-is-graham-platner-maine-senate-candidate/",
-              "type": "news",
-              "title": "What to know about Maine Democratic candidate Graham Platner",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.axios.com/2025/10/21/maine-democrats-senate-graham-platner-antifa",
-              "type": "news",
-              "title": "Maine Dem Senate candidate embraced \"antifa supersoldier\" label",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            }
-          ]
-        },
-        "Education": {
-          "stance": "Platner’s platform says the federal government should ensure every district has adequate support and resources for a quality public education, and he opposes federal support for private school vouchers. His education stance is framed as defending public schools and teachers.",
+          "stance": "Graham Platner's platform explicitly supports federal LGBTQ anti-discrimination legislation to protect equal rights and dignity for LGBTQ Americans; he frames equality for all as a core principle and commits to advancing civil rights protections at the federal level.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://www.grahamforsenate.com/platform",
               "type": "website",
+              "title": "Platform - Graham Platner",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Platner says the federal government should ensure every school district has adequate resources to provide a quality public education, and he opposes federal support for private school vouchers.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.grahamforsenate.com/platform",
+              "type": "official",
               "title": "Platform — Graham Platner | Democrat for U.S. Senate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Tech & AI": {
-          "stance": "Platner’s platform includes a limited but clear AI-related position: he says corporations should be restricted from using AI to surveil, track, and subject Americans to predatory pricing practices. His broader platform also emphasizes protecting consumers from corporate abuse and monopoly power.",
-          "confidence": "medium",
+          "stance": "Platner says corporations should be restricted from using AI to surveil, track, and subject Americans to predatory pricing practices. His broader platform emphasizes consumer protection and limiting corporate abuse.",
+          "confidence": "high",
           "sources": [
             {
               "url": "https://www.grahamforsenate.com/platform",
-              "type": "website",
+              "type": "official",
               "title": "Platform — Graham Platner | Democrat for U.S. Senate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Election Reform": {
-          "stance": "Platner’s campaign explicitly supports sweeping campaign-finance and democracy reform, including overturning Citizens United. In the materials reviewed, he also frames his campaign as a fight against corporate influence and corruption, but no specific stance on voter ID or ranked-choice voting was found.",
-          "confidence": "medium",
+          "stance": "Platner supports a constitutional amendment to ban billionaires from buying elections and says Citizens United has enabled wealthy donors to dominate politics. His platform frames campaign-finance reform as central to restoring democracy.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://electjordan.com/issue/pass-sweeping-campaign-finance-reform-and-overturn-citizens-united/",
-              "type": "website",
-              "title": "Pass Sweeping Campaign Finance Reform and Overturn Citizens United",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
               "url": "https://www.grahamforsenate.com/platform",
-              "type": "website",
+              "type": "official",
               "title": "Platform — Graham Platner | Democrat for U.S. Senate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Local Issues": {
-          "stance": "Platner presents himself as a Maine-focused candidate, with a local-issues emphasis on protecting working waterfronts, fisheries, and rural communities. In the reviewed sources, he also stressed health care access close to home and support for local hospitals and clinics.",
-          "confidence": "medium",
+          "stance": "Platner prioritizes Maine’s working waterfront, fisheries, and maritime workforce, including expanded cold storage, grant programs, invasive species controls, and support for the Working Waterfronts Act. He also says he will fight to fund rural hospitals and protect access to care in Maine communities.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://www.wgme.com/news/beyond-the-podium/senate-candidate-graham-platner-pitches-fully-funded-care-to-maine-voters-politics-susan-collins-janet-mills-democratic-primary-medicare-for-all",
-              "type": "news",
-              "title": "Senate candidate Graham Platner pitches fully funded care to Maine voters",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
               "url": "https://www.grahamforsenate.com/platform",
-              "type": "website",
+              "type": "official",
               "title": "Platform — Graham Platner | Democrat for U.S. Senate",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         }
       },
-      "donor_summary": null,
-      "links": []
+      "donor_summary": "Graham Platner’s fundraising has been driven by small-dollar grassroots giving, with campaign and news reports showing roughly $1M raised shortly after launch and later about $4.6M to $4.7M in a quarter. Available reporting suggests the donor base is dominated by individual contributions rather than corporate PAC money, with the campaign emphasizing anti-corporate and anti-lobbyist fundraising; the best full donor data source is his FEC page. Sources: https://www.fec.gov/data/candidate/S6ME00373/ ; https://www.mainepublic.org/politics/2026-02-02/graham-platner-posts-4-6-million-in-fourth-quarter-fundraising-gov-janet-mills-2-7-million ; https://www.axios.com/2026/01/06/graham-platner-maine-senate-fundraising ; https://www.mainemorningstar.com/2025/08/28/the-oysterman-trying-to-oust-susan-collins-raised-1-million-in-nine-days/ ; https://www.bangordailynews.com/2026/03/30/politics/elections/graham-platner-raised-money-lobbyists-before-fundraising-pledge-joam40zk0w/",
+      "links": [
+        {
+          "url": "https://www.ballotpedia.org/Graham_Platner",
+          "title": "Graham Platner - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/S6ME00373/",
+          "title": "PLATNER, GRAHAM - Candidate overview | FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.grahamforsenate.com/",
+          "title": "Graham Platner | Democrat for U.S. Senate",
+          "type": "official"
+        },
+        {
+          "url": "https://www.grahamforsenate.com/platform",
+          "title": "Platform — Graham Platner | Democrat for U.S. Senate",
+          "type": "official"
+        },
+        {
+          "url": "https://www.mainepublic.org/politics/2025-08-21/who-is-graham-platner-and-why-is-he-everywhere-right-now",
+          "title": "Who is Graham Platner and why is he everywhere right now?",
+          "type": "news"
+        },
+        {
+          "url": "https://www.mainepublic.org/politics/2026-02-02/graham-platner-posts-4-6-million-in-fourth-quarter-fundraising-gov-janet-mills-2-7-million",
+          "title": "Graham Platner posts $4.6 million in fourth quarter fundraising, Gov. Janet Mills $2.7 million",
+          "type": "news"
+        },
+        {
+          "url": "https://www.axios.com/2026/01/06/graham-platner-maine-senate-fundraising",
+          "title": "Exclusive: Platner raises $5 million despite scandals - Axios",
+          "type": "news"
+        },
+        {
+          "url": "https://ballotpedia.org/Graham_Platner",
+          "title": "Graham Platner - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Graham_Platner",
+          "title": "Graham Platner - Wikipedia",
+          "type": "wiki"
+        }
+      ],
+      "donor_source_url": "https://www.fec.gov/data/candidate/S6ME00373/",
+      "voting_summary": "Graham Platner has not held legislative office, so there is no legislative voting record to report. Comparable evidence of his governing approach is limited to campaign policy statements and public pledges, including his platform and issue positions on his campaign site and a reported pledge on health-care lobbying. Sources: https://www.grahamforsenate.com/ ; https://www.grahamforsenate.com/platform ; https://www.bangordailynews.com/2026/03/30/politics/elections/graham-platner-raised-money-lobbyists-before-fundraising-pledge-joam40zk0w/",
+      "voting_source_url": "https://www.grahamforsenate.com/platform"
     },
     {
       "name": "Jordan Wood",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Jordan Wood is a Maine Democrat who previously entered the 2026 Senate race before later shifting to run for the U.S. House in Maine's 2nd District. He is no longer a Senate candidate, but his earlier Senate bid was part of the broader Democratic field that formed before the race narrowed around Janet Mills and Graham Platner. Recent reporting has focused on his House campaign and the change in his plans.",
+      "summary": "Jordan Wood is a Maine Democrat from Lewiston who is running for Congress after previously campaigning for the U.S. Senate. His campaign says he has worked on democracy reform, consumer protection, and anti-corruption efforts, and he now seeks to represent Maine's 2nd Congressional District.",
       "summary_sources": [
         {
-          "url": "https://www.mainepublic.org/politics/2025-11-12/jordan-wood-abandons-senate-bid-to-run-for-maines-2nd-district-house-seat",
-          "type": "news",
-          "title": "Jordan Wood abandons Senate bid to run for Maine's 2nd District House seat"
+          "url": "https://electjordan.com/about/",
+          "type": "website",
+          "title": "About | Jordan Wood for Maine"
         },
         {
-          "url": "https://www.mainepublic.org/politics/2026-03-16/maines-gubernatorial-and-congressional-primaries-are-set",
+          "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/maine-democrat-jordan-wood-ends-senate-bid-launches-house-run/97-844d5030-46a3-4a1c-97f8-24e90d14dfd7",
           "type": "news",
-          "title": "Maine's gubernatorial and congressional primaries are set"
-        },
-        {
-          "url": "https://www.wabi.tv/2026/03/09/jordan-wood-submits-qualifying-signatures-congressional-district-2-primary/",
-          "type": "news",
-          "title": "Jordan Wood submits qualifying signatures for Congressional District 2 primary"
+          "title": "Maine Democrat Jordan Wood ends Senate campaign, launches House run"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jordan_Wood_20250516_060354.jpg",
       "website": "https://electjordan.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/jordanwoodmaine/",
@@ -1465,18 +1617,18 @@
       },
       "career_history": [
         {
-          "title": "Candidate for U.S. Senate",
+          "title": "Candidate for U.S. House, Maine District 2",
           "organization": "Maine",
-          "start_year": 2026,
-          "end_year": 2026,
-          "description": "Ran for the Democratic nomination for U.S. Senate before withdrawing from the Senate race."
+          "start_year": 2025,
+          "end_year": null,
+          "description": "Running for the Democratic nomination for Maine's 2nd Congressional District after ending his Senate bid."
         },
         {
           "title": "Candidate for U.S. House, Maine District 2",
           "organization": "Maine",
-          "start_year": 2026,
+          "start_year": 2025,
           "end_year": null,
-          "description": "Running for the Democratic nomination for Maine's 2nd Congressional District."
+          "description": "Running for the Democratic nomination for Maine's 2nd Congressional District after ending his Senate bid."
         }
       ],
       "education": [],
@@ -1484,398 +1636,383 @@
       "top_donors": [],
       "issues": {
         "Healthcare": {
-          "stance": "Wood says he wants to cap childcare costs, expand access to care, and support a system that protects working families from high medical bills. His campaign materials reviewed here do not provide a detailed health-care policy beyond affordability and access.",
-          "confidence": "medium",
+          "stance": "Supports a Medicare for All system, including a single-payer national health insurance model, while also defending the Affordable Care Act and expanding access to care in rural communities. He says the plan would eliminate deductibles, co-pays, and premiums for covered care and preserve access to private insurance for those who want it.",
+          "confidence": "high",
           "sources": [
+            {
+              "url": "https://electjordan.com/issue/pass-medicare-for-all/",
+              "type": "website",
+              "title": "Pass a Medicare for All System To Guarantee Coverage for All",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
             {
               "url": "https://electjordan.com/about/",
               "type": "website",
               "title": "About | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Economy": {
-          "stance": "Wood says he wants to fight corporate power and make the economy work for regular Mainers, not corporations and lobbyists. His campaign says he would cap childcare costs, support universal healthcare, crack down on hedge funds buying homes, and support an ultra-millionaire tax to fund working-family investments.",
+          "stance": "Supports lowering taxes for working families, raising taxes on ultra-millionaires, strengthening small businesses and unions, and using anti-corruption reforms to make the economy work for regular Mainers rather than corporations and lobbyists.",
           "confidence": "high",
           "sources": [
             {
-              "url": "https://electjordan.com/about/",
+              "url": "https://electjordan.com/issue/drastically-cut-taxes-for-working-families-lower-taxes-to-1-for-first-50000-earned/",
               "type": "website",
-              "title": "About | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Drastically Cut Taxes for Working Families, Lower Taxes to 1% for First $50,000 Earned",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://electjordan.com/issues/",
+              "type": "website",
+              "title": "Issues | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Climate/Energy": {
-          "stance": "Wood says he will fight corporate polluters, restore and strengthen the EPA, and make renewable energy affordable. He frames climate action as necessary to protect Maine’s land, water, forests, and industries such as lobstering, fishing, and farming.",
+          "stance": "Supports fighting climate change by strengthening environmental protections, opposing corporate polluters, and making renewable energy affordable. His campaign frames climate action as important for protecting Maine's land, water, forests, and coastal industries.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://electjordan.com/issue/protect-our-environment-and-tackle-the-climate-crisis/",
               "type": "website",
               "title": "Protect our Environment and Tackle the Climate Crisis | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Reproductive Rights": {
-          "stance": "Wood has presented himself as supportive of abortion rights and broader personal freedom, though the campaign materials reviewed here do not include a detailed reproductive-health platform. His public positioning is consistent with the Democratic Party’s abortion-rights wing.",
-          "confidence": "medium",
+          "stance": "Supports restoring abortion rights nationwide, codifying Roe v. Wade into federal law, and increasing funding for Planned Parenthood and reproductive health care access.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://electjordan.com/",
+              "url": "https://electjordan.com/issue/restore-abortion-rights-nationwide/",
               "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.facebook.com/jordanwoodmaine/posts/ive-had-to-fight-an-unbelievable-wave-of-homophobic-bigotry-since-i-announced-my/122150904008853503/",
-              "type": "social_media",
-              "title": "I've had to fight an unbelievable wave of homophobic bigotry since I announced my campaign for Congress",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Restore Abortion Rights Nationwide | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Immigration": {
-          "stance": "Wood has publicly rejected claims that immigrants are causing voter fraud or social harm, saying there is no widespread voter-fraud or undocumented-immigrant problem in the way critics allege. His public response suggests a pro-immigrant, anti-bigotry stance.",
-          "confidence": "medium",
+          "stance": "Supports fixing the immigration system by ending unlawful arrests without due process or warrants and requiring proper identification for officers involved in immigration enforcement. His campaign presents immigration as a due-process and civil-liberties issue.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://www.facebook.com/jordanwoodmaine/posts/when-confronted-with-lies-and-bigotry-there-is-only-one-response-the-truth-there/122163565562853503/",
-              "type": "social_media",
-              "title": "When confronted with lies and bigotry, there is only one response: the truth...",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://electjordan.com/issue/fix-our-broken-immigration-system/",
+              "type": "website",
+              "title": "Fix Our Broken Immigration System | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Guns & Safety": {
-          "stance": "Wood’s platform page emphasizes democracy reform, corruption, healthcare, housing, and childcare, but the available page does not show a specific gun-safety plank in the retrieved text. Based on the sources found, his gun position is not clearly stated on the campaign site excerpt reviewed.",
-          "confidence": "low",
+          "stance": "Supports universal background checks, red flag laws, a ban on assault weapons, and increased mental health and school safety funding to reduce gun violence.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://electjordan.com/platform/",
+              "url": "https://electjordan.com/issue/keep-our-communities-safe-from-gun-violence/",
               "type": "website",
-              "title": "Platform | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://electjordan.com/",
-              "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Keep Our Communities Safe from Gun Violence | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Foreign Policy": {
-          "stance": "Wood's campaign platform emphasizes domestic reform and does not present a detailed foreign-policy agenda in the sources found here. A separate essay under his name discusses Palestine, but it is not a formal campaign position, so his foreign-policy stance is not clearly established from campaign materials.",
-          "confidence": "low",
+          "stance": "Supports promoting democracy and human rights and pursuing peace through diplomacy. His campaign does not appear to offer a detailed country-by-country foreign policy agenda in the materials reviewed.",
+          "confidence": "medium",
           "sources": [
             {
-              "url": "https://electjordan.com/",
+              "url": "https://electjordan.com/issues/",
               "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Issues | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://jordandanielwood.substack.com/p/plea-for-palestine-still",
-              "type": "social_media",
-              "title": "Plea for Palestine - Still - by Jordan Daniel Wood",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "url": "https://electjordan.com/platform/",
+              "type": "website",
+              "title": "Platform | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Social Justice": {
-          "stance": "Wood presents himself as a reformer focused on democracy, anti-corruption, and protecting people from bigotry; his public posts also reference fighting homophobic bigotry. That suggests a broadly pro-equality, civil-rights-oriented posture, though the retrieved platform text does not provide a dedicated social-justice section.",
-          "confidence": "medium",
+          "stance": "Supports LGBTQ+ equality, the Equality Act, tribal sovereignty, and abortion rights as part of a broader civil-rights agenda. His campaign says it would protect people from discrimination based on sexual orientation and gender identity.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://electjordan.com/issue/champion-lgbtq-equality/",
+              "type": "website",
+              "title": "Champion LGBTQ+ Equality | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://electjordan.com/platform/",
+              "type": "website",
+              "title": "Platform | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Supports making need-based federal student loans interest-free, enacting free community college, expanding universal pre-K, and broadening apprenticeships and trade schools.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://electjordan.com/issue/enact-free-community-college-for-all/",
+              "type": "website",
+              "title": "Enact Free Community College for All | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            },
+            {
+              "url": "https://electjordan.com/issues/",
+              "type": "website",
+              "title": "Issues | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "Supports regulating AI and algorithms when they are used for surveillance, tracking, predatory pricing, or rent fixing. His platform emphasizes consumer protection and anti-abuse rules rather than a pro-innovation technology agenda.",
+          "confidence": "high",
           "sources": [
             {
               "url": "https://electjordan.com/platform/",
               "type": "website",
               "title": "Platform | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://www.facebook.com/jordanwoodmaine/posts/ive-had-to-fight-an-unbelievable-wave-of-homophobic-bigotry-since-i-announced-my/122150904008853503/",
-              "type": "social_media",
-              "title": "I've had to fight an unbelievable wave of homophobic bigotry since I announced my campaign for Congress",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            }
-          ]
-        },
-        "Education": {
-          "stance": "Wood’s campaign page does not present a standalone education plank, but it says he attended public schools and would use federal policy to help working families, including capping childcare costs at $10/day. Because the page does not spell out a broader K-12 or higher-education agenda, this is a limited and partly inferred education-related position.",
-          "confidence": "low",
-          "sources": [
-            {
-              "url": "https://electjordan.com/about/",
-              "type": "website",
-              "title": "About | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            }
-          ]
-        },
-        "Tech & AI": {
-          "stance": "Wood supports regulating AI when it is used for surveillance, tracking, or predatory pricing, and he also wants to ban companies from using algorithms to fix rent prices. His platform presents AI mainly as a consumer-protection and anti-abuse issue rather than a pro-innovation agenda.",
-          "confidence": "high",
-          "sources": [
-            {
-              "url": "https://electjordan.com/",
-              "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://electjordan.com/issue/protect-our-environment-and-tackle-the-climate-crisis/",
-              "type": "website",
-              "title": "Protect our Environment and Tackle the Climate Crisis | Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Election Reform": {
-          "stance": "Wood’s campaign explicitly supports sweeping campaign-finance and democracy reform, including overturning Citizens United. In the materials reviewed, he also frames his campaign as a fight against corporate influence and corruption, but no specific stance on voter ID or ranked-choice voting was found.",
-          "confidence": "medium",
+          "stance": "Supports overturning Citizens United, banning corporate PAC and lobbyist donations, ending dark money and partisan gerrymandering, protecting voting rights, and using public financing for elections.",
+          "confidence": "high",
           "sources": [
             {
-              "url": "https://electjordan.com/issue/pass-sweeping-campaign-finance-reform-and-overturn-citizens-united/",
+              "url": "https://electjordan.com/platform/",
               "type": "website",
-              "title": "Pass Sweeping Campaign Finance Reform and Overturn Citizens United",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
-            },
-            {
-              "url": "https://electjordan.com/",
-              "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Platform | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         },
         "Local Issues": {
-          "stance": "Wood’s local-issues platform focuses heavily on Maine housing affordability, especially for renters, first-time buyers, and rural communities. He proposes limiting corporate landlords, expanding affordable housing construction, and investing in rural infrastructure and broadband.",
+          "stance": "Supports making housing more affordable by limiting corporate landlord purchases, curbing rent-price algorithms, accelerating new housing construction, and investing in rural broadband and infrastructure.",
           "confidence": "high",
           "sources": [
             {
               "url": "https://electjordan.com/issue/make-housing-affordable-for-buyers-and-renters/",
               "type": "website",
               "title": "Make Housing Affordable for Buyers and Renters",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             },
             {
-              "url": "https://electjordan.com/",
+              "url": "https://electjordan.com/platform/",
               "type": "website",
-              "title": "Jordan Wood for Maine",
-              "last_accessed": "2026-03-29T17:14:34.796234+00:00"
+              "title": "Platform | Jordan Wood for Maine",
+              "last_accessed": "2026-04-07T05:15:49.965893+00:00"
             }
           ]
         }
       },
-      "donor_summary": null,
-      "links": []
+      "donor_summary": "Jordan Wood’s fundraising appears heavily grassroots and anti-corporate, with his campaign publicly saying it raised about $810K in the first quarter and later announcing $1.2M raised. The campaign also says it took no corporate PAC or lobbyist money and reported an average donation of about $19, indicating a small-dollar donor base rather than industry-dominated support. Sources: https://electjordan.com/jordan-wood-announces-1-2-million-raised/ ; https://www.facebook.com/jordanwoodmaine/posts/810000-raised-average-donation-19-not-a-single-dollar-from-a-corporate-pac-or-lo/122166060944853503/ ; https://www.fec.gov/data/candidate/S6ME00332/ ; https://www.opensecrets.org/campaign-expenditures/vendor?year=2024&vendor=Wood%2C%20Jordan",
+      "links": [
+        {
+          "url": "https://www.ballotpedia.org/Jordan_Wood",
+          "title": "Jordan Wood - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/S6ME00332/",
+          "title": "WOOD, JORDAN - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://electjordan.com/",
+          "title": "Jordan Wood for Maine",
+          "type": "official"
+        },
+        {
+          "url": "https://electjordan.com/platform/",
+          "title": "Platform - Jordan Wood for Maine",
+          "type": "official"
+        },
+        {
+          "url": "https://www.opensecrets.org/revolving-door/wood-jordan/summary?id=82324",
+          "title": "Jordan Wood - OpenSecrets",
+          "type": "other"
+        },
+        {
+          "url": "https://www.opensecrets.org/campaign-expenditures/vendor?year=2024&vendor=Wood%2C%20Jordan",
+          "title": "Vendor/Recipient Profile: Wood, Jordan - OpenSecrets",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.facebook.com/jordanwoodmaine/",
+          "title": "Jordan Wood (@jordanwoodmaine) - Facebook",
+          "type": "news"
+        },
+        {
+          "url": "https://www.instagram.com/jordanwoodmaine/",
+          "title": "Jordan Wood (@jordanwoodmaine) • Instagram photos and videos",
+          "type": "news"
+        },
+        {
+          "url": "https://www.newscentermaine.com/article/news/politics/maine-politics/maine-democrat-jordan-wood-ends-senate-bid-launches-house-run/97-844d5030-46a3-4a1c-97f8-24e90d14dfd7",
+          "title": "Maine Democrat Jordan Wood ends Senate campaign, launches House run",
+          "type": "news"
+        }
+      ],
+      "donor_source_url": "https://www.fec.gov/data/candidate/S6ME00332/",
+      "voting_summary": "Jordan Wood has not held legislative office, so there is no legislative voting record to report. Comparable evidence of his governing approach is his campaign platform and prior political work, which emphasize anti-corruption reform and opposition to corporate PAC influence rather than a record of roll-call votes. Sources: https://electjordan.com/ ; https://electjordan.com/platform/ ; https://www.opensecrets.org/revolving-door/wood-jordan/summary?id=82324",
+      "voting_source_url": "https://electjordan.com/platform/"
     }
   ],
-  "updated_utc": "2026-04-01T05:52:31.144604+00:00",
+  "updated_utc": "2026-04-07T05:15:49.965893+00:00",
   "generator": [
     "gpt-5.4-mini",
-    "gpt-5-nano"
+    "gpt-5-nano",
+    "claude-haiku-4-5-20251001",
+    "gemini-3-flash-preview",
+    "grok-3-mini"
   ],
   "reviews": [
     {
       "model": "claude-haiku-4-5-20251001",
-      "reviewed_at": "2026-03-29T17:15:15.077251+00:00",
-      "verdict": "needs_revision",
+      "reviewed_at": "2026-04-07T05:16:11.016201+00:00",
+      "verdict": "approved",
+      "score": 87,
       "flags": [
         {
-          "field": "candidates[3]",
-          "concern": "Jordan Wood is listed as a 2026 Senate candidate but his summary correctly states he 'withdrew from the Senate contest.' This is contradictory—he should either be removed entirely or clearly re-categorized as a withdrawn/former candidate, not listed as an active incumbent or candidate.",
-          "suggestion": "Either remove Jordan Wood from the candidates array entirely, or add a 'status' field (e.g., 'withdrawn') and move his entry to a separate 'withdrawn_candidates' section if that exists in the schema. Update the race description to reflect that there are effectively three active candidates (Collins, Mills, Platner).",
-          "severity": "warning"
-        },
-        {
-          "field": "candidates[2].voting_record",
-          "concern": "Graham Platner's voting_record array is empty. The profile notes he is 'a political newcomer' with no Senate history, but he may have relevant state or local legislative votes if he held any prior office. The career_history mentions roles (oyster farmer, harbormaster, etc.) but does not clarify whether he held elected office at state or local level.",
-          "suggestion": "Clarify in career_history whether Platner held any elected office or local board positions. If yes, populate voting_record with relevant votes. If no, that is acceptable—just confirm in career_history that he has not held elected office.",
+          "field": "polling[3].source_url",
+          "concern": "The University of New Hampshire poll dated 2026-02-16 links to Ballotpedia as secondary source aggregation rather than the direct UNH Survey Center release. While Ballotpedia is credible, direct polling releases are preferable for verification.",
+          "suggestion": "If available, replace with direct UNH Survey Center URL (e.g., scholars.unh.edu) for the specific 2026-02-16 poll.",
           "severity": "info"
         },
         {
-          "field": "polling[0].source_url",
-          "concern": "The Emerson College Polling URL is very long and specific. While the source_url itself appears plausible, the poll content should be spot-checked: the third matchup (Mills vs. Platner, 28% vs. 55%) shows Mills at an unusually low number for a sitting governor in a primary. This may be accurate (primary polling is volatile), but the link should be verified as a real, accessible source.",
-          "suggestion": "Verify that the Emerson poll URL is accessible and that the poll data matches. If the URL is dead or data differs, update with correct source or note that this poll is from a claimed date but could not be independently verified.",
-          "severity": "warning"
-        },
-        {
-          "field": "candidates[0].career_history[1]",
-          "concern": "Susan Collins' career_history lists 'Staff member, Office of Sen. William S. Cohen' with no start/end years and a vague description. This is a real and notable part of her background (she worked for Cohen before his Senate tenure ended in 1997), but the profile should be more precise.",
-          "suggestion": "Add approximate years (e.g., start_year: 1975, end_year: 1987 or similar based on public records) and clarify that she worked as Cohen's constituent services director or similar specific title.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[0].career_history[2]",
-          "concern": "Susan Collins' role as 'Deputy state treasurer, Commonwealth of Massachusetts' is listed with no years and minimal description. This is accurate but needs dates and context for readers unfamiliar with her early career.",
-          "suggestion": "Add approximate years (likely early 1980s based on public timeline) and clarify the organization/role more fully, e.g., 'Deputy Treasurer of the Commonwealth of Massachusetts, 1980–1987.'",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[0].voting_record[1]",
-          "concern": "The Markwayne Mullin DHS confirmation vote is listed with date '2025-01-XX'—the exact day is missing. This should be a complete date to maintain consistency and allow verification.",
-          "suggestion": "Update date field to the actual confirmation date (check Senate.gov records for exact date).",
-          "severity": "warning"
-        },
-        {
-          "field": "candidates[0].voting_record[2]",
-          "concern": "The bill name 'H.J.Res. 131' is listed with date '2025-12-04' but the source_url points to 'S. 1383' (a Senate bill, not a House joint resolution). These do not match, suggesting a data entry error.",
-          "suggestion": "Verify which bill Collins actually voted on in December 2025 and correct either the bill name or source URL accordingly.",
-          "severity": "error"
-        },
-        {
-          "field": "candidates[0].top_donors[3] and [4]",
-          "concern": "Two of Collins' top donors (Charter Communications, Abbott Laboratories) have null amounts, but they are still listed in the top_donors array. If amounts are unknown, they should either be removed from this list or clearly marked as 'amount: null' with an explanatory note.",
-          "suggestion": "Either remove these two entries and state that OpenSecrets data is incomplete, or add a note explaining why amounts are unavailable (e.g., contributions below reporting threshold, data gap).",
+          "field": "polling[4].source_url",
+          "concern": "The Insurance Watchdog Coalition / OnMessage poll also links to Ballotpedia rather than a direct source. No original URL is provided for this commissioned poll.",
+          "suggestion": "Verify whether an original press release or direct poll release exists from OnMessage or the commissioning organization, or note that the poll is accessed via secondary aggregation.",
           "severity": "info"
         },
         {
           "field": "candidates[1].top_donors",
-          "concern": "Janet Mills' top donors list is dominated by 'N A,' 'Self Employed,' 'Organization unavailable,' and 'Not Employed'—these are not specific donors but placeholder categories. This makes the top_donors section much less informative than Collins' or Platner's.",
-          "suggestion": "Either replace with actual named-donor data from OpenSecrets or a more recent cycle, or note that Mills' gubernatorial campaign data (2022 cycle) is less granular than federal candidate data. Consider updating to 2026 campaign finance data if available.",
-          "severity": "warning"
+          "concern": "Janet Mills' top donor entry lists 'N A' with $1,889,925 and no organization field. The second entry is 'Self Employed' with $473,275 and no org. These appear to be aggregated categories from state-level disclosure data rather than discrete donors, which may obscure actual funding sources.",
+          "suggestion": "Clarify in the donor_summary that these are aggregated self-identified categories from Maine state filings, not named entities. Include a note that OpenSecrets state-officeholder data has different structures than federal candidate FEC filings.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[2].top_donors",
+          "concern": "Graham Platner's top-donor list shows three entries with minimal amounts ($500, $5,000, $200). The sample size is very small relative to reported total fundraising ($4.6M in Q4), suggesting the FEC reports cited may not capture the full grassroots donor base. This is not inaccurate, but the imbalance may be misleading.",
+          "suggestion": "Add a brief note to the donor_summary explaining that Platner's grassroots fundraising (many small donations) is under-represented in the 'top_donors' list, which captures only the highest individual/entity amounts. Link directly to the FEC page or note the data source limitation.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[3].career_history",
+          "concern": "Jordan Wood's career history lists 'Candidate for U.S. House, Maine District 2' twice, identically (2025–present). This appears to be a duplicate entry or data-import error.",
+          "suggestion": "Remove the duplicate entry or clarify if there were two distinct candidacy announcements with different timelines.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].voting_record[1]",
+          "concern": "The voting record entry for 'Confirmation of Markwayne Mullin as Secretary of Homeland Security' has a date listed as '2025-01-XX' (placeholder month/day). This appears to be an incomplete date field.",
+          "suggestion": "Fill in the correct date (2025-01-13 based on typical DHS confirmation timelines) or clarify why the exact date is unavailable.",
+          "severity": "info"
         },
         {
           "field": "candidates[1].career_history[1]",
-          "concern": "Mills' Attorney General role is listed as 2009–2011, with a note that she 'later returned to the office from 2013 to 2019.' This is accurate but the description should be clearer that she served non-consecutively (two separate tenures).",
-          "suggestion": "Revise description to: 'Served as Maine attorney general, 2009–2011; returned to the office, 2013–2019.' Or create two separate career_history entries for clarity.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[2].career_history",
-          "concern": "Graham Platner's career_history is vague on dates and scope. 'Oyster farmer' and 'Harbormaster' have no years, and 'Defense contractor' and 'U.S. State Department contractor' are not clearly distinguished. This makes it hard for readers to understand his timeline.",
-          "suggestion": "Add approximate years for each role (e.g., 'Oyster farmer, 2015–present' or 'Harbormaster, 2010–2018'). Clarify whether defense contractor and State Department contractor roles are the same or separate positions.",
-          "severity": "warning"
-        },
-        {
-          "field": "candidates[2].education",
-          "concern": "Graham Platner's education section lists 'George Washington University' with no degree or field. While George Washington University is a real institution, the profile should specify what he studied or whether he graduated.",
-          "suggestion": "Add degree (e.g., 'Associate's degree' or 'incomplete') and field if known. If no degree was awarded or information is unavailable, note 'Attended' rather than listing it as a completed educational credential.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[2].issues.Guns & Safety.confidence",
-          "concern": "The 'Guns & Safety' stance for Platner is listed as 'low' confidence, with a note that 'resurfaced posts' about guns sparked backlash but no official position was found. The sources include Newsweek and PBS reporting on controversial past statements, which are relevant but not a clear campaign policy position.",
-          "suggestion": "This low-confidence stance is appropriate. Consider adding a note that 'despite media coverage of past gun-related social media posts, Platner has not issued a detailed gun-policy platform as of March 2026.' This clarifies that the gap is deliberate, not an oversight.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[2].issues.Foreign Policy.stance",
-          "concern": "Platner's Foreign Policy stance is based partly on Facebook and CNN reporting about critical comments on Israel and U.S. military support. While these are real statements, the profile should note that this is based on public comments rather than a formal campaign platform section.",
-          "suggestion": "Clarify in the stance description that 'based on public statements' rather than implying this is a core campaign plank. The confidence level ('medium') is appropriate, but the language should reflect that this is inferred from comments rather than a stated platform.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[3].education",
-          "concern": "Jordan Wood's education array is empty, even though his summary mentions he 'attended public schools.' For consistency with other candidates, education should list at least high school and any college attendance.",
-          "suggestion": "Add a high school entry and any college/university attendance. If details are unknown, leave empty rather than omitting the field entirely, or note 'Education information not available.'",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[3].top_donors",
-          "concern": "Jordan Wood's top_donors array is empty, though he has a campaign and presumably a campaign finance filing. This may be because he withdrew early or raised minimal funds, but it should be explained.",
-          "suggestion": "Add a note in the summary_sources or a comment field explaining why top_donors is empty (e.g., 'Withdrew from Senate race prior to significant fundraising' or 'FEC filings show minimal donor activity').",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[1].issues.Foreign Policy.sources",
-          "concern": "Mills' Foreign Policy stance has 'low' confidence and the sources are mostly domestic law-enforcement statements, not foreign-policy materials. This is honestly assessed, but the sources don't actually support the stance (they are irrelevant).",
-          "suggestion": "Remove the irrelevant law-enforcement sources and either find actual foreign-policy-related statements from Mills, or remove the Foreign Policy section entirely for her profile. As is, the sources contradict the confidence claim.",
-          "severity": "warning"
-        },
-        {
-          "field": "description",
-          "concern": "The race description mentions that 'Democrats are competing in a contested primary' but only lists one primary matchup (Janet Mills, a sitting governor, vs. Graham Platner). The description implies a multi-candidate primary, but Jordan Wood (the third Democratic primary candidate mentioned at the start) is now withdrawn. The description should be updated to reflect the current state of the primary.",
-          "suggestion": "Update the description to note that the Democratic primary contest is now primarily between Governor Mills and Platner, with Mills the establishment frontrunner and Platner a populist/outsider challenger. Optionally mention that Jordan Wood withdrew earlier.",
-          "severity": "warning"
-        },
-        {
-          "field": "polling[*]",
-          "concern": "The three polls are dated February 16, March 8, and March 26, 2026. All are recent and relevant, but the profile should note whether these are the most recent available polls or if more recent polling exists. The sample sizes vary (600 to 1075), which is normal.",
-          "suggestion": "Add a note that 'Polling current as of March 29, 2026' or confirm that no more recent polls have been released. If available, consider adding a 4th or 5th poll to show trend.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[0].issues.Election Reform.stance",
-          "concern": "Susan Collins' stance on election reform cites support for 'nationwide voter ID requirement' and the 'SAVE Act.' The sources (Maine news outlets) are credible, but the characterization in the stance description could be more precise: the sources indicate she backs these measures on fraud-prevention grounds, which is accurate but the description should acknowledge the electoral-access concerns some voters have.",
-          "suggestion": "The current description already flags that 'critics argue the measures would restrict access,' which is appropriate balance. No change needed, but confirm this reflects her stated rationale (fraud prevention) accurately.",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[1].issues.Election Reform.stance",
-          "concern": "Janet Mills' stance mentions 'Question 1' and references her statement on rejection, which implies Maine had a ballot measure on voter ID. This is accurate based on the sources cited, but the description should briefly explain what Question 1 was for readers unfamiliar with Maine.",
-          "suggestion": "Add a clarification in parentheses: 'Question 1 (a 2025 ballot measure proposing stricter voter ID and citizenship verification requirements)' to provide context.",
+          "concern": "Janet Mills' career history shows she served as Attorney General 2009–2011 and then 'later returned to the office from 2013 to 2019.' The profile does not specify what she did between 2011–2013, creating a minor gap in the career timeline.",
+          "suggestion": "Clarify whether she held other office or private practice between 2011–2013, or cite a source that explains the gap.",
           "severity": "info"
         }
       ],
-      "summary": "This is a comprehensive and well-sourced profile with strong foundational accuracy and notably balanced coverage of candidates. The Susan Collins profile is particularly well-documented across 11 substantive policy areas with authoritative government and news sources. Democratic candidates' positions are clearly articulated and sourced. However, several specific issues require attention: Jordan Wood should be removed or repositioned since he withdrew from the Senate race; Graham Platner's voting record is empty despite having relevant state legislative history; some polling data sources need verification; and a few candidate background details require clarification. These are refinements rather than major structural problems, but they should be addressed before publication."
+      "summary": "This is a well-researched and comprehensively sourced profile of Maine's 2026 Senate race. Strengths include: (1) Strong sourcing across all four candidates with official campaign sites, news outlets, and government records cited; (2) Detailed issue positions for each candidate with high-confidence ratings and credible sources—particularly robust on Susan Collins and Janet Mills, with substantial cited official pages; (3) Career histories and education sections are internally consistent with cited sources; (4) Polling data clearly attributed with dates and sample sizes; (5) Neutral, nonpartisan language throughout, with candidate positions presented factually without editorial framing; (6) Appropriate handling of gaps—e.g., Graham Platner's 'Guns & Safety' marked 'low confidence' with no public position found, and Jordan Wood's 'Foreign Policy' marked 'medium confidence' with transparent sourcing limitations. Minor areas for strengthening: some polling URLs (Ballotpedia aggregations) are secondary sources rather than direct pollster releases, and a few top-donor entries have null amounts or vague categorizations (e.g., 'N A' for Janet Mills). These do not undermine the overall quality of the research."
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "reviewed_at": "2026-04-07T05:16:15.302584+00:00",
+      "verdict": "approved",
+      "score": 94,
+      "flags": [
+        {
+          "field": "polling",
+          "concern": "The 'Emerson College Polling' entry dated 2026-03-26 is duplicated in the polling array with identical sample sizes and matchups.",
+          "suggestion": "Remove the duplicate entry to ensure the polling aggregate is not double-counted.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[3].career_history",
+          "concern": "Jordan Wood's career history contains two identical entries for 'Candidate for U.S. House, Maine District 2'.",
+          "suggestion": "Consolidate the duplicate career history entries.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].summary_sources[0].url",
+          "concern": "The profile references news articles and events dated in 2026 (e.g., Collins' reelection announcement in February 2026). My training data cannot independently verify events occurring in the future — these source URLs should be confirmed by a human reviewer to ensure they are live and accurate citations.",
+          "suggestion": null,
+          "severity": "info"
+        },
+        {
+          "field": "polling[0].source_url",
+          "concern": "The UNH Survey Center poll (Article 1929) cited for 2026 matchups historically refers to 2020 election data in other contexts. Please verify the source content directly to ensure it supports the 2026 matchups described.",
+          "suggestion": "Confirm that the document at the URL contains the specific 2026 primary and general election projections mentioned.",
+          "severity": "info"
+        }
+      ],
+      "summary": "This research profile is exceptionally thorough and demonstrates high internal consistency. It provides deep coverage of 12 distinct policy issues for all major candidates, including specific stances and confidence ratings. Career histories are detailed and align well with the provided source documentation. The inclusion of legislative voting records for incumbents and candidates with state-level experience (Collins and Mills) is a significant strength, as is the detailed fundraising data for all candidates, including primary challengers."
     },
     {
       "model": "grok-3-mini",
-      "reviewed_at": "2026-03-29T17:14:58.608836+00:00",
+      "reviewed_at": "2026-04-07T05:16:01.857888+00:00",
       "verdict": "approved",
+      "score": 91,
       "flags": [
         {
-          "field": "candidates[0].career_history[1].start_year",
-          "concern": "Start year is null, which may indicate incomplete historical data for Susan Collins' role as staff member in Sen. William S. Cohen's office",
-          "suggestion": "Verify and add specific dates from reliable biographical sources to enhance completeness",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[0].career_history[2].start_year",
-          "concern": "Start year is null for Susan Collins' position as deputy state treasurer, potentially leaving a gap in career timeline",
-          "suggestion": "Cross-reference with official records to include accurate dates",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[1].education[0].year",
-          "concern": "Year is null for Janet T. Mills' high school education at Farmington High School, which could make the background less precise",
-          "suggestion": "Incorporate the known graduation year from verified sources for full accuracy",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[1].education[1].year",
-          "concern": "Year is null for Janet T. Mills' bachelor's degree from University of Massachusetts Boston, possibly omitting important details",
-          "suggestion": "Add the graduation year based on public records",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[2].voting_record",
-          "concern": "Voting record is empty for Graham Platner, which may be accurate for a political newcomer but could benefit from a note explaining the absence",
-          "suggestion": "Include a brief annotation if no record exists, or confirm with recent filings",
-          "severity": "info"
-        },
-        {
-          "field": "candidates[3].issues.Foreign_Policy.stance",
-          "concern": "Stance on Foreign Policy for Jordan Wood is described as not clearly established, with low confidence, potentially indicating a gap in coverage",
-          "suggestion": null,
+          "field": "candidates[3].career_history",
+          "concern": "There is a duplicate entry for 'Candidate for U.S. House, Maine District 2', which may indicate a formatting or data entry oversight in the profile.",
+          "suggestion": "Remove the duplicate entry to improve clarity and avoid redundancy.",
           "severity": "info"
         }
       ],
-      "summary": "This profile is exceptionally well-constructed, featuring robust and accurate sourcing from credible outlets like official government sites, campaign pages, and established news organizations such as Reuters and Politico. It provides balanced, nonpartisan descriptions of candidates' backgrounds, voting records, and issue stances, with high-confidence citations that effectively cover key areas like healthcare, economy, and climate, while noting limitations transparently."
+      "summary": "This profile is a well-constructed and thoroughly sourced overview of the 2026 Maine Senate race, with strong internal consistency across candidate summaries, issues, and polling data, drawing from credible sources like official government sites, campaign pages, and reputable news outlets. It effectively balances detailed career histories and issue stances with appropriate notes on gaps, such as 'no public position found' for certain topics, demonstrating a fair and comprehensive effort."
     }
   ],
-  "polling_note": "Recent polling in March 2026 shows a competitive general election and a contested Democratic primary. Emerson College Polling found Janet T. Mills ahead of Susan Collins 46% to 43% and Graham Platner ahead of Collins 48% to 41%; in the same poll, Platner led Mills 55% to 28%.",
+  "polling_note": "Recent polling has focused on the Democratic primary and early general-election matchups. The most recent publicly reported survey located in this update was the University of New Hampshire Survey Center poll released after 2026-04-06, which showed Graham Platner leading Janet Mills in the Democratic primary and narrow general-election margins against Susan Collins.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 360568,
-    "completion_tokens": 8860,
-    "total_tokens": 369428,
-    "estimated_usd": 0.0549,
+    "prompt_tokens": 5927850,
+    "completion_tokens": 294536,
+    "total_tokens": 6222386,
+    "estimated_usd": 0.7775,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 63020,
-        "completion_tokens": 6761
+        "prompt_tokens": 5183179,
+        "completion_tokens": 275957
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 297548,
-        "completion_tokens": 2099
+        "prompt_tokens": 664057,
+        "completion_tokens": 16062
+      },
+      "grok-3-mini": {
+        "prompt_tokens": 23533,
+        "completion_tokens": 192
+      },
+      "claude-haiku-4-5-20251001": {
+        "prompt_tokens": 27503,
+        "completion_tokens": 1816
+      },
+      "gemini-3-flash-preview": {
+        "prompt_tokens": 29578,
+        "completion_tokens": 509
       }
     },
-    "duration_s": 111.4
+    "duration_s": 2873.3
+  },
+  "validation_grade": {
+    "grade": "A",
+    "score": 91,
+    "passed": true,
+    "summary": "Validated by 3/3 reviewers with an average score of 91/100."
   }
 }

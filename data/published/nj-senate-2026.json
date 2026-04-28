@@ -4,7 +4,7 @@
   "office": "U.S. Senate",
   "jurisdiction": "New Jersey",
   "election_date": "2026-11-03",
-  "description": "New Jersey voters will elect one U.S. senator in 2026 for the state\u2019s Class II seat. The race matters because it will help determine control of the U.S. Senate in the 120th Congress, and New Jersey is generally a Democratic-leaning state that has recently elected Democrats to statewide federal office. The contest is currently centered on incumbent Cory Booker\u2019s bid for reelection and a Republican primary field that includes several candidates with different political backgrounds and messaging.",
+  "description": "New Jersey voters will elect one U.S. senator in 2026 for the state’s Class II seat. The race matters because it will help determine control of the U.S. Senate in the 120th Congress, and New Jersey is generally a Democratic-leaning state that has recently elected Democrats to statewide federal office. The contest is currently centered on incumbent Cory Booker’s bid for reelection and a Republican primary field that includes several candidates with different political backgrounds and messaging.",
   "polling": [],
   "polling_note": "No public general-election polling for this race was found in the searched sources as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Cory_Booker%2C_official_portrait_%28119th_Congress%29.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/CoryBooker.jpg",
       "website": "https://corybooker.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/corybooker/",
@@ -103,7 +103,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -128,7 +128,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -159,7 +159,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Oklahomacitybombing-DF-ST-98-01356.jpg/500px-Oklahomacitybombing-DF-ST-98-01356.jpg",
       "website": "https://chrisfieldsforsenate.com/",
       "social_media": {},
       "career_history": [],
@@ -209,7 +209,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Gregory_Tomaini_26.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -234,7 +234,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Robert_Lebovics.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -271,7 +271,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JustinMurphy24.jpg",
       "website": "https://jerseyjustin4senate.org/",
       "social_media": {
         "x": "https://x.com/murpho5",
@@ -321,7 +321,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Natalie-Rivera-e1556213891448.jpg",
       "website": "https://votenatalie2026.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/natalieriveraofficial/",
@@ -340,7 +340,7 @@
       "name": "Richard Tabor",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Richard Tabor is listed by Ballotpedia as a Republican primary candidate for U.S. Senate in New Jersey. His campaign site and local GOP materials indicate he is running as a conservative candidate, and Ballotpedia\u2019s candidate listing confirms his place in the primary field, but the searched sources did not provide enough corroborated detail for a fuller biography.",
+      "summary": "Richard Tabor is listed by Ballotpedia as a Republican primary candidate for U.S. Senate in New Jersey. His campaign site and local GOP materials indicate he is running as a conservative candidate, and Ballotpedia’s candidate listing confirms his place in the primary field, but the searched sources did not provide enough corroborated detail for a fuller biography.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_New_Jersey,_2026",
@@ -361,7 +361,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Richard_Tabor_20260330_032501.jpeg",
       "website": "https://www.taborforsenate.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/rich_tabor/",
@@ -401,7 +401,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/azdan.jpeg",
       "website": "https://zdanforsenate.com/",
       "social_media": {
         "x": "https://x.com/ActualAlexZ",
@@ -426,7 +426,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:59:38.033928+00:00",
+  "updated_utc": "2026-04-06T17:33:07.388350+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -434,16 +434,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 96186,
-    "completion_tokens": 4368,
-    "total_tokens": 100554,
-    "estimated_usd": 0.017,
+    "prompt_tokens": 175823,
+    "completion_tokens": 12906,
+    "total_tokens": 188729,
+    "estimated_usd": 0.0272,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 92131,
+        "completion_tokens": 11797
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 96186,
-        "completion_tokens": 4368
+        "prompt_tokens": 83692,
+        "completion_tokens": 1109
       }
     },
-    "duration_s": 42.0
-  }
+    "duration_s": 167.8
+  },
+  "validation_grade": null
 }

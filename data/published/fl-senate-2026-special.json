@@ -4,8 +4,26 @@
   "office": "United States Senate",
   "jurisdiction": "Florida",
   "election_date": "2026-11-03",
-  "description": "Florida’s 2026 special U.S. Senate election will fill the final two years of Marco Rubio’s term after his departure from the seat. The race is shaping up as a contrast between appointed Republican incumbent Ashley Moody, who has statewide experience as Florida attorney general, and Democrat Alexander Vindman, a retired Army lieutenant colonel and impeachment whistleblower. Early polling suggests Moody has the advantage, but recent surveys show the race within single digits and still potentially competitive.",
+  "description": "Florida’s 2026 special U.S. Senate election will fill the remainder of Marco Rubio’s term, with a general election on November 3, 2026 and primaries on August 18, 2026. The race matters because it will determine partisan control of a Florida Senate seat in a strongly Republican state, and the main contrast is between appointed Republican Sen. Ashley Moody’s statewide record and Democrat Alexander Vindman’s national-profile outsider campaign.",
   "polling": [
+    {
+      "pollster": "Emerson College",
+      "date": "2026-03-31",
+      "matchups": [
+        {
+          "candidates": [
+            "Ashley Moody",
+            "Alexander Vindman"
+          ],
+          "percentages": [
+            46,
+            38
+          ]
+        }
+      ],
+      "source_url": "https://floridapolitics.com/archives/788552-poll-ashley-moody-leading-all-potential-democratic-opponents-in-senate-race/",
+      "sample_size": 1165
+    },
     {
       "pollster": "University of North Florida Public Opinion Research Lab",
       "date": "2026-03-02",
@@ -76,17 +94,17 @@
       "name": "Ashley Moody",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Ashley Moody is the Republican incumbent in Florida’s 2026 special U.S. Senate election, appointed by Gov. Ron DeSantis to fill the seat after Marco Rubio left for the Trump administration. She previously served as Florida attorney general and is seeking election to the remainder of the term in November. ",
+      "summary": "Ashley Moody is the appointed Republican U.S. senator from Florida and a former state attorney general. In the special election, she is running to keep the seat for the remainder of Marco Rubio’s term, and early polling has shown her with an advantage over Democratic challenger Alexander Vindman.",
       "summary_sources": [
         {
-          "url": "https://floridapolitics.com/archives/783202-unf-poll-shows-ashley-moody-lead-in-single-digits-against-either-angie-nixon-or-alex-vindman/",
-          "type": "news",
-          "title": "Poll shows Ashley Moody lead in single digits against Democratic challengers"
+          "url": "https://floridapolitics.com/archives/788552-poll-ashley-moody-leading-all-potential-democratic-opponents-in-senate-race/",
+          "title": "Poll: Ashley Moody leading all potential Democratic opponents in Senate race",
+          "type": "news"
         },
         {
-          "url": "https://ashleymoody.com/news/",
-          "type": "campaign",
-          "title": "Ashley Moody for U.S. Senate News"
+          "url": "https://www.moody.senate.gov/",
+          "title": "Sen. Ashley Moody official Senate website",
+          "type": "official"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Senator_Ashley_Moody_Official_Portrait.jpg/500px-Senator_Ashley_Moody_Official_Portrait.jpg",
@@ -511,17 +529,17 @@
       "name": "Alexander Vindman",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Alexander Vindman is a Democratic candidate in Florida’s 2026 special U.S. Senate election. A retired U.S. Army lieutenant colonel and former National Security Council official, he became widely known for his role as a whistleblower in President Donald Trump’s first impeachment. He moved to Broward County in 2023 and launched his Senate campaign in January 2026.",
+      "summary": "Alexander Vindman, a retired Army lieutenant colonel and former National Security Council official, entered Florida’s 2026 special U.S. Senate race as a Democrat. His campaign has emphasized his role as a whistleblower during President Donald Trump’s first impeachment and has framed the race as a challenge to Ashley Moody and Trump-aligned politics.",
       "summary_sources": [
         {
-          "url": "https://floridaphoenix.com/2026/01/27/whistleblower-alexander-vindman-to-seek-florida-democratic-nomination-for-senate/",
-          "type": "news",
-          "title": "Whistleblower Alexander Vindman to seek Florida Democratic nomination for Senate"
+          "url": "https://www.axios.com/2026/01/27/alexander-vindman-florida-senate",
+          "title": "Alexander Vindman announces Florida Senate campaign as a Democrat",
+          "type": "news"
         },
         {
-          "url": "https://floridapolitics.com/archives/783202-unf-poll-shows-ashley-moody-lead-in-single-digits-against-either-angie-nixon-or-alex-vindman/",
-          "type": "news",
-          "title": "Poll shows Ashley Moody lead in single digits against Democratic challengers"
+          "url": "https://floridapolitics.com/archives/776759-alex-vindman-pulls-in-1-7m-in-first-24-hours-of-senate-campaign/",
+          "title": "Alex Vindman pulls in $1.7M in first 24 hours of Senate campaign",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/07/Alexander_Vindman_on_May_20%2C_2019.jpg",
@@ -791,7 +809,7 @@
       "links": []
     }
   ],
-  "updated_utc": "2026-04-01T05:44:06.303589+00:00",
+  "updated_utc": "2026-04-06T18:17:02.233119+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -895,20 +913,21 @@
   "polling_note": "Recent polling found Ashley Moody leading Alexander Vindman 45% to 38% in a University of North Florida Public Opinion Research Lab survey of 786 likely midterm voters conducted Feb. 21 to Mar. 2, 2026. No additional polls from the last 90 days were identified in this update.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 128218,
-    "completion_tokens": 10403,
-    "total_tokens": 138621,
-    "estimated_usd": 0.0208,
+    "prompt_tokens": 231350,
+    "completion_tokens": 6291,
+    "total_tokens": 237641,
+    "estimated_usd": 0.0325,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 56665,
-        "completion_tokens": 9298
+        "prompt_tokens": 99376,
+        "completion_tokens": 4811
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 71553,
-        "completion_tokens": 1105
+        "prompt_tokens": 131974,
+        "completion_tokens": 1480
       }
     },
-    "duration_s": 87.6
-  }
+    "duration_s": 114.6
+  },
+  "validation_grade": null
 }

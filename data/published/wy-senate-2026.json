@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Wyoming",
   "election_date": "2026-11-03",
-  "description": "Voters in Wyoming will elect one U.S. senator in 2026 for the state\u2019s Class II Senate seat. The race is notable because incumbent Cynthia Lummis is not seeking re-election, making it an open-seat contest in a state that has been strongly Republican in recent federal elections. Ballotpedia rates the general election as solid/safe Republican, and the main contrast so far is within the Republican primary between a sitting member of Congress and a challenger emphasizing term limits and outsider status.",
+  "description": "Voters in Wyoming will elect one U.S. senator in 2026 for the state’s Class II Senate seat. The race is notable because incumbent Cynthia Lummis is not seeking re-election, making it an open-seat contest in a state that has been strongly Republican in recent federal elections. Ballotpedia rates the general election as solid/safe Republican, and the main contrast so far is within the Republican primary between a sitting member of Congress and a challenger emphasizing term limits and outsider status.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -12,7 +12,7 @@
       "name": "Harriet Hageman",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Harriet Hageman is a Republican member of the U.S. House from Wyoming who is running for the state\u2019s open U.S. Senate seat in 2026. Her campaign emphasizes opposition to federal overreach, protection of private property and water rights, and conservative governance. She previously worked as a lawyer and served in the Wyoming attorney general\u2019s office before entering Congress.",
+      "summary": "Harriet Hageman is a Republican member of the U.S. House from Wyoming who is running for the state’s open U.S. Senate seat in 2026. Her campaign emphasizes opposition to federal overreach, protection of private property and water rights, and conservative governance. She previously worked as a lawyer and served in the Wyoming attorney general’s office before entering Congress.",
       "summary_sources": [
         {
           "url": "https://history.house.gov/People/Detail/25769822962?current_search_qs=%3Ffilter%3D6%26PreviousSearch%3DSearch%252cLastName%252c%252c%252c%252c%252cFalse%252cFalse%252cTrue%252c65-66-67-68-69-70-71-72-73-74-75-76-77-78-79-80-81-82-83-84-85-86-87-88-89-90-91-92-93-94-95-96-97-98-99-100-101-102-103-104-105-106-107-108-109-110-111-112-113-114-115-116-117-118-119%252cState%26CurrentPage%3D6%26SortOrder%3DState%26ResultType%3DGrid%26Command%3D38",
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Harriet_Hageman_118th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Harriet-Hageman.PNG",
       "website": "https://www.hagemanforwyoming.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/harriethageman/",
@@ -46,11 +46,11 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2023,
           "end_year": null,
-          "description": "Represents Wyoming\u2019s at-large congressional district."
+          "description": "Represents Wyoming’s at-large congressional district."
         },
         {
           "title": "Staff attorney",
-          "organization": "Wyoming Attorney General\u2019s Office",
+          "organization": "Wyoming Attorney General’s Office",
           "start_year": null,
           "end_year": null,
           "description": "Served as a staff attorney before entering elected office."
@@ -114,7 +114,7 @@
       "name": "Jimmy Skovgard",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Jimmy Skovgard is a Republican challenger in Wyoming\u2019s 2026 U.S. Senate race. His campaign presents him as an outsider focused on term limits, financial transparency, limited government, and a more citizen-driven style of representation. He says he served more than a decade in the Wyoming Army National Guard and has also run his own business.",
+      "summary": "Jimmy Skovgard is a Republican challenger in Wyoming’s 2026 U.S. Senate race. His campaign presents him as an outsider focused on term limits, financial transparency, limited government, and a more citizen-driven style of representation. He says he served more than a decade in the Wyoming Army National Guard and has also run his own business.",
       "summary_sources": [
         {
           "url": "https://www.skovgard2026.org/",
@@ -135,7 +135,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jimmy_Skovgard_20250505_103227.jpg",
       "website": "https://www.skovgard2026.org/",
       "social_media": {
         "facebook": "https://www.facebook.com/skovgard2026/?locale=uk_UA"
@@ -187,7 +187,7 @@
       "name": "James Byrd",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "James Byrd is the Democratic candidate in Wyoming\u2019s 2026 U.S. Senate race. His campaign says he is focused on energy, healthcare access, and public lands, and he has framed his candidacy around representing Wyoming interests in Washington. Byrd previously served in the Wyoming House of Representatives, giving him prior legislative experience in state government.",
+      "summary": "James Byrd is the Democratic candidate in Wyoming’s 2026 U.S. Senate race. His campaign says he is focused on energy, healthcare access, and public lands, and he has framed his candidacy around representing Wyoming interests in Washington. Byrd previously served in the Wyoming House of Representatives, giving him prior legislative experience in state government.",
       "summary_sources": [
         {
           "url": "https://www.byrdforsenate.com/",
@@ -208,7 +208,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/James_W._Byrd.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Byrd.jpg",
       "website": "https://www.byrdforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/61588224903720?locale=zh_CN"
@@ -219,7 +219,7 @@
           "organization": "State of Wyoming",
           "start_year": 2009,
           "end_year": 2019,
-          "description": "Served five terms representing Cheyenne\u2019s 44th district."
+          "description": "Served five terms representing Cheyenne’s 44th district."
         },
         {
           "title": "Business leader",
@@ -245,7 +245,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:11:32.342578+00:00",
+  "updated_utc": "2026-04-06T16:55:13.278623+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -253,16 +253,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 200585,
-    "completion_tokens": 3034,
-    "total_tokens": 203619,
-    "estimated_usd": 0.0319,
+    "prompt_tokens": 146845,
+    "completion_tokens": 4959,
+    "total_tokens": 151804,
+    "estimated_usd": 0.0217,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 49210,
+        "completion_tokens": 4304
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 200585,
-        "completion_tokens": 3034
+        "prompt_tokens": 97635,
+        "completion_tokens": 655
       }
     },
-    "duration_s": 37.8
-  }
+    "duration_s": 102.2
+  },
+  "validation_grade": null
 }

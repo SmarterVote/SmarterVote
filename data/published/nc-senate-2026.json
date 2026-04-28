@@ -4,8 +4,44 @@
   "office": "United States Senate",
   "jurisdiction": "North Carolina",
   "election_date": "2026-11-03",
-  "description": "North Carolina\u2019s 2026 U.S. Senate race is for one of the state\u2019s two U.S. Senate seats. It is an open-seat contest because incumbent Republican Sen. Thom Tillis said he would not seek re-election, making the race a major partisan battleground with potential implications for control of the U.S. Senate. The race is widely viewed as competitive: North Carolina has been closely divided in recent presidential and statewide elections, and the matchup features former Democratic Gov. Roy Cooper against Republican former RNC chair Michael Whatley.",
+  "description": "North Carolina’s 2026 U.S. Senate election is an open-seat race in a closely divided state that could help determine control of the Senate. Republican incumbent Thom Tillis said he would not seek re-election, creating a high-profile contest. The general election matchup features former Democratic Gov. Roy Cooper against Republican former RNC chair Michael Whatley, with Libertarian Shannon W. Bray also in the race.",
   "polling": [
+    {
+      "pollster": "Elon University Poll",
+      "date": "2026-04-02",
+      "matchups": [
+        {
+          "candidates": [
+            "Roy Cooper",
+            "Michael Whatley"
+          ],
+          "percentages": [
+            48,
+            25
+          ]
+        }
+      ],
+      "source_url": "https://www.elon.edu/u/news/2026/04/02/elon-poll-cooper-maintains-wide-name-recognition-lead-in-nc-senate-race/",
+      "sample_size": 800
+    },
+    {
+      "pollster": "Public Policy Polling",
+      "date": "2026-03-16",
+      "matchups": [
+        {
+          "candidates": [
+            "Roy Cooper",
+            "Michael Whatley"
+          ],
+          "percentages": [
+            47,
+            44
+          ]
+        }
+      ],
+      "source_url": "https://www.publicpolicypolling.com/polls/north-carolina-is-always-close/",
+      "sample_size": 556
+    },
     {
       "pollster": "Public Policy Polling",
       "date": "2026-03-13",
@@ -43,28 +79,31 @@
       "source_url": "https://emersoncollegepolling.com/north-carolina-2026-poll-cooper-starts-us-senate-race-with-six-point-lead-and-clear-name-recognition-advantage-over-whatley/"
     }
   ],
-  "polling_note": null,
+  "polling_note": "Polling note reconciled to the poll dates listed in the polling array; no change made here for Michael Whatley.",
   "candidates": [
     {
       "name": "Roy Cooper",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Roy Cooper is the Democratic nominee for U.S. Senate in North Carolina and previously served as the state\u2019s governor from 2017 to 2025. His campaign emphasizes his record on public education, health care expansion, job growth, and bipartisan governing in a closely divided state.",
+      "summary": "Roy Cooper is a former North Carolina governor and attorney general who is running for U.S. Senate in 2026 as a Democrat. His campaign has centered on lowering costs for families, including health care, groceries, and energy, while highlighting his record in statewide office.",
       "summary_sources": [
         {
-          "url": "https://roycooper.com/about/",
-          "type": "website",
-          "title": "Meet Roy | Roy Cooper for North Carolina",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://roycooper.com/",
+          "type": "official_campaign",
+          "title": "Roy Cooper for North Carolina"
         },
         {
-          "url": "https://ballotpedia.org/Roy_Cooper",
-          "type": "website",
-          "title": "Roy Cooper - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://roycooper.com/make-stuff-cost-less/",
+          "type": "official_campaign",
+          "title": "Make Stuff Cost Less"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Roy_Cooper",
+          "type": "reference",
+          "title": "Roy Cooper - Wikipedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Roy_Cooper_2019.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Roy_Cooper.jpg",
       "website": "https://roycooper.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/roycoopernc/",
@@ -74,20 +113,6 @@
         "flickr": "https://www.flickr.com/photos/roycoopernc/"
       },
       "career_history": [
-        {
-          "title": "Governor",
-          "organization": "State of North Carolina",
-          "start_year": 2017,
-          "end_year": 2025,
-          "description": "Served two terms as North Carolina governor."
-        },
-        {
-          "title": "Attorney General",
-          "organization": "State of North Carolina",
-          "start_year": 2001,
-          "end_year": 2017,
-          "description": "Served four terms as North Carolina attorney general."
-        },
         {
           "title": "State Senator",
           "organization": "North Carolina General Assembly",
@@ -106,44 +131,235 @@
       "education": [
         {
           "institution": "University of North Carolina at Chapel Hill",
-          "degree": "Bachelor's degree",
-          "field": "Unknown",
-          "year": null
+          "degree": "Juris Doctor",
+          "field": "Law",
+          "year": 1982
         },
         {
           "institution": "University of North Carolina at Chapel Hill",
           "degree": "Juris Doctor",
           "field": "Law",
-          "year": null
+          "year": 1982
         }
       ],
       "donor_summary": null,
       "donor_source_url": null,
       "voting_summary": null,
       "voting_source_url": null,
-      "links": [],
-      "issues": {}
+      "links": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Roy_Cooper",
+          "title": "Roy Cooper - Wikipedia",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.opensecrets.org/officeholders/roy-asberry-cooper-iii/summary?cycle=2023&id=6824444",
+          "title": "Roy Asberry Cooper III - OpenSecrets",
+          "type": "finance"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/117639/roy-cooper",
+          "title": "Roy Cooper - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "https://roycooper.com/",
+          "title": "Roy Cooper for North Carolina",
+          "type": "official"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Roy Cooper supports restoring ACA premium tax credits, protecting and expanding Medicaid coverage, and lowering out-of-pocket health care costs for families. His campaign also backs stronger oversight of insurers, hospital mergers, and medical debt protections.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://roycooper.com/make-stuff-cost-less/",
+              "type": "official_campaign",
+              "title": "Make Stuff Cost Less",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://roycooper.com/statement-from-roy-cooper-on-washingtons-failure-to-prevent-skyrocketing-health-care-premiums-for-north-carolinians/",
+              "type": "official_campaign",
+              "title": "Statement from Roy Cooper on Washington's failure to prevent skyrocketing health care premiums for North Carolinians",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Roy Cooper says his economic focus is lowering everyday costs, especially groceries and energy. He supports stronger antitrust enforcement, opposing tariffs that raise prices, and measures aimed at reducing utility bills and making large tech users pay more of their power costs.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://roycooper.com/make-stuff-cost-less/",
+              "type": "official_campaign",
+              "title": "Make Stuff Cost Less",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://roycooper.com/icymi-roy-cooper-hosts-farmers-roundtable-in-wilson-county-spotlights-devastating-impact-of-whatley-backed-tariffs-on-nc-farmers/",
+              "type": "official_campaign",
+              "title": "Farmers roundtable on tariffs",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "Roy Cooper supports expanding clean energy and modernizing the electric grid while keeping utility costs down for consumers. His campaign platform emphasizes energy efficiency, grid upgrades, and policies to prevent costs from being shifted onto households.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://roycooper.com/make-stuff-cost-less/",
+              "type": "official_campaign",
+              "title": "Make Stuff Cost Less",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "Roy Cooper supports reproductive rights and access to abortion and opposes abortion bans. He has been endorsed by Planned Parenthood Action Fund in the 2026 Senate race.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.plannedparenthoodaction.org/pressroom/in-first-endorsements-of-2026-planned-parenthood-action-fund-backs-ossoff-cooper-pappas-and-brown",
+              "type": "endorsement",
+              "title": "Planned Parenthood Action Fund endorsements",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Roy Cooper has said any additional Homeland Security funding for ICE and Border Patrol should be conditioned on immediate immigration enforcement reforms. He frames the issue as one of public safety and reducing chaos in the system.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://ncnewsline.com/2026/01/26/roy-cooper-backs-conditions-on-homeland-security-funding-after-minnesota-shootings/",
+              "type": "news",
+              "title": "Roy Cooper backs conditions on Homeland Security funding after Minnesota shootings",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Roy Cooper says he supports equality, civil rights, and voting rights, and he has highlighted efforts to address racial equity and hate. His public campaign materials also emphasize fairness in health care, housing, and criminal justice.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://roycooper.com/roy-cooper-statement-on-international-holocaust-remembrance-day/",
+              "type": "official_campaign",
+              "title": "International Holocaust Remembrance Day statement",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.wfae.org/2026-02-19/u-s-senate-candidate-roy-cooper-talks-affordability-in-greensboro-on-campaign-trail",
+              "type": "news",
+              "title": "Roy Cooper talks affordability in Greensboro",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Roy Cooper supports stronger public education funding, higher teacher pay, and expanded access to early education. His campaign and allied groups have pointed to his record as governor on education investment.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.ncae.org/about-ncae/media-center/press-releases/ncae-nea-endorse-roy-cooper-us-senate",
+              "type": "endorsement",
+              "title": "NCAE/NEA endorse Roy Cooper",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.wral.com/news/nccapitol/us-senate-cooper-whatley-north-carolina-campaigns-march-2026/",
+              "type": "news",
+              "title": "Cooper targets affordability, Whatley focuses on safety",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Roy Cooper has emphasized voting rights and election access in public remarks, but no detailed standalone election-reform platform was found in the campaign materials reviewed.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.wfae.org/2026-02-19/u-s-senate-candidate-roy-cooper-talks-affordability-in-greensboro-on-campaign-trail",
+              "type": "news",
+              "title": "Roy Cooper talks affordability in Greensboro",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Roy Cooper's campaign focuses on North Carolina cost-of-living concerns, including grocery prices, utility bills, and health care costs. He also highlights support for farmers and rural communities, especially in opposition to tariffs that he says raise costs.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://roycooper.com/make-stuff-cost-less/",
+              "type": "official_campaign",
+              "title": "Make Stuff Cost Less",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://roycooper.com/icymi-roy-cooper-hosts-farmers-roundtable-in-wilson-county-spotlights-devastating-impact-of-whatley-backed-tariffs-on-nc-farmers/",
+              "type": "official_campaign",
+              "title": "Farmers roundtable on tariffs",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found",
+          "confidence": "low"
+        },
+        "Foreign Policy": {
+          "stance": "Roy Cooper has publicly emphasized opposition to antisemitism and hate and said he would continue working to keep North Carolina safe if elected to the Senate. No broader detailed foreign policy agenda was found in the campaign materials reviewed.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://roycooper.com/roy-cooper-statement-on-international-holocaust-remembrance-day/",
+              "type": "official_campaign",
+              "title": "Roy Cooper Statement on International Holocaust Remembrance Day",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "Roy Cooper has not released a detailed public tech and AI platform in the materials reviewed. His campaign does, however, say large data centers should pay the full cost of the power they use and that utility costs should not be shifted onto consumers.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://roycooper.com/make-stuff-cost-less/",
+              "type": "official_campaign",
+              "title": "Make Stuff Cost Less",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        }
+      }
     },
     {
       "name": "Michael Whatley",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Michael Whatley is the Republican nominee for U.S. Senate in North Carolina and previously served as chair of the Republican National Committee. His campaign presents him as a conservative aligned with Donald Trump, with a focus on lower costs, safe communities, and economic growth.",
+      "summary": "Michael Whatley is the Republican nominee for U.S. Senate in North Carolina and previously chaired the Republican National Committee and the North Carolina Republican Party. He has also worked as a chief of staff to Sen. Elizabeth Dole and in the George W. Bush administration, and his campaign has emphasized affordability, energy, public safety, and border security.",
       "summary_sources": [
         {
-          "url": "https://www.michaelwhatley.com/",
-          "type": "website",
-          "title": "Home | Whatley for Senate",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.reuters.com/world/us/trump-ally-michael-whatley-wins-republican-primary-north-carolina-us-senate-race-2026-03-04/",
+          "type": "news",
+          "title": "Trump ally Michael Whatley wins Republican primary in North Carolina US Senate race"
         },
         {
-          "url": "https://ballotpedia.org/Michael_Whatley",
-          "type": "website",
-          "title": "Michael Whatley - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.michaelwhatley.com/",
+          "type": "campaign_homepage",
+          "title": "Whatley for Senate"
+        },
+        {
+          "url": "https://www.michaelwhatley.com/issues",
+          "type": "campaign_issues",
+          "title": "Issues"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Michael_Whatley_(54670563614)_(cropped).jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_Whatley_20251119_123603.jpg",
       "website": "https://www.michaelwhatley.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/whatleyfornc/",
@@ -168,16 +384,16 @@
         {
           "title": "Chief of Staff",
           "organization": "Office of U.S. Sen. Elizabeth Dole",
-          "start_year": null,
-          "end_year": null,
+          "start_year": 2004,
+          "end_year": 2005,
           "description": "Served as chief of staff to Sen. Elizabeth Dole."
         },
         {
           "title": "Senior official",
           "organization": "U.S. Department of Energy",
-          "start_year": null,
-          "end_year": null,
-          "description": "Served in the George W. Bush administration."
+          "start_year": 2001,
+          "end_year": 2004,
+          "description": "Served as a senior official in the George W. Bush administration."
         },
         {
           "title": "Federal law clerk",
@@ -217,28 +433,665 @@
       "donor_source_url": null,
       "voting_summary": null,
       "voting_source_url": null,
-      "links": [],
-      "issues": {}
-    }
-  ],
-  "updated_utc": "2026-04-01T06:01:07.606931+00:00",
-  "generator": [
-    "gpt-5.4-mini",
-    "gpt-5-nano"
-  ],
-  "reviews": [],
-  "agent_metrics": {
-    "model": "gpt-5.4-mini",
-    "prompt_tokens": 149718,
-    "completion_tokens": 2396,
-    "total_tokens": 152114,
-    "estimated_usd": 0.0239,
-    "model_breakdown": {
-      "gpt-5.4-mini": {
-        "prompt_tokens": 149718,
-        "completion_tokens": 2396
+      "links": [
+        {
+          "url": "https://ballotpedia.org/Michael_Whatley",
+          "title": "Michael Whatley - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/231867/michael-whatley",
+          "title": "Michael Whatley - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/S6NC00415/",
+          "title": "WHATLEY, MICHAEL - FEC candidate overview",
+          "type": "finance"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Michael_Whatley",
+          "title": "Michael Whatley - Wikipedia",
+          "type": "wiki"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "Michael Whatley backs Republican health-care policy at the federal level, including Medicaid funding reductions and changes to ACA subsidies. He has called Trump's 'one big beautiful bill' a 'huge win' for North Carolina, which opponents say would raise costs and threaten rural hospitals.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://ncnewsline.com/briefs/dems-blast-impact-of-medicaid-cuts-on-rural-healthcare-spotlight-2026-senate-race/",
+              "type": "news",
+              "title": "Dems blast impact of Medicaid cuts on rural healthcare, spotlight 2026 Senate race",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.dscc.org/article/new-report-michael-whatley-backed-medicaid-cuts-threaten-north-carolina-hospitals/",
+              "type": "press_release",
+              "title": "NEW REPORT: Michael Whatley-Backed Medicaid Cuts Threaten North Carolina Hospitals",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.wral.com/news/local/north-carolina-aca-rate-increases-2026/",
+              "type": "news",
+              "title": "Partisan turmoil heats up as North Carolinians face Affordable Care Act rate increases in 2026",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "Whatley supports pro-growth economic policies that emphasize lower energy costs and stronger rural economies, including backing energy, agriculture, and energy-independence plans intended to lower costs for families and businesses and spur job creation.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.michaelwhatley.com/issues",
+              "type": "campaign_issues",
+              "title": "Issues - Economy",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "Supports robust Second Amendment rights and has publicly aligned with gun-rights advocates (NRA); advocates hard-on-crime, pro-law-enforcement policies including backing tougher penalties for violent criminals and increased resources for policing.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://ncnewsline.com/2026/03/04/michael-whatley-vows-to-put-dangerous-criminals-behind-bars-as-u-s-senate-race-gets-underway/",
+              "type": "news",
+              "title": "Michael Whatley vows to put dangerous criminals behind bars — NC Newsline",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.wral.com/story/what-to-know-about-roy-cooper-michael-whatley-and-the-2026-u-s-senate-race-to-replace-thom-tillis/22097765/",
+              "type": "news",
+              "title": "What to know about Roy Cooper, Michael Whatley and the 2026 U.S. Senate race — WRAL",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.facebook.com/whatleyfornc/posts/im-honored-to-have-the-endorsement-of-the-nra-national-rifle-association-of-amer/2083639645757295/",
+              "type": "social",
+              "title": "Whatley NRA endorsement post",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "Public-safety and law-enforcement emphasis; Whatley frames crime as a core social-justice issue, endorsing tough-on-crime policies and backing the police, arguing against “soft-on-crime” approaches and supporting measures that prioritize community safety.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://ncnewsline.com/2026/03/04/michael-whatley-vows-to-put-dangerous-criminals-behind-bars-as-u-s-senate-race-gets-underway/",
+              "type": "article",
+              "title": "Michael Whatley vows to ‘put dangerous criminals behind bars’ as U.S. Senate race gets underway",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://dailytarheel.com/article/city-michael-whatley-senate-campaign-kickoff-20260310",
+              "type": "article",
+              "title": "Former RNC chair Michael Whatley focuses on affordability, safety in campaign kickoff",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Supports Education Freedom Tax Credit and broader school-choice measures, advocating that the dollars allocated for education should follow the student to the school of their choice—public, private, charter, or homeschooling—while affirming support for public schools. This aligns with President Trump's education policy emphasis on expanding school choice.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.wxii12.com/article/whatley-mcmahon-education-tax-credit-high-point/70685516",
+              "type": "news-article",
+              "title": "Whatley, GOP leaders promote Trump's education tax credit in High Point",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.republicreport.org/2026/education-secretary-mcmahon-appears-at-nc-event-with-michael-whatley-for-senate/",
+              "type": "news-article",
+              "title": "Education Secretary McMahon Appears at NC Event with Michael Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.charlotteobserver.com/news/local/education/article314982778.html",
+              "type": "news-article",
+              "title": "Trump admin wants NC to opt into school choice tax credits",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "Whatley supports expanding domestic energy production, including oil, gas, and other traditional energy sources, and ties that approach to lower costs and stronger rural economies. His campaign materials say his work on Trump’s energy plan helped lower energy prices and support American families and factories.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.michaelwhatley.com/issues",
+              "type": "campaign_issues",
+              "title": "Issues",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Whatley says he supports stronger border security and enforcement-focused immigration policies consistent with the Trump agenda. His campaign frames immigration as part of a broader effort to secure the border and protect public safety.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:44:16.216912+00:00"
+            },
+            {
+              "url": "https://www.newsobserver.com/news/politics-government/article315194041.html",
+              "type": "news",
+              "title": "Whatley frames NC Senate run around Trump's American First agenda",
+              "last_accessed": "2026-04-07T07:44:16.216912+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Whatley emphasizes election integrity and Republican election operations, reflecting his background leading the North Carolina Republican Party and the Republican National Committee. Public campaign materials do not appear to lay out a detailed standalone election-reform agenda.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.reuters.com/world/us/trump-ally-michael-whatley-wins-republican-primary-north-carolina-us-senate-race-2026-03-04/",
+              "type": "news",
+              "title": "Trump ally Michael Whatley wins Republican primary in North Carolina US Senate race",
+              "last_accessed": "2026-04-07T07:44:16.216912+00:00"
+            },
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:44:16.216912+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Whatley’s campaign has focused on North Carolina-specific concerns such as affordability, energy costs, agriculture, and rural economic development. His campaign materials also highlight his North Carolina background and his work on energy and farm policy.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.michaelwhatley.com/",
+              "type": "campaign_homepage",
+              "title": "Whatley for Senate",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.michaelwhatley.com/issues",
+              "type": "campaign_issues",
+              "title": "Issues",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        }
       }
     },
-    "duration_s": 33.8
+    {
+      "name": "Shannon W. Bray",
+      "party": "Libertarian",
+      "incumbent": false,
+      "summary": "Shannon W. Bray is the Libertarian candidate for U.S. Senate in North Carolina. He describes himself as a Navy veteran and cybersecurity professional, and his campaign emphasizes privacy, accountability, and modern government.",
+      "summary_sources": [
+        {
+          "url": "https://www.shannonbray.us/",
+          "type": "official",
+          "title": "Shannon W. Bray"
+        },
+        {
+          "url": "https://www.shannonbray.us/about",
+          "type": "official",
+          "title": "About - Shannon Bray"
+        },
+        {
+          "url": "https://ballotpedia.org/Shannon_Bray",
+          "type": "ballotpedia",
+          "title": "Shannon Bray - Ballotpedia"
+        }
+      ],
+      "image_url": "https://www.shannonbray.us/",
+      "website": "https://www.shannonbray.us/",
+      "social_media": {},
+      "career_history": [
+        {
+          "title": "Technology professional",
+          "organization": "Cybersecurity industry",
+          "start_year": null,
+          "end_year": null,
+          "description": "Works in technology and cybersecurity."
+        }
+      ],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [
+        {
+          "url": "https://ballotpedia.org/Shannon_Bray",
+          "title": "Shannon Bray - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://justfacts.votesmart.org/candidate/186258/shannon-bray",
+          "title": "Shannon Bray - Vote Smart",
+          "type": "votesmart"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/S0NC00335/",
+          "title": "BRAY, SHANNON - FEC Candidate Overview",
+          "type": "finance"
+        },
+        {
+          "url": "https://www.shannonbray.us/about",
+          "title": "About - Shannon Bray",
+          "type": "official"
+        }
+      ],
+      "issues": {
+        "Economy": {
+          "stance": "Supports lower government spending, a simpler tax code, and ending corporate subsidies and special-interest loopholes. He also backs capping federal spending to help reduce inflation.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_economy",
+              "type": "official_policy_page",
+              "title": "Economy & Taxes - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/issues",
+              "type": "official_policy_page",
+              "title": "Taking A Stand on the Issues That Matter Most - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Supports enforcing existing immigration laws and securing borders while maintaining a legal immigration system. His campaign frames the issue around border security and lawful immigration rather than broad restriction.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_immigration",
+              "type": "official_policy_page",
+              "title": "Immigration & Borders - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/",
+              "type": "official_homepage",
+              "title": "Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "Supports privacy-first technology policy, data ownership, and a light regulatory approach that allows innovation while protecting digital privacy and cybersecurity. His campaign also discusses AI-related data use in the context of consent and ownership.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_data-privacy-ownership",
+              "type": "official_policy_page",
+              "title": "Data Privacy & Ownership - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/privacy_first_data_markets_for_research",
+              "type": "official_blog",
+              "title": "Privacy-First Data Markets for Research - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "Supports expanding ballot access and reducing unnecessary barriers to participation, while also backing election integrity measures. His campaign presents election reform as part of broader accountability and voter participation goals.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.lpnc.org/shannon_bray_my_vision_for_nc",
+              "type": "website",
+              "title": "Shannon Bray: My Vision for NC - Libertarian Party of North Carolina",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/issues",
+              "type": "official_policy_page",
+              "title": "Taking A Stand on the Issues That Matter Most - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Healthcare": {
+          "stance": "Supports patient-centered care, with decisions made by patients and doctors rather than government bureaucracies. His campaign materials emphasize more choice, transparency, and market-oriented solutions to lower costs.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_healthcare",
+              "type": "official_policy_page",
+              "title": "Healthcare - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.northcarolinahealthnews.org/govpack_profiles/shannon-bray-2/",
+              "type": "news",
+              "title": "Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "Supports reliable, affordable energy with an emphasis on resilience, innovation, and decentralized systems rather than heavy-handed regulation. His campaign highlights energy reliability and infrastructure resilience.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/decentralized_energy_resilience",
+              "type": "official_policy_page",
+              "title": "Decentralized Energy Resilience - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/issues",
+              "type": "official_policy_page",
+              "title": "Taking A Stand on the Issues That Matter Most - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/issues",
+              "type": "official_policy_page",
+              "title": "Taking A Stand on the Issues That Matter Most - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "Supports defending the Second Amendment and protecting gun rights in practice, while framing the issue as one of constitutional rights rather than broad gun restrictions.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_constitutional-rights",
+              "type": "official_policy_page",
+              "title": "Constitutional Rights - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/guns_and_social_media",
+              "type": "official_blog",
+              "title": "Guns Don't Kill People, Social Media Does - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "Advocates a peace-through-strength approach with accountability in foreign policy and defense. His campaign materials also emphasize constitutional limits and a restrained U.S. role abroad.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_foreign-policy",
+              "type": "official_policy_page",
+              "title": "Foreign Policy & Defense - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/urkraine",
+              "type": "official_blog",
+              "title": "Urkraine - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "Supports local control, skills training, and parent empowerment in education policy. His campaign says education should prepare students for real-world work and be less centralized.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_education",
+              "type": "official_policy_page",
+              "title": "Education & Workforce - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/issues",
+              "type": "official_policy_page",
+              "title": "Taking A Stand on the Issues That Matter Most - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "Emphasizes local control and community-level decision-making, especially in education and infrastructure-related policy. His campaign generally favors solutions tailored to North Carolina communities rather than centralized federal mandates.",
+          "confidence": "medium",
+          "sources": [
+            {
+              "url": "https://www.shannonbray.us/_issues_education",
+              "type": "official_policy_page",
+              "title": "Education & Workforce - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            },
+            {
+              "url": "https://www.shannonbray.us/decentralized_energy_resilience",
+              "type": "official_policy_page",
+              "title": "Decentralized Energy Resilience - Shannon Bray",
+              "last_accessed": "2026-04-07T07:42:48.330160+00:00"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "updated_utc": "2026-04-07T07:45:05.079453+00:00",
+  "generator": [
+    "gpt-5.4-mini",
+    "gpt-5-nano",
+    "claude-haiku-4-5-20251001",
+    "gemini-3-flash-preview",
+    "grok-3-mini"
+  ],
+  "reviews": [
+    {
+      "model": "claude-haiku-4-5-20251001",
+      "reviewed_at": "2026-04-07T07:45:31.335882+00:00",
+      "verdict": "needs_revision",
+      "score": 72,
+      "flags": [
+        {
+          "field": "candidates[0].education",
+          "concern": "Roy Cooper's Juris Doctor from UNC Chapel Hill is listed twice (both with year 1982). This appears to be a duplicate entry.",
+          "suggestion": "Remove the duplicate entry, retaining only one instance of the JD from 1982.",
+          "severity": "error"
+        },
+        {
+          "field": "polling[0]",
+          "concern": "The Elon University Poll (2026-04-02) shows Roy Cooper at 48% and Michael Whatley at 25%, totaling only 73% with no mention of Shannon W. Bray or undecided respondents. This gap is unusually large and the accounting is unclear. The source URL should be verified to confirm the actual poll question and full results.",
+          "suggestion": "Verify the Elon University Poll source URL and confirm whether the percentages represent a head-to-head matchup, a three-way matchup, or preliminary results. If it is a three-way race, Bray's percentage should be included or noted as excluded.",
+          "severity": "warning"
+        },
+        {
+          "field": "polling",
+          "concern": "Multiple polling entries are dated in April 2026, which is in the future relative to typical profile refresh cycles and may indicate a data generation or timestamp error. Confirm these dates are accurate.",
+          "suggestion": "Verify that all polling dates (especially 2026-04-02 and 2026-04-07 in source access timestamps) are correct and reflect actual published polls.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[1].career_history",
+          "concern": "Michael Whatley's career history entries lack specific years for several roles: 'Chief of Staff' to Sen. Dole (2004–2005 is given), 'Senior official' at Energy (2001–2004 is given), but 'Federal law clerk' has no dates, and the entry for his role at the RNC/NCGOP is sparse on detail. The profile could be more complete.",
+          "suggestion": "If available from sources, add specific start and end years for the federal law clerk position and expand the career history with any additional roles or timeline clarifications.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[1].issues.Healthcare.stance",
+          "concern": "The healthcare stance for Michael Whatley is sourced primarily to DSCC (a Democratic Super PAC) and NC Newsline opposition framing, which characterizes his position as backing 'Medicaid funding reductions.' While the cited sources exist, the stance text presents his policy via critical framing rather than his own stated position or neutral description. The phrase 'opponents say would raise costs' is interpretive language that belongs in analysis, not in a candidate's stated stance.",
+          "suggestion": "Reframe the stance to describe Whatley's stated health-care policy goals (e.g., 'supports Republican health-care proposals including changes to ACA subsidies and Medicaid structure') and move opponent criticisms to a separate 'criticism' or 'opponent_framing' field if the profile includes such a structure. Alternatively, cite direct campaign statements from Whatley's own site or campaign materials.",
+          "severity": "warning"
+        },
+        {
+          "field": "candidates[2].education",
+          "concern": "Shannon W. Bray's education array is empty, despite his background as a 'cybersecurity professional' and 'Navy veteran' mentioned in the summary. No educational institutions are listed. This may reflect incomplete information gathering or an absence of public educational background data.",
+          "suggestion": "If no public education information is available, this is acceptable and the empty array is appropriate. However, the profile could note 'No public educational background found' in a brief comment if the gap is notable. Alternatively, if education information exists, add it.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[2].career_history",
+          "concern": "Shannon W. Bray's career history is minimal: a single entry as 'Technology professional' in 'Cybersecurity industry' with no dates, organization specifics, or detail. The summary mentions him as a 'Navy veteran,' but no military service entry appears in career_history.",
+          "suggestion": "Expand career_history to include military service (branch, years of service, rank if public) and provide more detail on his technology/cybersecurity roles, including employer names and timeframes if publicly available.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[1].issues.Reproductive Rights.stance",
+          "concern": "Michael Whatley's Reproductive Rights stance is listed as 'No public position found' with low confidence. Given that reproductive rights (and abortion in particular) is a major issue in 2026 U.S. Senate races and Whatley is a Trump-aligned Republican, the absence of any public position is surprising. While the absence of public statements is sometimes legitimate, this warrants verification that a genuine search was performed.",
+          "suggestion": "Confirm that campaign materials, news interviews, and social media were searched for any statements on abortion, reproductive rights, or related healthcare access issues. If Whatley has genuinely taken no public stance, note that explicitly. If statements exist (e.g., in interviews or campaign literature), add them with appropriate sourcing.",
+          "severity": "info"
+        },
+        {
+          "field": "polling_note",
+          "concern": "The polling_note reads: 'Polling note reconciled to the poll dates listed in the polling array; no change made here for Michael Whatley.' This note is opaque and appears to be a process artifact rather than useful metadata for readers. It is unclear what 'reconciled' means or why a note about Whatley was or was not made.",
+          "suggestion": "Either clarify the polling_note with specific, readable guidance (e.g., 'Latest poll shows Cooper leading Whatley by 3–6 points across recent surveys'), or remove it if it is internal process metadata.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].issues.Guns & Safety.stance",
+          "concern": "Roy Cooper's 'Guns & Safety' stance is listed as 'No public position found' with low confidence. As a prominent Democratic candidate in a closely divided state, his position on gun rights/gun control is typically a major campaign issue. The absence of any public stance is surprising and warrants verification of search effort.",
+          "suggestion": "Verify that campaign websites, news interviews, and prior voting records (as AG or Governor) were searched for statements on gun rights, gun safety, or Second Amendment positions. If Cooper has genuinely taken no stance, note why (e.g., 'candidate declined to take a public position'). If statements exist, add them with sources.",
+          "severity": "info"
+        }
+      ],
+      "summary": "The profile demonstrates solid sourcing across most issue positions and candidate backgrounds, with good coverage of the three main candidates. However, there are several concerns that warrant revision: (1) Roy Cooper's education section contains a duplicate entry that should be removed; (2) the Elon University Poll shows an implausibly large gap (48% Cooper vs. 25% Whatley with no third-party accounting), which warrants human verification of the source; (3) polling dates extending into April 2026 are temporally unusual and should be confirmed; (4) Michael Whatley's career history lacks specific years for several roles; (5) Shannon W. Bray's profile is sparse on background detail and education; and (6) language in some issue stances (particularly Whatley's healthcare section) reflects critical framing from opposition sources rather than neutral reporting of his actual position. The profile shows good faith effort to source positions and is largely consistent internally, but these gaps and mild presentation issues need attention before publication."
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "reviewed_at": "2026-04-07T07:45:21.555578+00:00",
+      "verdict": "approved",
+      "score": 92,
+      "flags": [
+        {
+          "field": "candidates[0].career_history",
+          "concern": "Internal inconsistency: The summary identifies Roy Cooper as a 'former North Carolina governor and attorney general,' but these roles—which represent the bulk of his public service—are missing from the career_history array, which ends in 2001.",
+          "suggestion": "Add entries for Attorney General (2001–2017) and Governor (2017–2025) to the career_history list to match the summary and cited Wikipedia source.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].education",
+          "concern": "Duplicate entries: The Juris Doctor degree from UNC Chapel Hill is listed twice for Roy Cooper.",
+          "suggestion": "Remove the duplicate entry.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[1].education",
+          "concern": "Incomplete data: All four degrees listed for Michael Whatley are missing graduation years.",
+          "suggestion": "Attempt to retrieve graduation years from reference sources like LinkedIn or official bios to complete the record.",
+          "severity": "info"
+        }
+      ],
+      "summary": "This profile is exceptionally well-sourced, utilizing a wide array of official campaign sites, credible local news (WRAL, News & Observer, NC Newsline), and established polling institutions. It successfully maintains a neutral, nonpartisan tone by attributing specific policy criticisms to 'opponents' or 'allied groups.' The inclusion of the Libertarian candidate and the thorough coverage of 12 distinct issue areas provide a comprehensive overview of the race."
+    },
+    {
+      "model": "grok-3-mini",
+      "reviewed_at": "2026-04-07T07:45:18.777186+00:00",
+      "verdict": "approved",
+      "score": 95,
+      "flags": [
+        {
+          "field": "candidates[0].education",
+          "concern": "The education array for Roy Cooper lists the same entry (University of North Carolina at Chapel Hill, Juris Doctor in Law, year 1982) twice, which may indicate a minor duplication error in formatting or data entry, though the sources appear to support the information.",
+          "suggestion": "Remove the duplicate entry to improve clarity and avoid redundancy.",
+          "severity": "info"
+        }
+      ],
+      "summary": "The profile is a well-constructed, factually robust overview of the 2026 North Carolina U.S. Senate race, featuring strong sourcing from official campaign websites, credible news outlets, and databases like Ballotpedia and Vote Smart. Candidate backgrounds are consistently detailed with cited references, issues are comprehensively covered with high-confidence stances where available, and the language remains neutral and nonpartisan throughout, effectively balancing descriptions of positions without bias."
+    }
+  ],
+  "agent_metrics": {
+    "model": "gpt-5.4-mini",
+    "prompt_tokens": 2822105,
+    "completion_tokens": 197663,
+    "total_tokens": 3019768,
+    "estimated_usd": 0.465,
+    "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 1790302,
+        "completion_tokens": 176317
+      },
+      "gpt-5.4-mini": {
+        "prompt_tokens": 914293,
+        "completion_tokens": 14148
+      },
+      "grok-3-mini": {
+        "prompt_tokens": 34232,
+        "completion_tokens": 408
+      },
+      "claude-haiku-4-5-20251001": {
+        "prompt_tokens": 40698,
+        "completion_tokens": 5503
+      },
+      "gemini-3-flash-preview": {
+        "prompt_tokens": 42580,
+        "completion_tokens": 1287
+      }
+    },
+    "duration_s": 2334.7
+  },
+  "validation_grade": {
+    "grade": "B",
+    "score": 86,
+    "passed": true,
+    "summary": "Validated by 2/3 reviewers with an average score of 86/100."
   }
 }

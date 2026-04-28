@@ -4,8 +4,26 @@
   "office": "Governor of Pennsylvania",
   "jurisdiction": "Pennsylvania",
   "election_date": "2026-11-03",
-  "description": "Pennsylvania is holding an election for governor and lieutenant governor on November 3, 2026, with the governor\u2019s race on the ballot statewide. The contest is notable because incumbent Democrat Josh Shapiro is seeking reelection, while Republican State Treasurer Stacy Garrity is the leading GOP candidate; Ballotpedia rates the race as Likely Democratic to Solid Democratic depending on the outlet. The race matters because Pennsylvania is a large swing state with national political significance, and the campaign is likely to center on taxes, state spending, public safety, abortion/reproductive rights, and Shapiro\u2019s record in office versus Garrity\u2019s fiscal and military background.",
+  "description": "Pennsylvania’s 2026 gubernatorial race is the contest for governor of a large swing state with major stakes for state budgeting, energy policy, transit funding, abortion rights, and the commonwealth’s response to the Trump administration. Democratic incumbent Josh Shapiro is seeking a second term against Republican state Treasurer Stacy Garrity, with the race also serving as an early test of each party’s 2026 message in a nationally watched battleground.",
   "polling": [
+    {
+      "pollster": "Susquehanna Polling & Research",
+      "date": "2026-04-01",
+      "matchups": [
+        {
+          "candidates": [
+            "Josh Shapiro",
+            "Stacy Garrity"
+          ],
+          "percentages": [
+            58,
+            36
+          ]
+        }
+      ],
+      "source_url": "https://www.politicspa.com/susquehanna-poll-shapiro-holds-commanding-lead-over-garrity/146021/",
+      "sample_size": 700
+    },
     {
       "pollster": "Franklin & Marshall",
       "date": "2026-03-05",
@@ -67,28 +85,20 @@
       "name": "Josh Shapiro",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Josh Shapiro is the incumbent governor of Pennsylvania and is seeking reelection in 2026. He previously served as Pennsylvania attorney general, Montgomery County commissioner chair, and a state representative, and his campaign and official biography emphasize a record focused on public safety, education, infrastructure, and government management.",
+      "summary": "Josh Shapiro is the Democratic governor of Pennsylvania and is seeking reelection in 2026. In early April 2026, his campaign reported raising more than $10 million in the first quarter, a new state record for that reporting period, and said it entered the year with more than $30 million cash on hand.",
       "summary_sources": [
         {
-          "url": "https://www.nga.org/governor/josh-shapiro/",
-          "type": "government",
-          "title": "Josh Shapiro - National Governors Association",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Pennsylvania_gubernatorial_and_lieutenant_gubernatorial_election,_2026",
+          "url": "https://www.cbsnews.com/news/josh-shapiro-reelection-campaign-pennsylvania-fundraising-2026/",
           "type": "news",
-          "title": "Pennsylvania gubernatorial and lieutenant gubernatorial election, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Pennsylvania Gov. Josh Shapiro raises record $10 million in 2026"
         },
         {
-          "url": "https://joshshapiro.org/",
-          "type": "website",
-          "title": "Home - Shapiro For Governor",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.post-gazette.com/news/politics-state/2026/04/02/shapiro-governor-race-garrity/stories/202604020082",
+          "type": "news",
+          "title": "Gov. Josh Shapiro raised $10M in first three months of 2026"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Governor_Shapiro.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Josh-Shapiro.PNG",
       "website": "https://joshshapiro.org/",
       "social_media": {
         "facebook": "https://www.facebook.com/JoshShapiroPA/",
@@ -150,28 +160,20 @@
       "name": "Stacy Garrity",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Stacy Garrity is Pennsylvania\u2019s state treasurer and the Republican candidate for governor in 2026. Her campaign and official biography highlight her military service, business background, and work in the Treasury Department, where she has focused on unclaimed property, fee reductions, and fiscal oversight.",
+      "summary": "Stacy Garrity is Pennsylvania’s state treasurer and the Republican candidate for governor in 2026. In January 2026, she used a campaign speech to attack Gov. Josh Shapiro’s record and outline a platform focused on taxes, infrastructure, energy development, and cooperation with the Trump administration.",
       "summary_sources": [
         {
-          "url": "https://www.patreasury.gov/treasurer/",
-          "type": "government",
-          "title": "Treasurer Garrity - Pennsylvania Treasury Department",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://garrityforpa.com/",
-          "type": "website",
-          "title": "Stacy Garrity for Governor",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Pennsylvania_gubernatorial_and_lieutenant_gubernatorial_election,_2026",
+          "url": "https://www.penncapital-star.com/election-2026/republican-stacy-garritys-first-campaign-speech-of-2026-was-all-about-gov-josh-shapiro/",
           "type": "news",
-          "title": "Pennsylvania gubernatorial and lieutenant gubernatorial election, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Republican Stacy Garrity’s first campaign speech of 2026 was all about Gov. Josh Shapiro"
+        },
+        {
+          "url": "https://radio.wpsu.org/2025-09-22/pa-gop-formally-taps-stacy-garrity-as-2026-gubernatorial-nominee-to-challenge-josh-shapiro",
+          "type": "news",
+          "title": "Pa. GOP formally taps Stacy Garrity as 2026 gubernatorial nominee to challenge Josh Shapiro"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Stacy_Garrity%2C_2024.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/StacyGarrity2024.jpg",
       "website": "https://garrityforpa.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/GarrityForPA/",
@@ -230,7 +232,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:03:34.237416+00:00",
+  "updated_utc": "2026-04-06T17:18:49.698567+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -238,16 +240,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 98092,
-    "completion_tokens": 2257,
-    "total_tokens": 100349,
-    "estimated_usd": 0.0161,
+    "prompt_tokens": 186251,
+    "completion_tokens": 9981,
+    "total_tokens": 196232,
+    "estimated_usd": 0.0291,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 62275,
+        "completion_tokens": 8612
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 98092,
-        "completion_tokens": 2257
+        "prompt_tokens": 123976,
+        "completion_tokens": 1369
       }
     },
-    "duration_s": 35.4
-  }
+    "duration_s": 120.7
+  },
+  "validation_grade": null
 }

@@ -4,9 +4,9 @@
   "office": "U.S. Senate",
   "jurisdiction": "Delaware",
   "election_date": "2026-11-03",
-  "description": "This race is for Delaware\u2019s Class II seat in the U.S. Senate, with the general election scheduled for November 3, 2026. It matters because it will help determine control of the Senate in the next Congress, though Delaware is widely rated as a strongly Democratic state and the seat is currently held by incumbent Democrat Chris Coons. The main contrast is between Coons\u2019 long tenure and bipartisan governing style and the challengers\u2019 efforts to present alternatives in a state where Democrats have a clear registration and electoral advantage.",
+  "description": "Voters in Delaware will elect one member to the U.S. Senate on November 3, 2026. The seat is currently held by Democrat Chris Coons, who first took office in 2010, and the race is expected to center on whether he wins another term in a state that has voted Democratic in recent federal elections.",
   "polling": [],
-  "polling_note": "No public polling found for this race as of 2026-04-01.",
+  "polling_note": "No polls published after 2026-04-01T05:42:38.373247+00:00 were found in the available sources.",
   "candidates": [
     {
       "name": "Chris Coons",
@@ -27,7 +27,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Chris_Coons%2C_official_portrait%2C_112th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Chris_Andrew_Coons.jpg",
       "website": "https://www.coons.senate.gov/",
       "social_media": {
         "x": "https://x.com/ChrisCoons",
@@ -97,7 +97,7 @@
       "name": "Christopher Beardsley",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Christopher Beardsley is a Democratic primary challenger to Chris Coons in Delaware\u2019s 2026 Senate race. His campaign website says he is running on issues including healthcare, housing, education, wages, and social justice, and social media bios describe him as a former HUD analyst and union member.",
+      "summary": "Christopher Beardsley is a Democratic primary challenger to Chris Coons in Delaware’s 2026 Senate race. His campaign website says he is running on issues including healthcare, housing, education, wages, and social justice, and social media bios describe him as a former HUD analyst and union member.",
       "summary_sources": [
         {
           "url": "https://www.beardsleyfordelaware.com/",
@@ -108,7 +108,7 @@
         {
           "url": "https://www.beardsleyfordelaware.com/issues",
           "type": "website",
-          "title": "Issues | Take Action Now for Change \u2014 Beardsley",
+          "title": "Issues | Take Action Now for Change — Beardsley",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -118,7 +118,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Christopher_Beardsley_20251202_100251.png",
       "website": "https://www.beardsleyfordelaware.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/beardsleyfordelaware/",
@@ -152,7 +152,7 @@
       "name": "Michael Katz",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Michael Katz is running in the Republican primary for Delaware\u2019s 2026 U.S. Senate race. His campaign materials and social media present him as a physician, business owner, and problem-solver, but publicly available biographical detail is limited in the sources reviewed.",
+      "summary": "Michael Katz is running in the Republican primary for Delaware’s 2026 U.S. Senate race. His campaign materials and social media present him as a physician, business owner, and problem-solver, but publicly available biographical detail is limited in the sources reviewed.",
       "summary_sources": [
         {
           "url": "https://www.drmikekatz.com/",
@@ -173,7 +173,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael-Katz.jpg",
       "website": "https://www.drmikekatz.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/michael.katz.16/",
@@ -207,7 +207,7 @@
       "name": "John Shulli",
       "party": "Republican",
       "incumbent": false,
-      "summary": "John Shulli is a Republican candidate in Delaware\u2019s 2026 Senate primary. His campaign website frames his candidacy around an \u201cAmerican Renaissance\u201d theme focused on prosperity, technology, jobs, and restoring civic confidence.",
+      "summary": "John Shulli is a Republican candidate in Delaware’s 2026 Senate primary. His campaign website frames his candidacy around an “American Renaissance” theme focused on prosperity, technology, jobs, and restoring civic confidence.",
       "summary_sources": [
         {
           "url": "https://shulli.org/",
@@ -228,7 +228,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/John_Shulli_26.png",
       "website": "https://shulli.org/",
       "social_media": {
         "facebook": "https://www.facebook.com/john.shulli/videos/save-act-support/892561507095625/"
@@ -246,7 +246,7 @@
       "name": "Dexter Bland",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Dexter Bland is listed by Ballotpedia as an independent general-election candidate in Delaware\u2019s 2026 U.S. Senate race. Publicly available campaign material is sparse, but his social media and committee branding suggest a community- and advocacy-oriented campaign focused on education, democracy, and local issues.",
+      "summary": "Dexter Bland is listed by Ballotpedia as an independent general-election candidate in Delaware’s 2026 U.S. Senate race. Publicly available campaign material is sparse, but his social media and committee branding suggest a community- and advocacy-oriented campaign focused on education, democracy, and local issues.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Dexter_Bland",
@@ -257,7 +257,7 @@
         {
           "url": "https://www.instagram.com/believeinbland/",
           "type": "website",
-          "title": "Believe In Bland (@believeinbland) \u2022 Instagram photos and videos",
+          "title": "Believe In Bland (@believeinbland) • Instagram photos and videos",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -267,7 +267,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {
         "instagram": "https://www.instagram.com/believeinbland/",
@@ -283,7 +283,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:42:38.373247+00:00",
+  "updated_utc": "2026-04-06T18:19:28.309504+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -291,16 +291,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 75197,
-    "completion_tokens": 2845,
-    "total_tokens": 78042,
-    "estimated_usd": 0.013,
+    "prompt_tokens": 120826,
+    "completion_tokens": 7835,
+    "total_tokens": 128661,
+    "estimated_usd": 0.0176,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 77813,
+        "completion_tokens": 6778
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 75197,
-        "completion_tokens": 2845
+        "prompt_tokens": 43013,
+        "completion_tokens": 1057
       }
     },
-    "duration_s": 28.8
-  }
+    "duration_s": 124.7
+  },
+  "validation_grade": null
 }

@@ -4,36 +4,33 @@
   "office": "U.S. Senate",
   "jurisdiction": "Mississippi",
   "election_date": "2026-11-03",
-  "description": "This race is for Mississippi\u2019s Class II seat in the U.S. Senate, currently held by Republican Cindy Hyde-Smith. It matters because it will help determine control of the Senate in the 120th Congress, and Mississippi is widely rated as a solid Republican state, making the general election more about candidate contrast than overall partisan balance. The contest features an incumbent Republican, a Democratic district attorney, and an independent candidate, with themes centered on jobs, healthcare, fiscal policy, and public safety.",
+  "description": "This race is for Mississippi’s Class II seat in the U.S. Senate, currently held by Republican Cindy Hyde-Smith. It matters because the seat is part of the Senate’s 2026 balance of power, but Mississippi remains a strongly Republican state, so the general election is likely to hinge more on candidate contrast, turnout, and fundraising than on partisan competitiveness. The field includes an incumbent Republican, a Democratic district attorney, and independent and minor-party challengers, with attention centered on healthcare, costs, jobs, public safety, and ethics.",
   "polling": [],
-  "polling_note": "No public polling found for this race as of 2026-04-01.",
+  "polling_note": "No public polling found for this race after 2026-04-01.",
   "candidates": [
     {
       "name": "Cindy Hyde-Smith",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Cindy Hyde-Smith is the incumbent U.S. senator from Mississippi, first taking office in 2018. Before the Senate, she served as Mississippi commissioner of agriculture and commerce and in the state legislature. Her campaign and official Senate materials present her as a conservative aligned with Republican priorities.",
+      "summary": "Cindy Hyde-Smith is the incumbent U.S. senator from Mississippi and won the Republican nomination in the 2026 primary. She previously served as Mississippi commissioner of agriculture and commerce and in the state legislature, and her campaign continues to emphasize conservative priorities and her alignment with Republican leadership.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Mississippi,_2026",
-          "type": "government",
-          "title": "United States Senate election in Mississippi, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.clarionledger.com/story/news/politics/elections/2026/03/10/cindy-hyde-smith-wins-mississippi-us-senate-republican-primary-election/89063095007/",
+          "type": "news",
+          "title": "Hyde-Smith wins GOP nomination, Colom secures Democratic nod ..."
         },
         {
           "url": "https://www.hydesmith.senate.gov/about-cindy",
-          "type": "government",
-          "title": "About Cindy | Senator Cindy Hyde-Smith",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "About Cindy | Senator Cindy Hyde-Smith"
         },
         {
-          "url": "https://cindyhydesmith.com/",
-          "type": "website",
-          "title": "Cindy Hyde-Smith for United State Senate: Homepage",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/Cindy_Hyde-Smith",
+          "type": "ballotpedia",
+          "title": "Cindy Hyde-Smith - Ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Official_portrait_of_US_Senator_Cindy_Hyde-Smith.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/480px-Cindy_Hyde-Smith_official_photo.jpg",
       "website": "https://cindyhydesmith.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenatorCindyHydeSmith/",
@@ -53,7 +50,7 @@
           "organization": "State of Mississippi",
           "start_year": 2012,
           "end_year": 2018,
-          "description": "Served as Mississippi\u2019s agriculture commissioner before joining the Senate."
+          "description": "Served as Mississippi’s agriculture commissioner before joining the Senate."
         },
         {
           "title": "State Senator",
@@ -75,28 +72,25 @@
       "name": "Scott Colom",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Scott Colom is the Democratic nominee for U.S. Senate in Mississippi and currently serves as district attorney for Mississippi\u2019s 16th Judicial District. His campaign emphasizes lowering costs, protecting hospitals, and bringing jobs to the state, while highlighting his record as a prosecutor and his earlier judicial nomination by President Biden. He is running as a reform-minded Democrat in a state that remains strongly Republican at the federal level.",
+      "summary": "Scott Colom is the Democratic nominee for U.S. Senate in Mississippi and serves as district attorney for the 16th Judicial District. His campaign has focused on lowering costs, protecting hospitals, and expanding economic opportunity, while highlighting his record as a prosecutor and his earlier federal judicial nomination.",
       "summary_sources": [
         {
+          "url": "https://www.clarionledger.com/story/news/politics/elections/2026/03/10/cindy-hyde-smith-wins-mississippi-us-senate-republican-primary-election/89063095007/",
+          "type": "news",
+          "title": "Hyde-Smith wins GOP nomination, Colom secures Democratic nod ..."
+        },
+        {
           "url": "https://ballotpedia.org/Scott_Colom",
-          "type": "government",
-          "title": "Scott Colom - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "ballotpedia",
+          "title": "Scott Colom - Ballotpedia"
         },
         {
           "url": "https://scottcolom.com/",
-          "type": "website",
-          "title": "Scott Colom for Senate \u2013 Mississippi Matters",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.nbcnews.com/politics/2026-election/senate-primary-mississippi-cindy-hyde-smith-scott-colom-rcna262587",
-          "type": "news",
-          "title": "GOP Sen. Cindy Hyde-Smith and Democrat Scott Colom to face off ...",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "Scott Colom for Senate – Mississippi Matters"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ScottColom2025.jpeg",
       "website": "https://scottcolom.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/ScottColomForSenate/",
@@ -174,28 +168,25 @@
       "name": "Ty Pinkins",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Ty Pinkins is an independent candidate for U.S. Senate in Mississippi and previously ran for the seat in 2024. He is a U.S. Army veteran and attorney whose campaign focuses on housing, education, healthcare, and jobs, and he has framed his candidacy as a challenge to the state\u2019s two-party system. Pinkins has also run for statewide office before, including Mississippi secretary of state in 2023.",
+      "summary": "Ty Pinkins is running for U.S. Senate in Mississippi as an independent after previously being the Democratic nominee for the seat in 2024. He is a U.S. Army veteran and attorney whose campaign has centered on housing, education, healthcare, and jobs, and he has framed his bid as a challenge to the state’s two-party system.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Ty_Pinkins",
-          "type": "government",
-          "title": "Ty Pinkins - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.wjtv.com/news/election/ty-pinkins-to-run-as-independent-for-us-senate-in-2026/",
+          "type": "news",
+          "title": "Ty Pinkins rocks political boat for 2026 US Senate bid - WJTV"
         },
         {
           "url": "https://www.typinkins.com/",
-          "type": "website",
-          "title": "Ty Pinkins for US Senate | Mississippi",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "Ty Pinkins for US Senate | Mississippi"
         },
         {
-          "url": "https://www.typinkins.com/meet-ty-pinkins",
-          "type": "website",
-          "title": "About | Ty Pinkins for US Senate | Mississippi",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/Ty_Pinkins",
+          "type": "ballotpedia",
+          "title": "Ty Pinkins - Ballotpedia"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Ty-Pinkins.png",
       "website": "https://www.typinkins.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/typinkins",
@@ -262,28 +253,25 @@
       "name": "Sarah Adlakha",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Sarah Adlakha ran in the Republican primary for U.S. Senate in Mississippi and is a physician by profession. Her campaign emphasized healthcare, affordability, education, border security, fiscal restraint, and ethics reform, presenting her as an outsider with experience in medicine and business. She lost the Republican primary to incumbent Cindy Hyde-Smith.",
+      "summary": "Sarah Adlakha ran in the Republican primary for U.S. Senate in Mississippi and is a physician by profession. Her campaign emphasized healthcare, affordability, education, border security, fiscal restraint, and ethics reform, but she lost the primary to incumbent Cindy Hyde-Smith.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Sarah_Adlakha",
-          "type": "government",
-          "title": "Sarah Adlakha - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.clarionledger.com/story/news/politics/elections/2026/03/10/cindy-hyde-smith-wins-mississippi-us-senate-republican-primary-election/89063095007/",
+          "type": "news",
+          "title": "Hyde-Smith wins GOP nomination, Colom secures Democratic nod ..."
         },
         {
           "url": "https://www.wtok.com/2025/09/11/republican-candidate-sarah-adlakha-adds-her-name-us-senate-race/",
           "type": "news",
-          "title": "Republican candidate Sarah Adlakha adds her name to the U.S. Senate race",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Republican candidate Sarah Adlakha adds her name to the U.S. Senate race"
         },
         {
-          "url": "https://www.facebook.com/sarahforsenate/",
-          "type": "website",
-          "title": "Sarah Adlakha for US Senate (@sarahforsenate) - Facebook",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/Sarah_Adlakha",
+          "type": "ballotpedia",
+          "title": "Sarah Adlakha - Ballotpedia"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Sarah_Adlakha_20250528_073510.jpg",
       "website": "https://www.facebook.com/sarahforsenate/",
       "social_media": {
         "facebook": "https://www.facebook.com/sarahforsenate/",
@@ -353,9 +341,67 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Albert R. Littell",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Albert R. Littell was a Democratic candidate in Mississippi’s 2026 U.S. Senate race and campaigned on living wages and affordable healthcare. He was one of the Democratic primary candidates but did not emerge as the nominee.",
+      "summary_sources": [
+        {
+          "url": "https://www.mississippifreepress.org/democrat-albert-littell-vows-20-living-wage-if-mississippi-sends-him-to-us-senate/",
+          "type": "news",
+          "title": "Albert Littell Vows $20 Living Wage if Elected to US Senate"
+        },
+        {
+          "url": "https://ballotpedia.org/Albert_Littell",
+          "type": "ballotpedia",
+          "title": "Albert Littell - Ballotpedia"
+        }
+      ],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Priscilla W. Till",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Priscilla W. Till was a Democratic candidate in Mississippi’s 2026 U.S. Senate race and ran on a platform focused on change and public service. She was one of the Democratic primary candidates but did not win the nomination.",
+      "summary_sources": [
+        {
+          "url": "https://jacksonadvocateonline.com/priscilla-williams-till-a-choice-for-real-change/",
+          "type": "news",
+          "title": "Priscilla Williams Till: A choice for real change - Jackson Advocate"
+        },
+        {
+          "url": "https://ballotpedia.org/Priscilla_Till",
+          "type": "ballotpedia",
+          "title": "Priscilla Till - Ballotpedia"
+        }
+      ],
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/48/Priscilla_Hill.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:56:12.150406+00:00",
+  "updated_utc": "2026-04-06T17:44:14.888185+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -363,16 +409,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 96917,
-    "completion_tokens": 3123,
-    "total_tokens": 100040,
-    "estimated_usd": 0.0164,
+    "prompt_tokens": 287527,
+    "completion_tokens": 10427,
+    "total_tokens": 297954,
+    "estimated_usd": 0.0434,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 86584,
+        "completion_tokens": 8381
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 96917,
-        "completion_tokens": 3123
+        "prompt_tokens": 200943,
+        "completion_tokens": 2046
       }
     },
-    "duration_s": 30.5
-  }
+    "duration_s": 155.0
+  },
+  "validation_grade": null
 }

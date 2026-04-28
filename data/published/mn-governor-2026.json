@@ -386,7 +386,7 @@
           "title": "Mike Newcome leaves race for Minnesota governor | MPR News"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mike_Newcome_2025.jpg",
       "website": "https://www.newcomeforgovernor.com/",
       "social_media": {},
       "career_history": [],
@@ -1048,7 +1048,7 @@
           "title": "Kendall Qualls - Ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Kendall_Qualls.jpg/500px-Kendall_Qualls.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/DSC_0039-min.JPG",
       "website": "https://www.kqformn.com/",
       "social_media": {},
       "career_history": [
@@ -1602,7 +1602,7 @@
           "title": "Lisa Demuth for Governor"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Lisa_Demuth.jpg/500px-Lisa_Demuth.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/A37D94B8-06B3-4BA6-8D1A-E5BF37FD8E21.png",
       "website": "https://lisaformn.com/",
       "social_media": {},
       "career_history": [
@@ -1863,7 +1863,7 @@
           "title": "Rep. Peggy Bennett announces run for Minnesota Governor - KTTC"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Peggy_Bennett.jpg/500px-Peggy_Bennett.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Peggy_Bennett.jpg",
       "website": "https://peggybennettforgovernor.com/",
       "social_media": {},
       "career_history": [
@@ -2174,7 +2174,7 @@
           "title": "Kristin Robbins Announces Candidacy for Governor of Minnesota"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Kristin_Robbins.jpg/500px-Kristin_Robbins.jpg",
+      "image_url": null,
       "website": "https://kristinrobbinsforgovernor.com/",
       "social_media": {},
       "career_history": [],
@@ -2377,13 +2377,10 @@
       ]
     }
   ],
-  "updated_utc": "2026-04-01T05:36:23.737273+00:00",
+  "updated_utc": "2026-04-06T18:38:03.454109+00:00",
   "generator": [
     "gpt-5.4-mini",
-    "gpt-5-nano",
-    "claude-haiku-4-5-20251001",
-    "gemini-3.1-flash-lite-preview",
-    "grok-3-mini"
+    "gpt-5-nano"
   ],
   "reviews": [
     {
@@ -2678,32 +2675,21 @@
   "polling_note": "Polling data in this profile is limited and includes duplicate Emerson College entries; two March 24, 2026 entries contain placeholder null percentages and should be treated as incomplete until verified or replaced.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 7527814,
-    "completion_tokens": 499762,
-    "total_tokens": 8027576,
-    "estimated_usd": 1.2195,
+    "prompt_tokens": 401357,
+    "completion_tokens": 11509,
+    "total_tokens": 412866,
+    "estimated_usd": 0.0554,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 4842715,
-        "completion_tokens": 449193
+        "prompt_tokens": 200217,
+        "completion_tokens": 8680
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 2347458,
-        "completion_tokens": 32547
-      },
-      "gemini-3.1-flash-lite-preview": {
-        "prompt_tokens": 121631,
-        "completion_tokens": 1931
-      },
-      "grok-3-mini": {
-        "prompt_tokens": 98992,
-        "completion_tokens": 2936
-      },
-      "claude-haiku-4-5-20251001": {
-        "prompt_tokens": 117018,
-        "completion_tokens": 13155
+        "prompt_tokens": 201140,
+        "completion_tokens": 2829
       }
     },
-    "duration_s": 4889.8
-  }
+    "duration_s": 173.8
+  },
+  "validation_grade": null
 }

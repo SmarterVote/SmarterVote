@@ -27,7 +27,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://www.risch.senate.gov/public/index.cfm?p=download-official-portrait",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jim_Risch.jpg",
       "website": "https://senatorrisch.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenatorJimRisch/",
@@ -115,7 +115,7 @@
         {
           "url": "https://joeevansforidaho.com/",
           "type": "website",
-          "title": "Joe Evans \u2013 for U.S. Senate",
+          "title": "Joe Evans – for U.S. Senate",
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
@@ -146,7 +146,7 @@
       "name": "Denny LaVe",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Denny LaVe is listed by Ballotpedia as a Republican primary candidate for Idaho\u2019s U.S. Senate seat. Public biographical information was not readily available in the sources reviewed, so his background and campaign profile could not be confirmed beyond his candidacy.",
+      "summary": "Denny LaVe is listed by Ballotpedia as a Republican primary candidate for Idaho’s U.S. Senate seat. Public biographical information was not readily available in the sources reviewed, so his background and campaign profile could not be confirmed beyond his candidacy.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Idaho,_2026",
@@ -155,7 +155,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Denny_LaVe_20260303_013311.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -186,7 +186,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Josh_Roy_20260103_055702.png",
       "website": "https://joshroyforidaho.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/JoshRoyforIdaho/"
@@ -239,7 +239,7 @@
       "name": "Matt Loesby",
       "party": "Libertarian",
       "incumbent": false,
-      "summary": "Matt Loesby is listed by Ballotpedia as the Libertarian primary candidate for Idaho\u2019s U.S. Senate seat. The sources reviewed did not provide enough reliable biographical detail to summarize his background beyond his candidacy.",
+      "summary": "Matt Loesby is listed by Ballotpedia as the Libertarian primary candidate for Idaho’s U.S. Senate seat. The sources reviewed did not provide enough reliable biographical detail to summarize his background beyond his candidacy.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Idaho,_2026",
@@ -248,7 +248,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/MattLoesby2024.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -264,7 +264,7 @@
       "name": "Nickolas Bonds",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Nickolas Bonds is a Democratic primary candidate for Idaho\u2019s U.S. Senate seat. The sources reviewed confirmed his candidacy but did not provide enough reliable biographical detail to summarize his background or policy profile.",
+      "summary": "Nickolas Bonds is a Democratic primary candidate for Idaho’s U.S. Senate seat. The sources reviewed confirmed his candidacy but did not provide enough reliable biographical detail to summarize his background or policy profile.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Idaho,_2026",
@@ -273,7 +273,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Nickolas_Bonds_20260311_061451.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -289,7 +289,7 @@
       "name": "Brad Moore",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Brad Moore is a Democratic primary candidate for Idaho\u2019s U.S. Senate seat. Publicly available biographical information was limited in the sources reviewed, so only his candidacy could be confirmed with confidence.",
+      "summary": "Brad Moore is a Democratic primary candidate for Idaho’s U.S. Senate seat. Publicly available biographical information was limited in the sources reviewed, so only his candidacy could be confirmed with confidence.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Brad_Moore",
@@ -304,7 +304,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {
         "linkedin": "https://www.linkedin.com/"
@@ -322,7 +322,7 @@
       "name": "David Roth",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "David Roth is a Democratic primary candidate in Idaho\u2019s 2026 U.S. Senate race and previously ran for the seat in 2022. His campaign and Ballotpedia profile identify him as an Idaho father and nonprofit leader, and his campaign says it is focused on affordability, health care, and practical economic concerns.",
+      "summary": "David Roth is a Democratic primary candidate in Idaho’s 2026 U.S. Senate race and previously ran for the seat in 2022. His campaign and Ballotpedia profile identify him as an Idaho father and nonprofit leader, and his campaign says it is focused on affordability, health care, and practical economic concerns.",
       "summary_sources": [
         {
           "url": "https://rothforidaho.org/",
@@ -337,7 +337,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/DavidRoth.jpg",
       "website": "https://rothforidaho.org/",
       "social_media": {
         "facebook": "https://www.facebook.com/rothforIdaho/",
@@ -371,12 +371,12 @@
       "name": "Todd Achilles",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Todd Achilles is an independent candidate in Idaho\u2019s 2026 U.S. Senate race. His campaign says he is a former Army tank commander and armor officer who later worked in the tech sector and now teaches public policy, and he frames his run as an alternative to the two-party system.",
+      "summary": "Todd Achilles is an independent candidate in Idaho’s 2026 U.S. Senate race. His campaign says he is a former Army tank commander and armor officer who later worked in the tech sector and now teaches public policy, and he frames his run as an alternative to the two-party system.",
       "summary_sources": [
         {
           "url": "https://www.achillesforidaho.com/meet-todd",
           "type": "website",
-          "title": "Meet Todd | Empower Idahoans Today \u2014 Todd Achilles for Idaho",
+          "title": "Meet Todd | Empower Idahoans Today — Todd Achilles for Idaho",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -386,7 +386,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ToddAchilles.jpg",
       "website": "https://www.achillesforidaho.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/achilles4idaho/",
@@ -434,7 +434,7 @@
       "name": "Natalie Fleming",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Natalie Fleming is an independent candidate in Idaho\u2019s 2026 U.S. Senate race. The sources reviewed confirm her candidacy and campaign presence, but they did not provide enough reliable biographical detail to summarize her career or education with confidence.",
+      "summary": "Natalie Fleming is an independent candidate in Idaho’s 2026 U.S. Senate race. The sources reviewed confirm her candidacy and campaign presence, but they did not provide enough reliable biographical detail to summarize her career or education with confidence.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Natalie_Fleming_(Idaho)",
@@ -465,7 +465,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:46:57.873329+00:00",
+  "updated_utc": "2026-04-06T18:12:05.953665+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -473,16 +473,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 322235,
-    "completion_tokens": 4379,
-    "total_tokens": 326614,
-    "estimated_usd": 0.051,
+    "prompt_tokens": 266537,
+    "completion_tokens": 12055,
+    "total_tokens": 278592,
+    "estimated_usd": 0.035,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 204567,
+        "completion_tokens": 9756
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 322235,
-        "completion_tokens": 4379
+        "prompt_tokens": 61970,
+        "completion_tokens": 2299
       }
     },
-    "duration_s": 50.1
-  }
+    "duration_s": 134.4
+  },
+  "validation_grade": null
 }

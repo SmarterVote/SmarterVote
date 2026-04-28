@@ -66,7 +66,7 @@
           "title": "News and Updates | Kansas - Cindy Holscher for Governor"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Cindy-Holscher.jpg",
       "website": "https://cindyforkansas.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/CindyHolscherKS",
@@ -321,7 +321,7 @@
           "title": "Kansas Insurance Commissioner Vicki Schmidt initiates Republican campaign for governor"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/sen_schmidt_vicki_1.jpg",
       "website": "https://vickiforgovernor.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/vickiforgovernor",
@@ -903,7 +903,7 @@
       "links": []
     }
   ],
-  "updated_utc": "2026-04-01T06:16:02.135773+00:00",
+  "updated_utc": "2026-04-06T16:48:38.815197+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -1057,20 +1057,21 @@
   "polling_note": "No polls were found in the last 90 days for this race in the sources reviewed.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 204077,
-    "completion_tokens": 4873,
-    "total_tokens": 208950,
-    "estimated_usd": 0.0299,
+    "prompt_tokens": 101355,
+    "completion_tokens": 4576,
+    "total_tokens": 105931,
+    "estimated_usd": 0.0136,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 61028,
-        "completion_tokens": 3096
+        "prompt_tokens": 70500,
+        "completion_tokens": 4127
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 143049,
-        "completion_tokens": 1777
+        "prompt_tokens": 30855,
+        "completion_tokens": 449
       }
     },
-    "duration_s": 63.4
-  }
+    "duration_s": 79.7
+  },
+  "validation_grade": null
 }

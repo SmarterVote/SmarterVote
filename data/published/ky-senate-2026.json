@@ -4,8 +4,40 @@
   "office": "U.S. Senate",
   "jurisdiction": "Kentucky",
   "election_date": "2026-11-03",
-  "description": "Kentucky voters will elect one U.S. senator in 2026. The race is open because incumbent Mitch McConnell announced he will not seek re-election, making this one of the cycle\u2019s notable open-seat Senate contests. Kentucky has leaned strongly Republican in recent federal elections, but the GOP primary is competitive and has drawn attention because candidates are competing to define themselves as aligned with or distinct from McConnell and President Trump. The general election is expected to be shaped by Kentucky\u2019s partisan lean, the open-seat dynamic, and contrasts over ideology, governing style, and national Republican politics.",
+  "description": "Kentucky voters will elect one U.S. senator on November 3, 2026, with the primary set for May 19, 2026. The seat is open because Mitch McConnell said in February 2025 that he would not seek re-election. The race is expected to center on Republican primary competition among Andy Barr, Daniel Cameron, and Nate Morris, while Democrats are also contesting an open-seat race in a state that has leaned Republican in recent federal elections.",
   "polling": [
+    {
+      "pollster": "Emerson College Polling / FOX56",
+      "date": "2026-04-02",
+      "matchups": [
+        {
+          "candidates": [
+            "Andy Barr",
+            "Daniel Cameron",
+            "Nate Morris"
+          ],
+          "percentages": [
+            28,
+            21,
+            15
+          ]
+        },
+        {
+          "candidates": [
+            "Charles Booker",
+            "Amy McGrath",
+            "Pamela Stevenson"
+          ],
+          "percentages": [
+            36,
+            18,
+            3
+          ]
+        }
+      ],
+      "source_url": "https://emersoncollegepolling.com/kentucky-2026-poll-barr-maintains-edge-in-gop-primary-as-booker-gains-among-democratic-voters/",
+      "sample_size": 1050
+    },
     {
       "pollster": "Public Opinion Strategies",
       "date": "2026-03-12",
@@ -203,22 +235,20 @@
       "name": "Andy Barr",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Andy Barr is a U.S. representative from Kentucky\u2019s 6th Congressional District and a candidate for the open U.S. Senate seat. His campaign has emphasized support for President Trump, border security, tax cuts, energy production, and opposition to DEI initiatives. Barr is running as a Republican in a crowded primary that has centered on which candidate best fits Kentucky\u2019s current GOP coalition.",
+      "summary": "Andy Barr, a Republican U.S. representative from Kentucky, entered the 2026 Senate race after serving in the House. In early April 2026 polling, he led the Republican primary field and was described by pollsters as the candidate most associated with support for the Trump administration's agenda.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Andy_Barr",
-          "type": "website",
-          "title": "Andy Barr - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://apnews.com/article/kentucky-senate-campaign-congressman-andy-barr-d0b4f658bbe80a549b094361b077f8ce",
+          "title": "U.S. Rep. Barr enters competitive race to succeed Sen. McConnell in Kentucky",
+          "type": "news"
         },
         {
-          "url": "https://barrforsenate.com/",
-          "type": "website",
-          "title": "Andy Barr for Senate",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://emersoncollegepolling.com/kentucky-2026-poll-barr-maintains-edge-in-gop-primary-as-booker-gains-among-democratic-voters/",
+          "title": "Kentucky 2026 Poll: Barr Maintains Edge in GOP Primary as Booker Gains Among Democratic Voters",
+          "type": "poll"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Andy_Barr_official_congressional_photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Andy_Barr__official_portrait__113th_Congress-7_fixed.jpg",
       "website": "https://barrforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/BarrForSenate/",
@@ -293,22 +323,20 @@
       "name": "Daniel Cameron",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Daniel Cameron is a former Kentucky attorney general and the Republican nominee for governor in 2023. In the Senate race, he has presented himself as an America First conservative aligned with Trump, focusing on law and order, anti-DEI politics, energy, and border security. Cameron enters the race with statewide name recognition from his prior office and a campaign built around his record as attorney general.",
+      "summary": "Daniel Cameron, Kentucky's former attorney general, is running in the Republican primary for the state's open U.S. Senate seat. He has remained one of the top contenders in early polling, though recent surveys have shown him trailing Andy Barr in the GOP field.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Daniel_Cameron",
-          "type": "website",
           "title": "Daniel Cameron - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "ballotpedia"
         },
         {
-          "url": "https://cameronforkentucky.com/",
-          "type": "website",
-          "title": "Daniel Cameron for Kentucky | Daniel Cameron for U.S. Senate",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://emersoncollegepolling.com/kentucky-2026-poll-barr-maintains-edge-in-gop-primary-as-booker-gains-among-democratic-voters/",
+          "title": "Kentucky 2026 Poll: Barr Maintains Edge in GOP Primary as Booker Gains Among Democratic Voters",
+          "type": "poll"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Attorney_General_Daniel_Cameron_-_Official_Portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/dcameron3.jpg",
       "website": "https://cameronforkentucky.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/DanielCameronKY/",
@@ -391,22 +419,20 @@
       "name": "Nate Morris",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Nate Morris is a businessman and founder of Morris Industries running for the open Kentucky Senate seat. His campaign casts him as a pro-Trump outsider focused on immigration enforcement, energy, gun rights, and opposition to what he calls the Washington establishment. Morris has tried to position himself as the anti-McConnell candidate in the Republican primary.",
+      "summary": "Nate Morris, a Kentucky businessman and Rubicon founder, is running in the Republican primary for the open Senate seat. He has been part of the top tier of the race and has drawn attention for his self-funding and for positioning himself as an outsider in the GOP field.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Nate_Morris",
-          "type": "website",
-          "title": "Nate Morris - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://apnews.com/article/nate-morris-kentucky-senate-seat-mitch-mcconnell-99134572303d3eb76a8533128dc3abe8",
+          "title": "CEO Nate Morris joins Kentucky Senate race to succeed McConnell",
+          "type": "news"
         },
         {
-          "url": "https://natemorris.com/",
-          "type": "website",
-          "title": "Nate Morris for Senate",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://kentuckylantern.com/2026/03/17/4-takeaways-from-the-money-race-for-us-senate-in-kentucky/",
+          "title": "4 takeaways from the money race for US Senate in Kentucky",
+          "type": "news"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Nate_Morris.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Nate_Morris_20250811_040116.jpg",
       "website": "https://natemorris.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/nate.morris/",
@@ -455,22 +481,20 @@
       "name": "Amy McGrath",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Amy McGrath is a former Marine fighter pilot and the Democratic candidate in Kentucky\u2019s 2026 Senate primary. She is running on a message centered on lowering costs, protecting health care, supporting veterans, and defending democratic institutions, while criticizing tariffs and other policies she says hurt Kentucky families. McGrath previously ran for the U.S. Senate in 2020 and for Congress in 2018, giving her substantial statewide name recognition.",
+      "summary": "Amy McGrath, the Democratic nominee for U.S. Senate in Kentucky in 2020, is again running for the state's open Senate seat in 2026. In early April 2026 polling, she trailed Charles Booker in the Democratic primary but remained a notable contender in the field.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Amy_McGrath",
-          "type": "website",
-          "title": "Amy McGrath - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://emersoncollegepolling.com/kentucky-2026-poll-barr-maintains-edge-in-gop-primary-as-booker-gains-among-democratic-voters/",
+          "title": "Kentucky 2026 Poll: Barr Maintains Edge in GOP Primary as Booker Gains Among Democratic Voters",
+          "type": "poll"
         },
         {
-          "url": "https://amymcgrath.com/",
-          "type": "website",
-          "title": "Home - Amy McGrath",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.wdrb.com/news/politics/democrats-running-for-kentuckys-open-us-senate-seat-spar-in-debate/article_e20ba4c5-1c82-4a1c-bbfe-af08099dce2d.html",
+          "title": "Democrats running for Kentucky's open US Senate seat spar in debate",
+          "type": "news"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Amy_McGrath_2018.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/amy.jpg",
       "website": "https://amymcgrath.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/AmyMcGrathKY/",
@@ -549,9 +573,27 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Temporary",
+      "party": "Temporary",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/Mexican_Fruit_Pickers_%287618119180%29.jpg/500px-Mexican_Fruit_Pickers_%287618119180%29.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:50:13.688735+00:00",
+  "updated_utc": "2026-04-06T18:01:19.529282+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -559,16 +601,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 122661,
-    "completion_tokens": 3907,
-    "total_tokens": 126568,
-    "estimated_usd": 0.0207,
+    "prompt_tokens": 267355,
+    "completion_tokens": 7683,
+    "total_tokens": 275038,
+    "estimated_usd": 0.0384,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 104445,
+        "completion_tokens": 5616
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 122661,
-        "completion_tokens": 3907
+        "prompt_tokens": 162910,
+        "completion_tokens": 2067
       }
     },
-    "duration_s": 43.5
-  }
+    "duration_s": 110.5
+  },
+  "validation_grade": null
 }

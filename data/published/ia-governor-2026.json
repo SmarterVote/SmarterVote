@@ -4,19 +4,19 @@
   "office": "Governor of Iowa",
   "jurisdiction": "Iowa",
   "election_date": "2026-11-03",
-  "description": "Iowa’s 2026 governor’s race will decide who succeeds term-limited Republican Gov. Kim Reynolds. The contest is drawing attention because Democrats see an opening with state Auditor Rob Sand, while Republicans are split among multiple primary candidates including Adam Steen and Eddie Andrews; key issues in the race include taxes, the economy, health care, education, and alignment with President Donald Trump’s agenda.",
+  "description": "Iowa’s 2026 gubernatorial election will choose the state’s next governor after incumbent Kim Reynolds declined to seek re-election. The race features Democratic state Auditor Rob Sand and a Republican primary field that includes U.S. Rep. Randy Feenstra, state Rep. Eddie Andrews, former state Rep. Brad Sherman, former state agency director Adam Steen, and businessman-farmer Zach Lahn. Early contrasts center on fundraising, endorsements, and policy emphasis, including Sand’s election-reform agenda, Feenstra’s Washington ties and fundraising edge, and the GOP field’s competing appeals to grassroots conservatives and anti-establishment voters.",
   "polling": [],
   "candidates": [
     {
       "name": "Rob Sand",
       "party": "Democratic Party",
       "incumbent": false,
-      "summary": "Rob Sand is Iowa’s state auditor and the Democratic candidate for governor in 2026. Since launching his campaign, he has emphasized accountability, public service, and a statewide tour focused on issues such as health care, the economy, and government reform.",
+      "summary": "Rob Sand is Iowa’s state auditor and the Democratic candidate for governor in 2026. In April 2026, he unveiled an election-reform-focused policy agenda that includes term limits, age and cognitive tests for elected officials, and a proposal to replace Iowa’s current two-party primary system with a top-four, ranked-style general election format.",
       "summary_sources": [
         {
-          "url": "https://robsand.com/news",
-          "title": "Rob Sand In the News",
-          "type": "campaign"
+          "url": "https://www.cbs2iowa.com/news/local/rob-sand-proposes-shake-up-to-iowas-elections-in-new-policy-agenda",
+          "title": "Rob Sand proposes shake up to Iowa's elections in new policy agenda",
+          "type": "news"
         },
         {
           "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
@@ -360,17 +360,17 @@
       "name": "Adam Steen",
       "party": "Republican Party",
       "incumbent": false,
-      "summary": "Adam Steen is a Republican candidate for governor and a former director of the Iowa Department of Administrative Services. He has received backing from The Family Leader and has framed his campaign around conservative priorities, including culture, government management, and issues such as eminent domain.",
+      "summary": "Adam Steen is a former Iowa Department of Administrative Services director and Republican candidate for governor in 2026. In February 2026, he received an endorsement from Bob Vander Plaats of The Family Leader and has emphasized his grassroots campaign style and business and state-agency management experience.",
       "summary_sources": [
         {
-          "url": "https://www.iowapublicradio.org/political-news/2026-03-18/former-gov-branstad-endorses-feenstra-for-governor-while-the-family-leader-backs-steen",
-          "title": "Terry Branstad endorses Randy Feenstra for governor. The Family Leader backs Adam Steen",
+          "url": "https://www.radioiowa.com/2026/02/06/endorsements-in-iowa-gops-2026-race-for-governor/",
+          "title": "Endorsements in Iowa GOP’s 2026 race for governor",
           "type": "news"
         },
         {
-          "url": "https://adamsteen.com/gop-candidate-for-ia-governor-says-eminent-domain-should-be-top-issue-this-election-cycle-cbs/",
-          "title": "GOP candidate for IA governor says eminent domain should be top issue this election cycle",
-          "type": "campaign"
+          "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
+          "title": "Here's who's running for governor of Iowa in 2026",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Jackie_Sandler_Adam_Sandler_Jay_Kelly-36_%283x4%29.jpg/500px-Jackie_Sandler_Adam_Sandler_Jay_Kelly-36_%283x4%29.jpg",
@@ -632,20 +632,107 @@
       "name": "Eddie Andrews",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Eddie Andrews is a Republican state representative from Urbandale running for governor in 2026. In late March, he survived a ballot challenge and then publicly criticized Adam Steen over the dispute, making ballot access and campaign conduct part of the early primary fight.",
+      "summary": "Eddie Andrews is a Republican state representative from Johnston and a candidate for governor in 2026. He has emphasized his legislative record, repeated wins in a Democratic-leaning district, and a campaign strategy that relies on grassroots outreach rather than large fundraising totals.",
       "summary_sources": [
         {
-          "url": "https://www.desmoinesregister.com/story/news/politics/elections/2026/03/25/eddie-andrews-qualifies-for-election-2026-primary-ballot-for-iowa-governor/89306768007/",
-          "title": "Eddie Andrews defeats challenge, qualifies for governor primary ballot",
+          "url": "https://www.radioiowa.com/2026/02/06/endorsements-in-iowa-gops-2026-race-for-governor/",
+          "title": "Endorsements in Iowa GOP’s 2026 race for governor",
           "type": "news"
         },
         {
-          "url": "https://www.iowapublicradio.org/political-news/2026-03-27/eddie-andrews-adam-steen-governor-lincoln-dinner",
-          "title": "Governor candidate Eddie Andrews calls out opponent Adam Steen over ballot challenge at GOP event",
+          "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
+          "title": "Here's who's running for governor of Iowa in 2026",
           "type": "news"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Eddie-Andrews.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Randy Feenstra",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Randy Feenstra is the Republican U.S. representative for Iowa’s 4th Congressional District and a candidate for governor in 2026. In early 2026, he launched a major advertising campaign, reported raising more than $4.3 million, and sought President Donald Trump’s endorsement while presenting himself as the frontrunner in the GOP field.",
+      "summary_sources": [
+        {
+          "url": "https://www.radioiowa.com/2026/02/06/endorsements-in-iowa-gops-2026-race-for-governor/",
+          "title": "Endorsements in Iowa GOP’s 2026 race for governor",
+          "type": "news"
+        },
+        {
+          "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
+          "title": "Here's who's running for governor of Iowa in 2026",
+          "type": "news"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Randy_Feenstra.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Zach Lahn",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Zach Lahn is a businessman and farmer from Belle Plaine and a Republican candidate for governor in 2026. He has aligned his campaign with the “Make America Healthy Again” agenda, focusing on water quality and cancer rates, and in February 2026 the MAHA PAC endorsed him.",
+      "summary_sources": [
+        {
+          "url": "https://www.radioiowa.com/2026/02/06/endorsements-in-iowa-gops-2026-race-for-governor/",
+          "title": "Endorsements in Iowa GOP’s 2026 race for governor",
+          "type": "news"
+        },
+        {
+          "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
+          "title": "Here's who's running for governor of Iowa in 2026",
+          "type": "news"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Zach_Lahn_20260224_023356.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Brad Sherman",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Brad Sherman is a former Iowa state representative, pastor, and real estate developer running as a Republican for governor in 2026. He has campaigned as a grassroots candidate, said he has visited all 99 Iowa counties, and has highlighted his varied work experience as a contrast with better-funded rivals.",
+      "summary_sources": [
+        {
+          "url": "https://www.radioiowa.com/2026/02/06/endorsements-in-iowa-gops-2026-race-for-governor/",
+          "title": "Endorsements in Iowa GOP’s 2026 race for governor",
+          "type": "news"
+        },
+        {
+          "url": "https://www.iowapublicradio.org/political-news/2026-03-10/iowa-governor-candidates-rob-sand-randy-feenstra-2026-primary-ballot",
+          "title": "Here's who's running for governor of Iowa in 2026",
+          "type": "news"
+        }
+      ],
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/9/9f/Brad_Sherman_portrait_%28118th_Congress%29.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -658,7 +745,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:14:58.379359+00:00",
+  "updated_utc": "2026-04-06T16:51:37.630406+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -833,23 +920,24 @@
       "summary": "This profile is a well-constructed and balanced overview of the 2026 Iowa gubernatorial race, with accurate representations of candidates' positions drawn from credible sources like Ballotpedia, campaign websites, and reputable news outlets such as the Des Moines Register and KCCI. The career histories for Rob Sand are thoroughly documented with specific timelines and sources, while issue stances are clearly linked to high-confidence evidence, demonstrating strong attention to neutrality and completeness in areas like healthcare and education."
     }
   ],
-  "polling_note": "No public polls found in the last 90 days as of 2026-03-29.",
+  "polling_note": "No polls published after 2026-04-01 were found in the available sources during this update.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 212270,
-    "completion_tokens": 7758,
-    "total_tokens": 220028,
-    "estimated_usd": 0.0339,
+    "prompt_tokens": 163013,
+    "completion_tokens": 12327,
+    "total_tokens": 175340,
+    "estimated_usd": 0.0261,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 25988,
-        "completion_tokens": 6331
+        "prompt_tokens": 73571,
+        "completion_tokens": 10234
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 186282,
-        "completion_tokens": 1427
+        "prompt_tokens": 89442,
+        "completion_tokens": 2093
       }
     },
-    "duration_s": 88.8
-  }
+    "duration_s": 162.1
+  },
+  "validation_grade": null
 }

@@ -31,7 +31,7 @@
       "name": "Pete Ricketts",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Pete Ricketts is Nebraska\u2019s junior U.S. senator and a former two-term governor of the state. His campaign and Senate biography emphasize tax cuts, government efficiency, agriculture, and conservative policy priorities.",
+      "summary": "Pete Ricketts is Nebraska’s junior U.S. senator and a former two-term governor of the state. His campaign and Senate biography emphasize tax cuts, government efficiency, agriculture, and conservative policy priorities.",
       "summary_sources": [
         {
           "url": "https://www.ricketts.senate.gov/about/",
@@ -52,7 +52,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Sen._Pete_Ricketts_official_portrait%2C_118th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/PeteRicketts2015.jpg",
       "website": "https://petericketts.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/PeteRickettsNE/",
@@ -91,7 +91,7 @@
           "year": 1993
         },
         {
-          "institution": "University of Nebraska\u2013Lincoln",
+          "institution": "University of Nebraska–Lincoln",
           "degree": "BS",
           "field": "Biology",
           "year": 1986
@@ -129,7 +129,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Dan_Osborn_2024.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Audrey_Hatch_20240808_095600.jpg",
       "website": "https://www.osbornforsenate.com/",
       "social_media": {},
       "career_history": [
@@ -176,9 +176,153 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Eric Mortimore",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Todd Knobel",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Mac Stevens",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Debb Axtell Schultz",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Cindy Burbank",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "William J. Forbes",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Mike Marvin",
+      "party": "Legal Marijuana NOW",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Earl Starkey",
+      "party": "Legal Marijuana NOW",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:57:46.429622+00:00",
+  "updated_utc": "2026-04-06T17:39:11.489568+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -186,16 +330,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 78438,
-    "completion_tokens": 1802,
-    "total_tokens": 80240,
-    "estimated_usd": 0.0128,
+    "prompt_tokens": 156425,
+    "completion_tokens": 14151,
+    "total_tokens": 170576,
+    "estimated_usd": 0.0252,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 81334,
+        "completion_tokens": 13267
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 78438,
-        "completion_tokens": 1802
+        "prompt_tokens": 75091,
+        "completion_tokens": 884
       }
     },
-    "duration_s": 18.2
-  }
+    "duration_s": 182.7
+  },
+  "validation_grade": null
 }

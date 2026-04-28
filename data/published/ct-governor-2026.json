@@ -4,7 +4,7 @@
   "office": "Governor of Connecticut",
   "jurisdiction": "Connecticut",
   "election_date": "2026-11-03",
-  "description": "Connecticut is holding an election for governor on November 3, 2026, with the primary scheduled for August 11, 2026. The race is notable because Gov. Ned Lamont is seeking re-election and faces primary challenges in both parties, while Ballotpedia and major race-ratings outlets currently rate the general election as safely or solidly Democratic. The contest is likely to center on affordability, taxes, housing, education, and the state\u2019s overall direction, with Democrats defending an incumbent record and Republicans arguing for a change in leadership.",
+  "description": "Connecticut is holding an election for governor on November 3, 2026, with the primary scheduled for August 11, 2026. The race is notable because Gov. Ned Lamont is seeking re-election and faces primary challenges in both parties, while Ballotpedia and major race-ratings outlets currently rate the general election as safely or solidly Democratic. The contest is likely to center on affordability, taxes, housing, education, and the state’s overall direction, with Democrats defending an incumbent record and Republicans arguing for a change in leadership.",
   "polling": [
     {
       "pollster": "University of New Hampshire Survey Center",
@@ -64,7 +64,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Governor_Ned_Lamont_of_Connecticut%2C_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Ned_Lamont_20240913_045834.jpg",
       "website": "https://www.nedlamont.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/NedLamontCT/",
@@ -142,7 +142,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Elliott.png",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -181,7 +181,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/RyanFazio.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -210,7 +210,7 @@
         {
           "url": "https://erinforct.com/bio/",
           "type": "website",
-          "title": "Bio - Erin Stewart \u2013 Republican For Governor 2026",
+          "title": "Bio - Erin Stewart – Republican For Governor 2026",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -220,7 +220,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/thumb/Erin_Stewart.jpg/300px-Erin_Stewart.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/800px-Erin_E._Stewart__40th_Mayor_of_New_Britain__CT_fixed.jpg",
       "website": "https://erinforct.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/ErinStewartCT/",
@@ -304,7 +304,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -350,7 +350,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Timothy_Wilcox_20250915_012501.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -363,7 +363,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:42:09.216268+00:00",
+  "updated_utc": "2026-04-06T18:21:22.144574+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -371,16 +371,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 158727,
-    "completion_tokens": 3279,
-    "total_tokens": 162006,
-    "estimated_usd": 0.0258,
+    "prompt_tokens": 161805,
+    "completion_tokens": 5149,
+    "total_tokens": 166954,
+    "estimated_usd": 0.0214,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 101180,
+        "completion_tokens": 4672
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 158727,
-        "completion_tokens": 3279
+        "prompt_tokens": 60625,
+        "completion_tokens": 477
       }
     },
-    "duration_s": 30.3
-  }
+    "duration_s": 94.4
+  },
+  "validation_grade": null
 }

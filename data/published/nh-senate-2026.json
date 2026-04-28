@@ -4,8 +4,56 @@
   "office": "United States Senate",
   "jurisdiction": "New Hampshire",
   "election_date": "2026-11-03",
-  "description": "New Hampshire’s 2026 U.S. Senate race is an open-seat contest to replace retiring Democratic Sen. Jeanne Shaheen. The race matters because control of the Senate is at stake, and early polling suggests a competitive general election with Chris Pappas running ahead of Scott Brown in a hypothetical matchup while Brown remains in a contested Republican primary against John E. Sununu. Sources: https://www.semafor.com/article/03/27/2026/scott-brown-isnt-leaving-new-hampshires-weird-senate-race ; https://emersoncollegepolling.com/new-hampshire-2026-sununu-leads-gop-nomination-ties-pappas-for-senate/ ; https://www.wmur.com/article/poll-sununu-brown-republican-senate-032326/70825858",
+  "description": "Open 2026 U.S. Senate race in New Hampshire for the seat held by retiring Sen. Jeanne Shaheen. The contest is drawing attention because New Hampshire is a competitive statewide battleground, with Democrats and Republicans testing different paths to the seat through the general election and the Sept. 8 primary.",
   "polling": [
+    {
+      "pollster": "UNH Survey Center",
+      "date": "2026-01-21",
+      "matchups": [
+        {
+          "candidates": [
+            "Chris Pappas",
+            "John E. Sununu"
+          ],
+          "percentages": [
+            50,
+            45
+          ]
+        },
+        {
+          "candidates": [
+            "Chris Pappas",
+            "Scott Brown"
+          ],
+          "percentages": [
+            52,
+            42
+          ]
+        },
+        {
+          "candidates": [
+            "John E. Sununu",
+            "Scott Brown"
+          ],
+          "percentages": [
+            48,
+            25
+          ]
+        },
+        {
+          "candidates": [
+            "Chris Pappas",
+            "Karishma Manzur"
+          ],
+          "percentages": [
+            65,
+            11
+          ]
+        }
+      ],
+      "source_url": "https://scholars.unh.edu/survey_center_polls/922/",
+      "sample_size": 2053
+    },
     {
       "pollster": "Saint Anselm College Survey Center",
       "date": "2026-03-18",
@@ -106,17 +154,17 @@
       "name": "Chris Pappas",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Chris Pappas is the Democratic U.S. representative from New Hampshire’s 1st Congressional District and the party’s leading candidate in the 2026 Senate race. His campaign has recently emphasized lowering costs, including proposals on gas taxes, grocery prices, and health care, as he prepares for a competitive general election. Sources: https://chrispappas.org/news/ ; https://emersoncollegepolling.com/new-hampshire-2026-sununu-leads-gop-nomination-ties-pappas-for-senate/",
+      "summary": "Chris Pappas is the Democratic U.S. representative for New Hampshire's 1st Congressional District and a candidate for the open Senate seat in 2026. In April 2026, his campaign highlighted a child care cost plan as part of its broader tax-and-costs message.",
       "summary_sources": [
         {
-          "url": "https://chrispappas.org/news/",
-          "type": "campaign news",
-          "title": "Chris Pappas for Senate Newsroom"
+          "url": "https://chrispappas.org/2026/04/chris-pappas-for-senate-highlights-plan-to-lower-child-care-costs-for-granite-state-families/",
+          "type": "news",
+          "title": "Chris Pappas for Senate Highlights Plan to Lower Child Care Costs for Granite State Families"
         },
         {
-          "url": "https://emersoncollegepolling.com/new-hampshire-2026-sununu-leads-gop-nomination-ties-pappas-for-senate/",
+          "url": "https://scholars.unh.edu/survey_center_polls/922/",
           "type": "poll",
-          "title": "Emerson College Polling"
+          "title": "Sununu, Pappas Frontrunners in 2026 NH Senate Race; Ayotte Favored for Re-Election as Governor"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Chris_Pappas%2C_official_portrait%2C_116th_Congress.jpg/500px-Chris_Pappas%2C_official_portrait%2C_116th_Congress.jpg",
@@ -477,20 +525,117 @@
       "name": "Scott Brown",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Scott Brown is a former U.S. senator from Massachusetts and former U.S. ambassador to New Zealand and Samoa who is running in New Hampshire’s 2026 Senate race. In March 2026, he said he would stay in the Republican primary despite pressure from national Republicans to clear the field for John E. Sununu. Sources: https://www.semafor.com/article/03/27/2026/scott-brown-isnt-leaving-new-hampshires-weird-senate-race ; https://www.politico.com/news/2025/06/25/scott-brown-new-hampshire-senate-2026-midterms-00422703",
+      "summary": "Scott Brown is a former U.S. senator from Massachusetts and the Republican nominee in New Hampshire's 2014 Senate race. In the 2026 cycle, he is running for the open New Hampshire Senate seat and was trailing John E. Sununu in the Republican primary polling cited in January 2026.",
       "summary_sources": [
         {
-          "url": "https://www.semafor.com/article/03/27/2026/scott-brown-isnt-leaving-new-hampshires-weird-senate-race",
-          "type": "news article",
-          "title": "Semafor: Scott Brown isn’t leaving New Hampshire’s ‘weird’ Senate race"
-        },
-        {
-          "url": "https://www.politico.com/news/2025/06/25/scott-brown-new-hampshire-senate-2026-midterms-00422703",
-          "type": "news article",
-          "title": "Politico: Scott Brown launches campaign for Senate in New Hampshire"
+          "url": "https://scholars.unh.edu/survey_center_polls/922/",
+          "type": "poll",
+          "title": "Sununu, Pappas Frontrunners in 2026 NH Senate Race; Ayotte Favored for Re-Election as Governor"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/1-Scott_Brown.jpg/500px-1-Scott_Brown.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "John E. Sununu",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "John E. Sununu is a former U.S. senator from New Hampshire and a member of the state's Sununu political family. In the January 2026 UNH Survey Center poll, he led Scott Brown in the Republican primary and was the Republican candidate tested most competitively against Chris Pappas in the general election.",
+      "summary_sources": [
+        {
+          "url": "https://scholars.unh.edu/survey_center_polls/922/",
+          "type": "poll",
+          "title": "Sununu, Pappas Frontrunners in 2026 NH Senate Race; Ayotte Favored for Re-Election as Governor"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/2d1ee27058dab074de7ae6b2d7e94d6f.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Charlie Hough",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Tejasinha Sivalingam",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/tsivalingam.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Karishma Manzur",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Karishma Manzur is a scientist and Democratic candidate in the 2026 New Hampshire Senate race. In the January 2026 UNH Survey Center poll, she trailed Chris Pappas by a wide margin in the Democratic primary testing.",
+      "summary_sources": [
+        {
+          "url": "https://scholars.unh.edu/survey_center_polls/922/",
+          "type": "poll",
+          "title": "Sununu, Pappas Frontrunners in 2026 NH Senate Race; Ayotte Favored for Re-Election as Governor"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Karishma_Manzur_20260104_015303.jpeg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Jared Sullivan",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jared-Sullivan.PNG",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -503,7 +648,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:58:55.772929+00:00",
+  "updated_utc": "2026-04-06T17:35:46.998774+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -696,23 +841,24 @@
       "summary": "The profile is generally accurate and unbiased, with strong sourcing for Chris Pappas's background and issues, drawing from official campaign sites, government records, and credible news outlets. However, it falls short in completeness for John E. Sununu, where several issues have low-confidence stances and rely on limited or indirect sources, potentially leaving gaps in a balanced representation."
     }
   ],
-  "polling_note": "Recent polling shows a competitive general election and a contested Republican primary. Emerson College Polling (Mar. 21-23, 2026) found Pappas 45%, John E. Sununu 44%, and Pappas 48%, Brown 39%; Saint Anselm College Survey Center (Mar. 16-18, 2026) found Pappas 46%, Sununu 43%, and Pappas 47%, Brown 38%. Sources: https://emersoncollegepolling.com/new-hampshire-2026-sununu-leads-gop-nomination-ties-pappas-for-senate/ ; https://www.wmur.com/article/poll-sununu-brown-republican-senate-032326/70825858",
+  "polling_note": "Recent publicly available polling found in this update includes the UNH Survey Center's Jan. 21, 2026 Granite State Poll. No post-2026-04-01 public polls were identified in the sources reviewed for this update.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 148288,
-    "completion_tokens": 7086,
-    "total_tokens": 155374,
-    "estimated_usd": 0.024,
+    "prompt_tokens": 197164,
+    "completion_tokens": 9060,
+    "total_tokens": 206224,
+    "estimated_usd": 0.0305,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 27733,
-        "completion_tokens": 5596
+        "prompt_tokens": 62146,
+        "completion_tokens": 7204
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 120555,
-        "completion_tokens": 1490
+        "prompt_tokens": 135018,
+        "completion_tokens": 1856
       }
     },
-    "duration_s": 69.0
-  }
+    "duration_s": 141.6
+  },
+  "validation_grade": null
 }

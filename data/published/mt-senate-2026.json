@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Montana",
   "election_date": "2026-11-03",
-  "description": "Montana voters will elect one U.S. senator in 2026 for the state\u2019s Class II seat. The race matters because it will help determine control of the U.S. Senate, and Ballotpedia rates the contest as leaning strongly Republican with the seat currently held by Steve Daines. The field includes a crowded set of primary candidates across parties, with Republicans emphasizing continuity and Democrats highlighting affordability, health care, and public services.",
+  "description": "Montana voters will elect one U.S. senator in 2026 for the state’s Class II seat. The race is now an open-seat contest after incumbent Steve Daines withdrew from the filing process on March 4, 2026, and it matters because it will help determine control of the U.S. Senate. Republicans are competing to hold the seat, while Democrats and independents are trying to capitalize on the open field and a crowded primary lineup.",
   "polling": [
     {
       "pollster": "Public Policy Polling",
@@ -35,34 +35,31 @@
       "source_url": "https://dailymontanan.com/2026/02/24/poll-shows-daines-with-sizable-lead-over-democratic-independent-challengers/"
     }
   ],
-  "polling_note": null,
+  "polling_note": "No polls published after 2026-04-01T05:57:27.918287+00:00 were found in the sources reviewed.",
   "candidates": [
     {
       "name": "Steve Daines",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Steve Daines is the sitting U.S. senator from Montana and a former businessman. He entered the 2026 cycle as the incumbent in the race for Montana\u2019s Class II Senate seat, but Ballotpedia notes he withdrew from the Republican primary filing process, so his status in the race should be treated cautiously. His public profile and campaign messaging have emphasized conservative priorities such as jobs, freedom, border security, and Montana values.",
+      "summary": "Steve Daines is the incumbent U.S. senator from Montana and a former businessman. On March 4, 2026, he withdrew from the 2026 Senate race, which changed the contest from an incumbent defense to an open-seat race. His prior public profile and campaign messaging emphasized conservative priorities such as jobs, border security, and Montana values.",
       "summary_sources": [
+        {
+          "url": "https://montanafreepress.org/2026/03/04/republican-u-s-senate-steve-daines-withdraws/",
+          "type": "news",
+          "title": "As filings close, Republican Steve Daines withdraws from U.S. Senate race"
+        },
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Montana,_2026",
           "type": "government",
-          "title": "United States Senate election in Montana, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "United States Senate election in Montana, 2026 - Ballotpedia"
         },
         {
           "url": "https://stevedaines.com/",
           "type": "website",
-          "title": "Steve Daines for Montana | Faith, Freedom & Opportunity",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Steve_Daines",
-          "type": "government",
-          "title": "Steve Daines - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Steve Daines for Montana | Faith, Freedom & Opportunity"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Steve_Daines_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Steve_Daines_official_Senate_portrait.jpg",
       "website": "https://stevedaines.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SteveDainesMT/",
@@ -82,7 +79,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2013,
           "end_year": 2015,
-          "description": "Represented Montana\u2019s at-large congressional district."
+          "description": "Represented Montana’s at-large congressional district."
         },
         {
           "title": "Business executive",
@@ -132,7 +129,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Reilly_Neill.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Reilly_Neill_2024b.png",
       "website": "https://reillyformontana.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/reillyformontana/",
@@ -189,7 +186,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Kurt_Alme.jpg",
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -220,7 +217,7 @@
       "name": "Lee Calhoun",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Lee Calhoun is a Republican candidate in Montana\u2019s 2026 U.S. Senate primary. Ballotpedia lists him among the Republican contenders, and campaign materials describe him as a Montana conservative focused on economic opportunity, health care, and community issues. Public reporting indicates he later suspended or withdrew his bid, so his active status should be checked against the latest filing records.",
+      "summary": "Lee Calhoun is a Republican candidate in Montana’s 2026 U.S. Senate primary. Ballotpedia lists him among the Republican contenders, and campaign materials describe him as a Montana conservative focused on economic opportunity, health care, and community issues. Public reporting indicates he later suspended or withdrew his bid, so his active status should be checked against the latest filing records.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Lee_Calhoun",
@@ -241,7 +238,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": "https://lee.calhounformt.com/",
       "social_media": {},
       "career_history": [],
@@ -257,7 +254,7 @@
       "name": "Charles A. Walking Child",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Charles A. Walking Child is a Republican candidate in Montana\u2019s 2026 U.S. Senate primary. His campaign says he is focused on economic opportunity, accessible health care, and conservative values, and Ballotpedia lists him among the Republican contenders. Public biographical material describes him as a Montana native with Blackfeet heritage and a background shaped by both hardship and faith.",
+      "summary": "Charles A. Walking Child is a Republican candidate in Montana’s 2026 U.S. Senate primary. His campaign says he is focused on economic opportunity, accessible health care, and conservative values, and Ballotpedia lists him among the Republican contenders. Public biographical material describes him as a Montana native with Blackfeet heritage and a background shaped by both hardship and faith.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Charles_A._Walking_Child",
@@ -278,7 +275,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/CharlesWalkingChild2024.jpg",
       "website": "https://www.charleswalkingchildforussenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/walkingchildforcongress/"
@@ -330,7 +327,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Seth_Bodnar.jpg",
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -387,7 +384,7 @@
       "name": "Michael Black Wolf",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Michael Black Wolf is listed by Ballotpedia as a Democratic primary candidate for Montana\u2019s 2026 U.S. Senate race. Publicly available biographical detail is limited in the sources reviewed, so his background and issue profile are not well documented in the materials found. He remains one of several Democrats competing for the nomination.",
+      "summary": "Michael Black Wolf is listed by Ballotpedia as a Democratic primary candidate for Montana’s 2026 U.S. Senate race. Publicly available biographical detail is limited in the sources reviewed, so his background and issue profile are not well documented in the materials found. He remains one of several Democrats competing for the nomination.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Montana,_2026",
@@ -396,7 +393,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_BlackWolf_20251007_075645.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -412,7 +409,7 @@
       "name": "Michael Hummert",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Michael Hummert is a Democratic candidate in Montana\u2019s 2026 U.S. Senate primary and previously ran in the 2024 Democratic primary for the same seat. Ballotpedia lists him among the current Democratic contenders, but the sources reviewed did not provide much additional biographical detail. He is part of a crowded Democratic field that is competing to challenge the Republican nominee in November.",
+      "summary": "Michael Hummert is a Democratic candidate in Montana’s 2026 U.S. Senate primary and previously ran in the 2024 Democratic primary for the same seat. Ballotpedia lists him among the current Democratic contenders, but the sources reviewed did not provide much additional biographical detail. He is part of a crowded Democratic field that is competing to challenge the Republican nominee in November.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Michael_Hummert",
@@ -427,7 +424,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/MichaelHummert.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -443,7 +440,7 @@
       "name": "Christopher Kehoe",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Christopher Kehoe is listed by Ballotpedia as a Democratic primary candidate in Montana\u2019s 2026 U.S. Senate race. The sources reviewed did not provide substantial public biographical information about his career or education. He is one of several Democrats seeking the nomination.",
+      "summary": "Christopher Kehoe is listed by Ballotpedia as a Democratic primary candidate in Montana’s 2026 U.S. Senate race. The sources reviewed did not provide substantial public biographical information about his career or education. He is one of several Democrats seeking the nomination.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Montana,_2026",
@@ -468,7 +465,7 @@
       "name": "Alani Bankhead",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Alani Bankhead is listed by Ballotpedia as a Democratic primary candidate in Montana\u2019s 2026 U.S. Senate race. The reviewed sources did not yield enough reliable public biographical detail to summarize her career or education in depth. She is part of the Democratic primary field seeking the nomination.",
+      "summary": "Alani Bankhead is listed by Ballotpedia as a Democratic primary candidate in Montana’s 2026 U.S. Senate race. The reviewed sources did not yield enough reliable public biographical detail to summarize her career or education in depth. She is part of the Democratic primary field seeking the nomination.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Montana,_2026",
@@ -477,7 +474,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Alani_Bankhead_20260106_102822.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -493,7 +490,7 @@
       "name": "Kyle Austin",
       "party": "Libertarian",
       "incumbent": false,
-      "summary": "Kyle Austin is a Libertarian candidate in Montana\u2019s 2026 U.S. Senate primary. Ballotpedia lists him among the Libertarian contenders, but the reviewed sources provided little additional biographical detail. He is part of a smaller third-party field in the race.",
+      "summary": "Kyle Austin is a Libertarian candidate in Montana’s 2026 U.S. Senate primary. Ballotpedia lists him among the Libertarian contenders, but the reviewed sources provided little additional biographical detail. He is part of a smaller third-party field in the race.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Kyle_Austin_(Montana)",
@@ -524,7 +521,7 @@
       "name": "Tom Jandron",
       "party": "Libertarian",
       "incumbent": false,
-      "summary": "Tom Jandron is listed by Ballotpedia as a Libertarian candidate in Montana\u2019s 2026 U.S. Senate primary. The sources reviewed did not provide enough reliable public biographical information to detail his career or education. He is one of the Libertarian contenders in the race.",
+      "summary": "Tom Jandron is listed by Ballotpedia as a Libertarian candidate in Montana’s 2026 U.S. Senate primary. The sources reviewed did not provide enough reliable public biographical information to detail his career or education. He is one of the Libertarian contenders in the race.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Montana,_2026",
@@ -533,7 +530,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -546,7 +543,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:57:27.918287+00:00",
+  "updated_utc": "2026-04-06T17:41:21.579450+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -554,16 +551,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 84370,
-    "completion_tokens": 4896,
-    "total_tokens": 89266,
-    "estimated_usd": 0.0156,
+    "prompt_tokens": 320092,
+    "completion_tokens": 11324,
+    "total_tokens": 331416,
+    "estimated_usd": 0.0418,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 219655,
+        "completion_tokens": 10093
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 84370,
-        "completion_tokens": 4896
+        "prompt_tokens": 100437,
+        "completion_tokens": 1231
       }
     },
-    "duration_s": 38.0
-  }
+    "duration_s": 112.1
+  },
+  "validation_grade": null
 }

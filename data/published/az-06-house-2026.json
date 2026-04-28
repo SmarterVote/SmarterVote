@@ -1,0 +1,423 @@
+{
+  "id": "az-06-house-2026",
+  "title": "2026 U.S. House election in Arizona's 6th Congressional District",
+  "office": "U.S. House of Representatives",
+  "jurisdiction": "Arizona's 6th Congressional District, United States",
+  "state": "Arizona",
+  "district": "6th Congressional District",
+  "election_date": "2026-11-03",
+  "description": "Arizona's 6th Congressional District race is for a U.S. House seat in southeast Arizona, including parts of Tucson and Casa Grande. The district is widely viewed as competitive and a likely battleground because recent presidential results have been very close. Republican incumbent Juan Ciscomani is seeking reelection, and the race is expected to center on whether he can again hold a district that has narrowly split between the parties. Democratic challenger JoAnna Mendoza has emerged as a leading opponent, giving voters a clear incumbent-versus-challenger contrast in a closely divided district.",
+  "polling": [],
+  "polling_note": "No public polling found for this race as of 2026-04-07.",
+  "candidates": [
+    {
+      "name": "Trevor Dickerson",
+      "party": "Independent",
+      "incumbent": false,
+      "summary": "Trevor Dickerson is running as an independent in the general election for U.S. House in Arizona's 6th Congressional District in 2026. Publicly available biographical information was limited in the sources reviewed, and his official campaign website was identified but not found to provide additional verified background details in the searches conducted.",
+      "summary_sources": [
+        {
+          "url": "https://ballotpedia.org/Trevor_Dickerson",
+          "type": "website",
+          "title": "Trevor Dickerson - Ballotpedia"
+        },
+        {
+          "url": "https://ballotpedia.org/Arizona%27s_6th_Congressional_District_election,_2026",
+          "type": "website",
+          "title": "Arizona's 6th Congressional District election, 2026 - Ballotpedia"
+        },
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+          "type": "government",
+          "title": "FEC candidate overview"
+        },
+        {
+          "url": "https://www.trevordickerson.com/",
+          "type": "official",
+          "title": "Trevor Dickerson's Complex Simplicity"
+        }
+      ],
+      "image_url": null,
+      "website": null,
+      "social_media": {
+        "facebook": "https://www.facebook.com/trevordickerson/"
+      },
+      "career_history": [],
+      "education": [],
+      "donor_summary": "Trevor Dickerson\u2019s 2026 House campaign is a small early-stage operation. FEC records for the 2026 election cycle show $19,352.18 in total receipts through 9/30/2025, including $4,722.72 in individual contributions and $14,629.06 in candidate loans, with no party committee or PAC money reported in the summary.",
+      "donor_source_url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+      "voting_summary": "Trevor Dickerson is a non-incumbent challenger and has no public legislative voting record. FEC records identify him as a challenger for Arizona House District 6 in the 2026 election cycle, and no prior legislative office or executive office record was found in the searches conducted.",
+      "voting_source_url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+      "links": [
+        {
+          "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+          "title": "DICKERSON, TREVOR - Candidate overview - FEC",
+          "type": "finance"
+        },
+        {
+          "url": "https://ballotpedia.org/Trevor_Dickerson",
+          "title": "Trevor Dickerson - Ballotpedia",
+          "type": "ballotpedia"
+        },
+        {
+          "url": "https://www.trevordickerson.com/",
+          "title": "Trevor Dickerson's Complex Simplicity",
+          "type": "official"
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/2026_United_States_House_of_Representatives_elections_in_Arizona",
+          "title": "2026 United States House of Representatives elections in Arizona",
+          "type": "wiki"
+        },
+        {
+          "url": "https://www.opencampaign.com/united-states-elections/3171/2026-u.s.-house-elections/arizona/district-6",
+          "title": "2026 U.S. House elections in Arizona district 6 - OpenCampaign",
+          "type": "other"
+        },
+        {
+          "url": "https://www.repmyblock.org/TREVORDICKERSON_3491/voter/detail",
+          "title": "Rep My Block Voter Guide - Trevor Dickerson",
+          "type": "other"
+        },
+        {
+          "url": "https://gilavalleycentral.net/severson-drops-out-of-congressional-race/",
+          "title": "Severson drops out of Congressional race - GilaValleyCentral",
+          "type": "news"
+        }
+      ],
+      "issues": {
+        "Healthcare": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Economy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Climate/Energy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Immigration": {
+          "stance": "Supports legal immigration and law enforcement. In a public Facebook post, Dickerson said he supports \u201cthe vast majority of law enforcement officers and legal immigration\u201d and believes people should come here through the appropriate legal process.",
+          "confidence": "high",
+          "sources": [
+            {
+              "url": "https://www.facebook.com/trevordickerson/posts/i-want-to-start-by-saying-i-support-the-vast-majority-of-law-enforcement-officer/10229010460877643/",
+              "type": "social",
+              "title": "Facebook post on law enforcement and legal immigration",
+              "last_accessed": "2026-04-07T09:11:17.189082+00:00"
+            },
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:11:17.189082+00:00"
+            }
+          ]
+        },
+        "Guns & Safety": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Foreign Policy": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Social Justice": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Education": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Tech & AI": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Election Reform": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Reproductive Rights": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        },
+        "Local Issues": {
+          "stance": "No public position found.",
+          "confidence": "low",
+          "sources": [
+            {
+              "url": "https://ballotpedia.org/Trevor_Dickerson",
+              "type": "website",
+              "title": "Trevor Dickerson - Ballotpedia",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            },
+            {
+              "url": "https://www.fec.gov/data/candidate/H6AZ06115/",
+              "type": "government",
+              "title": "FEC candidate overview",
+              "last_accessed": "2026-04-07T09:10:30.297377+00:00"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "updated_utc": "2026-04-07T09:11:17.189082+00:00",
+  "generator": [
+    "gpt-5.4-mini",
+    "gpt-5-nano",
+    "claude-haiku-4-5-20251001",
+    "gemini-3-flash-preview",
+    "grok-3-mini"
+  ],
+  "reviews": [
+    {
+      "model": "claude-haiku-4-5-20251001",
+      "reviewed_at": "2026-04-07T09:11:25.842636+00:00",
+      "verdict": "approved",
+      "score": 87,
+      "flags": [
+        {
+          "field": "candidates[0].website",
+          "concern": "The website field is null, but the profile summary notes the official campaign website was 'identified' (https://www.trevordickerson.com/). This URL appears in the links array and social_media references it. The null value may be inconsistent with the summary's claim that a website was found.",
+          "suggestion": "Populate the website field with https://www.trevordickerson.com/ to match the sources cited elsewhere in the profile.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].career_history and candidates[0].education",
+          "concern": "Both arrays are empty. While the voting_summary and summary both note that 'no prior legislative office or executive office record was found,' these fields do not explicitly state whether searches were conducted for non-political career or educational background. For an independent candidate with limited public profile, this may reflect genuine data scarcity, but it is unclear whether the absence is due to non-existent information or incomplete research.",
+          "suggestion": "If searches were conducted but no education or career history was publicly available, add a note in the summary (e.g., 'Public career and education records not found in available sources'). If not searched, conduct targeted searches of LinkedIn, news archives, or local business records to document whether such information exists.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].image_url",
+          "concern": "The image_url field is null. While not critical, a profile image would enhance usability and verification. This may reflect technical limitations or incomplete scraping of the candidate's social media or campaign site rather than a data research failure.",
+          "suggestion": "Attempt to retrieve a headshot or campaign photo from the candidate's Facebook page or official website and include the URL.",
+          "severity": "info"
+        }
+      ],
+      "summary": "This profile demonstrates strong research methodology and transparency about data limitations. The agent conducted thorough searches across multiple authoritative sources (FEC, Ballotpedia, Facebook, official campaign site) and explicitly documented the absence of public positions on 11 of 12 policy issues\u2014a sign of honest reporting rather than fabrication. The one sourced stance (Immigration) is backed by a direct Facebook post URL. Financial data from FEC records is current (through 9/30/2025) and specific. The race description is accurate and balanced, presenting both the incumbent and challenger without partisan framing. The profile's transparency about Trevor Dickerson's low public profile (limited biographical information, early-stage campaign operation, no prior legislative record) is appropriate for a lesser-known independent candidate. No internal contradictions, bias, or unsupported claims were detected. Minor gaps (missing website URL despite identifying a campaign site, empty career_history and education arrays) reflect genuine data scarcity rather than research failure."
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "reviewed_at": "2026-04-07T09:11:30.615183+00:00",
+      "verdict": "approved",
+      "score": 95,
+      "flags": [
+        {
+          "field": "description",
+          "concern": "The race description identifies Juan Ciscomani and JoAnna Mendoza as the primary contenders, but their candidate profiles are missing from this specific JSON entry.",
+          "suggestion": "If this is a comprehensive race profile, add candidate objects for Ciscomani and Mendoza. If this is a candidate-specific report for Trevor Dickerson, the profile is complete as-is.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].career_history",
+          "concern": "The career history and education fields are empty. While the summary notes limited biographical information, local news or social media often contains clues about professional background.",
+          "suggestion": "A human reviewer should check the 'Gila Valley Central' or 'Rep My Block' sources for any mentions of past employment or residency duration to flesh out the bio.",
+          "severity": "info"
+        },
+        {
+          "field": "candidates[0].links",
+          "concern": "The link to 'Rep My Block' is a high-quality find for local grassroots activity and should be verified for any additional candidate platform details not captured in the issues section.",
+          "suggestion": null,
+          "severity": "info"
+        }
+      ],
+      "summary": "This is an exceptionally high-quality research profile for an independent candidate. The agent demonstrated superior research depth by locating a specific, relevant policy stance on immigration and law enforcement within a social media post, which provides valuable context for an otherwise low-profile candidate. Financial data is precisely sourced from FEC records, and the use of local news sources (Gila Valley Central) and official candidate sites indicates a thorough search process."
+    },
+    {
+      "model": "grok-3-mini",
+      "reviewed_at": "2026-04-07T09:11:29.687311+00:00",
+      "verdict": "approved",
+      "score": 95,
+      "flags": [
+        {
+          "field": "candidates",
+          "concern": "The array only includes Trevor Dickerson, while the description mentions other potential candidates (e.g., Juan Ciscomani and JoAnna Mendoza); this could indicate a gap in coverage, though the cited sources do not explicitly cover these individuals, suggesting the profile reflects available data.",
+          "suggestion": "Consider expanding the candidates array if additional sources become available to ensure comprehensive race coverage.",
+          "severity": "info"
+        }
+      ],
+      "summary": "This profile is a well-executed and balanced overview of the 2026 Arizona 6th Congressional District race, particularly for candidate Trevor Dickerson, with strong reliance on credible sources like FEC and Ballotpedia to document limited public information. It handles gaps in candidate background and issue stances transparently, maintaining neutral language throughout, and provides detailed sourcing for the one confirmed candidate, making it a reliable resource for early-stage election analysis."
+    }
+  ],
+  "validation_grade": {
+    "grade": "A",
+    "score": 92,
+    "passed": true,
+    "summary": "Validated by 3/3 reviewers with an average score of 92/100."
+  },
+  "agent_metrics": {
+    "model": "gpt-5.4-mini",
+    "prompt_tokens": 828392,
+    "completion_tokens": 70105,
+    "total_tokens": 898497,
+    "estimated_usd": 0.1448,
+    "model_breakdown": {
+      "gpt-5.4-mini": {
+        "prompt_tokens": 373140,
+        "completion_tokens": 5935
+      },
+      "gpt-5-nano": {
+        "prompt_tokens": 424508,
+        "completion_tokens": 61568
+      },
+      "claude-haiku-4-5-20251001": {
+        "prompt_tokens": 10553,
+        "completion_tokens": 1353
+      },
+      "grok-3-mini": {
+        "prompt_tokens": 9106,
+        "completion_tokens": 319
+      },
+      "gemini-3-flash-preview": {
+        "prompt_tokens": 11085,
+        "completion_tokens": 930
+      }
+    },
+    "duration_s": 758.8
+  }
+}

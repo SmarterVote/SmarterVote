@@ -4,7 +4,7 @@
   "office": "U.S. Senate",
   "jurisdiction": "Rhode Island",
   "election_date": "2026-11-03",
-  "description": "Rhode Island voters will elect one U.S. senator in 2026 for the state\u2019s Class II seat. The race matters because it will help determine control of the U.S. Senate, and Rhode Island is widely rated as safely Democratic based on recent election history and current race ratings. The Democratic primary features incumbent Jack Reed and challenger Connor Burbridge, while the Republican primary includes Raymond McKay and Allen Waters; independent Jon Lindley is also running in the general election. The main contrasts so far are between Reed\u2019s long incumbency and institutional record, Burbridge\u2019s progressive insurgent campaign, and the Republican candidates\u2019 efforts to break through in a heavily Democratic state.",
+  "description": "Rhode Island voters will elect one U.S. senator in 2026 for the state’s Class II seat. The race matters because it will help determine control of the U.S. Senate, and Rhode Island is widely rated as safely Democratic based on recent election history and current race ratings. The Democratic primary features incumbent Jack Reed and challenger Connor Burbridge, while the Republican primary includes Raymond McKay and Allen Waters; independent Jon Lindley is also running in the general election. The main contrasts so far are between Reed’s long incumbency and institutional record, Burbridge’s progressive insurgent campaign, and the Republican candidates’ efforts to break through in a heavily Democratic state.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Senator_Jack_Reed_Official_Portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jack_Reed.jpg",
       "website": "https://www.reed.senate.gov/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenJackReed/",
@@ -117,7 +117,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Connor_Burbridge_2025.jpg",
       "website": "https://www.burbridgeforri.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/burbridge.for.ri/",
@@ -153,7 +153,7 @@
       "name": "Raymond McKay",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Raymond McKay is running in the Republican primary for Rhode Island\u2019s U.S. Senate seat. Public descriptions of his campaign portray him as a longtime Rhode Island resident and veteran with a business background, and his prior Senate run makes him one of the more established Republican contenders in the race.",
+      "summary": "Raymond McKay is running in the Republican primary for Rhode Island’s U.S. Senate seat. Public descriptions of his campaign portray him as a longtime Rhode Island resident and veteran with a business background, and his prior Senate run makes him one of the more established Republican contenders in the race.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Raymond_McKay",
@@ -174,7 +174,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/RaymondMcKay.png",
       "website": "https://www.mckayforussenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/mckayforsenate/?locale=lt_LT",
@@ -238,7 +238,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Allen_Waters_01.jpg",
       "website": "https://www.allenrwaters.com/",
       "social_media": {
         "x": "https://x.com/AllenWatersUSA",
@@ -288,7 +288,7 @@
       "name": "Jon Lindley",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Jon Lindley is running as an independent in the general election for Rhode Island\u2019s U.S. Senate seat. Ballotpedia lists him as an official candidate, but there is limited publicly available biographical information in the sources reviewed.",
+      "summary": "Jon Lindley is running as an independent in the general election for Rhode Island’s U.S. Senate seat. Ballotpedia lists him as an official candidate, but there is limited publicly available biographical information in the sources reviewed.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Jon_Lindley",
@@ -303,7 +303,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://commons.wikimedia.org/wiki/File:JLindley.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/9/9b/JLindley.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -316,7 +316,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:04:07.349831+00:00",
+  "updated_utc": "2026-04-06T17:16:28.830619+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -324,16 +324,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 110163,
-    "completion_tokens": 3144,
-    "total_tokens": 113307,
-    "estimated_usd": 0.0184,
+    "prompt_tokens": 119323,
+    "completion_tokens": 5042,
+    "total_tokens": 124365,
+    "estimated_usd": 0.0163,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 75752,
+        "completion_tokens": 4285
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 110163,
-        "completion_tokens": 3144
+        "prompt_tokens": 43571,
+        "completion_tokens": 757
       }
     },
-    "duration_s": 32.8
-  }
+    "duration_s": 82.0
+  },
+  "validation_grade": null
 }

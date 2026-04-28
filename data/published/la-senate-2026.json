@@ -4,8 +4,50 @@
   "office": "United States Senate",
   "jurisdiction": "Louisiana",
   "election_date": "2026-11-03",
-  "description": "Louisiana will elect one U.S. senator in 2026 for the Class II seat currently held by Bill Cassidy. The race matters because it will help determine control of the U.S. Senate, and Louisiana is now using closed partisan primaries and a runoff system for this office. The Republican primary is the main contest so far, with Cassidy facing challengers including John Fleming and Julia Letlow; the state is widely rated Republican-leaning, but the primary has drawn attention because of Trump and Gov. Jeff Landry\u2019s endorsement of Letlow and Cassidy\u2019s history of breaking with Trump on impeachment.",
+  "description": "Louisiana’s 2026 U.S. Senate race features incumbent Republican Bill Cassidy seeking another term against a crowded field that includes Republican challengers John Fleming and Julia Letlow and Democratic candidates Nick Albares, Gary Crockett, Jamie Davis, and Jamie LaBranche, plus Mark Spencer. Louisiana uses a closed primary system, and the race matters because the state’s Senate seat is one of the few competitive Republican-held contests in 2026; the main contrasts are over alignment with Donald Trump, party establishment support, and which candidate can consolidate primary voters in a likely runoff.",
   "polling": [
+    {
+      "pollster": "American Pulse Research & Polling",
+      "date": "2026-03-25",
+      "matchups": [
+        {
+          "candidates": [
+            "Julia Letlow",
+            "John Fleming",
+            "Bill Cassidy"
+          ],
+          "percentages": [
+            30.5,
+            24.5,
+            20.5
+          ]
+        },
+        {
+          "candidates": [
+            "Julia Letlow",
+            "John Fleming"
+          ],
+          "percentages": [
+            36.7,
+            33.9
+          ]
+        },
+        {
+          "candidates": [
+            "Julia Letlow",
+            "John Fleming",
+            "Bill Cassidy"
+          ],
+          "percentages": [
+            39.2,
+            24.0,
+            18.0
+          ]
+        }
+      ],
+      "source_url": "https://data.ddhq.io/polls/2026/04/02/American-Pulse-Research-&-Polling-Louisiana",
+      "sample_size": 455
+    },
     {
       "pollster": "Quantus Insights",
       "date": "2026-02-25",
@@ -48,7 +90,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Bill_Cassidy_official_Senate_photo.jpg/512px-Bill_Cassidy_official_Senate_photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Bill_Cassidy_official_Senate_photo.jpg",
       "website": "https://www.billcassidy.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenBillCassidy/",
@@ -82,7 +124,7 @@
           "organization": "Louisiana charity hospital system / Greater Baton Rouge Community Clinic",
           "start_year": 1990,
           "end_year": 2009,
-          "description": "Worked as a physician in Louisiana\u2019s charity hospital system and co-founded a free clinic for uninsured patients."
+          "description": "Worked as a physician in Louisiana’s charity hospital system and co-founded a free clinic for uninsured patients."
         }
       ],
       "education": [
@@ -113,7 +155,7 @@
       "name": "John Fleming",
       "party": "Republican",
       "incumbent": false,
-      "summary": "John Fleming is a Republican candidate in the Louisiana Senate primary and, as of 2026, serves as Louisiana state treasurer. He previously represented Louisiana\u2019s 4th Congressional District in the U.S. House and has also worked as a physician, business owner, and Navy officer. His campaign has framed him as a conservative aligned with President Trump and focused on border security, Louisiana jobs, and traditional Republican priorities.",
+      "summary": "John Fleming is a Republican candidate in the Louisiana Senate primary and, as of 2026, serves as Louisiana state treasurer. He previously represented Louisiana’s 4th Congressional District in the U.S. House and has also worked as a physician, business owner, and Navy officer. His campaign has framed him as a conservative aligned with President Trump and focused on border security, Louisiana jobs, and traditional Republican priorities.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Louisiana,_2026",
@@ -122,7 +164,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/c/cb/John_Fleming_official_photo_%28alt_crop%29.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -131,7 +173,7 @@
           "organization": "State of Louisiana",
           "start_year": 2024,
           "end_year": null,
-          "description": "Serves as Louisiana\u2019s state treasurer."
+          "description": "Serves as Louisiana’s state treasurer."
         },
         {
           "title": "U.S. Representative, Louisiana's 4th District",
@@ -196,7 +238,7 @@
       "name": "Julia Letlow",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Julia Letlow is a Republican U.S. representative from Louisiana\u2019s 5th Congressional District and a candidate for the Senate seat in 2026. Before Congress, she worked in higher education and university administration, and her campaign has emphasized conservative themes such as border security, law enforcement, education, and support for President Trump. She entered Congress in 2021 after winning a special election to succeed her late husband, Luke Letlow.",
+      "summary": "Julia Letlow is a Republican U.S. representative from Louisiana’s 5th Congressional District and a candidate for the Senate seat in 2026. Before Congress, she worked in higher education and university administration, and her campaign has emphasized conservative themes such as border security, law enforcement, education, and support for President Trump. She entered Congress in 2021 after winning a special election to succeed her late husband, Luke Letlow.",
       "summary_sources": [
         {
           "url": "https://letlow.house.gov/about",
@@ -217,7 +259,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Julia_Letlow_117th_%28cropped%29.jpg/512px-Julia_Letlow_117th_%28cropped%29.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JuliaLetlowLA2.png",
       "website": "https://www.julialetlow.com/",
       "social_media": {
         "x": "https://x.com/jbletlow",
@@ -230,7 +272,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2021,
           "end_year": null,
-          "description": "Represents Louisiana\u2019s 5th Congressional District."
+          "description": "Represents Louisiana’s 5th Congressional District."
         },
         {
           "title": "Executive Director of External Affairs and Strategic Communications",
@@ -290,9 +332,99 @@
         "https://www.julialetlow.com/"
       ],
       "issues": {}
+    },
+    {
+      "name": "Mark Spencer",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Mark_Spencer_Official_Cabinet_Portrait%2C_September_2021_%28cropped%29.jpg/500px-Mark_Spencer_Official_Cabinet_Portrait%2C_September_2021_%28cropped%29.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Nick Albares",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Nick_Albares_20260222_032731.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Gary Crockett",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/garycrockett.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Jamie Davis",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Jamie LaBranche",
+      "party": "Independent",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jamie_LaBranche.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:50:39.448099+00:00",
+  "updated_utc": "2026-04-06T17:59:08.347118+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -300,16 +432,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 65858,
-    "completion_tokens": 2627,
-    "total_tokens": 68485,
-    "estimated_usd": 0.0115,
+    "prompt_tokens": 195085,
+    "completion_tokens": 11325,
+    "total_tokens": 206410,
+    "estimated_usd": 0.0297,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 86406,
+        "completion_tokens": 9979
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 65858,
-        "completion_tokens": 2627
+        "prompt_tokens": 108679,
+        "completion_tokens": 1346
       }
     },
-    "duration_s": 25.5
-  }
+    "duration_s": 150.7
+  },
+  "validation_grade": null
 }

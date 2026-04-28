@@ -4,7 +4,7 @@
   "office": "U.S. Senate",
   "jurisdiction": "South Carolina",
   "election_date": "2026-11-03",
-  "description": "South Carolina\u2019s 2026 U.S. Senate race will decide the state\u2019s Class II Senate seat, currently held by Republican Lindsey Graham. The race matters because it affects control of the U.S. Senate and is being watched as a test of whether Democrats can make the contest more competitive in a state that recent ratings still classify as strongly Republican. The main contrast is between Graham\u2019s long incumbency and national-security-focused brand and the challengers\u2019 efforts to frame the race around cost of living, health care, accountability, and broader dissatisfaction with Washington.",
+  "description": "South Carolina’s 2026 U.S. Senate race will decide the state’s Class II Senate seat, currently held by Republican Lindsey Graham. The race matters because it affects control of the U.S. Senate and is being watched as a test of whether Democrats can make the contest more competitive in a state that recent ratings still classify as strongly Republican. The main contrast is between Graham’s long incumbency and national-security-focused brand and the challengers’ efforts to frame the race around cost of living, health care, accountability, and broader dissatisfaction with Washington.",
   "polling": [
     {
       "pollster": "Impact Research",
@@ -52,7 +52,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Lindsey_Graham%2C_official_portrait%2C_113th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Lindsey_Graham.jpg",
       "website": "https://lindseygraham.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/LindseyGrahamSC/",
@@ -127,7 +127,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Annie_Andrews.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Annieandrews.jpg",
       "website": "https://drannieandrews.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/AnnieAndrewsMD/",
@@ -200,7 +200,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Paul_Dans.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Paul_Dans_20251106_061937.jpg",
       "website": "https://www.pauldans.com/",
       "social_media": {},
       "career_history": [
@@ -292,7 +292,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Kyle_Freeman_20241122_105330.jpg",
       "website": "https://kylefreemanforsenate.com/",
       "social_media": {},
       "career_history": [
@@ -332,7 +332,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -357,7 +357,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -382,7 +382,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Don_Louis_20260321_024344.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -407,7 +407,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -432,7 +432,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -457,7 +457,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/CahterineFlemingBruce2025.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -482,7 +482,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Brandon_Browner.JPG/500px-Brandon_Browner.JPG",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -495,7 +495,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:04:48.029036+00:00",
+  "updated_utc": "2026-04-06T17:14:44.904589+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -503,16 +503,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 92577,
-    "completion_tokens": 4260,
-    "total_tokens": 96837,
-    "estimated_usd": 0.0164,
+    "prompt_tokens": 302806,
+    "completion_tokens": 7999,
+    "total_tokens": 310805,
+    "estimated_usd": 0.0435,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 107622,
+        "completion_tokens": 6905
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 92577,
-        "completion_tokens": 4260
+        "prompt_tokens": 195184,
+        "completion_tokens": 1094
       }
     },
-    "duration_s": 40.4
-  }
+    "duration_s": 126.5
+  },
+  "validation_grade": null
 }

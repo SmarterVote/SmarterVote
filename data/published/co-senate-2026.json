@@ -4,42 +4,84 @@
   "office": "United States Senate",
   "jurisdiction": "Colorado",
   "election_date": "2026-11-03",
-  "description": "Colorado will elect one U.S. senator in 2026 for the Class II seat currently held by Democrat John Hickenlooper. The race matters because it will help determine control of the U.S. Senate, and Colorado is generally viewed as a Democratic-leaning state in recent federal elections. The contest is likely to center on partisan control, candidate experience, and policy differences on issues such as the economy, health care, climate, and federal governance.",
-  "polling": [],
+  "description": "Voters in Colorado will elect one member to the U.S. Senate on November 3, 2026, with the primary scheduled for June 30, 2026. The race is for the Class II seat held by incumbent Democrat John Hickenlooper, and the contest is drawing attention because Hickenlooper faces a Democratic primary challenge from state Sen. Julie Gonzales while Republicans are competing to become the general-election nominee.",
+  "polling": [
+    {
+      "pollster": "Data for Progress",
+      "date": "2026-02-25",
+      "matchups": [
+        {
+          "candidates": [
+            "John Hickenlooper",
+            "Julie Gonzales",
+            "Karen Breslin",
+            "Anthony Zimpfer",
+            "Brashad Hasley"
+          ],
+          "percentages": [
+            38,
+            35,
+            null,
+            null,
+            null
+          ]
+        },
+        {
+          "candidates": [
+            "John Hickenlooper",
+            "Julie Gonzales"
+          ],
+          "percentages": [
+            33,
+            40
+          ]
+        },
+        {
+          "candidates": [
+            "John Hickenlooper",
+            "Julie Gonzales",
+            "Karen Breslin",
+            "Anthony Zimpfer",
+            "Brashad Hasley"
+          ],
+          "percentages": [
+            45,
+            13,
+            3,
+            3,
+            3
+          ]
+        }
+      ],
+      "source_url": "https://workingfamilies.org/wp-content/uploads/2026/02/Colorado-Senate-Democratic-Primary-Poll-Summary-of-Findings-WFP-1.pdf",
+      "sample_size": 739
+    }
+  ],
   "polling_note": "No public general-election polling found for this race as of 2026-04-01.",
   "candidates": [
     {
       "name": "John Hickenlooper",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "John Hickenlooper is the incumbent U.S. senator from Colorado and a former governor and Denver mayor. He has emphasized a problem-solving, bipartisan style and has framed his Senate work around issues such as health care, climate, the economy, and public lands.",
+      "summary": "John Hickenlooper is the incumbent Democratic U.S. senator from Colorado seeking reelection in 2026. In March 2026, he qualified for the Democratic primary ballot by petition and has continued to report strong fundraising and endorsements from groups including Planned Parenthood Action and an environmental organization.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Colorado,_2026",
-          "type": "government",
-          "title": "United States Senate election in Colorado, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.coloradopolitics.com/2026/03/26/democratic-us-sen-john-hickenlooper-qualifies-for-colorado-primary-by-petition-will-skip-assembly/",
+          "title": "Democratic US Sen. John Hickenlooper qualifies for Colorado primary by petition, will skip assembly",
+          "type": "news"
         },
         {
-          "url": "https://www.hickenlooper.senate.gov/",
-          "type": "government",
-          "title": "Senator John Hickenlooper | Senator for Colorado",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.coloradopolitics.com/2026/02/19/hickenlooper-endorsed-by-planned-parenthood-action-environmental-group-in-colorados-u-s-senate-race/",
+          "title": "Hickenlooper endorsed by Planned Parenthood Action, environmental group in Colorado's U.S. Senate race",
+          "type": "news"
         },
         {
-          "url": "https://hickenlooper.com/",
-          "type": "website",
-          "title": "Hickenlooper for Colorado: Join the team",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://en.wikipedia.org/wiki/John_Hickenlooper",
-          "type": "news",
-          "title": "John Hickenlooper - Wikipedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.coloradopolitics.com/2026/01/22/colorado-democrat-john-hickenlooper-raises-over-1-1-million-in-4th-quarter-for-reelection-bid/",
+          "title": "Colorado Democrat John Hickenlooper raises over $1.1 million in 4th quarter for reelection bid",
+          "type": "news"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/John_Hickenlooper_official_portrait.jpg/512px-John_Hickenlooper_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JohnHickenlooper.jpg",
       "website": "https://hickenlooper.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/JohnHickenlooper",
@@ -112,7 +154,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/KarenBreslin2024.JPG",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -128,22 +170,20 @@
       "name": "Julie Gonzales",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Julie Gonzales is listed by Ballotpedia as a candidate in the Democratic primary for Colorado's 2026 U.S. Senate race. She is known in Colorado politics as a state legislator and progressive organizer, and her campaign is likely to emphasize a more activist policy approach than the incumbent.",
+      "summary": "Julie Gonzales is a Democratic state senator from Denver who launched a primary challenge to incumbent U.S. Sen. John Hickenlooper in December 2025. In February 2026, a Working Families Party-backed poll showed her closing the gap with Hickenlooper after voters were given more information about the candidates.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Colorado,_2026",
-          "type": "government",
-          "title": "United States Senate election in Colorado, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.coloradopolitics.com/2025/12/08/colorado-democrat-julie-gonzales-launches-u-s-senate-primary-challenge-to-incumbent-john-hickenlooper/",
+          "title": "Colorado Democrat Julie Gonzales launches U.S. Senate primary challenge to incumbent John Hickenlooper",
+          "type": "news"
         },
         {
-          "url": "https://ballotpedia.org/Julie_Gonzales",
-          "type": "government",
-          "title": "Julie Gonzales - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://workingfamilies.org/wp-content/uploads/2026/02/Colorado-Senate-Democratic-Primary-Poll-Summary-of-Findings-WFP-1.pdf",
+          "title": "Colorado Senate Democratic Primary Poll Summary of Findings",
+          "type": "poll"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JulieGonzalesCO.jfif",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -183,7 +223,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Brashad_Hasley_20250925_123613.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -208,7 +248,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Jessica_Williams_at_Televerse_2025.jpg/500px-Jessica_Williams_at_Televerse_2025.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -233,7 +273,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/AnthonyZimpfer25.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -249,22 +289,15 @@
       "name": "Mark Baisley",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Mark Baisley is a Colorado state senator and a Republican candidate in the 2026 U.S. Senate race. His public profile in state politics has centered on conservative positions and legislative service in the Colorado Senate.",
+      "summary": "Mark Baisley is a Republican Colorado state senator who left the gubernatorial race in January 2026 and entered the U.S. Senate contest against incumbent Democrat John Hickenlooper. His campaign announcement shifted him into the Senate primary field as one of the Republican candidates seeking the nomination.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Colorado,_2026",
-          "type": "government",
-          "title": "United States Senate election in Colorado, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Mark_Baisley",
-          "type": "government",
-          "title": "Mark Baisley - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.coloradopolitics.com/2026/01/05/colorado-republican-mark-baisley-exits-gubernatorial-race-launches-u-s-senate-campaign/",
+          "title": "Colorado Republican Mark Baisley exits gubernatorial race, launches U.S. Senate campaign",
+          "type": "news"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mark_Baisley_20241022_115022.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -297,7 +330,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Amanda_Calderon.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -322,7 +355,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Dathan_Jones_20260201_085630.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -353,7 +386,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Janak_Joshi.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -393,7 +426,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/George_Washington_Markert_20260304_052410.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -418,7 +451,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Sean_Pond_20260328_034833.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -431,7 +464,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:41:38.639648+00:00",
+  "updated_utc": "2026-04-06T18:23:41.497500+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -439,16 +472,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 95753,
-    "completion_tokens": 3692,
-    "total_tokens": 99445,
-    "estimated_usd": 0.0166,
+    "prompt_tokens": 232327,
+    "completion_tokens": 7635,
+    "total_tokens": 239962,
+    "estimated_usd": 0.034,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 89450,
+        "completion_tokens": 5036
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 95753,
-        "completion_tokens": 3692
+        "prompt_tokens": 142877,
+        "completion_tokens": 2599
       }
     },
-    "duration_s": 30.7
-  }
+    "duration_s": 120.3
+  },
+  "validation_grade": null
 }

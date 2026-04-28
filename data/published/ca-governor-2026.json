@@ -4,8 +4,42 @@
   "office": "Governor of California",
   "jurisdiction": "California",
   "election_date": "2026-11-03",
-  "description": "California\u2019s 2026 gubernatorial race is for governor, the state\u2019s top executive office. Because Gov. Gavin Newsom is term-limited, the race is an open seat, and California\u2019s top-two primary system means the June primary will determine which two candidates advance to November. The contest is drawing attention because California is heavily Democratic overall, but the field is crowded and recent polling has shown multiple candidates with plausible paths to the top two. Key contrasts in the race include public safety and cost-of-living messaging from Republicans Chad Bianco and Steve Hilton, versus Democratic candidates emphasizing affordability, consumer protection, and opposition to Donald Trump.",
+  "description": "California’s 2026 gubernatorial election is an open-seat race for governor, the state’s top executive office, because Gov. Gavin Newsom is term-limited. Under California’s top-two primary system, the June 2 primary will determine which two candidates advance to the November general election. The race matters because California is heavily Democratic overall, but recent polling has shown a competitive field and a possible path for Republicans if they split the Democratic vote; key contrasts center on affordability, housing, taxes, public safety, regulation, and how aggressively the next governor should confront or work with Donald Trump.",
   "polling": [
+    {
+      "pollster": "Emerson College Polling / Inside California Politics",
+      "date": "2026-03-11",
+      "matchups": [
+        {
+          "candidates": [
+            "Eric Swalwell",
+            "Steve Hilton",
+            "Tom Steyer",
+            "Chad Bianco",
+            "Katie Porter",
+            "Xavier Becerra",
+            "Antonio Villaraigosa",
+            "Matt Mahan",
+            "Betty Yee",
+            "Tony Thurmond"
+          ],
+          "percentages": [
+            17,
+            13,
+            11,
+            11,
+            8,
+            3,
+            3,
+            3,
+            2,
+            1
+          ]
+        }
+      ],
+      "source_url": "https://emersoncollegepolling.com/california-2026-poll-swalwell-takes-lead-in-governor-primary-25-undecided-election-for-la-mayor-wide-open/",
+      "sample_size": 1000
+    },
     {
       "pollster": "Berkeley IGS",
       "date": "2026-03-18",
@@ -203,28 +237,25 @@
       "name": "Chad Bianco",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Chad Bianco is the Riverside County sheriff and a Republican candidate for governor. His campaign has emphasized public safety, lower taxes, and reducing regulation, and Ballotpedia lists him as a candidate in California\u2019s June 2, 2026 top-two primary. He is running as a law-and-order conservative with support from some Republican elected officials and law-enforcement groups.",
+      "summary": "Chad Bianco is the Riverside County sheriff and a Republican candidate for governor. In April 2026, reporting on the race highlighted his campaign’s emphasis on deregulation, lower taxes, public safety, and opposition to Democratic environmental policies, while also noting his effort to recount ballots from a Riverside County special election that is on hold amid legal challenges. He is running as a law-and-order conservative with support from some law-enforcement groups.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Chad_Bianco",
-          "type": "website",
-          "title": "Chad Bianco - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://calmatters.org/politics/2026/04/california-governor-gop-candidates/",
+          "type": "news",
+          "title": "California GOP governor candidates face unusual paradox"
         },
         {
           "url": "https://www.riversidesheriff.org/689/Sheriff-Chad-Bianco",
           "type": "government",
-          "title": "Sheriff Chad Bianco | Riverside County Sheriff, CA",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Sheriff Chad Bianco | Riverside County Sheriff, CA"
         },
         {
-          "url": "https://che4ca.com/",
+          "url": "https://ballotpedia.org/Chad_Bianco",
           "type": "website",
-          "title": "Ch\u00e9 Ahn California Governor | Official Campaign Website",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Chad Bianco - Ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Chad_Bianco%2C_2025.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Chad_Bianco_20250505_034559.jpg",
       "website": "https://biancoforgovernor.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SheriffChadBianco/",
@@ -237,14 +268,14 @@
           "organization": "Riverside County",
           "start_year": 2019,
           "end_year": null,
-          "description": "Elected county sheriff; oversees the Riverside County Sheriff\u2019s Department."
+          "description": "Elected county sheriff; oversees the Riverside County Sheriff’s Department."
         },
         {
           "title": "Deputy / law enforcement officer",
           "organization": "Riverside County Sheriff's Department",
           "start_year": 1990,
           "end_year": 2018,
-          "description": "Worked in the sheriff\u2019s department for about 26 years before becoming sheriff."
+          "description": "Worked in the sheriff’s department for about 26 years before becoming sheriff."
         }
       ],
       "education": [
@@ -266,28 +297,25 @@
       "name": "Steve Hilton",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Steve Hilton is a Republican candidate for governor and a former political adviser and media commentator. His campaign site and Ballotpedia profile describe him as a conservative candidate focused on housing, taxes, education, and making California more business-friendly. He is running as an outsider with prior experience in U.K. politics and U.S. media.",
+      "summary": "Steve Hilton is a Republican candidate for governor and a former political adviser and media commentator. In April 2026 coverage, he was described as one of the two leading Republicans in the race, campaigning on deregulation, lower taxes, cheaper energy, and a program he calls “CalDOGE” to target waste and fraud in state government. He is running as an outsider with prior experience in U.K. politics and U.S. media.",
       "summary_sources": [
         {
-          "url": "https://ballotpedia.org/Steve_Hilton",
-          "type": "website",
-          "title": "Steve Hilton - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://calmatters.org/politics/2026/04/california-governor-gop-candidates/",
+          "type": "news",
+          "title": "California GOP governor candidates face unusual paradox"
         },
         {
           "url": "https://stevehiltonforgovernor.com/",
-          "type": "website",
-          "title": "Steve Hilton for California Governor | Official Campaign Site",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "Steve Hilton for California Governor | Official Campaign Site"
         },
         {
-          "url": "https://en.wikipedia.org/wiki/Steve_Hilton",
+          "url": "https://ballotpedia.org/Steve_Hilton",
           "type": "website",
-          "title": "Steve Hilton - Wikipedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Steve Hilton - Ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Steve_Hilton_2025.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Steve_HiltonCA.jpg",
       "website": "https://stevehiltonforgovernor.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/TheSteveHilton/",
@@ -336,28 +364,25 @@
       "name": "Eric Swalwell",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Eric Swalwell is a Democratic member of Congress from California\u2019s 14th District and a candidate for governor. His background includes service as a prosecutor and city councilmember, and his campaign has framed the race around affordability, public safety, and opposition to Donald Trump. He is one of several high-profile Democrats in a crowded top-two primary.",
+      "summary": "Eric Swalwell is a Democratic member of Congress from California’s 14th District and a candidate for governor. In March and April 2026 polling and coverage, he emerged as one of the leading Democrats in the crowded primary, with his campaign emphasizing affordability, public safety, and opposition to Donald Trump. He is one of several high-profile Democrats competing for a place in California’s top-two primary runoff.",
       "summary_sources": [
+        {
+          "url": "https://emersoncollegepolling.com/california-2026-poll-swalwell-takes-lead-in-governor-primary-25-undecided-election-for-la-mayor-wide-open/",
+          "type": "poll",
+          "title": "California 2026 Poll: Swalwell Takes Lead in Governor Primary, 25% undecided; Election for LA Mayor Wide Open"
+        },
+        {
+          "url": "https://calmatters.org/politics/2026/03/california-governor-candidates/",
+          "type": "news",
+          "title": "The field is set: 10 candidates are running for California governor"
+        },
         {
           "url": "https://ballotpedia.org/Eric_Swalwell",
           "type": "website",
-          "title": "Eric Swalwell - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.ericswalwell.com/",
-          "type": "website",
-          "title": "Eric Swalwell for Governor",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "http://swalwell.house.gov/about/full-biography",
-          "type": "government",
-          "title": "Meet Eric | Representative Swalwell - House.gov",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Eric Swalwell - Ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Eric_Swalwell_2024.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Eric_Swalwell,_official_portrait,_113th_Congress-7.jpg",
       "website": "https://www.ericswalwell.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/EricMSwalwell/",
@@ -371,14 +396,14 @@
           "organization": "U.S. House of Representatives, California's 14th District",
           "start_year": 2023,
           "end_year": null,
-          "description": "Represents California\u2019s 14th Congressional District."
+          "description": "Represents California’s 14th Congressional District."
         },
         {
           "title": "U.S. Representative",
           "organization": "U.S. House of Representatives, California's 15th District",
           "start_year": 2013,
           "end_year": 2023,
-          "description": "Previously represented California\u2019s 15th Congressional District."
+          "description": "Previously represented California’s 15th Congressional District."
         },
         {
           "title": "Deputy District Attorney",
@@ -426,28 +451,25 @@
       "name": "Katie Porter",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Katie Porter is a former U.S. representative from Orange County and a Democratic candidate for governor. Her campaign and biography emphasize consumer protection, affordability, and a confrontational style toward corporate and political power. She is running as a progressive-leaning Democrat with a record in Congress and as a law professor.",
+      "summary": "Katie Porter is a former U.S. representative from Orange County and a Democratic candidate for governor. In April 2026 coverage, she remained among the leading Democrats in the race, with her campaign centered on affordability, consumer protection, and a more confrontational approach to corporate and political power. She is running as a progressive-leaning Democrat with a record in Congress and as a law professor.",
       "summary_sources": [
+        {
+          "url": "https://calmatters.org/politics/2026/04/california-governor-gop-candidates/",
+          "type": "news",
+          "title": "California GOP governor candidates face unusual paradox"
+        },
         {
           "url": "https://ballotpedia.org/Katie_Porter",
           "type": "website",
-          "title": "Katie Porter - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Katie Porter - Ballotpedia"
         },
         {
           "url": "https://katieporter.com/",
-          "type": "website",
-          "title": "Katie Porter for Governor | Official Campaign Website",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://katieporter.com/about/",
-          "type": "website",
-          "title": "Meet Katie | Katie Porter for Governor",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "Katie Porter for Governor | Official Campaign Website"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Katie_Porter_2024.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/KATIE_PORTER.jpg",
       "website": "https://katieporter.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/katieporterca/",
@@ -468,7 +490,7 @@
           "organization": "U.S. House of Representatives, California's 45th District",
           "start_year": 2019,
           "end_year": 2023,
-          "description": "Previously represented California\u2019s 45th Congressional District."
+          "description": "Previously represented California’s 45th Congressional District."
         },
         {
           "title": "Professor",
@@ -510,28 +532,20 @@
       "name": "Antonio Villaraigosa",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Antonio Villaraigosa is a former Los Angeles mayor and former speaker of the California State Assembly who is running for governor as a Democrat. His campaign and biography stress experience, problem-solving, and a focus on affordability, jobs, and public services. He is one of the most experienced candidates in the field and is seeking a return to statewide office after earlier runs for governor.",
+      "summary": "Antonio Villaraigosa is a former Los Angeles mayor and a Democratic candidate for governor. He remains in the crowded top-two primary field, where his campaign has focused on affordability, housing, and state management experience. He is running as a centrist Democrat with a long record in California politics.",
       "summary_sources": [
+        {
+          "url": "https://calmatters.org/politics/2026/03/california-governor-candidates/",
+          "type": "news",
+          "title": "The field is set: 10 candidates are running for California governor"
+        },
         {
           "url": "https://ballotpedia.org/Antonio_Villaraigosa",
           "type": "website",
-          "title": "Antonio Villaraigosa - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.antonio2026.com/",
-          "type": "website",
-          "title": "Antonio Villaraigosa for Governor 2026",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.antonio2026.com/about-antonio",
-          "type": "website",
-          "title": "About Antonio Villaraigosa \u2014 Antonio Villaraigosa for Governor 2026",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Antonio Villaraigosa - Ballotpedia"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/Antonio_Villaraigosa_Headshot.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Antonio_Villaraigosa_Headshot.jpg",
       "website": "https://www.antonio2026.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/AntonioVillaraigosa/",
@@ -599,28 +613,20 @@
       "name": "Xavier Becerra",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Xavier Becerra is a former U.S. secretary of health and human services, former California attorney general, and former longtime member of Congress. His campaign presents him as a defender of the California Dream, and his background includes decades in state and federal office. He is running as a high-profile Democrat with extensive executive and legislative experience.",
+      "summary": "Xavier Becerra is a former California attorney general and former U.S. health and human services secretary who is running for governor as a Democrat. He remains in the crowded primary field, where his campaign has emphasized experience in state and federal government and a focus on affordability and public services. He is running as a mainstream Democrat with a long record in California and national office.",
       "summary_sources": [
+        {
+          "url": "https://calmatters.org/politics/2026/03/california-governor-candidates/",
+          "type": "news",
+          "title": "The field is set: 10 candidates are running for California governor"
+        },
         {
           "url": "https://ballotpedia.org/Xavier_Becerra",
           "type": "website",
-          "title": "Xavier Becerra - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.xavierbecerra2026.com/",
-          "type": "website",
-          "title": "Xavier Becerra - Build, Protect, and Lead California",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://www.congress.gov/117/meeting/house/112595/witnesses/HHRG-117-IF14-Bio-BecerraX-20210512.pdf",
-          "type": "government",
-          "title": "Bio of Secretary of Health and Human Services Xavier Becerra",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "Xavier Becerra - Ballotpedia"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/Xavier_Becerra.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Xavier_Becerra.jpg",
       "website": "https://www.xavierbecerra2026.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/becerraforgovernor/",
@@ -633,35 +639,35 @@
           "organization": "U.S. Department of Health and Human Services",
           "start_year": 2021,
           "end_year": 2025,
-          "description": "Served in President Biden\u2019s cabinet."
+          "description": "Served in President Biden’s cabinet."
         },
         {
           "title": "Attorney General",
           "organization": "State of California",
           "start_year": 2017,
           "end_year": 2021,
-          "description": "Served as California\u2019s attorney general."
+          "description": "Served as California’s attorney general."
         },
         {
           "title": "U.S. Representative",
           "organization": "U.S. House of Representatives, California's 34th District",
           "start_year": 2013,
           "end_year": 2017,
-          "description": "Represented California\u2019s 34th Congressional District."
+          "description": "Represented California’s 34th Congressional District."
         },
         {
           "title": "U.S. Representative",
           "organization": "U.S. House of Representatives, California's 31st District",
           "start_year": 2003,
           "end_year": 2013,
-          "description": "Represented California\u2019s 31st Congressional District."
+          "description": "Represented California’s 31st Congressional District."
         },
         {
           "title": "U.S. Representative",
           "organization": "U.S. House of Representatives, California's 30th District",
           "start_year": 1993,
           "end_year": 2003,
-          "description": "Represented California\u2019s 30th Congressional District."
+          "description": "Represented California’s 30th Congressional District."
         },
         {
           "title": "Member",
@@ -675,7 +681,7 @@
           "organization": "State of California",
           "start_year": 1987,
           "end_year": 1990,
-          "description": "Worked in the California Attorney General\u2019s office."
+          "description": "Worked in the California Attorney General’s office."
         }
       ],
       "education": [
@@ -698,9 +704,130 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Matt Mahan",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Matt Mahan is the mayor of San Jose and a Democratic candidate for governor. In April 2026 coverage, he was described as a late entrant who has struggled to gain traction despite significant Silicon Valley support, and he has tried to distinguish himself with a more business-friendly, reform-oriented message. He is running as a moderate Democrat focused on affordability, housing, and government efficiency.",
+      "summary_sources": [
+        {
+          "url": "https://calmatters.org/commentary/2026/04/california-governor-race-chicken-game/",
+          "type": "news",
+          "title": "This isn't a race for California governor; it's a game of chicken"
+        },
+        {
+          "url": "https://calmatters.org/commentary/2026/01/california-issues-discourage-candidates-governor/",
+          "type": "news",
+          "title": "Did CA's major issues scare off governor's race candidates?"
+        },
+        {
+          "url": "https://ballotpedia.org/Matt_Mahan",
+          "type": "website",
+          "title": "Matt Mahan - Ballotpedia"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Matt_Mahan2.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Tom Steyer",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Tom Steyer is a billionaire environmental activist and Democratic candidate for governor. In April 2026 coverage, he was described as one of the most visible Democrats in the race, using substantial self-funding and a campaign focused on affordability, climate, and economic relief. He is running as a high-profile progressive with extensive national political involvement.",
+      "summary_sources": [
+        {
+          "url": "https://calmatters.org/commentary/2026/04/california-governor-race-chicken-game/",
+          "type": "news",
+          "title": "This isn't a race for California governor; it's a game of chicken"
+        },
+        {
+          "url": "https://ballotpedia.org/Tom_Steyer",
+          "type": "website",
+          "title": "Tom Steyer - Ballotpedia"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Tom_Steyer.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Tony Thurmond",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Tony Thurmond is California’s state superintendent of public instruction and a Democratic candidate for governor. He remains in the crowded primary field, where his campaign has emphasized education, affordability, and public services. He is running as a statewide elected official with a background in local and state government.",
+      "summary_sources": [
+        {
+          "url": "https://calmatters.org/politics/2026/03/california-governor-candidates/",
+          "type": "news",
+          "title": "The field is set: 10 candidates are running for California governor"
+        },
+        {
+          "url": "https://ballotpedia.org/Tony_Thurmond",
+          "type": "website",
+          "title": "Tony Thurmond - Ballotpedia"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Tony_Thurmond.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Betty Yee",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "Betty Yee is a former California state controller and a Democratic candidate for governor. She remains in the crowded primary field, where her campaign has emphasized fiscal management, affordability, and state budget issues. She is running as a longtime California budget and finance official with experience in statewide office.",
+      "summary_sources": [
+        {
+          "url": "https://calmatters.org/politics/2026/03/california-governor-candidates/",
+          "type": "news",
+          "title": "The field is set: 10 candidates are running for California governor"
+        },
+        {
+          "url": "https://ballotpedia.org/Betty_Yee",
+          "type": "website",
+          "title": "Betty Yee - Ballotpedia"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Betty_Yee.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:41:07.601117+00:00",
+  "updated_utc": "2026-04-06T18:27:32.556949+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -708,16 +835,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 724025,
-    "completion_tokens": 5379,
-    "total_tokens": 729404,
-    "estimated_usd": 0.1118,
+    "prompt_tokens": 783514,
+    "completion_tokens": 12234,
+    "total_tokens": 795748,
+    "estimated_usd": 0.1195,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 71737,
+        "completion_tokens": 8809
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 724025,
-        "completion_tokens": 5379
+        "prompt_tokens": 711777,
+        "completion_tokens": 3425
       }
     },
-    "duration_s": 60.2
-  }
+    "duration_s": 206.1
+  },
+  "validation_grade": null
 }

@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Ohio",
   "election_date": "2026-11-03",
-  "description": "This race is for the U.S. Senate seat in Ohio created when J.D. Vance left the chamber to become vice president. It matters because it is a special election that will determine who serves the remainder of the term and could affect the partisan balance of the Senate. Ohio has recently leaned Republican in federal races, but Sherrod Brown\u2019s entry makes the contest more competitive and highlights a contrast between Brown\u2019s labor-focused populism and Jon Husted\u2019s Republican governing record.",
+  "description": "This race is for the U.S. Senate seat in Ohio created when J.D. Vance left the chamber to become vice president. It matters because it is a special election that will determine who serves the remainder of the term and could affect the partisan balance of the Senate. Ohio has recently leaned Republican in federal races, but Sherrod Brown’s entry makes the contest more competitive and highlights a contrast between Brown’s labor-focused populism and Jon Husted’s Republican governing record.",
   "polling": [
     {
       "pollster": "OnMessage Public Strategies",
@@ -88,7 +88,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Jon_Husted_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jon_Husted_2013.jpg",
       "website": "https://www.jonhustedforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/hustedforohio/",
@@ -101,14 +101,14 @@
           "organization": "U.S. Senate",
           "start_year": 2025,
           "end_year": null,
-          "description": "Appointed to fill Ohio\u2019s Senate vacancy in 2025."
+          "description": "Appointed to fill Ohio’s Senate vacancy in 2025."
         },
         {
           "title": "Lieutenant Governor",
           "organization": "State of Ohio",
           "start_year": 2019,
           "end_year": 2025,
-          "description": "Served as Ohio\u2019s lieutenant governor before joining the Senate."
+          "description": "Served as Ohio’s lieutenant governor before joining the Senate."
         },
         {
           "title": "Secretary of State",
@@ -172,7 +172,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Sherrod_Brown_official_portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Sherrod_Brown.jpg",
       "website": "https://www.sherrodbrown.com/",
       "social_media": {
         "bluesky": "https://bsky.app/profile/sherrodbrown.com",
@@ -226,9 +226,45 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Libertarian Party candidate unknown for Ohio 2026 Senate special",
+      "party": "Libertarian",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Independent candidate unknown for Ohio 2026 Senate special",
+      "party": "Independent",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:02:04.466035+00:00",
+  "updated_utc": "2026-04-06T17:24:39.638009+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -236,16 +272,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 43315,
-    "completion_tokens": 1995,
-    "total_tokens": 45310,
-    "estimated_usd": 0.0077,
+    "prompt_tokens": 183623,
+    "completion_tokens": 10535,
+    "total_tokens": 194158,
+    "estimated_usd": 0.0267,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 104899,
+        "completion_tokens": 9785
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 43315,
-        "completion_tokens": 1995
+        "prompt_tokens": 78724,
+        "completion_tokens": 750
       }
     },
-    "duration_s": 22.6
-  }
+    "duration_s": 113.5
+  },
+  "validation_grade": null
 }

@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Oklahoma",
   "election_date": "2026-11-03",
-  "description": "Oklahoma voters will elect one U.S. senator in 2026 for the Class II seat. The race matters because it will help determine control of the U.S. Senate, and current race ratings from major forecasters describe Oklahoma as strongly Republican. The contest is also notable because the seat is open following Markwayne Mullin\u2019s resignation in March 2026, and the primary fields include multiple candidates in both parties. Key contrasts so far include Republican candidates emphasizing conservative alignment and experience in office or business, while Democratic candidates are running on grassroots themes such as health care, education, and affordability.",
+  "description": "Voters in Oklahoma will elect one member to the U.S. Senate in the general election on November 3, 2026. The primary is June 16, 2026, with a runoff on August 25, 2026, and the filing deadline was April 3, 2026. The race is for the Class II seat previously held by Markwayne Mullin (R), and it will help determine the partisan balance of the U.S. Senate.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -12,29 +12,21 @@
       "name": "N'Kiyla Thomas",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "N'Kiyla Thomas is a Democratic candidate for U.S. Senate in Oklahoma. Her campaign website presents her as a grassroots candidate focused on education, health care, workers, veterans, Native sovereignty, and LGBTQIA+ protections, and she says she is not a career politician. Public biographical coverage is limited, so her broader professional background is not well documented in the sources found.",
+      "summary": "N'Kiyla Thomas is the Democratic candidate for Oklahoma's 2026 U.S. Senate race. Ballotpedia describes her as a declared candidate for the Democratic primary, and her campaign has publicly framed her bid around being a nurse, mother, and grassroots candidate focused on Oklahoma's future.",
       "summary_sources": [
         {
-          "url": "https://www.jasmineforok.com/",
-          "type": "website",
-          "title": "Jasmine Thomas for Oklahoma | Join the Movement Now",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/N'Kiyla_Thomas",
+          "title": "Ballotpedia profile",
+          "type": "ballotpedia"
         },
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Oklahoma,_2026",
-          "type": "website",
-          "title": "United States Senate election in Oklahoma, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/N%27Kiyla_Thomas",
-          "type": "website",
-          "title": "N'Kiyla Thomas - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.instagram.com/jasmineforok/",
+          "title": "Campaign Instagram",
+          "type": "official"
         }
       ],
-      "image_url": null,
-      "website": "https://www.jasmineforok.com/",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Nkiyla_Thomas_2025.jpeg",
+      "website": "https://www.instagram.com/jasmineforok/",
       "social_media": {
         "facebook": "https://www.facebook.com/p/NKiyla-Jasmine-Thomas-US-Senate-2026-61573870225392/",
         "instagram": "https://www.instagram.com/jasmineforok/",
@@ -61,28 +53,25 @@
       "name": "Kevin Hern",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Kevin Hern is a Republican candidate for U.S. Senate in Oklahoma and a sitting member of the U.S. House from Oklahoma\u2019s 1st Congressional District. His public profile emphasizes business experience and conservative positions, and he entered the Senate race after Markwayne Mullin resigned from the seat. Hern\u2019s campaign and congressional materials present him as a pro-business, Trump-aligned Republican with prior federal legislative experience.",
+      "summary": "Kevin Hern is the Republican candidate for Oklahoma's 2026 U.S. Senate race and currently represents Oklahoma's 1st Congressional District in the U.S. House. He announced his Senate bid in March 2026 and has been backed by President Donald Trump and other Republican leaders, making him the early frontrunner in the GOP primary.",
       "summary_sources": [
         {
-          "url": "https://hern.house.gov/",
-          "type": "government",
-          "title": "U.S. Representative Kevin Hern",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/Kevin_Hern",
+          "title": "Ballotpedia profile",
+          "type": "ballotpedia"
         },
         {
-          "url": "https://www.facebook.com/KevinRHern/",
-          "type": "news",
-          "title": "Kevin Hern (@KevinRHern) - Facebook",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://thehill.com/homenews/campaign/5783965-trump-endorses-kevin-hern/",
+          "title": "The Hill: Trump endorses Hern",
+          "type": "news"
         },
         {
-          "url": "https://ballotpedia.org/United_States_Senate_election_in_Oklahoma,_2026",
-          "type": "website",
-          "title": "United States Senate election in Oklahoma, 2026 - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://oklahomavoice.com/briefs/hern-launches-bid-for-us-senate-announces-he-will-not-seek-another-term-in-house/",
+          "title": "Oklahoma Voice: Hern launches Senate bid",
+          "type": "news"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Kevin_Hern_117th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/15589751_225475587878868_2375580706974003254_n.jpg",
       "website": "https://hern.house.gov/",
       "social_media": {
         "facebook": "https://www.facebook.com/KevinRHern/",
@@ -113,7 +102,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:02:24.858443+00:00",
+  "updated_utc": "2026-04-06T17:22:25.612833+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -121,16 +110,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 86982,
-    "completion_tokens": 1478,
-    "total_tokens": 88460,
-    "estimated_usd": 0.0139,
+    "prompt_tokens": 222199,
+    "completion_tokens": 8446,
+    "total_tokens": 230645,
+    "estimated_usd": 0.0338,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 63642,
+        "completion_tokens": 7298
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 86982,
-        "completion_tokens": 1478
+        "prompt_tokens": 158557,
+        "completion_tokens": 1148
       }
     },
-    "duration_s": 20.1
-  }
+    "duration_s": 100.8
+  },
+  "validation_grade": null
 }

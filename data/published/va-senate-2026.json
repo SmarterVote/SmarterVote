@@ -4,30 +4,48 @@
   "office": "United States Senate",
   "jurisdiction": "Virginia",
   "election_date": "2026-11-03",
-  "description": "This race is for Virginia\u2019s U.S. Senate seat, currently held by Democrat Mark Warner. It matters because Warner is an incumbent seeking another term in a state that has leaned Democratic in recent federal elections, but where statewide races can still be competitive depending on turnout and candidate quality. The contest also has national implications because Senate control can hinge on a small number of seats. The main contrast so far is between Warner\u2019s long record in elected office and Jason Reynolds\u2019 progressive challenge from within the Democratic primary.",
-  "polling": [],
-  "polling_note": "No public polling found for this race as of 2026-04-01.",
+  "description": "Voters in Virginia will elect one member to the U.S. Senate on November 3, 2026. The race will decide the Class II seat held by incumbent Democrat Mark Warner, who is seeking re-election, and is expected to center on the state’s response to federal budget cuts, health care costs, and national political control.",
+  "polling": [
+    {
+      "pollster": "No new polls found",
+      "date": "2026-04-01",
+      "matchups": [
+        {
+          "candidates": [
+            "Mark Warner",
+            "Jason Reynolds",
+            "Kim Farington"
+          ],
+          "percentages": [
+            null,
+            null,
+            null
+          ]
+        }
+      ],
+      "source_url": "https://ballotpedia.org/United_States_Senate_election_in_Virginia,_2026"
+    }
+  ],
+  "polling_note": "No polls published after 2026-04-01 were found in the available search results.",
   "candidates": [
     {
       "name": "Mark Warner",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Mark Warner is the incumbent U.S. senator from Virginia and a former governor. His campaign emphasizes bipartisan problem-solving, infrastructure, broadband expansion, national security, and lowering health care costs. Warner\u2019s long tenure and statewide profile make him the best-known candidate in the race.",
+      "summary": "Mark Warner is the incumbent Democratic U.S. senator from Virginia, first elected in 2008 and seeking another term in 2026. In April 2026, he and Sen. Tim Kaine highlighted the impact of federal budget and Medicaid cuts on Virginia hospitals, and separately warned that the Trump administration’s Iran policy was raising costs for Virginians.",
       "summary_sources": [
         {
-          "url": "https://www.warner.senate.gov/public/index.cfm/biography",
-          "type": "government",
-          "title": "Biography - Mark R. Warner",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.warner.senate.gov/public/index.cfm/pressreleases",
+          "type": "official",
+          "title": "Mark R. Warner Press Releases"
         },
         {
-          "url": "https://www.markwarnerva.com/",
-          "type": "website",
-          "title": "Mark Warner - Delivering for Virginia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://virginiamercury.com/2026/03/16/warner-files-for-reelection-launching-bid-for-fourth-u-s-senate-term/",
+          "type": "news",
+          "title": "Warner files for reelection, launching bid for fourth U.S. Senate term"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Mark_Warner_2025.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mark_Warner.jpg",
       "website": "https://www.markwarnerva.com/",
       "social_media": {
         "x": "https://x.com/MarkWarner",
@@ -76,22 +94,15 @@
       "name": "Jason Reynolds",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Jason Reynolds is a Democratic primary challenger to incumbent Mark Warner. His campaign presents him as a progressive alternative focused on democracy reform, universal health care, reproductive rights, campaign finance reform, and economic fairness. Reynolds says he is running as a grassroots candidate to give Virginia Democrats a choice in the Senate primary.",
+      "summary": "Jason Reynolds is a Democratic candidate for U.S. Senate in Virginia who says he is running as a progressive alternative to incumbent Mark Warner. His campaign platform emphasizes democracy reform, universal health care, reproductive rights, labor and tax policy, and he says he will not accept corporate or super PAC money.",
       "summary_sources": [
         {
           "url": "https://www.jasonreynoldsforsenate.com/",
-          "type": "website",
-          "title": "Jason Reynolds for Senate",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
-        {
-          "url": "https://ballotpedia.org/Jason_Reynolds_(Virginia)",
-          "type": "news",
-          "title": "Jason Reynolds (Virginia) - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "type": "official",
+          "title": "Jason Reynolds for Senate"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Jason_Reynolds_%2849395922668%29.jpg/500px-Jason_Reynolds_%2849395922668%29.jpg",
       "website": "https://www.jasonreynoldsforsenate.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/jason_reynolds_for_senate/",
@@ -141,9 +152,33 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Kim Farington",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "Kim Farington is the Republican candidate for U.S. Senate in Virginia. Her campaign biography says she is a CPA, inventor, entrepreneur, and former senior government financial manager who led work at several federal agencies before founding a cybersecurity and financial management firm.",
+      "summary_sources": [
+        {
+          "url": "https://kimforvirginia.com/meet-kim/",
+          "type": "official",
+          "title": "Meet Kim"
+        }
+      ],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Kim_Farington_2025.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:08:50.942392+00:00",
+  "updated_utc": "2026-04-06T17:01:56.386152+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -151,16 +186,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 80253,
-    "completion_tokens": 1767,
-    "total_tokens": 82020,
-    "estimated_usd": 0.0131,
+    "prompt_tokens": 223985,
+    "completion_tokens": 9060,
+    "total_tokens": 233045,
+    "estimated_usd": 0.0345,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 59012,
+        "completion_tokens": 7703
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 80253,
-        "completion_tokens": 1767
+        "prompt_tokens": 164973,
+        "completion_tokens": 1357
       }
     },
-    "duration_s": 26.6
-  }
+    "duration_s": 137.4
+  },
+  "validation_grade": null
 }

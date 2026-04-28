@@ -4,8 +4,28 @@
   "office": "Governor of Michigan",
   "jurisdiction": "Michigan",
   "election_date": "2026-11-03",
-  "description": "Michigan will elect a governor and lieutenant governor on November 3, 2026. The race is open because Gov. Gretchen Whitmer is term-limited, and it is shaping up as a major test of whether Democrats, Republicans, or an independent can win in a state that has been closely divided in recent statewide elections. The main contrasts in the field center on affordability, housing, healthcare, public safety, government transparency, and whether voters prefer a party-line candidate or an independent alternative.",
+  "description": "Michigan’s 2026 gubernatorial race will decide who succeeds term-limited Gov. Gretchen Whitmer. The contest is drawing attention because it features a Democratic nominee-in-waiting in Secretary of State Jocelyn Benson, Republican U.S. Rep. John James, former Republican Attorney General Mike Cox, and independent former Detroit Mayor Mike Duggan, with early polling showing a competitive three-way general election.",
   "polling": [
+    {
+      "pollster": "Glengariff Group for Detroit Regional Chamber",
+      "date": "2026-02-02",
+      "matchups": [
+        {
+          "candidates": [
+            "Mike Duggan",
+            "John James",
+            "Jocelyn Benson"
+          ],
+          "percentages": [
+            30.1,
+            28.9,
+            28
+          ]
+        }
+      ],
+      "source_url": "https://michiganadvance.com/2026/02/23/detroit-regional-chamber-poll-governors-race-in-a-three-way-dead-heat/",
+      "sample_size": 600
+    },
     {
       "pollster": "The Glengariff Group",
       "date": "2026-02-02",
@@ -186,22 +206,22 @@
       "name": "Jocelyn Benson",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Jocelyn Benson is Michigan’s secretary of state and a Democratic candidate for governor. Her campaign has recently centered on affordability, including housing, healthcare, and government transparency, while also emphasizing election administration and public trust.",
+      "summary": "Michigan Secretary of State Jocelyn Benson remains a leading Democratic contender for governor. In early 2026, she continued to emphasize transparency and efficiency in state government while benefiting from strong fundraising and polling that placed her near the top of the field.",
       "summary_sources": [
         {
-          "url": "https://www.apnews.com/article/michigan-secretary-of-state-jocelyn-benson-governor-239c5b50c5f37f61c88e2ae0c37d2d38",
-          "type": "news",
-          "title": "Democratic Michigan Secretary of State Jocelyn Benson launches campaign for governor"
+          "url": "https://www.detroitnews.com/story/news/politics/2025/01/22/secretary-of-state-jocelyn-benson-launches-campaign-for-michigan-governor/77803537007/",
+          "title": "Michigan Secretary of State Jocelyn Benson launches run for governor",
+          "type": "news"
         },
         {
-          "url": "https://www.jocelynbenson.com/news/benson-shares-affordability-agenda-across-west-michigan-meeting-with-voters-small-business-owners",
-          "type": "website",
-          "title": "Benson Shares Affordability Agenda Across West Michigan, Meeting with Voters, Small Business Owners"
+          "url": "https://michiganadvance.com/2026/02/23/detroit-regional-chamber-poll-governors-race-in-a-three-way-dead-heat/",
+          "title": "Detroit Regional Chamber poll: Governor’s race in a three-way dead heat",
+          "type": "news"
         },
         {
-          "url": "https://www.jocelynbenson.com/news/icymi-benson-is-the-only-candidate-with-a-plan-to-lower-housing-costs",
-          "type": "website",
-          "title": "ICYMI: Benson Is the Only Candidate with a Plan to Lower Housing Costs"
+          "url": "https://www.detroitnews.com/story/news/politics/2026/02/04/benson-raises-most-in-gubernatorial-race-in-final-2025-campaign-filings-cox-has-most-cash-on-hand/",
+          "title": "Benson tops fundraising in final 2025 filings",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/SOS_Jocelyn_Benson_web.jpg/500px-SOS_Jocelyn_Benson_web.jpg",
@@ -569,17 +589,17 @@
       "name": "Mike Cox",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Mike Cox is a Republican and former Michigan attorney general running for governor. His campaign entered the race in 2025, and recent coverage has placed him among the Republican contenders seeking to succeed term-limited Gov. Gretchen Whitmer.",
+      "summary": "Former Michigan Attorney General Mike Cox is running as a Republican in the 2026 governor’s race. He entered the contest in April 2025 after leaving elected office years earlier and has positioned himself as an experienced conservative alternative in the GOP field.",
       "summary_sources": [
         {
-          "url": "https://www.freep.com/story/news/local/michigan/2025/04/20/michigan-2026-gubernatorial-race-mike-cox-full-list-candidates/83175495007/",
-          "type": "news",
-          "title": "Michigan's 2026 gubernatorial race: Mike Cox joins field. Here's the ..."
+          "url": "https://www.detroitnews.com/story/news/politics/2025/04/18/michigan-governor-race-gets-crowded-the-more-the-better/83138561007/",
+          "title": "Michigan governor race gets crowded: 'The more, the better'",
+          "type": "news"
         },
         {
-          "url": "https://www.detroitnews.com/story/news/politics/2025/04/18/michigan-governor-race-gets-crowded-the-more-the-better/83138561007/",
-          "type": "news",
-          "title": "Michigan governor race gets crowded: 'The more, the better'"
+          "url": "https://www.detroitnews.com/story/opinion/columnists/kaitlyn-buss/2025/04/15/buss-mike-cox-joins-governors-race/83097188007/",
+          "title": "Buss: Why Mike Cox joined the governor's race",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Mike_Cox_Summer_2009.JPG",
@@ -878,22 +898,22 @@
       "name": "Mike Duggan",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Mike Duggan is the mayor of Detroit and is running for governor as an independent after previously identifying as a Democrat. His campaign has focused on presenting himself as a cross-party alternative, and recent polling and coverage have highlighted him as a major factor in the race.",
+      "summary": "Detroit’s former mayor Mike Duggan is running for governor as an independent after leaving city office. He has drawn support from some business and civic leaders and has polled competitively against the major-party candidates in early 2026 surveys.",
       "summary_sources": [
         {
-          "url": "https://apnews.com/article/duggan-detroit-michigan-governor-independent-democrat-5dba0e7b2d9304c2a00d716c9cd6ca05",
-          "type": "news",
-          "title": "Detroit Mayor Duggan will run for Michigan governor in 2026 as ..."
+          "url": "https://www.detroitnews.com/story/news/local/detroit-city/2025/04/28/mike-duggan-endorsed-pastors-governor/83329816007/",
+          "title": "Over 150 clergy endorse Mike Duggan's run for governor",
+          "type": "news"
         },
         {
-          "url": "https://www.crainsdetroit.com/politics-policy/mike-duggan-surges-dead-heat-michigan-governor/",
-          "type": "news",
-          "title": "Mike Duggan surges into dead heat for Michigan governor"
+          "url": "https://michiganadvance.com/2026/02/23/detroit-regional-chamber-poll-governors-race-in-a-three-way-dead-heat/",
+          "title": "Detroit Regional Chamber poll: Governor’s race in a three-way dead heat",
+          "type": "news"
         },
         {
-          "url": "https://www.detroitchamber.com/feb-2026-michigan-voter-poll/",
-          "type": "news",
-          "title": "New Statewide Poll: Voters Unaware as Michigan’s Economic and Education Rankings Continue to Plummet"
+          "url": "https://www.detroitnews.com/story/news/politics/2025/07/17/detroit-regional-chamber-pac-early-endorsement-of-mike-duggan-for-michigan-governor/85254510007/",
+          "title": "Detroit Regional Chamber PAC makes early endorsement",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Mike_Duggan_8r4a8513_54264084636_%282%29.jpg/500px-Mike_Duggan_8r4a8513_54264084636_%282%29.jpg",
@@ -1214,17 +1234,22 @@
       "name": "John James",
       "party": "Republican",
       "incumbent": false,
-      "summary": "John James is a Republican U.S. representative from Shelby Township running for governor. He entered the race in 2025 and has been described in recent coverage as one of the leading Republican contenders in the field.",
+      "summary": "U.S. Rep. John James is the Republican candidate in Michigan’s 2026 governor’s race. He has framed his campaign around conservative leadership and education, and early polling has kept him near the top of the field alongside Jocelyn Benson and Mike Duggan.",
       "summary_sources": [
         {
-          "url": "https://apnews.com/article/john-james-michigan-governor-election-2026-1eece7b20d10ca01de11ef3ff2a34284",
-          "type": "news",
-          "title": "GOP Rep. John James announces candidacy for Michigan governor ..."
+          "url": "https://www.detroitnews.com/story/news/politics/2025/04/07/republican-congressman-john-james-announces-campaign-for-michigan-governor-trump/82981510007/",
+          "title": "U.S. Rep. John James announces campaign for Michigan governor",
+          "type": "news"
         },
         {
-          "url": "https://www.detroitnews.com/story/news/politics/2025/04/07/republican-congressman-john-james-announces-campaign-for-michigan-governor-trump/82981510007/",
-          "type": "news",
-          "title": "U.S. Rep. John James announces campaign for Michigan governor"
+          "url": "https://www.detroitnews.com/story/news/politics/2025/04/26/qa-john-james-labels-michigans-poor-reading-rates-a-crime/83255368007/",
+          "title": "Republican John James says education is 'a basic civil right'",
+          "type": "news"
+        },
+        {
+          "url": "https://michiganadvance.com/2026/02/23/detroit-regional-chamber-poll-governors-race-in-a-three-way-dead-heat/",
+          "title": "Detroit Regional Chamber poll: Governor’s race in a three-way dead heat",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/John_James_Audubon_1826.jpg/500px-John_James_Audubon_1826.jpg",
@@ -1657,7 +1682,7 @@
       "links": []
     }
   ],
-  "updated_utc": "2026-04-01T06:17:38.407980+00:00",
+  "updated_utc": "2026-04-06T16:46:59.785865+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -1779,20 +1804,21 @@
   "polling_note": "Recent polling in February 2026 shows a competitive race, with Benson leading in some matchups and the field remaining close in others. Polls cited here are from the last 90 days and include both a campaign-commissioned Impact Research survey and a Detroit Regional Chamber/Glengariff Group poll.",
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 360609,
-    "completion_tokens": 8811,
-    "total_tokens": 369420,
-    "estimated_usd": 0.0568,
+    "prompt_tokens": 293540,
+    "completion_tokens": 8238,
+    "total_tokens": 301778,
+    "estimated_usd": 0.0395,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 24429,
-        "completion_tokens": 6608
+        "prompt_tokens": 165079,
+        "completion_tokens": 6342
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 336180,
-        "completion_tokens": 2203
+        "prompt_tokens": 128461,
+        "completion_tokens": 1896
       }
     },
-    "duration_s": 95.9
-  }
+    "duration_s": 139.9
+  },
+  "validation_grade": null
 }

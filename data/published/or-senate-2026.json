@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Oregon",
   "election_date": "2026-11-03",
-  "description": "Oregon\u2019s 2026 U.S. Senate race is for the state\u2019s Class II seat in the U.S. Senate, currently held by Democrat Jeff Merkley. It is an open-and-shut incumbent reelection race in a strongly Democratic state, and multiple nonpartisan race ratings currently classify it as safely or solidly Democratic. The main contrast is between Merkley, a long-serving progressive incumbent, and a Republican field that includes several lesser-known challengers, with issues such as the economy, public safety, climate, and federal governance likely to frame the contest.",
+  "description": "Oregon’s 2026 U.S. Senate race is for the state’s Class II seat in the U.S. Senate, currently held by Democrat Jeff Merkley. It is an open-and-shut incumbent reelection race in a strongly Democratic state, and multiple nonpartisan race ratings currently classify it as safely or solidly Democratic. The main contrast is between Merkley, a long-serving progressive incumbent, and a Republican field that includes several lesser-known challengers, with issues such as the economy, public safety, climate, and federal governance likely to frame the contest.",
   "polling": [],
   "polling_note": "No public head-to-head polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Jeff_Merkley%2C_official_portrait%2C_113th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jeff_Merkley.jpg",
       "website": "https://www.jeffmerkley.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/jeffmerkley/",
@@ -95,7 +95,7 @@
       "name": "Paul Damian Wells",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Paul Damian Wells is a Democratic primary challenger to Jeff Merkley in Oregon\u2019s 2026 U.S. Senate race. Publicly available information on his background and campaign is limited compared with the incumbent, and he appears to be running as a lesser-known challenger in the primary.",
+      "summary": "Paul Damian Wells is a Democratic primary challenger to Jeff Merkley in Oregon’s 2026 U.S. Senate race. Publicly available information on his background and campaign is limited compared with the incumbent, and he appears to be running as a lesser-known challenger in the primary.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Paul_Damian_Wells",
@@ -110,7 +110,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/PaulWells2024.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -141,7 +141,7 @@
       "name": "Brent Barker",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Brent Barker is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary. Ballotpedia and news coverage describe him as a commercial real estate broker, but detailed public campaign information is limited.",
+      "summary": "Brent Barker is a Republican candidate in Oregon’s 2026 U.S. Senate primary. Ballotpedia and news coverage describe him as a commercial real estate broker, but detailed public campaign information is limited.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Oregon,_2026",
@@ -156,7 +156,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Brent_Barker.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -180,7 +180,7 @@
       "name": "Deborah Brown",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Deborah Brown is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary. Publicly available reporting identifies her as a retired civil engineer, but there is limited campaign-specific information available in the sources reviewed.",
+      "summary": "Deborah Brown is a Republican candidate in Oregon’s 2026 U.S. Senate primary. Publicly available reporting identifies her as a retired civil engineer, but there is limited campaign-specific information available in the sources reviewed.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Oregon,_2026",
@@ -195,7 +195,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Debra_Bowen_op.png",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -219,7 +219,7 @@
       "name": "David Burch",
       "party": "Republican",
       "incumbent": false,
-      "summary": "David Burch is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary. Available public sources describe him as a perennial candidate, but detailed biographical information is sparse in the materials reviewed.",
+      "summary": "David Burch is a Republican candidate in Oregon’s 2026 U.S. Senate primary. Available public sources describe him as a perennial candidate, but detailed biographical information is sparse in the materials reviewed.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Oregon,_2026",
@@ -234,7 +234,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/David_Burch_20240808_092528.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -258,7 +258,7 @@
       "name": "Russell McAlmond",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Russell McAlmond is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary. Public sources reviewed describe him as a businessman, but there is limited additional biographical detail available in the search results.",
+      "summary": "Russell McAlmond is a Republican candidate in Oregon’s 2026 U.S. Senate primary. Public sources reviewed describe him as a businessman, but there is limited additional biographical detail available in the search results.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Oregon,_2026",
@@ -273,7 +273,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Russell_McAlmond_20251219_063148.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -297,7 +297,7 @@
       "name": "Jo Rae Perkins",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Jo Rae Perkins is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary and has previously been the party\u2019s nominee for U.S. Senate in 2020 and 2022. She is a recurring figure in Oregon Republican politics and has also held local party leadership roles.",
+      "summary": "Jo Rae Perkins is a Republican candidate in Oregon’s 2026 U.S. Senate primary and has previously been the party’s nominee for U.S. Senate in 2020 and 2022. She is a recurring figure in Oregon Republican politics and has also held local party leadership roles.",
       "summary_sources": [
         {
           "url": "https://joraeperkins.com/",
@@ -318,7 +318,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/0/0f/Jo_Rae_Perkins.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/jo_rae_perkinsor1.png",
       "website": "https://joraeperkins.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/JoRaePerkins/",
@@ -366,12 +366,12 @@
       "name": "Timothy Skelton",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Timothy Skelton is a Republican candidate in Oregon\u2019s 2026 U.S. Senate primary. His campaign materials emphasize jobs, schools, and forest policy, and describe him as a Scoutmaster and job creator.",
+      "summary": "Timothy Skelton is a Republican candidate in Oregon’s 2026 U.S. Senate primary. His campaign materials emphasize jobs, schools, and forest policy, and describe him as a Scoutmaster and job creator.",
       "summary_sources": [
         {
           "url": "https://timskeltonfororegon.com/",
           "type": "website",
-          "title": "Tim Skelton for U.S. Senate \u2013 A Stronger Oregon Starts Here",
+          "title": "Tim Skelton for U.S. Senate – A Stronger Oregon Starts Here",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -387,7 +387,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Timothy_Skelton_20250430_122034.jpg",
       "website": "https://timskeltonfororegon.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/p/Tim-Skelton-for-Oregon-2026-61575274496151/",
@@ -442,7 +442,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/David_Smith_20230601_085406.jpg",
       "website": "https://www.davidbrocksmithfororegon.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenatorDavidBrockSmith/",
@@ -506,7 +506,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:02:58.489533+00:00",
+  "updated_utc": "2026-04-06T17:20:23.814024+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -514,16 +514,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 104416,
-    "completion_tokens": 4237,
-    "total_tokens": 108653,
-    "estimated_usd": 0.0182,
+    "prompt_tokens": 213957,
+    "completion_tokens": 4306,
+    "total_tokens": 218263,
+    "estimated_usd": 0.0284,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 110989,
+        "completion_tokens": 3416
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 104416,
-        "completion_tokens": 4237
+        "prompt_tokens": 102968,
+        "completion_tokens": 890
       }
     },
-    "duration_s": 33.3
-  }
+    "duration_s": 74.3
+  },
+  "validation_grade": null
 }

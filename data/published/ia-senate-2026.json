@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Iowa",
   "election_date": "2026-11-03",
-  "description": "Iowa\u2019s 2026 U.S. Senate race is for the state\u2019s Class II seat in the U.S. Senate. The seat is open because incumbent Republican Joni Ernst is not seeking re-election, making the contest one of the more closely watched Senate races of the cycle. Ballotpedia rates the race as likely Republican, but the open-seat dynamic and the candidates\u2019 contrasting profiles \u2014 including labor, military, and state-legislative backgrounds \u2014 give both parties a clear incentive to compete aggressively.",
+  "description": "Iowa’s 2026 U.S. Senate race is for the state’s Class II seat in the U.S. Senate. The seat is open because incumbent Republican Joni Ernst is not seeking re-election, making the contest one of the more closely watched Senate races of the cycle. Ballotpedia rates the race as likely Republican, but the open-seat dynamic and the candidates’ contrasting profiles — including labor, military, and state-legislative backgrounds — give both parties a clear incentive to compete aggressively.",
   "polling": [],
   "polling_note": "No public, credible general-election polling for this race was found in the searched sources as of 2026-04-01.",
   "candidates": [
@@ -27,7 +27,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Josh_Turek_2022.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Josh_Turek_20250901_100606.jpg",
       "website": "https://turek4iowa.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/Turek4Iowa",
@@ -118,7 +118,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3f/Zach_Wahls_Iowa_Legislature_Portait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Zach_Wahls_20250122_084308.jpg",
       "website": "https://zachwahls.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/zach.wahls",
@@ -140,7 +140,7 @@
           "organization": "GreenState Credit Union",
           "start_year": null,
           "end_year": null,
-          "description": "Worked in community investment at Iowa\u2019s largest independent financial cooperative."
+          "description": "Worked in community investment at Iowa’s largest independent financial cooperative."
         },
         {
           "title": "Advocate and author",
@@ -184,7 +184,7 @@
         {
           "url": "https://www.sageforsenate.com/about",
           "type": "website",
-          "title": "About \u2014 Nathan Sage | Democrat for U.S. Senate",
+          "title": "About — Nathan Sage | Democrat for U.S. Senate",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -194,7 +194,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Nathan_Sage_headshot.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Nathan_Sage_20250513_090956.jpg",
       "website": "https://www.sageforsenate.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/sageforiowa/",
@@ -266,7 +266,7 @@
       "name": "Jim Carlin",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Jim Carlin is a Republican candidate in Iowa\u2019s 2026 U.S. Senate race. He previously served in the Iowa Senate and is running in the Republican primary for the open seat.",
+      "summary": "Jim Carlin is a Republican candidate in Iowa’s 2026 U.S. Senate race. He previously served in the Iowa Senate and is running in the Republican primary for the open seat.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Iowa,_2026",
@@ -281,7 +281,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jim-Carlin.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -308,7 +308,7 @@
       "name": "Ashley Hinson",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Ashley Hinson is a Republican candidate in Iowa\u2019s 2026 U.S. Senate race and a sitting member of the U.S. House. She entered the Senate contest after Joni Ernst announced she would not seek re-election, bringing a congressional and media background to the race.",
+      "summary": "Ashley Hinson is a Republican candidate in Iowa’s 2026 U.S. Senate race and a sitting member of the U.S. House. She entered the Senate contest after Joni Ernst announced she would not seek re-election, bringing a congressional and media background to the race.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Iowa,_2026",
@@ -323,7 +323,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/428px-Ashley_Hinson.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -332,7 +332,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2021,
           "end_year": null,
-          "description": "Represents Iowa\u2019s 2nd Congressional District."
+          "description": "Represents Iowa’s 2nd Congressional District."
         },
         {
           "title": "Television news anchor and reporter",
@@ -379,7 +379,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://www.ernst.senate.gov/wp-content/uploads/2024/01/Joni-Ernst-Official-Photo.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Joni_Ernst_Official_photo_portrait_114th_Congress.jpg",
       "website": "https://www.ernst.senate.gov/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenJoniErnst",
@@ -443,7 +443,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:48:45.970877+00:00",
+  "updated_utc": "2026-04-06T18:06:12.813960+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -451,16 +451,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 197907,
-    "completion_tokens": 4066,
-    "total_tokens": 201973,
-    "estimated_usd": 0.0321,
+    "prompt_tokens": 110170,
+    "completion_tokens": 12669,
+    "total_tokens": 122839,
+    "estimated_usd": 0.0184,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 66986,
+        "completion_tokens": 11735
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 197907,
-        "completion_tokens": 4066
+        "prompt_tokens": 43184,
+        "completion_tokens": 934
       }
     },
-    "duration_s": 45.5
-  }
+    "duration_s": 174.0
+  },
+  "validation_grade": null
 }

@@ -4,7 +4,7 @@
   "office": "U.S. Senate",
   "jurisdiction": "South Dakota",
   "election_date": "2026-11-03",
-  "description": "South Dakota voters will choose one U.S. senator in 2026 for the state\u2019s Class II seat. The race matters because it will help determine control of the U.S. Senate, and South Dakota is generally considered a strongly Republican state, making the incumbent GOP seat the central benchmark. The contest features incumbent Republican Mike Rounds, Democrat Julian Beaudion, and independent Brian Bengs, with the main contrasts centered on party control, governing style, and policy priorities such as public safety, healthcare, the economy, and government accountability.",
+  "description": "South Dakota voters will choose one U.S. senator in 2026 for the state’s Class II seat. The race matters because it will help determine control of the U.S. Senate, and South Dakota is generally considered a strongly Republican state, making the incumbent GOP seat the central benchmark. The contest features incumbent Republican Mike Rounds, Democrat Julian Beaudion, and independent Brian Bengs, with the main contrasts centered on party control, governing style, and policy priorities such as public safety, healthcare, the economy, and government accountability.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Mike_Rounds_113th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mike_Rounds_official_Senate_portrait.jpg",
       "website": "https://roundsforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenatorMikeRounds/",
@@ -88,7 +88,7 @@
         {
           "url": "https://www.julianforsd.com/about",
           "type": "website",
-          "title": "About \u2014 Julian Beaudion for U.S. Senate | South Dakota",
+          "title": "About — Julian Beaudion for U.S. Senate | South Dakota",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -98,7 +98,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Julian_Beaudion_2025.jpg",
       "website": "https://www.julianforsd.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/julianforsd",
@@ -121,7 +121,7 @@
         },
         {
           "title": "Owner",
-          "organization": "Swamp Daddy\u2019s Cajun Kitchen",
+          "organization": "Swamp Daddy’s Cajun Kitchen",
           "start_year": null,
           "end_year": null,
           "description": "Owns a family restaurant in Sioux Falls."
@@ -161,7 +161,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/BrianBengs2025.jpeg",
       "website": null,
       "social_media": {
         "facebook": "https://www.facebook.com/BBengs1970?locale=zh_CN",
@@ -234,7 +234,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:05:20.934087+00:00",
+  "updated_utc": "2026-04-06T17:12:18.405667+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -242,16 +242,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 152982,
-    "completion_tokens": 2419,
-    "total_tokens": 155401,
-    "estimated_usd": 0.0244,
+    "prompt_tokens": 112340,
+    "completion_tokens": 4003,
+    "total_tokens": 116343,
+    "estimated_usd": 0.0154,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 63740,
+        "completion_tokens": 3448
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 152982,
-        "completion_tokens": 2419
+        "prompt_tokens": 48600,
+        "completion_tokens": 555
       }
     },
-    "duration_s": 32.6
-  }
+    "duration_s": 115.8
+  },
+  "validation_grade": null
 }

@@ -4,7 +4,7 @@
   "office": "U.S. House of Representatives",
   "jurisdiction": "Utah's 4th Congressional District",
   "election_date": "2026-11-03",
-  "description": "This race is for Utah\u2019s 4th Congressional District seat in the U.S. House of Representatives, with the general election set for Nov. 3, 2026. It matters because all 435 House seats are on the ballot and the outcome will affect control of the chamber. Utah\u2019s court-ordered 2026 congressional map reshaped the district, making the Republican primary the main contest. The field includes incumbent Republican Mike Kennedy; Republican primary challengers Pasitale Lupeamanu and Seth Stewart; Democratic challenger Archie Williams III; and independent Steven Burt.",
+  "description": "This race is for Utah’s 4th Congressional District seat in the U.S. House of Representatives, with the general election set for Nov. 3, 2026. It matters because all 435 House seats are on the ballot and the outcome will affect control of the chamber. Utah’s court-ordered 2026 congressional map reshaped the district, making the Republican primary the main contest. The field includes incumbent Republican Mike Kennedy; Republican primary challengers Pasitale Lupeamanu and Seth Stewart; Democratic challenger Archie Williams III; and independent Steven Burt.",
   "polling": [],
   "polling_note": "No public polling was found for this race as of 2026-04-02.",
   "candidates": [
@@ -12,7 +12,7 @@
       "name": "Mike Kennedy",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Mike Kennedy is a Republican member of the U.S. House representing Utah\u2019s 3rd Congressional District and is running for the Republican nomination in Utah\u2019s 4th Congressional District in 2026. Before Congress, he served in the Utah Legislature and worked as a family doctor and attorney.",
+      "summary": "Mike Kennedy is a Republican member of the U.S. House representing Utah’s 3rd Congressional District and is running for the Republican nomination in Utah’s 4th Congressional District in 2026. Before Congress, he served in the Utah Legislature and worked as a family doctor and attorney.",
       "summary_sources": [
         {
           "url": "https://www.congress.gov/member/mike-kennedy/K000403",
@@ -30,7 +30,7 @@
           "title": "Mike Kennedy - Utah Declaration of Candidacy"
         }
       ],
-      "image_url": null,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Kennedy_Mike_119th_Congress_2.jpg/500px-Kennedy_Mike_119th_Congress_2.jpg",
       "website": "https://mikekennedy.house.gov/",
       "social_media": {
         "facebook": "https://www.facebook.com/KennedyForUtah/",
@@ -88,7 +88,7 @@
           "year": null
         }
       ],
-      "donor_summary": "Mike Kennedy\u2019s federal campaign committee reported $610,158.88 in total receipts for 2025, including $574,063.88 in contributions and $290,500 from other committees. OpenSecrets shows his 2023\u20132024 PAC money was led by ideological/single-issue PACs ($136,850), followed by health ($58,500) and finance/insurance/real estate ($38,500), with business PACs slightly outweighing ideological PACs overall.",
+      "donor_summary": "Mike Kennedy’s federal campaign committee reported $610,158.88 in total receipts for 2025, including $574,063.88 in contributions and $290,500 from other committees. OpenSecrets shows his 2023–2024 PAC money was led by ideological/single-issue PACs ($136,850), followed by health ($58,500) and finance/insurance/real estate ($38,500), with business PACs slightly outweighing ideological PACs overall.",
       "donor_source_url": "https://www.fec.gov/data/committee/C00864488/",
       "voting_summary": "Kennedy is a sitting U.S. House member, so he has a legislative voting record. GovTrack shows he has voted mostly with the House Republican majority on recent roll calls, including support for AGOA extension and opposition to several appropriations and preparedness measures; he missed 12 of 470 votes from Jan. 2025 to Mar. 2026 (2.6%).",
       "voting_source_url": "https://www.govtrack.us/congress/members/mike_kennedy/457025",
@@ -193,7 +193,7 @@
             {
               "url": "https://www.deseret.com/utah/2026/03/31/utah-representative-mike-kennedy-tech-college-bill/",
               "type": "news",
-              "title": "Rep. Mike Kennedy's bill would boost funding at tech colleges \u2013 Deseret News",
+              "title": "Rep. Mike Kennedy's bill would boost funding at tech colleges – Deseret News",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             },
             {
@@ -241,7 +241,7 @@
             {
               "url": "https://www.congress.gov/member/mike-kennedy/K000403",
               "type": "official_profile",
-              "title": "Mike Kennedy \u2013 Congress.gov",
+              "title": "Mike Kennedy – Congress.gov",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -360,7 +360,7 @@
       "name": "Steven Burt",
       "party": "Independent",
       "incumbent": false,
-      "summary": "Steven Burt is an independent candidate for Utah\u2019s 4th Congressional District in the 2026 U.S. House election. He is an attorney who previously practiced at Ballard Spahr, spent more than nine years in in-house roles at solar energy companies, and has an active pro bono practice.",
+      "summary": "Steven Burt is an independent candidate for Utah’s 4th Congressional District in the 2026 U.S. House election. He is an attorney who previously practiced at Ballard Spahr, spent more than nine years in in-house roles at solar energy companies, and has an active pro bono practice.",
       "summary_sources": [
         {
           "url": "https://www.ballardspahr.com/people/attorneys/b/burt-steven",
@@ -378,7 +378,7 @@
           "title": "Steven Burt - Ballotpedia"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Steven_Burt_20251119_063056.jpg",
       "website": "https://stevenburt.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/voteforstevenburt/",
@@ -386,7 +386,7 @@
       },
       "career_history": [],
       "education": [],
-      "donor_summary": "Steven Burt\u2019s campaign finance profile on Ballotpedia reports $19,549 in contributions and $12,619 in expenditures for his 2026 U.S. House campaign. The available disclosures reviewed do not show a dominant PAC or industry source of support.",
+      "donor_summary": "Steven Burt’s campaign finance profile on Ballotpedia reports $19,549 in contributions and $12,619 in expenditures for his 2026 U.S. House campaign. The available disclosures reviewed do not show a dominant PAC or industry source of support.",
       "donor_source_url": "https://ballotpedia.org/Steven_Burt",
       "voting_summary": "Steven Burt is not a current or former legislator in the sources reviewed, so there is no legislative voting record to summarize. His public campaign materials instead describe his background in law, solar-energy policy, and pro bono immigration-related work.",
       "voting_source_url": "https://stevenburt.com/f/policy-focus",
@@ -472,7 +472,7 @@
           ]
         },
         "Healthcare": {
-          "stance": "No publicly stated healthcare policy was identified in the sources reviewed. Burt\u2019s campaign materials emphasize independence and energy policy rather than healthcare.",
+          "stance": "No publicly stated healthcare policy was identified in the sources reviewed. Burt’s campaign materials emphasize independence and energy policy rather than healthcare.",
           "confidence": "low",
           "sources": [
             {
@@ -496,7 +496,7 @@
           ]
         },
         "Reproductive Rights": {
-          "stance": "No publicly stated position on reproductive rights was identified in the sources reviewed. Burt\u2019s campaign materials emphasize independence and energy policy, with immigration issues mentioned but no abortion stance disclosed.",
+          "stance": "No publicly stated position on reproductive rights was identified in the sources reviewed. Burt’s campaign materials emphasize independence and energy policy, with immigration issues mentioned but no abortion stance disclosed.",
           "confidence": "low",
           "sources": [
             {
@@ -526,25 +526,25 @@
             {
               "url": "https://stevenburt.com/",
               "type": "official_website",
-              "title": "Steven Burt \u2013 Official Campaign Site",
+              "title": "Steven Burt – Official Campaign Site",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             },
             {
               "url": "https://stevenburt.com/f/policy-focus",
               "type": "official_website",
-              "title": "Policy Focus \u2013 Steven Burt",
+              "title": "Policy Focus – Steven Burt",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             },
             {
               "url": "https://stevenburt.com/f/your-priorities",
               "type": "official_website",
-              "title": "Your Priorities \u2013 Steven Burt",
+              "title": "Your Priorities – Steven Burt",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             },
             {
               "url": "https://ballotpedia.org/Steven_Burt",
               "type": "news_encyclopedia",
-              "title": "Steven Burt \u2013 Ballotpedia",
+              "title": "Steven Burt – Ballotpedia",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             }
           ]
@@ -562,7 +562,7 @@
           ]
         },
         "Immigration": {
-          "stance": "Burt\u2019s campaign materials do not publish a detailed immigration platform, but he says he has done pro bono representation associated with immigration issues. His public materials emphasize independence and broader policy themes rather than a specific immigration plan.",
+          "stance": "Burt’s campaign materials do not publish a detailed immigration platform, but he says he has done pro bono representation associated with immigration issues. His public materials emphasize independence and broader policy themes rather than a specific immigration plan.",
           "confidence": "low",
           "sources": [
             {
@@ -610,7 +610,7 @@
           ]
         },
         "Guns & Safety": {
-          "stance": "No explicit policy positions on guns or gun safety were identified in the sources reviewed. Burt\u2019s campaign materials emphasize independence and general policy themes without specific gun-control or safety proposals.",
+          "stance": "No explicit policy positions on guns or gun safety were identified in the sources reviewed. Burt’s campaign materials emphasize independence and general policy themes without specific gun-control or safety proposals.",
           "confidence": "low",
           "sources": [
             {
@@ -628,7 +628,7 @@
           ]
         },
         "Social Justice": {
-          "stance": "No publicly stated position on social justice was identified in the sources reviewed. Burt\u2019s public materials emphasize independence and policy areas such as energy and immigration rather than a social-justice platform.",
+          "stance": "No publicly stated position on social justice was identified in the sources reviewed. Burt’s public materials emphasize independence and policy areas such as energy and immigration rather than a social-justice platform.",
           "confidence": "low",
           "sources": [
             {
@@ -670,7 +670,7 @@
             {
               "url": "https://stevenburt.com/",
               "type": "campaign website",
-              "title": "Steven Burt \u2013 Home",
+              "title": "Steven Burt – Home",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             },
             {
@@ -682,7 +682,7 @@
           ]
         },
         "Local Issues": {
-          "stance": "No explicit local-issues policy was identified in the sources reviewed. Burt\u2019s materials emphasize unaffiliated independence and national priorities such as energy policy rather than Utah-specific local proposals.",
+          "stance": "No explicit local-issues policy was identified in the sources reviewed. Burt’s materials emphasize unaffiliated independence and national priorities such as energy policy rather than Utah-specific local proposals.",
           "confidence": "low",
           "sources": [
             {
@@ -699,7 +699,7 @@
       "name": "Archie Williams III",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Archie Williams III is a Democratic candidate for Utah\u2019s 4th Congressional District in 2026. Ballotpedia identifies him as a Provo-born heavy equipment operator with a bachelor\u2019s degree from Salt Lake Baptist College, and it notes prior campaigns for Utah and federal office.",
+      "summary": "Archie Williams III is a Democratic candidate for Utah’s 4th Congressional District in 2026. Ballotpedia identifies him as a Provo-born heavy equipment operator with a bachelor’s degree from Salt Lake Baptist College, and it notes prior campaigns for Utah and federal office.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/Archie_Williams_III",
@@ -717,12 +717,12 @@
           "title": "2026 declaration of candidacy - Utah Voter Information"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Archie_Williams.jpg",
       "website": "https://standfororem.org/archie-williams-iii",
       "social_media": {},
       "career_history": [],
       "education": [],
-      "donor_summary": "Public campaign finance disclosures were not readily available in the sources reviewed, and Ballotpedia indicates campaign finance information was not yet available. The candidate\u2019s public profile therefore does not currently show a documented donor base in the materials reviewed.",
+      "donor_summary": "Public campaign finance disclosures were not readily available in the sources reviewed, and Ballotpedia indicates campaign finance information was not yet available. The candidate’s public profile therefore does not currently show a documented donor base in the materials reviewed.",
       "donor_source_url": "https://ballotpedia.org/Archie_Williams_III",
       "voting_summary": "Archie Williams III has no legislative voting record because he has not held elected legislative office in the sources reviewed. Public records instead show prior candidacies for federal, state, and statewide office.",
       "voting_source_url": "https://ballotpedia.org/Archie_Williams_III",
@@ -1005,7 +1005,7 @@
           "title": "CD4-Pasitale-F.-Lupeamanu.pdf (Utah Voter Information)"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": "No campaign website identified as of 2026-04-02.",
       "social_media": {},
       "career_history": [],
@@ -1263,7 +1263,7 @@
             {
               "url": "https://kiowacountypress.net/content/utahs-new-court-ordered-map-draws-41-candidates-congress",
               "type": "article",
-              "title": "Utah\u2019s new court-ordered map draws 41 candidates for Congress",
+              "title": "Utah’s new court-ordered map draws 41 candidates for Congress",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -1274,7 +1274,7 @@
       "name": "Seth Stewart",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Seth Stewart is a Republican candidate for Utah\u2019s 4th Congressional District. Public materials identify him as a software engineer and AI/ML researcher, and his campaign messaging emphasizes constitutional government and Utah\u2019s caucus system.",
+      "summary": "Seth Stewart is a Republican candidate for Utah’s 4th Congressional District. Public materials identify him as a software engineer and AI/ML researcher, and his campaign messaging emphasizes constitutional government and Utah’s caucus system.",
       "summary_sources": [
         {
           "url": "https://www.americanfork.gov/DocumentCenter/View/18550",
@@ -1289,7 +1289,7 @@
         {
           "url": "https://sethandrewstewart.com/",
           "type": "campaign website",
-          "title": "Restore the Republic \u2013 Seth Stewart"
+          "title": "Restore the Republic – Seth Stewart"
         }
       ],
       "image_url": null,
@@ -1344,7 +1344,7 @@
         },
         {
           "url": "https://sethandrewstewart.com/",
-          "title": "Restore the Republic \u2013 Seth Stewart",
+          "title": "Restore the Republic – Seth Stewart",
           "type": "official"
         },
         {
@@ -1409,7 +1409,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "web",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -1427,7 +1427,7 @@
             {
               "url": "https://www.americanfork.gov/DocumentCenter/View/18550",
               "type": "official-doc",
-              "title": "Seth Stewart \u2013 American Fork City Council Candidate",
+              "title": "Seth Stewart – American Fork City Council Candidate",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             },
             {
@@ -1457,7 +1457,7 @@
           ]
         },
         "Tech & AI": {
-          "stance": "Stewart\u2019s public materials identify him as a software engineer and AI/ML researcher, and his campaign website centers on constitutional government and caucus reform rather than a detailed technology platform. The available record does not show a formal AI policy, so any regulatory views should be treated as limited and inferred from his public comments rather than a published platform.",
+          "stance": "Stewart’s public materials identify him as a software engineer and AI/ML researcher, and his campaign website centers on constitutional government and caucus reform rather than a detailed technology platform. The available record does not show a formal AI policy, so any regulatory views should be treated as limited and inferred from his public comments rather than a published platform.",
           "confidence": "medium",
           "sources": [
             {
@@ -1469,7 +1469,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "campaign website",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:37:18.301796+00:00"
             },
             {
@@ -1493,7 +1493,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "website",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             },
             {
@@ -1517,7 +1517,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "campaign_site",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             },
             {
@@ -1547,7 +1547,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "website",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -1559,7 +1559,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "website",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -1583,7 +1583,7 @@
             {
               "url": "https://sethandrewstewart.com/",
               "type": "Website",
-              "title": "Restore the Republic \u2013 Seth Stewart",
+              "title": "Restore the Republic – Seth Stewart",
               "last_accessed": "2026-04-02T04:35:36.315262+00:00"
             }
           ]
@@ -1591,13 +1591,10 @@
       }
     }
   ],
-  "updated_utc": "2026-04-02T04:38:50.026781+00:00",
+  "updated_utc": "2026-04-06T16:42:45.017120+00:00",
   "generator": [
     "gpt-5.4-mini",
-    "gpt-5-nano",
-    "claude-haiku-4-5-20251001",
-    "gemini-3.1-flash-lite-preview",
-    "grok-3-mini"
+    "gpt-5-nano"
   ],
   "reviews": [
     {
@@ -1709,8 +1706,8 @@
         },
         {
           "field": "candidates[0].donor_summary",
-          "concern": "The summary mixes two distinct reporting periods without clear temporal boundaries: '2025 total receipts' ($610,158.88) are followed immediately by '2023\u20132024 PAC money' data. While both are accurate, the temporal blending could confuse readers about the most current fundraising status.",
-          "suggestion": "Revise for clarity: 'Through year-end 2025, Kennedy's federal campaign committee reported $610,158.88 in total receipts, including $574,063.88 in contributions and $290,500 from other committees. For the 2023\u20132024 cycle, OpenSecrets data shows his PAC support was led by ideological/single-issue PACs ($136,850), followed by health ($58,500) and finance/insurance/real estate ($38,500).' This makes reporting periods explicit.",
+          "concern": "The summary mixes two distinct reporting periods without clear temporal boundaries: '2025 total receipts' ($610,158.88) are followed immediately by '2023–2024 PAC money' data. While both are accurate, the temporal blending could confuse readers about the most current fundraising status.",
+          "suggestion": "Revise for clarity: 'Through year-end 2025, Kennedy's federal campaign committee reported $610,158.88 in total receipts, including $574,063.88 in contributions and $290,500 from other committees. For the 2023–2024 cycle, OpenSecrets data shows his PAC support was led by ideological/single-issue PACs ($136,850), followed by health ($58,500) and finance/insurance/real estate ($38,500).' This makes reporting periods explicit.",
           "severity": "info"
         },
         {
@@ -1756,7 +1753,7 @@
           "severity": "info"
         }
       ],
-      "summary": "This profile demonstrates excellent sourcing and depth for the incumbent candidate, Mike Kennedy, with comprehensive issue coverage backed by official congressional sources, campaign materials, and credible outlets. However, the profile has critical factual errors (image URLs pointing to wrong subjects, district representation confusion), significant coverage asymmetry (three challengers with minimal policy documentation and low-confidence entries), and incomplete biographical data (missing career histories and education for most non-incumbents). These issues\u2014particularly the factual errors and the stark imbalance between the incumbent and challengers\u2014require correction before publication to ensure accuracy and fairness."
+      "summary": "This profile demonstrates excellent sourcing and depth for the incumbent candidate, Mike Kennedy, with comprehensive issue coverage backed by official congressional sources, campaign materials, and credible outlets. However, the profile has critical factual errors (image URLs pointing to wrong subjects, district representation confusion), significant coverage asymmetry (three challengers with minimal policy documentation and low-confidence entries), and incomplete biographical data (missing career histories and education for most non-incumbents). These issues—particularly the factual errors and the stark imbalance between the incumbent and challengers—require correction before publication to ensure accuracy and fairness."
     },
     {
       "model": "gemini-3.1-flash-lite-preview",
@@ -1885,32 +1882,21 @@
   ],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 4747103,
-    "completion_tokens": 329006,
-    "total_tokens": 5076109,
-    "estimated_usd": 0.7839,
+    "prompt_tokens": 173471,
+    "completion_tokens": 8842,
+    "total_tokens": 182313,
+    "estimated_usd": 0.0253,
     "model_breakdown": {
-      "gpt-5.4-mini": {
-        "prompt_tokens": 1459213,
-        "completion_tokens": 18970
-      },
       "gpt-5-nano": {
-        "prompt_tokens": 3065834,
-        "completion_tokens": 295355
+        "prompt_tokens": 89068,
+        "completion_tokens": 8011
       },
-      "gemini-3.1-flash-lite-preview": {
-        "prompt_tokens": 80358,
-        "completion_tokens": 1824
-      },
-      "grok-3-mini": {
-        "prompt_tokens": 65407,
-        "completion_tokens": 2145
-      },
-      "claude-haiku-4-5-20251001": {
-        "prompt_tokens": 76291,
-        "completion_tokens": 10712
+      "gpt-5.4-mini": {
+        "prompt_tokens": 84403,
+        "completion_tokens": 831
       }
     },
-    "duration_s": 3400.5
-  }
+    "duration_s": 135.9
+  },
+  "validation_grade": null
 }

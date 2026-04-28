@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "Massachusetts",
   "election_date": "2026-11-03",
-  "description": "Massachusetts will elect one U.S. senator in 2026 for the state\u2019s Class II seat. The race matters because it will determine whether incumbent Democrat Ed Markey wins another term and because the seat is part of the broader balance of power in the U.S. Senate. Massachusetts is a strongly Democratic state in federal elections, so the main competition is expected to be in the Democratic primary, where Markey faces challengers including Rep. Seth Moulton. The race has centered on generational change, Markey\u2019s long record in Congress, and contrasting views on how aggressively Democrats should confront national politics and policy priorities.",
+  "description": "Massachusetts will elect one U.S. senator in 2026 for the state’s Class II seat. The race matters because it will determine whether incumbent Democrat Ed Markey wins another term and because the seat is part of the broader balance of power in the U.S. Senate. Massachusetts is a strongly Democratic state in federal elections, so the main competition is expected to be in the Democratic primary, where Markey faces challengers including Rep. Seth Moulton. The race has centered on generational change, Markey’s long record in Congress, and contrasting views on how aggressively Democrats should confront national politics and policy priorities.",
   "polling": [
     {
       "pollster": "University of New Hampshire",
@@ -64,7 +64,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Edward_Markey%2C_official_portrait%2C_114th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Ed_Markey__Official_Portrait__112th_Congress_2-7_fixed.jpg",
       "website": "https://www.edmarkey.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/EdMarkeyforMA/",
@@ -120,7 +120,7 @@
       "name": "Seth Moulton",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Seth Moulton is a U.S. representative from Massachusetts\u2019s 6th Congressional District and a Democratic primary challenger to Markey. His campaign biography highlights his Marine Corps service, his work in Congress, and his pitch as a newer generation of Democratic leadership focused on change and urgency.",
+      "summary": "Seth Moulton is a U.S. representative from Massachusetts’s 6th Congressional District and a Democratic primary challenger to Markey. His campaign biography highlights his Marine Corps service, his work in Congress, and his pitch as a newer generation of Democratic leadership focused on change and urgency.",
       "summary_sources": [
         {
           "url": "http://moulton.house.gov/about/biography",
@@ -135,7 +135,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/Seth_Moulton_portrait_%28118th_Congress%29.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Seth_Moulton.jpg",
       "website": "https://sethmoulton.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SethMoulton/",
@@ -149,7 +149,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2015,
           "end_year": null,
-          "description": "Represents Massachusetts\u2019s 6th Congressional District."
+          "description": "Represents Massachusetts’s 6th Congressional District."
         },
         {
           "title": "Marine Corps officer",
@@ -212,7 +212,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6d/John_Deaton%2C_2024.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/2024_United_States_Senate_election_in_Massachusetts_results_map_by_county.svg/500px-2024_United_States_Senate_election_in_Massachusetts_results_map_by_county.svg.png",
       "website": "https://www.johndeatonforsenate.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/deatonforsenate/"
@@ -280,7 +280,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/William_Gates_20260120_085346.jpg",
       "website": "https://www.williamfgatesforsenate.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/wfgates1/"
@@ -321,7 +321,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Alexander_Rikleen_20250525_012218.jpg",
       "website": "https://www.alexrikleen.us/",
       "social_media": {
         "x": "https://x.com/Rikleen",
@@ -348,7 +348,7 @@
           "organization": "School/community activities",
           "start_year": null,
           "end_year": null,
-          "description": "Campaign biography says he focused volunteer efforts at his children\u2019s school before running for office."
+          "description": "Campaign biography says he focused volunteer efforts at his children’s school before running for office."
         }
       ],
       "education": [
@@ -379,7 +379,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -404,7 +404,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -420,7 +420,7 @@
       "name": "Joseph Tache",
       "party": "Party for Socialism and Liberation",
       "incumbent": false,
-      "summary": "Joseph Tache is listed by Ballotpedia as a general-election candidate in the Massachusetts Senate race. Ballotpedia\u2019s candidate profile says his campaign emphasizes socialism, climate action, anti-war policy, and redistribution of wealth.",
+      "summary": "Joseph Tache is listed by Ballotpedia as a general-election candidate in the Massachusetts Senate race. Ballotpedia’s candidate profile says his campaign emphasizes socialism, climate action, anti-war policy, and redistribution of wealth.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_Massachusetts,_2026",
@@ -429,7 +429,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JosephTache2025.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -454,7 +454,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ShivaAyyadurai.jpeg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -479,7 +479,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Morgan_Dawicki_20250713_074529.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -492,7 +492,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:53:57.982363+00:00",
+  "updated_utc": "2026-04-06T17:50:45.208409+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -500,16 +500,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 201580,
-    "completion_tokens": 4294,
-    "total_tokens": 205874,
-    "estimated_usd": 0.0328,
+    "prompt_tokens": 106961,
+    "completion_tokens": 6579,
+    "total_tokens": 113540,
+    "estimated_usd": 0.0167,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 42332,
+        "completion_tokens": 5772
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 201580,
-        "completion_tokens": 4294
+        "prompt_tokens": 64629,
+        "completion_tokens": 807
       }
     },
-    "duration_s": 42.8
-  }
+    "duration_s": 92.2
+  },
+  "validation_grade": null
 }

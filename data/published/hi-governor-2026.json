@@ -4,7 +4,7 @@
   "office": "Governor of Hawaii",
   "jurisdiction": "Hawaii",
   "election_date": "2026-11-03",
-  "description": "The 2026 Hawaii gubernatorial election will choose the next governor of Hawaii, a statewide executive office. Incumbent Democratic Gov. Josh Green is eligible to seek a second term, and the race is currently viewed as strongly favorable to Democrats in a state that has voted reliably blue in recent statewide elections. The main contrast is likely to be between Green\u2019s record on housing, affordability, health care, and wildfire recovery and any Republican challenger\u2019s critique of cost of living, government performance, and economic conditions.",
+  "description": "The 2026 Hawaii gubernatorial election will choose the next governor of Hawaii, a statewide executive office. Incumbent Democratic Gov. Josh Green is eligible to seek a second term, and the race is currently viewed as strongly favorable to Democrats in a state that has voted reliably blue in recent statewide elections. The main contrast is likely to be between Green’s record on housing, affordability, health care, and wildfire recovery and any Republican challenger’s critique of cost of living, government performance, and economic conditions.",
   "polling": [
     {
       "pollster": "Cook Political Report",
@@ -31,7 +31,7 @@
       "name": "Josh Green",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Josh Green is Hawaii\u2019s incumbent governor and a physician by training. He has centered his public profile on housing affordability, homelessness, health care access, and recovery from the Maui wildfires, while emphasizing his experience in state government and medicine.",
+      "summary": "Josh Green is Hawaii’s incumbent governor and a physician by training. He has centered his public profile on housing affordability, homelessness, health care access, and recovery from the Maui wildfires, while emphasizing his experience in state government and medicine.",
       "summary_sources": [
         {
           "url": "https://governor.hawaii.gov/about/",
@@ -46,7 +46,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://governor.hawaii.gov/wp-content/uploads/2022/12/Governor-Green-Headshot.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Josh_Green_Official_Photo_2022_%28cropped%29_1cropped%29.jpg/500px-Josh_Green_Official_Photo_2022_%28cropped%29_1cropped%29.jpg",
       "website": "https://joshgreenforhawaii.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/GovJoshGreen/",
@@ -88,7 +88,7 @@
           "organization": "Private practice / rural health care in Hawaii",
           "start_year": null,
           "end_year": 2018,
-          "description": "Worked as a family physician and emergency room doctor, including service in Ka\u2018\u016b on Hawaii Island."
+          "description": "Worked as a family physician and emergency room doctor, including service in Ka‘ū on Hawaii Island."
         }
       ],
       "education": [
@@ -137,7 +137,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://www.garycorderyforgovernor.com/_next/image?url=https%3A%2F%2Fstatic.wixstatic.com%2Fmedia%2Fplaceholder&w=3840&q=75",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Gary_Cordery.jpeg",
       "website": "https://www.garycorderyforgovernor.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/garycorderyforgovernor/",
@@ -168,7 +168,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:46:07.410443+00:00",
+  "updated_utc": "2026-04-06T18:13:20.263603+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -176,16 +176,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 143618,
-    "completion_tokens": 1868,
-    "total_tokens": 145486,
-    "estimated_usd": 0.0227,
+    "prompt_tokens": 99390,
+    "completion_tokens": 3812,
+    "total_tokens": 103202,
+    "estimated_usd": 0.0137,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 56229,
+        "completion_tokens": 3299
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 143618,
-        "completion_tokens": 1868
+        "prompt_tokens": 43161,
+        "completion_tokens": 513
       }
     },
-    "duration_s": 29.9
-  }
+    "duration_s": 56.7
+  },
+  "validation_grade": null
 }

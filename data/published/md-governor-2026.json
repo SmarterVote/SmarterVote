@@ -4,7 +4,7 @@
   "office": "Governor and Lieutenant Governor of Maryland",
   "jurisdiction": "Maryland",
   "election_date": "2026-11-03",
-  "description": "Maryland will elect its governor and lieutenant governor on November 3, 2026; the two offices are elected together on a single ticket. The race is being held in a state that recent nonpartisan ratings describe as solidly Democratic, and the incumbent governor, Wes Moore, is seeking re-election. The contest matters because it will determine control of the state executive branch and test whether Moore\u2019s first-term record and the Democratic lean of the state outweigh Republican efforts to make the race about taxes, affordability, and public safety.",
+  "description": "Maryland will elect its governor and lieutenant governor on November 3, 2026; the two offices are elected together on a single ticket. The race is being held in a state that recent nonpartisan ratings describe as solidly Democratic, and the incumbent governor, Wes Moore, is seeking re-election. The contest matters because it will determine control of the state executive branch and test whether Moore’s first-term record and the Democratic lean of the state outweigh Republican efforts to make the race about taxes, affordability, and public safety.",
   "polling": [
     {
       "pollster": "Gonzales Research & Media Services",
@@ -49,7 +49,7 @@
       "name": "Wes Moore",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Wes Moore is Maryland\u2019s incumbent governor and is seeking a second term. Before entering elected office, he served in the U.S. Army, led nonprofit and philanthropic organizations, and became a best-selling author; as governor, he has emphasized economic opportunity, education, child poverty reduction, and public safety.",
+      "summary": "Wes Moore is Maryland’s incumbent governor and is seeking a second term. Before entering elected office, he served in the U.S. Army, led nonprofit and philanthropic organizations, and became a best-selling author; as governor, he has emphasized economic opportunity, education, child poverty reduction, and public safety.",
       "summary_sources": [
         {
           "url": "https://governor.maryland.gov/leadership/pages/governor.aspx",
@@ -64,7 +64,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Wes_Moore_Official_Governor_Portrait.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Wes_Moore.jpg",
       "website": "https://wesmoore.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/iamwesmoore/?hl=en",
@@ -78,14 +78,14 @@
           "organization": "State of Maryland",
           "start_year": 2023,
           "end_year": null,
-          "description": "Serves as Maryland\u2019s 63rd governor."
+          "description": "Serves as Maryland’s 63rd governor."
         },
         {
           "title": "CEO",
           "organization": "Robin Hood Foundation",
           "start_year": null,
           "end_year": null,
-          "description": "Led one of the country\u2019s largest anti-poverty organizations before entering office."
+          "description": "Led one of the country’s largest anti-poverty organizations before entering office."
         },
         {
           "title": "Founder and leader",
@@ -127,7 +127,7 @@
       "name": "Aruna Miller",
       "party": "Democratic",
       "incumbent": true,
-      "summary": "Aruna Miller is Maryland\u2019s lieutenant governor and is running for re-election on the Democratic ticket with Wes Moore. Her background is in civil and transportation engineering, and in elected office she has focused on transportation, STEM education, working families, and public safety-related issues.",
+      "summary": "Aruna Miller is Maryland’s lieutenant governor and is running for re-election on the Democratic ticket with Wes Moore. Her background is in civil and transportation engineering, and in elected office she has focused on transportation, STEM education, working families, and public safety-related issues.",
       "summary_sources": [
         {
           "url": "https://governor.maryland.gov/leadership/ltgovernor/Pages/biography.aspx",
@@ -142,7 +142,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Aruna-Miller.PNG",
       "website": "https://arunamiller.com/",
       "social_media": {},
       "career_history": [
@@ -151,7 +151,7 @@
           "organization": "State of Maryland",
           "start_year": 2023,
           "end_year": null,
-          "description": "Serves as Maryland\u2019s 10th lieutenant governor."
+          "description": "Serves as Maryland’s 10th lieutenant governor."
         },
         {
           "title": "Member, Maryland House of Delegates",
@@ -202,7 +202,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Dan_Cox.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Dan_Cox_Mar2020_%2849617550556%29.jpg/500px-Dan_Cox_Mar2020_%2849617550556%29.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -281,7 +281,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": "https://haleforgov.com/",
       "social_media": {},
       "career_history": [
@@ -341,7 +341,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Andy_Ellis.png",
       "website": "https://www.gogreen2026.com/",
       "social_media": {
         "instagram": "https://www.instagram.com/gogreenmd/",
@@ -416,9 +416,351 @@
       "voting_source_url": null,
       "links": [],
       "issues": {}
+    },
+    {
+      "name": "Eric S. Felber",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Eric_Felber.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "LaTrece Hawkins Lytes",
+      "party": "Democratic",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/LaTreceHawkinsLytes2.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Carl A. Brunner, Jr.",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Kevin L. Rhodes, Sr.",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "L. D. Burkindine",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Jeremy M. Shifflett",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Rob Krop",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Tyrone Keys, Jr.",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Douglas Larcomb",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Douglas_Larcomb_2026.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Martina D. Duncan",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "John A. Myrick",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/JohnMyrick2024.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Brenda J. Thiam",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/bthiam.jpg",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Michael Oakes",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Ronald W. Abend",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Nancy Jane Taylor",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Rachel Hannah Swift",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Shannon Wright",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": null,
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Reba A. Hawkins",
+      "party": "Republican",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Reba-Hawkins.PNG",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
+    },
+    {
+      "name": "Owen Silverman Andrews",
+      "party": "Green",
+      "incumbent": false,
+      "summary": "",
+      "summary_sources": [],
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
+      "website": null,
+      "social_media": {},
+      "career_history": [],
+      "education": [],
+      "donor_summary": null,
+      "donor_source_url": null,
+      "voting_summary": null,
+      "voting_source_url": null,
+      "links": [],
+      "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:53:14.854330+00:00",
+  "updated_utc": "2026-04-06T17:54:22.233656+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -426,16 +768,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 207610,
-    "completion_tokens": 3597,
-    "total_tokens": 211207,
-    "estimated_usd": 0.0333,
+    "prompt_tokens": 343705,
+    "completion_tokens": 31520,
+    "total_tokens": 375225,
+    "estimated_usd": 0.0527,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 231609,
+        "completion_tokens": 30887
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 207610,
-        "completion_tokens": 3597
+        "prompt_tokens": 112096,
+        "completion_tokens": 633
       }
     },
-    "duration_s": 43.4
-  }
+    "duration_s": 197.3
+  },
+  "validation_grade": null
 }

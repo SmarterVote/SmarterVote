@@ -4,7 +4,7 @@
   "office": "Governor of Vermont",
   "jurisdiction": "Vermont",
   "election_date": "2026-11-03",
-  "description": "The 2026 race is for governor of Vermont, the state\u2019s chief executive office. It is an open primary cycle in the sense that the general-election field has not yet been finalized, but incumbent Republican Phil Scott is already running for renomination, and Democrat Amanda Janoo has announced a challenge. Vermont has recently been a strongly Republican governor\u2019s race despite voting heavily Democratic in federal elections, so the contest will likely center on affordability, education, taxes, and Scott\u2019s long tenure in office.",
+  "description": "The 2026 Vermont governor’s race is for the state’s chief executive office, with Republican incumbent Phil Scott seeking reelection and Democrat Amanda Janoo mounting an early challenge. The contest is likely to center on affordability, education governance, taxes, and Scott’s long tenure, with Janoo framing her campaign around housing, health care, and opposition to forced school consolidation.",
   "polling": [
     {
       "pollster": "University of New Hampshire Survey Center",
@@ -25,28 +25,26 @@
       "source_url": "https://scholars.unh.edu/survey_center_polls/898/"
     }
   ],
-  "polling_note": null,
+  "polling_note": "No polls published after 2026-04-01T06:08:24.063764+00:00 were found in the available sources. The most recent poll currently in the profile predates that cutoff.",
   "candidates": [
     {
       "name": "Phil Scott",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Phil Scott is the incumbent governor of Vermont and a longtime statewide officeholder. He has emphasized economic growth, affordability, and education reform, and he has governed as a socially moderate Republican in a state that leans Democratic in federal elections.",
+      "summary": "Phil Scott is the Republican incumbent governor of Vermont and is seeking reelection in 2026. Recent coverage has centered on his push to overhaul Vermont’s education governance and funding system, including school consolidation proposals, while he continues to emphasize affordability and state management.",
       "summary_sources": [
         {
-          "url": "https://governor.vermont.gov/about-us",
-          "type": "government",
-          "title": "About the Governor | Office of Governor Phil Scott",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.vermontpublic.org/local-news/2026-03-10/republican-gov-phil-scott-democratic-challenge-2026",
+          "type": "news",
+          "title": "Republican Gov. Phil Scott to see Democratic challenge in 2026"
         },
         {
-          "url": "https://ballotpedia.org/Phil_Scott_(Vermont)",
-          "type": "website",
-          "title": "Phil Scott (Vermont) - Ballotpedia",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://governor.vermont.gov/press-release/statement-governor-scotts-office-vermont-labor-relations-board-decision-states-hybrid",
+          "type": "government",
+          "title": "Statement from Governor Scott's Office on the Vermont Labor Relations Board Decision on the State's Hybrid Work Standard"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/6/6f/Phil_Scott.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Phil_Scott_2019.png/500px-Phil_Scott_2019.png",
       "website": "https://www.philscott.org/",
       "social_media": {
         "facebook": "https://www.facebook.com/GovPhilScott/",
@@ -109,28 +107,25 @@
       "name": "Amanda Janoo",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Amanda Janoo is a Democratic candidate for governor who entered the race in 2026. Her campaign has highlighted affordability, housing, education, and health care, and she has described herself as an economist and policy expert with international experience.",
+      "summary": "Amanda Janoo is a Democratic candidate for governor who announced her campaign in March 2026. Her launch focused on affordability, housing, free primary and preventive health care, and opposition to forced school consolidation, and she has said she will seek the Progressive Party’s endorsement.",
       "summary_sources": [
-        {
-          "url": "https://janooforvt.com/",
-          "type": "website",
-          "title": "Amanda Janoo for Governor of Vermont",
-          "last_accessed": "2026-04-01T00:00:00Z"
-        },
         {
           "url": "https://vtdigger.org/2026/03/10/first-democratic-challenger-to-phil-scott-enters-governors-race/",
           "type": "news",
-          "title": "First Democratic candidate enters governor's race - VTDigger",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "title": "First Democratic candidate enters governor's race - VTDigger"
         },
         {
-          "url": "https://vt.emergeamerica.org/staff/amanda-janoo-2/",
-          "type": "website",
-          "title": "Amanda Janoo - Emerge Vermont",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.vermontpublic.org/local-news/2026-03-10/republican-gov-phil-scott-democratic-challenge-2026",
+          "type": "news",
+          "title": "Republican Gov. Phil Scott to see Democratic challenge in 2026"
+        },
+        {
+          "url": "https://vermontbiz.com/news/2026/march/10/amanda-janoo-announces-campaign-governor",
+          "type": "news",
+          "title": "Amanda Janoo announces campaign for governor"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": "https://janooforvt.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/JanooForVT/",
@@ -169,7 +164,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:08:24.063764+00:00",
+  "updated_utc": "2026-04-06T17:04:53.802468+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -177,16 +172,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 106077,
-    "completion_tokens": 1919,
-    "total_tokens": 107996,
-    "estimated_usd": 0.0171,
+    "prompt_tokens": 227267,
+    "completion_tokens": 8080,
+    "total_tokens": 235347,
+    "estimated_usd": 0.0347,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 57452,
+        "completion_tokens": 6662
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 106077,
-        "completion_tokens": 1919
+        "prompt_tokens": 169815,
+        "completion_tokens": 1418
       }
     },
-    "duration_s": 32.2
-  }
+    "duration_s": 139.1
+  },
+  "validation_grade": null
 }

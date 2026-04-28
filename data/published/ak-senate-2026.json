@@ -4,8 +4,26 @@
   "office": "United States Senate",
   "jurisdiction": "Alaska",
   "election_date": "2026-11-03",
-  "description": "This race is for Alaska\u2019s Class II seat in the U.S. Senate, currently held by Republican Dan Sullivan. It matters because it could affect control of the Senate, and Alaska\u2019s top-four primary plus ranked-choice general election can make the contest more fluid than a traditional two-party race. The state has leaned Republican in recent federal elections, but Mary Peltola\u2019s entry gives Democrats a high-profile challenger and sets up a contrast between an incumbent with deep federal and military experience and a former congresswoman emphasizing cost of living, fisheries, and government reform.",
+  "description": "Alaska’s 2026 U.S. Senate race is for the state’s Class II seat, with incumbent Republican Dan Sullivan seeking reelection against former Democratic U.S. Rep. Mary Peltola. Alaska uses a top-four primary and ranked-choice general election system, and the contest is drawing national attention because control of the Senate could be affected and both candidates have already attracted outside spending and high-profile endorsements.",
   "polling": [
+    {
+      "pollster": "Alaska Survey Research",
+      "date": "2026-03-22",
+      "matchups": [
+        {
+          "candidates": [
+            "Mary Peltola",
+            "Dan Sullivan"
+          ],
+          "percentages": [
+            48.5,
+            40.7
+          ]
+        }
+      ],
+      "source_url": "https://alaskasurveyresearch.com/senate-tracking-survey/",
+      "sample_size": 1590
+    },
     {
       "pollster": "Alaska Survey Research",
       "date": "2026-01-11",
@@ -31,22 +49,25 @@
       "name": "Dan Sullivan",
       "party": "Republican",
       "incumbent": true,
-      "summary": "Dan Sullivan is the incumbent U.S. senator from Alaska and is seeking reelection in 2026. Before the Senate, he served as Alaska attorney general, commissioner of the Alaska Department of Natural Resources, and in senior national security roles in the George W. Bush administration; he also had a long career in the Marine Corps Reserve.",
+      "summary": "Dan Sullivan is the Republican incumbent U.S. senator from Alaska, first elected in 2014. In 2026, he is seeking reelection and has emphasized his record on Alaska-specific priorities such as health care, Coast Guard funding, and energy development while facing a challenge from former U.S. Rep. Mary Peltola.",
       "summary_sources": [
         {
-          "url": "https://www.sullivan.senate.gov/about/bio",
-          "type": "website",
-          "title": "Meet Dan | U.S. Senator Dan Sullivan of Alaska",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/United_States_Senate_election_in_Alaska,_2026",
+          "title": "Ballotpedia: United States Senate election in Alaska, 2026",
+          "type": "ballotpedia"
         },
         {
-          "url": "https://bioguide.congress.gov/search/bio/S001198",
-          "type": "government",
-          "title": "SULLIVAN, Daniel Scott - Bioguide Search",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.alaskabeacon.com/2026/01/12/mary-peltola-announces-run-for-alaska-u-s-senate-challenging-incumbent-dan-sullivan/",
+          "title": "Alaska Beacon: Mary Peltola announces run for Alaska U.S. Senate",
+          "type": "news"
+        },
+        {
+          "url": "https://www.axios.com/2026/03/09/alaska-senate-dan-sullivan-peltola-ads",
+          "title": "Axios: Alaska's Dan Sullivan gets outside air support",
+          "type": "news"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/7/7e/Senator_Dan_Sullivan_official.jpg",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/Senator_Dan_Sullivan_official.jpg/500px-Senator_Dan_Sullivan_official.jpg",
       "website": "https://dansullivanforalaska.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/SenDanSullivan/",
@@ -67,7 +88,7 @@
           "organization": "State of Alaska",
           "start_year": 2009,
           "end_year": 2010,
-          "description": "Served as Alaska\u2019s attorney general."
+          "description": "Served as Alaska’s attorney general."
         },
         {
           "title": "Commissioner",
@@ -116,28 +137,25 @@
       "name": "Mary Peltola",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Mary Peltola is a former U.S. representative from Alaska and is running for Senate in 2026. Her campaign emphasizes Alaska-specific issues such as fisheries, affordability, and what she describes as fixing a broken system in Washington, drawing on her background in rural Alaska and public service.",
+      "summary": "Mary Peltola is a former Alaska at-large U.S. representative who served from 2022 to 2024 and was the first Alaska Native elected to Congress. She entered the 2026 U.S. Senate race against incumbent Dan Sullivan and has framed her campaign around Alaska-focused themes including fisheries, cost of living, energy prices, and housing.",
       "summary_sources": [
         {
-          "url": "https://marypeltola.com/",
-          "type": "website",
-          "title": "Mary Peltola: Home",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://www.alaskabeacon.com/2026/01/12/mary-peltola-announces-run-for-alaska-u-s-senate-challenging-incumbent-dan-sullivan/",
+          "title": "Alaska Beacon: Mary Peltola announces run for Alaska U.S. Senate",
+          "type": "news"
         },
         {
-          "url": "https://marypeltola.com/my-story/#%21",
-          "type": "website",
-          "title": "My Story | Mary Peltola for Congress",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://marypeltola.com/press/",
+          "title": "Mary Peltola campaign press page",
+          "type": "official"
         },
         {
-          "url": "https://bioguide.congress.gov/search/bio/P000619",
-          "type": "government",
-          "title": "PELTOLA, Mary Sattler - Bioguide Search",
-          "last_accessed": "2026-04-01T00:00:00Z"
+          "url": "https://ballotpedia.org/United_States_Senate_election_in_Alaska,_2026",
+          "title": "Ballotpedia: United States Senate election in Alaska, 2026",
+          "type": "ballotpedia"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Mary_Peltola_Congressional_Member_Portrait_%282%29.jpeg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Mary-Peltola.PNG",
       "website": "https://marypeltola.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/marypeltola/",
@@ -152,7 +170,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2022,
           "end_year": 2025,
-          "description": "Represented Alaska\u2019s at-large congressional district."
+          "description": "Represented Alaska’s at-large congressional district."
         },
         {
           "title": "Member",
@@ -210,7 +228,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:38:40.861350+00:00",
+  "updated_utc": "2026-04-06T18:32:03.786830+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -218,16 +236,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 121253,
-    "completion_tokens": 2125,
-    "total_tokens": 123378,
-    "estimated_usd": 0.0195,
+    "prompt_tokens": 136199,
+    "completion_tokens": 6555,
+    "total_tokens": 142754,
+    "estimated_usd": 0.0218,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 32263,
+        "completion_tokens": 4761
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 121253,
-        "completion_tokens": 2125
+        "prompt_tokens": 103936,
+        "completion_tokens": 1794
       }
     },
-    "duration_s": 29.7
-  }
+    "duration_s": 118.3
+  },
+  "validation_grade": null
 }

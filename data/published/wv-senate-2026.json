@@ -4,7 +4,7 @@
   "office": "United States Senate",
   "jurisdiction": "West Virginia",
   "election_date": "2026-11-03",
-  "description": "West Virginia voters will elect one U.S. senator in 2026 for the state\u2019s Class II seat. The race is notable because it is an open-seat-style contest in the sense that the current senator, Shelley Moore Capito, is running for reelection while the seat is also part of the broader fight for Senate control; Ballotpedia rates the race as solid/safe Republican. West Virginia has trended strongly Republican in recent federal elections, and the main contrast in the race is likely to be between the GOP incumbent\u2019s record and the Democratic nominee chosen in the May primary.",
+  "description": "West Virginia voters will elect one U.S. senator in 2026 for the state’s Class II seat. The race is notable because it is an open-seat-style contest in the sense that the current senator, Shelley Moore Capito, is running for reelection while the seat is also part of the broader fight for Senate control; Ballotpedia rates the race as solid/safe Republican. West Virginia has trended strongly Republican in recent federal elections, and the main contrast in the race is likely to be between the GOP incumbent’s record and the Democratic nominee chosen in the May primary.",
   "polling": [],
   "polling_note": "No public general-election polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/0/0d/Shelley_Moore_Capito%2C_official_photo_portrait%2C_color.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Shelley_Moore_Capito.jpeg",
       "website": "https://shelleymoorecapito.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/senshelley",
@@ -54,7 +54,7 @@
           "organization": "U.S. House of Representatives",
           "start_year": 2001,
           "end_year": 2015,
-          "description": "Represented West Virginia\u2019s 2nd Congressional District for seven terms."
+          "description": "Represented West Virginia’s 2nd Congressional District for seven terms."
         },
         {
           "title": "Member",
@@ -98,7 +98,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Thornton_Cooper.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -123,7 +123,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Fetty_Anderson2.JPG",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -148,7 +148,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Kessler_jeffrey.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -173,7 +173,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Rio_Phillips_25.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -189,7 +189,7 @@
       "name": "Zachary Shrewsbury",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Zachary Shrewsbury is a Democratic candidate in the 2026 West Virginia U.S. Senate primary and was also a 2024 Senate candidate in the state. Ballotpedia\u2019s race page shows him as an active candidate with notable fundraising relative to other Democrats in the field, but the sources reviewed did not provide a full current campaign biography for this cycle.",
+      "summary": "Zachary Shrewsbury is a Democratic candidate in the 2026 West Virginia U.S. Senate primary and was also a 2024 Senate candidate in the state. Ballotpedia’s race page shows him as an active candidate with notable fundraising relative to other Democrats in the field, but the sources reviewed did not provide a full current campaign biography for this cycle.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_West_Virginia,_2026",
@@ -198,7 +198,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ZacharyShrewsbury.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -223,7 +223,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Gaaserudalex.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -248,7 +248,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/BryanMcKinney2023.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -264,7 +264,7 @@
       "name": "Janet McNulty",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Janet McNulty is a Republican candidate in the 2026 West Virginia U.S. Senate primary. She appears on Ballotpedia\u2019s candidate list, but the sources reviewed did not confirm a current campaign website or detailed biography for this race.",
+      "summary": "Janet McNulty is a Republican candidate in the 2026 West Virginia U.S. Senate primary. She appears on Ballotpedia’s candidate list, but the sources reviewed did not confirm a current campaign website or detailed biography for this race.",
       "summary_sources": [
         {
           "url": "https://ballotpedia.org/United_States_Senate_election_in_West_Virginia,_2026",
@@ -273,7 +273,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Janet_McNulty.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -298,7 +298,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/David_Purkey.JPG",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -336,7 +336,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T06:09:56.304806+00:00",
+  "updated_utc": "2026-04-06T16:59:17.995560+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -344,16 +344,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 58507,
-    "completion_tokens": 3259,
-    "total_tokens": 61766,
-    "estimated_usd": 0.0107,
+    "prompt_tokens": 147699,
+    "completion_tokens": 7206,
+    "total_tokens": 154905,
+    "estimated_usd": 0.0217,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 69225,
+        "completion_tokens": 6436
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 58507,
-        "completion_tokens": 3259
+        "prompt_tokens": 78474,
+        "completion_tokens": 770
       }
     },
-    "duration_s": 26.5
-  }
+    "duration_s": 122.8
+  },
+  "validation_grade": null
 }

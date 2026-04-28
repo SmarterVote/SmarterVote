@@ -4,7 +4,7 @@
   "office": "U.S. Senate",
   "jurisdiction": "Kansas",
   "election_date": "2026-11-03",
-  "description": "Kansas\u2019s 2026 U.S. Senate race is for the Class II Senate seat held by Republican Roger Marshall, with the primary on August 4, 2026 and the general election on November 3, 2026. The race matters because it will help determine control of the U.S. Senate, and Kansas has been a reliably Republican state in recent federal elections. Ballotpedia rates the seat Solid Republican, while other forecasters also currently lean Republican, so Democrats are trying to make the contest competitive by recruiting a broad field of challengers. The main contrast so far is between Marshall\u2019s incumbent record and a Democratic field that includes candidates with backgrounds in law, business, public service, and state politics.",
+  "description": "Kansas’s 2026 U.S. Senate race is for the Class II Senate seat held by Republican Roger Marshall, with the primary on August 4, 2026 and the general election on November 3, 2026. The race matters because it will help determine control of the U.S. Senate, and Kansas has been a reliably Republican state in recent federal elections. Ballotpedia rates the seat Solid Republican, while other forecasters also currently lean Republican, so Democrats are trying to make the contest competitive by recruiting a broad field of challengers. The main contrast so far is between Marshall’s incumbent record and a Democratic field that includes candidates with backgrounds in law, business, public service, and state politics.",
   "polling": [],
   "polling_note": "No public polling found for this race as of 2026-04-01.",
   "candidates": [
@@ -33,7 +33,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Roger_Marshall%2C_Official_Portrait%2C_116th_Congress.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/RogerMarshall.jpg",
       "website": "https://www.marshall.senate.gov/",
       "social_media": {
         "facebook": "https://www.facebook.com/RogerMarshallMD/",
@@ -116,7 +116,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/Christy_Davis.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Christy2026Davis.png",
       "website": "https://www.christydavisforkansas.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/christydavisforkansas/",
@@ -185,7 +185,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": "https://ballotpedia.org/wiki/images/Erik_Murray.jpg",
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Erik_Murray_20260331_051614.jpeg",
       "website": "https://erikforkansas.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/erik.murray.820582/",
@@ -230,7 +230,7 @@
         {
           "url": "https://www.anneforkansas.com/about",
           "type": "website",
-          "title": "About | Learn More, Get Involved Today \u2014 Anne Parelkar for Senate",
+          "title": "About | Learn More, Get Involved Today — Anne Parelkar for Senate",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -240,7 +240,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Anne_Parelkar_20251012_042603.jpg",
       "website": "https://www.anneforkansas.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/AnneForKansas/",
@@ -279,7 +279,7 @@
         {
           "url": "https://patrickforkansas.com/",
           "type": "website",
-          "title": "Patrick Schmidt for US Senate \u2013 Patrick Schmidt is a former U.S. Navy Intelligence Officer running to represent Kansas in the U.S. Senate.",
+          "title": "Patrick Schmidt for US Senate – Patrick Schmidt is a former U.S. Navy Intelligence Officer running to represent Kansas in the U.S. Senate.",
           "last_accessed": "2026-04-01T00:00:00Z"
         },
         {
@@ -295,7 +295,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Patrick-Schmidt.PNG",
       "website": "https://patrickforkansas.com/",
       "social_media": {
         "facebook": "https://www.facebook.com/patrickforkansas/",
@@ -351,7 +351,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_Soetaert_2025.jpg",
       "website": null,
       "social_media": {},
       "career_history": [
@@ -390,7 +390,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Sandy_Spidel_Neumann_20260318_105918.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -415,7 +415,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -440,7 +440,7 @@
           "last_accessed": "2026-04-01T00:00:00Z"
         }
       ],
-      "image_url": null,
+      "image_url": "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/ChaseLaPorte.jpg",
       "website": null,
       "social_media": {},
       "career_history": [],
@@ -453,7 +453,7 @@
       "issues": {}
     }
   ],
-  "updated_utc": "2026-04-01T05:49:29.672503+00:00",
+  "updated_utc": "2026-04-06T18:02:58.565884+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -461,16 +461,21 @@
   "reviews": [],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 125173,
-    "completion_tokens": 4506,
-    "total_tokens": 129679,
-    "estimated_usd": 0.0215,
+    "prompt_tokens": 224687,
+    "completion_tokens": 4110,
+    "total_tokens": 228797,
+    "estimated_usd": 0.0288,
     "model_breakdown": {
+      "gpt-5-nano": {
+        "prompt_tokens": 133091,
+        "completion_tokens": 3706
+      },
       "gpt-5.4-mini": {
-        "prompt_tokens": 125173,
-        "completion_tokens": 4506
+        "prompt_tokens": 91596,
+        "completion_tokens": 404
       }
     },
-    "duration_s": 43.4
-  }
+    "duration_s": 78.2
+  },
+  "validation_grade": null
 }

@@ -4,8 +4,26 @@
   "office": "United States Senate",
   "jurisdiction": "Michigan",
   "election_date": "2026-11-03",
-  "description": "Michigan’s 2026 U.S. Senate race is for an open seat after Sen. Gary Peters said he would not seek reelection. The contest matters because Michigan is a closely divided swing state and control of the Senate could hinge on the seat; the Democratic primary has featured a three-way affordability-focused race among Abdul El-Sayed, Mallory McMorrow, and Haley Stevens, while Republican Mike Rogers is the party’s leading contender.",
+  "description": "Michigan will elect one U.S. senator in 2026 for the Class II seat held by Democrat Gary Peters, who is not seeking re-election. The race is expected to be competitive because Michigan is a closely divided battleground state, with Democrats contesting an open seat and Republicans aiming to flip it; the Democratic primary features Abdul El-Sayed, Mallory McMorrow, and Haley Stevens, while Mike Rogers is the leading Republican contender.",
   "polling": [
+    {
+      "pollster": "Detroit News-WDIV",
+      "date": "2026-01-14",
+      "matchups": [
+        {
+          "candidates": [
+            "Mike Rogers",
+            "Haley Stevens"
+          ],
+          "percentages": [
+            44.1,
+            43.7
+          ]
+        }
+      ],
+      "source_url": "https://www.detroitnews.com/story/news/politics/2026/01/14/michigan-senate-race-poll-mike-rogers-haley-stevens-mallory-mcmorrow-abdul-el-sayed/88148893007/",
+      "sample_size": 600
+    },
     {
       "pollster": "Emerson College Polling / Nexstar Media",
       "date": "2026-01-29",
@@ -130,17 +148,22 @@
       "name": "Abdul El-Sayed",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Abdul El-Sayed is a physician and former Wayne County health director running for Michigan’s open U.S. Senate seat as a Democrat. He has emphasized affordability and health care in the race and has received an endorsement from Sen. Bernie Sanders.",
+      "summary": "Abdul El-Sayed is a former Michigan public health official and 2018 Democratic nominee for governor who entered the 2026 U.S. Senate race in April 2025. In the 2026 campaign, he has emphasized progressive positions on immigration and health care and has drawn attention for his criticism of ICE and for controversy over his association with online streamer Hasan Piker.",
       "summary_sources": [
         {
           "url": "https://apnews.com/article/michigan-senate-race-democrat-abdul-elsayed-fb8b90a59ae5df53f5c6b524968b205e",
           "title": "Ex-Michigan health officer Abdul El-Sayed enters Democratic US Senate race",
-          "type": "article"
+          "type": "news"
         },
         {
-          "url": "https://emersoncollegepolling.com/michigan-2026-poll-crowded-democratic-senate-primary-remains-wide-open/",
-          "title": "Michigan 2026 Poll: Crowded Democratic Senate Primary Remains Wide Open",
-          "type": "poll"
+          "url": "https://www.detroitnews.com/story/news/politics/2026/01/24/where-michigan-senate-candidates-stand-on-ice-tactics-immigration-trump-kristi-noem/88319690007/",
+          "title": "Where Michigan Senate candidates stand on ICE tactics",
+          "type": "news"
+        },
+        {
+          "url": "https://www.themidwesterner.news/2026/04/democrat-think-tank-third-way-demands-abdul-el-sayed-answer-questions-about-his-association-with-hasan-piker/",
+          "title": "Third Way demands Abdul El-Sayed answer questions about Hasan Piker",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Abdul_El-Sayed.jpg/500px-Abdul_El-Sayed.jpg",
@@ -480,17 +503,22 @@
       "name": "Mallory McMorrow",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Mallory McMorrow is a Michigan state senator running for the state’s open U.S. Senate seat as a Democrat. Her campaign has centered on affordability and she has been among the top contenders in early polling.",
+      "summary": "Mallory McMorrow is a Michigan state senator and Democratic candidate for U.S. Senate who entered the race in 2025. Her campaign has centered on affordability and consumer issues, and she has recently drawn attention for a policy plan targeting Big Tech and for early polling that showed her leading the Democratic primary field.",
       "summary_sources": [
         {
-          "url": "https://apnews.com/article/mallory-mcmorrow-2026-election-michigan-senate-1e5f694a199cac0b48c37cb0bd99298d",
-          "title": "Michigan lawmaker Mallory McMorrow announces Democratic bid for US Senate",
-          "type": "article"
+          "url": "https://www.michiganpublic.org/politics-government/2025-04-17/former-michigan-health-officer-abdul-el-sayed-enters-democratic-us-senate-race",
+          "title": "Michigan Senate race coverage",
+          "type": "news"
         },
         {
-          "url": "https://emersoncollegepolling.com/michigan-2026-poll-crowded-democratic-senate-primary-remains-wide-open/",
-          "title": "Michigan 2026 Poll: Crowded Democratic Senate Primary Remains Wide Open",
-          "type": "poll"
+          "url": "https://michiganadvance.com/2026/02/09/mcmorrow-issues-policy-plan-taking-on-big-tech-to-keep-kids-safe/",
+          "title": "McMorrow issues policy plan taking on Big Tech to keep kids safe",
+          "type": "news"
+        },
+        {
+          "url": "https://thehill.com/homenews/campaign/5709140-democratic-senate-race-michigan/",
+          "title": "McMorrow leads Stevens in wide-open Michigan Senate primary: Poll",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Mallory_McMorrow_in_2023_-_8R4A5252.jpg/500px-Mallory_McMorrow_in_2023_-_8R4A5252.jpg",
@@ -984,17 +1012,22 @@
       "name": "Haley Stevens",
       "party": "Democratic",
       "incumbent": false,
-      "summary": "Haley Stevens is a U.S. representative from Michigan who entered the Democratic primary for the state’s open U.S. Senate seat. She has framed her campaign around the economy and affordability and has been competitive in early polling.",
+      "summary": "Haley Stevens is a U.S. representative from Michigan who entered the 2026 U.S. Senate race in April 2025. Her campaign launch focused on economic concerns, and she has since remained a major contender in the Democratic primary and in early general-election polling against Republican Mike Rogers.",
       "summary_sources": [
         {
           "url": "https://apnews.com/article/michigan-senate-race-2026-haley-stevens-70cdfce62c91aa4c1b5e801dd141e3ff",
           "title": "Michigan Democrat Haley Stevens joins Mallory McMorrow in Senate primary",
-          "type": "article"
+          "type": "news"
         },
         {
-          "url": "https://emersoncollegepolling.com/michigan-2026-poll-crowded-democratic-senate-primary-remains-wide-open/",
-          "title": "Michigan 2026 Poll: Crowded Democratic Senate Primary Remains Wide Open",
-          "type": "poll"
+          "url": "https://www.detroitnews.com/story/news/politics/2026/01/14/michigan-senate-race-poll-mike-rogers-haley-stevens-mallory-mcmorrow-abdul-el-sayed/88148893007/",
+          "title": "Rogers, Stevens tied in Michigan U.S. Senate matchup, poll finds",
+          "type": "news"
+        },
+        {
+          "url": "https://www.themidwesterner.news/2026/04/haley-stevens-ad-for-campaign-staff-encourages-applicants-with-any-immigration-or-citizenship-status-to-apply/",
+          "title": "Haley Stevens ad for campaign staff encourages applicants with any immigration or citizenship status to apply",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Haley_Stevens%2C_official_portrait%2C_116th_Congress.jpg/500px-Haley_Stevens%2C_official_portrait%2C_116th_Congress.jpg",
@@ -1447,17 +1480,22 @@
       "name": "Mike Rogers",
       "party": "Republican",
       "incumbent": false,
-      "summary": "Mike Rogers is a former Republican U.S. representative and former House Intelligence Committee chair running for Michigan’s open U.S. Senate seat. He is the Republican candidate in the race and has been positioned as the party’s nominee in early general-election polling.",
+      "summary": "Mike Rogers is a former Republican U.S. representative and former FBI agent who is running again for Michigan's open U.S. Senate seat after narrowly losing the 2024 Senate race. In 2026, he has positioned himself as a candidate aligned with President Donald Trump's agenda and remains a leading Republican contender in the race.",
       "summary_sources": [
         {
-          "url": "https://apnews.com/article/michigan-senate-mike-rogers-elissa-slotkin-4090100478bd1f84813e96a94e83cceb",
-          "title": "Former Republican congressman Mike Rogers expected to run for US Senate in Michigan, AP sources say",
-          "type": "article"
+          "url": "https://apnews.com/article/rogers-senate-michigan-republican-bc42564436311ab9167582a69928c0c7",
+          "title": "After loss to Slotkin, Michigan Republican Mike Rogers runs again",
+          "type": "news"
         },
         {
-          "url": "https://emersoncollegepolling.com/michigan-2026-poll-crowded-democratic-senate-primary-remains-wide-open/",
-          "title": "Michigan 2026 Poll: Crowded Democratic Senate Primary Remains Wide Open",
-          "type": "poll"
+          "url": "https://punchbowl.news/article/senate/rogers-trump-mich/",
+          "title": "Rogers lost with Trump on the ballot. Can he win without him?",
+          "type": "news"
+        },
+        {
+          "url": "https://www.detroitnews.com/story/news/politics/2026/01/14/michigan-senate-race-poll-mike-rogers-haley-stevens-mallory-mcmorrow-abdul-el-sayed/88148893007/",
+          "title": "Rogers, Stevens tied in Michigan U.S. Senate matchup, poll finds",
+          "type": "news"
         }
       ],
       "image_url": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Mike_Rogers_119th_Congress.jpg",
@@ -1918,7 +1956,7 @@
       "links": []
     }
   ],
-  "updated_utc": "2026-04-01T05:55:07.978289+00:00",
+  "updated_utc": "2026-04-06T17:48:52.812694+00:00",
   "generator": [
     "gpt-5.4-mini",
     "gpt-5-nano"
@@ -2003,20 +2041,21 @@
   ],
   "agent_metrics": {
     "model": "gpt-5.4-mini",
-    "prompt_tokens": 207640,
-    "completion_tokens": 7816,
-    "total_tokens": 215456,
-    "estimated_usd": 0.0334,
+    "prompt_tokens": 406679,
+    "completion_tokens": 6580,
+    "total_tokens": 413259,
+    "estimated_usd": 0.0601,
     "model_breakdown": {
       "gpt-5-nano": {
-        "prompt_tokens": 24120,
-        "completion_tokens": 6051
+        "prompt_tokens": 80331,
+        "completion_tokens": 4400
       },
       "gpt-5.4-mini": {
-        "prompt_tokens": 183520,
-        "completion_tokens": 1765
+        "prompt_tokens": 326348,
+        "completion_tokens": 2180
       }
     },
-    "duration_s": 69.7
-  }
+    "duration_s": 94.9
+  },
+  "validation_grade": null
 }
