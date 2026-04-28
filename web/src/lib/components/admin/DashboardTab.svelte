@@ -13,13 +13,16 @@
   } from "chart.js";
   import { Doughnut, Line } from "svelte-chartjs";
   import { analyticsService } from "$lib/services/analyticsService";
+  import { PipelineApiService } from "$lib/services/pipelineApiService";
   import type { Alert, AnalyticsOverview, PipelineMetricsSummary, PipelineRunRecord } from "$lib/types";
+  import type { RaceRecord } from "$lib/types";
 
   // Register Chart.js components once
   ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
   export let onAlertCountChange: (n: number) => void = () => {};
   export let recentRuns: { run_id: string; status: string; payload?: Record<string, unknown>; started_at?: string }[] = [];
+  export let apiService: PipelineApiService | undefined = undefined;
 
   const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
   const GCP_PROJECT = import.meta.env.VITE_GCP_PROJECT || "";
@@ -73,6 +76,15 @@
   // Separate race request tracking per race
   let raceRequests: { race_id: string; requests_24h: number }[] = [];
 
+  // Discovery-only races
+  let allRaces: RaceRecord[] = [];
+  $: discoveryOnlyRaces = allRaces.filter((r) => {
+    const opts = (r.last_run_options ?? r.queue_options) as { enabled_steps?: string[] } | undefined;
+    if (!opts) return false;
+    const steps = opts.enabled_steps;
+    return Array.isArray(steps) && steps.length === 1 && steps[0] === "discovery";
+  });
+
   $: donutData = raceRequests.length
     ? (() => {
         const top6 = raceRequests.slice(0, 6);
@@ -114,6 +126,11 @@
       if (racesRes.status === "fulfilled") raceRequests = racesRes.value.races;
       if (metricsRes.status === "fulfilled") pipelineRecords = metricsRes.value.records;
       if (metricsSummaryRes.status === "fulfilled") pipelineSummary = metricsSummaryRes.value;
+
+      // Load race list for discovery-only count
+      if (apiService) {
+        try { allRaces = await apiService.listRaces(); } catch { /* non-critical */ }
+      }
     } catch (e) {
       error = String(e);
     } finally {
@@ -262,6 +279,33 @@
       </p>
     </div>
   </div>
+
+  <!-- Discovery-only callout -->
+  {#if discoveryOnlyRaces.length > 0}
+    <div class="mb-4 rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-950/30 px-4 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 min-w-0">
+        <svg class="w-4 h-4 text-violet-600 dark:text-violet-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <span class="text-sm font-medium text-violet-900 dark:text-violet-100">
+          {discoveryOnlyRaces.length} race{discoveryOnlyRaces.length !== 1 ? "s" : ""} in discovery-only state
+        </span>
+        <span class="text-xs text-violet-700 dark:text-violet-300 truncate hidden sm:block">
+          — candidates found but issues, research &amp; finance not yet populated
+        </span>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
+        {#each discoveryOnlyRaces.slice(0, 4) as r}
+          <span class="text-xs font-mono bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200 rounded px-1.5 py-0.5 border border-violet-200 dark:border-violet-800">
+            {r.race_id}
+          </span>
+        {/each}
+        {#if discoveryOnlyRaces.length > 4}
+          <span class="text-xs text-violet-600 dark:text-violet-400">+{discoveryOnlyRaces.length - 4} more</span>
+        {/if}
+      </div>
+    </div>
+  {/if}
 
   <!-- Charts row -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">

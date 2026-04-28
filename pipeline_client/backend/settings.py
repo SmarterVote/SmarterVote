@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"  # comma-separated string — parsed in main.py
     auth0_domain: str | None = None
     auth0_audience: str | None = None
+    # Set SKIP_AUTH=true ONLY in local development. Never set in production.
+    skip_auth: bool = False
 
     @property
     def allowed_origins_list(self) -> list[str]:

@@ -111,12 +111,19 @@ jobs:
     if: always()
 
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Summary
+    - name: Check all gates
+      env:
+        PIPELINE_RESULT: ${{ needs.test-pipeline.result }}
+        APIS_RESULT: ${{ needs.test-apis.result }}
+        WEB_RESULT: ${{ needs.test-web.result }}
+        TERRAFORM_RESULT: ${{ needs.terraform-validate.result }}
       run: |
-        echo "✅ Pipeline tests passed"
-        echo "✅ API tests passed"
-        echo "✅ Web tests passed"
-        echo "✅ Terraform configuration validated"
-        echo "🎯 Ready for deployment"
+        echo "test-pipeline:       $PIPELINE_RESULT"
+        echo "test-apis:           $APIS_RESULT"
+        echo "test-web:            $WEB_RESULT"
+        echo "terraform-validate:  $TERRAFORM_RESULT"
+        if [[ "$PIPELINE_RESULT" != "success" || "$APIS_RESULT" != "success" || "$WEB_RESULT" != "success" || "$TERRAFORM_RESULT" != "success" ]]; then
+          echo "❌ One or more CI gates failed"
+          exit 1
+        fi
+        echo "✅ All CI gates passed — ready for deployment"

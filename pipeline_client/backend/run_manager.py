@@ -355,8 +355,8 @@ class RunManager:
                     if data.get("run_id") not in active_ids:
                         try:
                             runs.append(RunInfo(**data))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("Skipping malformed run doc %s: %s", doc.id, e)
             except Exception:
                 logger.exception("Firestore list_recent_runs query failed")
         else:

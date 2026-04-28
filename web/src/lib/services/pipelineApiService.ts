@@ -35,6 +35,7 @@ export interface AdminChatRaceRecord {
   requests_24h: number;
   published_at?: string;
   draft_updated_at?: string;
+  discovery_only?: boolean;
 }
 
 export interface AdminChatResponse {

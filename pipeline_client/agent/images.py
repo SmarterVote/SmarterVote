@@ -142,8 +142,8 @@ async def _lookup_wikipedia_image(candidate_name: str, context: str = "") -> Opt
                 if result:
                     return result
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Candidate image lookup failed: %s", e)
     return None
 
 
@@ -349,7 +349,7 @@ async def resolve_candidate_images(
         if on_progress:
             try:
                 on_progress(int(done / total * 100), c.get("name", ""))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Image progress callback failed: %s", e)
 
     await asyncio.gather(*[_resolve_with_progress(c) for c in candidates])

@@ -7,8 +7,11 @@ update flow runners, and review-iteration logic.  Selection helpers live in
 
 import copy
 import json
+import logging
 import time
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("pipeline")
 
 from .handlers import _make_editing_handlers
 from .images import resolve_candidate_images
@@ -118,8 +121,8 @@ async def _run_issue_research_for_candidate(
         if on_issue_progress:
             try:
                 on_issue_progress(issue_idx, issue)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("Issue progress callback failed: %s", _e)
 
         handoff_ctx = _build_handoff_context(handoffs, cached_info)
 

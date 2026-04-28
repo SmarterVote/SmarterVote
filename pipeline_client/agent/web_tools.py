@@ -4,9 +4,11 @@ All HTTP-level infrastructure for the research agent lives here.
 """
 
 import asyncio
+import ipaddress
 import logging
 import os
 import re
+import socket
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -69,6 +71,39 @@ _BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
+
+# ---------------------------------------------------------------------------
+# URL validation (SSRF protection)
+# ---------------------------------------------------------------------------
+
+_PRIVATE_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),    # loopback
+    ipaddress.ip_network("10.0.0.0/8"),     # RFC 1918
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918
+    ipaddress.ip_network("192.168.0.0/16"), # RFC 1918
+    ipaddress.ip_network("169.254.0.0/16"), # link-local / GCP metadata
+    ipaddress.ip_network("::1/128"),        # IPv6 loopback
+    ipaddress.ip_network("fc00::/7"),       # IPv6 ULA
+]
+
+
+def _validate_url(url: str) -> None:
+    """Raise ValueError if the URL targets a private/internal address or uses a disallowed scheme."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Disallowed URL scheme: {parsed.scheme!r}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL has no hostname")
+    try:
+        # Resolve to IP and check against private ranges
+        addr = ipaddress.ip_address(socket.gethostbyname(hostname))
+        for network in _PRIVATE_NETWORKS:
+            if addr in network:
+                raise ValueError(f"URL resolves to private/internal address: {addr}")
+    except socket.gaierror:
+        # DNS failure — let the actual fetch fail naturally; don't block
+        pass
 
 _UNUSABLE_PAGE_MARKERS = [
     "enable javascript",
@@ -226,6 +261,12 @@ def _get_serper_client() -> httpx.AsyncClient:
 
 async def _fetch_page(url: str) -> str:
     """Fetch a URL and return stripped text content, with caching and fallback."""
+    try:
+        _validate_url(url)
+    except ValueError as exc:
+        logger.warning("Blocked fetch of disallowed URL %s: %s", url, exc)
+        return f"[Blocked: {exc}]"
+
     cache = _get_search_cache()
     if cache:
         cached = cache.get_page(url)

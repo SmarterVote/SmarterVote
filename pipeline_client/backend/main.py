@@ -115,8 +115,13 @@ async def _decode_token(token: str) -> Dict[str, Any]:
 async def verify_token(
     credentials: HTTPAuthorizationCredentials | None = Depends(http_bearer),
 ) -> Dict[str, Any]:
-    if not settings.auth0_domain or not settings.auth0_audience:
+    if settings.skip_auth:
         return {}
+    if not settings.auth0_domain or not settings.auth0_audience:
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication not configured (AUTH0_DOMAIN/AUTH0_AUDIENCE missing). Set SKIP_AUTH=true for local dev.",
+        )
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing token")
     try:
@@ -126,8 +131,13 @@ async def verify_token(
 
 
 async def verify_token_ws(token: str | None) -> Dict[str, Any]:
-    if not settings.auth0_domain or not settings.auth0_audience:
+    if settings.skip_auth:
         return {}
+    if not settings.auth0_domain or not settings.auth0_audience:
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication not configured (AUTH0_DOMAIN/AUTH0_AUDIENCE missing). Set SKIP_AUTH=true for local dev.",
+        )
     if not token:
         raise HTTPException(status_code=401, detail="Missing token")
     try:
@@ -267,6 +277,13 @@ def _load_race_json(race_id: str, *, gcs_prefix: str, local_dir: Path) -> Dict[s
 def _load_retired_version_json(race_id: str, filename: str) -> Dict[str, Any] | None:
     """Load retired version JSON using cloud-first precedence on Cloud Run."""
     local_path = ROOT / "data" / "retired" / race_id / filename
+    # Defense-in-depth: confirm the resolved path stays within the retired/{race_id} dir.
+    _base = (ROOT / "data" / "retired" / race_id).resolve()
+    try:
+        local_path.resolve().relative_to(_base)
+    except ValueError:
+        logging.warning("Path traversal attempt rejected for retired version: %s / %s", race_id, filename)
+        return None
     if _prefer_cloud_storage():
         gcs_bucket = settings.gcs_bucket
         if gcs_bucket:
@@ -1317,8 +1334,8 @@ async def get_alerts() -> Dict[str, Any]:
                 resp = await client.get(f"{races_api_url}/analytics/overview", headers={"X-Admin-Key": admin_key})
                 if resp.status_code == 200:
                     overview = resp.json()
-        except Exception:
-            pass  # Analytics unavailable — skip health alert
+        except Exception as e:
+            logging.debug("Analytics unavailable for health alerts: %s", e)  # non-critical
 
     alerts = evaluate_all(run_manager, overview=overview)
     unacknowledged = sum(1 for a in alerts if not a.acknowledged)
@@ -1485,6 +1502,14 @@ class _AdminChatRequest(BaseModel):
     messages: List[_AdminChatMessage]
 
 
+def _is_discovery_only(opts: Dict[str, Any] | None) -> bool:
+    """Return True when the run options limit execution to only the discovery step."""
+    if not opts:
+        return False
+    steps = opts.get("enabled_steps")
+    return isinstance(steps, list) and len(steps) == 1 and steps[0] == "discovery"
+
+
 def _build_race_context() -> str:
     """Build a compact text summary of all known races for LLM context, enriched with race_manager metadata."""
     published = _list_races_gcs("races")
@@ -1499,8 +1524,8 @@ def _build_race_context() -> str:
     try:
         for rec in race_manager.list_races():
             rm_index[rec.race_id] = rec
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("Failed to index race records from race_manager: %s", e)
 
     def _race_line(r: Dict[str, Any], source: str) -> str:
         rid = r["id"]
@@ -1525,6 +1550,11 @@ def _build_race_context() -> str:
             parts.append(f"  Last run: {last_run}")
         if runs:
             parts.append(f"  Requests/24h: {runs}")
+        # Flag if the most recent (or current) run was discovery-only
+        active_opts = rec.queue_options if rec and rec.status in ("queued", "running") else None
+        last_run_opts = rec.last_run_options if rec else None
+        if _is_discovery_only(active_opts) or _is_discovery_only(last_run_opts):
+            parts.append("  ⚠ DISCOVERY ONLY — candidates found but no research/issues/finance yet")
         return " | ".join(parts)
 
     lines: List[str] = ["### Published Races"]
@@ -1569,8 +1599,8 @@ def _load_full_race(race_id: str) -> Dict[str, Any] | None:
             try:
                 with open(candidate) as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                logging.warning("Failed to read race file %s: %s", candidate, e)
     return None
 
 
@@ -1663,8 +1693,8 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
                 inspect_messages = messages + [{"role": "assistant", "content": reply_text}] if reply_text else messages
                 try:
                     reply_text = await _call_admin_llm(inspect_system, inspect_messages)
-                except Exception:
-                    pass  # fall back to the partial reply already set
+                except Exception as exc:
+                    logging.warning("INSPECT second-pass LLM call failed, using initial reply: %s", exc)  # fall back to the partial reply already set
         except (json.JSONDecodeError, ValueError, KeyError):
             pass
 
@@ -1698,6 +1728,7 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
                         "requests_24h": rec.requests_24h,
                         "published_at": rec.published_at,
                         "draft_updated_at": rec.draft_updated_at,
+                        "discovery_only": _is_discovery_only(rec.last_run_options) or _is_discovery_only(rec.queue_options),
                     }
                 )
 

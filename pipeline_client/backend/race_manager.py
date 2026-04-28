@@ -63,6 +63,7 @@ class RaceRecord(BaseModel):
     # Pipeline / Queue
     queue_position: Optional[int] = None
     queue_options: Optional[Dict[str, Any]] = None
+    last_run_options: Optional[Dict[str, Any]] = None  # options used for the most recent run
     current_run_id: Optional[str] = None
     last_run_id: Optional[str] = None
     last_run_at: Optional[str] = None
@@ -290,11 +291,13 @@ class RaceManager:
 
     def start_run(self, race_id: str, run_id: str) -> RaceRecord:
         """Mark race as running with the given run_id."""
+        race = self.get_race(race_id)
         return self.upsert_race(
             race_id,
             status="running",
             current_run_id=run_id,
             queue_position=None,
+            last_run_options=race.queue_options if race else None,
         )
 
     def complete_run(self, race_id: str, run_id: str, artifact_id: Optional[str] = None) -> RaceRecord:

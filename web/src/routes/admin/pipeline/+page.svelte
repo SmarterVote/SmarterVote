@@ -572,6 +572,7 @@
     <DashboardTab
       onAlertCountChange={(n) => (alertBadgeCount = n)}
       recentRuns={pipeline.runHistory ?? []}
+      {apiService}
     />
   {/if}
 

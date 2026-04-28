@@ -482,6 +482,11 @@
                 <div class="text-content-muted truncate">{rec.title}</div>
               {/if}
               <div class="flex flex-wrap gap-1">
+                {#if rec.discovery_only}
+                  <span class="rounded px-1.5 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700" title="Only discovery step was run — no research/issues/finance yet">
+                    discovery only
+                  </span>
+                {/if}
                 {#if rec.quality_grade}
                   <span class="rounded px-1.5 py-0.5 font-semibold {gradeColor(rec.quality_grade)}">
                     Grade {rec.quality_grade}

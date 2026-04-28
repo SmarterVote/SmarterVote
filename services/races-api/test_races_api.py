@@ -233,14 +233,14 @@ def test_analytics_timeseries_correct_key(client):
 
 
 def test_analytics_no_key_configured(client):
-    """When no key is configured, unauthenticated access is permitted (dev mode)."""
+    """When no admin key is configured, analytics endpoints return 503 (not accessible)."""
     import main as main_mod
 
     original = main_mod._ADMIN_API_KEY
-    main_mod._ADMIN_API_KEY = ""
+    main_mod._ADMIN_API_KEY = None
     try:
         resp = client.get("/analytics/overview")
-        assert resp.status_code == 200
+        assert resp.status_code == 503
     finally:
         main_mod._ADMIN_API_KEY = original
 

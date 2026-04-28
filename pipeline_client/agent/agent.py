@@ -178,8 +178,8 @@ async def run_agent(
         if step_tracker and action in step_tracker:
             try:
                 step_tracker[action](step, **kwargs)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("Step tracker callback '%s' for '%s' failed: %s", action, step, _e)
 
     # Initialise a fresh cost accumulator for this run
     _acc: Dict[str, Any] = {"prompt_tokens": 0, "completion_tokens": 0}

@@ -105,6 +105,13 @@
     return !!row.draft_updated_at && row.status === "published" && !!row.published_at && row.draft_updated_at > row.published_at;
   }
 
+  function isDiscoveryOnly(row: RaceRecord): boolean {
+    const opts = (row.last_run_options ?? row.queue_options) as { enabled_steps?: string[] } | undefined;
+    if (!opts) return false;
+    const steps = opts.enabled_steps;
+    return Array.isArray(steps) && steps.length === 1 && steps[0] === "discovery";
+  }
+
   $: selectedWithDrafts = [...selected].filter((id) => {
     const row = rows.find((r) => r.race_id === id);
     return row && hasPendingDraft(row);
@@ -372,6 +379,17 @@
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium {statusBadgeClass(row.status)}">
                       {row.status}
                     </span>
+                    {#if isDiscoveryOnly(row)}
+                      <span
+                        class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700"
+                        title="Last run was discovery-only — candidates found but issues/research/finance not yet populated"
+                      >
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        discovery
+                      </span>
+                    {/if}
                     {#if hasPendingDraft(row)}
                       <span
                         class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
@@ -452,6 +470,9 @@
           {rows.filter((r) => r.status === "published").length} published ·
           {rows.filter((r) => r.status === "draft").length} draft ·
           {rows.filter((r) => r.status === "queued" || r.status === "running").length} active
+          {#if rows.filter(isDiscoveryOnly).length > 0}
+            · <span class="text-violet-600 dark:text-violet-400">{rows.filter(isDiscoveryOnly).length} discovery-only</span>
+          {/if}
         </span>
       </div>
     </div>

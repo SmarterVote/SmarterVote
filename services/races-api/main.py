@@ -31,13 +31,15 @@ publish_service = SimplePublishService(data_directory=DATA_DIR)
 # Rate limiter (keyed by client IP)
 limiter = Limiter(key_func=get_remote_address)
 
-_ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+_ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
 _RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
 
 
 def _require_admin_key(x_admin_key: str = Header(default="")) -> None:
     """Dependency: reject requests missing a valid X-Admin-Key header."""
-    if _ADMIN_API_KEY and not secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
+    if not _ADMIN_API_KEY:
+        raise HTTPException(status_code=503, detail="Admin API key not configured")
+    if not secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key")
 
 

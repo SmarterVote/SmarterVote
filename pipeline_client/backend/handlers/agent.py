@@ -104,8 +104,8 @@ class AgentHandler:
                 # Fallback: pick the first active run (legacy path)
                 active = next(iter(_run_manager.list_active_runs()), None)
                 run_id = active.run_id if active else None
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.debug("Failed to resolve run context: %s", _e)
 
         # --- Create all sub-steps upfront ---
         if run_id and _run_manager:
@@ -117,8 +117,8 @@ class AgentHandler:
                         step_obj.weight = STEP_WEIGHTS.get(step_name, 0)
                         if step_name not in enabled_set:
                             _run_manager.update_step_status(run_id, step_name, RunStatus.SKIPPED)
-                except Exception:
-                    pass
+                except Exception as _e:
+                    logger.debug("Failed to initialise step '%s': %s", step_name, _e)
 
         # --- Step tracker callbacks ---
         def _on_step_start(step: str, **_kw):
@@ -131,8 +131,8 @@ class AgentHandler:
                 # Compute cumulative progress: sum of completed step weights + 0% of current
                 pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("_on_step_start tracking failed for '%s': %s", step, _e)
 
         def _on_step_complete(step: str, *, duration_ms: int = 0, **_kw):
             if not run_id or not _run_manager:
@@ -142,16 +142,16 @@ class AgentHandler:
                 pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
                 label = STEP_LABELS.get(step, step) + " ✓"
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("_on_step_complete tracking failed for '%s': %s", step, _e)
 
         def _on_step_skip(step: str, **_kw):
             if not run_id or not _run_manager:
                 return
             try:
                 _run_manager.update_step_status(run_id, step, RunStatus.SKIPPED)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("_on_step_skip tracking failed for '%s': %s", step, _e)
 
         def _on_step_progress(step: str, *, pct: int = 0, message: str = "", **_kw):
             if not run_id or not _run_manager:
@@ -167,8 +167,8 @@ class AgentHandler:
                 overall = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set, step, pct)
                 label = message or STEP_LABELS.get(step, step)
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": overall, "message": label})
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("_on_step_progress tracking failed for '%s': %s", step, _e)
 
         step_tracker = {
             "start": _on_step_start,
@@ -190,8 +190,8 @@ class AgentHandler:
             if run_id and _run_manager:
                 try:
                     _run_manager.add_run_log(run_id, log_entry)
-                except Exception:
-                    pass
+                except Exception as _e:
+                    logger.debug("Failed to persist run log entry: %s", _e)
 
         # Run the agent
         race_json = await run_agent(

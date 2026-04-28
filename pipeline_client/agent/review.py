@@ -80,8 +80,8 @@ async def _call_gemini(system: str, user: str, *, model: str = DEFAULT_GEMINI_MO
     try:
         um = response.usage_metadata
         accumulate(um.prompt_token_count or 0, um.candidates_token_count or 0, model)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to read Gemini usage metadata: %s", e)
     return response.text or ""
 
 

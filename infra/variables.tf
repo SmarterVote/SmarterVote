@@ -103,9 +103,9 @@ variable "enable_pipeline_client" {
 }
 
 variable "pipeline_client_public_invoker" {
-  description = "Expose the pipeline client Cloud Run service to unauthenticated invokers. Defaults to true for backward compatibility; set false only when using private invoker IAM or other edge auth."
+  description = "Expose the pipeline client Cloud Run service to unauthenticated invokers. Authentication is enforced at the application layer via Auth0 JWT. Set true only when you need Cloud Run to route traffic without GCP-level IAM auth."
   type        = bool
-  default     = true
+  default     = false
 }
 
 # Monitoring / alerting

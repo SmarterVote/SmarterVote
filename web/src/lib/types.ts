@@ -390,6 +390,7 @@ export interface RaceRecord {
 
   queue_position?: number;
   queue_options?: Record<string, unknown>;
+  last_run_options?: Record<string, unknown>;
   current_run_id?: string;
   last_run_id?: string;
   last_run_at?: string;
