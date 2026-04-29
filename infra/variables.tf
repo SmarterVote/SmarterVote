@@ -103,9 +103,9 @@ variable "enable_pipeline_client" {
 }
 
 variable "pipeline_client_public_invoker" {
-  description = "Expose the pipeline client Cloud Run service to unauthenticated invokers. Authentication is enforced at the application layer via Auth0 JWT. Set true only when you need Cloud Run to route traffic without GCP-level IAM auth."
+  description = "Allow unauthenticated Cloud Run invocations. Must be true for browser clients: CORS OPTIONS preflights carry no credentials so GCP-level IAM auth blocks them before the app can respond. Auth0 JWT handles application-layer auth."
   type        = bool
-  default     = false
+  default     = false  # Override to true in tfvars for any deployment that serves browser clients
 }
 
 # Monitoring / alerting
