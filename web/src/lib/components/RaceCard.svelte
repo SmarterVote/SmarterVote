@@ -56,7 +56,7 @@
   </div>
 
   <!-- Candidate avatars + names -->
-  <div class="px-4 pb-4">
+  <div class="px-4 pb-3">
     <div class="flex flex-wrap gap-3">
       {#each race.candidates as candidate}
         <div class="flex items-center gap-2 min-w-0">
@@ -89,5 +89,13 @@
         </div>
       {/each}
     </div>
+  </div>
+
+  <!-- View race footer -->
+  <div class="px-4 py-2.5 border-t border-stroke flex items-center justify-end gap-1 text-xs font-medium text-blue-500 dark:text-blue-400">
+    View race
+    <svg class="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" />
+    </svg>
   </div>
 </a>
