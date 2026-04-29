@@ -1260,18 +1260,24 @@ async def websocket_logs_all(websocket: WebSocket):
         return
     connection_id = str(uuid.uuid4())
 
+    async def _ping_loop() -> None:
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await websocket.send_text('{"type": "ping"}')
+            except Exception:
+                break
+
+    ping_task = asyncio.create_task(_ping_loop())
     try:
         await logging_manager.connect_websocket(websocket, connection_id)
-
         while True:
             try:
-                await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-            except asyncio.TimeoutError:
-                await websocket.send_text('{"type": "ping"}')
-
-    except WebSocketDisconnect:
-        pass
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
     finally:
+        ping_task.cancel()
         logging_manager.disconnect_websocket(connection_id)
 
 
@@ -1286,18 +1292,24 @@ async def websocket_logs_run(websocket: WebSocket, run_id: str):
         return
     connection_id = str(uuid.uuid4())
 
+    async def _ping_loop() -> None:
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await websocket.send_text('{"type": "ping"}')
+            except Exception:
+                break
+
+    ping_task = asyncio.create_task(_ping_loop())
     try:
         await logging_manager.connect_websocket(websocket, connection_id, run_id)
-
         while True:
             try:
-                await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-            except asyncio.TimeoutError:
-                await websocket.send_text('{"type": "ping"}')
-
-    except WebSocketDisconnect:
-        pass
+                await websocket.receive_text()
+            except WebSocketDisconnect:
+                break
     finally:
+        ping_task.cancel()
         logging_manager.disconnect_websocket(connection_id)
 
 
@@ -1859,8 +1871,8 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
                         continue
                     if _kind == "search":
                         web_thinking.append(f"Searched: {_label}")
-                        _hits = _result  # type: ignore[assignment]
-                        if _hits and not (len(_hits) == 1 and _hits[0].get("error")):
+                        _hits: Any = _result
+                        if isinstance(_hits, list) and _hits and not (len(_hits) == 1 and _hits[0].get("error")):
                             _hit_lines = [f"### Search results: {_label}"]
                             for _h in _hits[:6]:
                                 _hit_lines.append(
@@ -1900,7 +1912,7 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
             action = json.loads(action_match.group(1))
             reply_text = reply_text[: action_match.start()].rstrip()
             # Ensure cheap_mode is always present (never None/missing)
-            if action.get("type") == "queue_run" and "options" in action:
+            if isinstance(action, dict) and action.get("type") == "queue_run" and "options" in action:
                 action["options"].setdefault("cheap_mode", True)
         except (json.JSONDecodeError, ValueError):
             pass
