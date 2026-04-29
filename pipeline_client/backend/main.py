@@ -173,6 +173,14 @@ class QueueAddRequest(BaseModel):
 def _race_summary(data: Dict[str, Any], fallback_id: str) -> Dict[str, Any]:
     """Build a race summary dict from full race JSON."""
     am = data.get("agent_metrics") or {}
+    cands = data.get("candidates", [])
+    cands_with_issues = sum(
+        1 for c in cands
+        if any(
+            isinstance(v, dict) and v.get("stance")
+            for v in c.get("issues", {}).values()
+        )
+    )
     return {
         "id": data.get("id", fallback_id),
         "title": data.get("title"),
@@ -182,8 +190,10 @@ def _race_summary(data: Dict[str, Any], fallback_id: str) -> Dict[str, Any]:
         "updated_utc": data.get("updated_utc", ""),
         "candidates": [
             {"name": c.get("name", ""), "party": c.get("party")}
-            for c in data.get("candidates", [])
+            for c in cands
         ],
+        "candidates_with_issues": cands_with_issues,
+        "total_candidates": len(cands),
         "agent_metrics": (
             {
                 "estimated_usd": am.get("estimated_usd"),
@@ -1480,8 +1490,8 @@ ACTION:{"type":"queue_run","race_ids":["nv-governor-2026"],"options":{"enabled_s
 
 ## Inspecting a race in detail
 If the user asks detailed questions about a specific race (e.g. "what does the race say about issue X?",
-"show me candidate Y's bio", "what is the full content?"), append an INSPECT block at the END of your
-reply so the system can fetch the full race data and you can answer precisely in a follow-up:
+"show me candidate Y's bio", "what is the full content?"), include an INSPECT block **anywhere** in your
+reply so the system can fetch the full race data and you can answer precisely:
 
 INSPECT:{"race_ids":["race-id-1","race-id-2"]}
 
@@ -1490,6 +1500,9 @@ Rules for INSPECT:
 - Only use race IDs from the list below.
 - Do not use both ACTION and INSPECT in the same reply — pick the most relevant one.
 - Do not wrap it in markdown code fences.
+- The system will automatically strip the INSPECT block and replace your reply with a full analysis
+  once the race data is loaded — so you do NOT need to write placeholder text like "Once I see the data...".
+  Just write the INSPECT block and the system handles the rest.
 
 ## Web research
 When the user asks about competitive/swingy races, recent polling, or other live information not
@@ -1605,19 +1618,14 @@ def _build_race_context() -> str:
         if _is_discovery_only(active_opts) or _is_discovery_only(last_run_opts):
             parts.append("  ⚠ DISCOVERY ONLY — candidates found but no research/issues/finance yet")
         # Flag candidates actually missing issue data (regardless of run options)
-        all_cands = r.get("candidates", [])
-        missing_issues = [
-            c["name"] for c in all_cands
-            if not any(v and v.get("stance") for v in c.get("issues", {}).values())
-        ]
-        if missing_issues and not (_is_discovery_only(active_opts) or _is_discovery_only(last_run_opts)):
-            if len(missing_issues) == len(all_cands):
-                parts.append(f"  ⚠ NO ISSUE DATA — all {len(missing_issues)} candidates need issue research")
+        total_cands = r.get("total_candidates", 0)
+        cands_with_issues = r.get("candidates_with_issues", 0)
+        missing_count = total_cands - cands_with_issues
+        if total_cands > 0 and missing_count > 0 and not (_is_discovery_only(active_opts) or _is_discovery_only(last_run_opts)):
+            if missing_count == total_cands:
+                parts.append(f"  ⚠ NO ISSUE DATA — all {total_cands} candidates need issue research")
             else:
-                names_str = ", ".join(missing_issues[:6])
-                if len(missing_issues) > 6:
-                    names_str += f" (+{len(missing_issues) - 6} more)"
-                parts.append(f"  ⚠ PARTIAL — {len(missing_issues)} candidate(s) missing issues: {names_str}")
+                parts.append(f"  ⚠ PARTIAL ISSUES — {missing_count}/{total_cands} candidates need issue research")
         return " | ".join(parts)
 
     lines: List[str] = ["### Published Races"]
@@ -1665,6 +1673,51 @@ def _load_full_race(race_id: str) -> Dict[str, Any] | None:
             except Exception as e:
                 logging.warning("Failed to read race file %s: %s", candidate, e)
     return None
+
+
+def _format_race_for_inspect(data: Dict[str, Any]) -> str:
+    """Format a full race JSON into a readable markdown summary for LLM INSPECT context."""
+    lines: List[str] = []
+    lines.append(f"**{data.get('title', data.get('id', '?'))}**")
+    lines.append(f"Updated: {(data.get('updated_utc') or '')[:10] or 'unknown'}")
+    rec_grade = data.get("quality_grade")
+    rec_score = data.get("quality_score")
+    if rec_grade:
+        lines.append(f"Grade: {rec_grade}" + (f" ({rec_score})" if rec_score is not None else ""))
+    lines.append("")
+
+    for c in data.get("candidates", []):
+        name = c.get("name", "?")
+        party = c.get("party", "?")
+        lines.append(f"### {name} ({party})")
+        bio = c.get("bio") or c.get("biography") or ""
+        if bio:
+            lines.append(f"Bio: {str(bio)[:300]}")
+        issues = c.get("issues") or {}
+        if issues:
+            lines.append("**Issues:**")
+            for topic, val in issues.items():
+                if isinstance(val, dict):
+                    stance = val.get("stance") or ""
+                    conf = val.get("confidence") or ""
+                    conf_tag = f" [{conf}]" if conf else ""
+                    lines.append(f"- {topic}{conf_tag}: {str(stance)[:250]}")
+        else:
+            lines.append("_No issue data_")
+        finance = c.get("finance") or {}
+        if finance:
+            raised = finance.get("total_raised") or finance.get("raised")
+            spent = finance.get("total_spent") or finance.get("spent")
+            parts: List[str] = []
+            if raised:
+                parts.append(f"raised {raised}")
+            if spent:
+                parts.append(f"spent {spent}")
+            if parts:
+                lines.append(f"Finance: {', '.join(parts)}")
+        lines.append("")
+
+    return "\n".join(lines)[:14000]  # cap at ~14KB per race
 
 
 async def _call_admin_llm(
@@ -1735,11 +1788,13 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail=f"AI service error: {exc}") from exc
 
     # Handle INSPECT directive — second LLM pass with full race data
-    inspect_match = re.search(r"\nINSPECT:(\{[^\n]+\})\s*$", reply_text)
+    inspect_match = re.search(r"\nINSPECT:(\{[^\n]+\})", reply_text)
     if inspect_match:
         try:
             inspect_data = json.loads(inspect_match.group(1))
             inspect_ids: List[str] = (inspect_data.get("race_ids") or [])[:3]
+            # Strip the INSPECT directive and everything after it (LLM often writes
+            # placeholder text like "Once I see the data…" after the block)
             reply_text = reply_text[: inspect_match.start()].rstrip()
 
             if inspect_ids:
@@ -1747,12 +1802,11 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
                 for rid in inspect_ids:
                     full = _load_full_race(rid)
                     if full:
-                        snippet = json.dumps(full)[:12000]  # cap at ~12KB per race
-                        race_details.append(f"=== {rid} ===\n{snippet}")
+                        race_details.append(f"=== {rid} ===\n{_format_race_for_inspect(full)}")
                     else:
                         race_details.append(f"=== {rid} ===\n(not found)")
 
-                inspect_system = system_prompt + "\n\n## Full Race Data\n" + "\n\n".join(race_details)
+                inspect_system = system_prompt + "\n\n## Inspected Race Data\n" + "\n\n".join(race_details)
                 inspect_messages = messages + [{"role": "assistant", "content": reply_text}] if reply_text else messages
                 try:
                     reply_text = await _call_admin_llm(inspect_system, inspect_messages)
