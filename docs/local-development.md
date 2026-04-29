@@ -168,8 +168,8 @@ When triggering a run, the `options` object supports:
 | Research (OpenAI) | gpt-5.4-mini | gpt-5.4 |
 | Sub-tasks (OpenAI) | gpt-5-nano | gpt-5.4-mini |
 | Review: Claude | claude-haiku-4-5-20251001 | claude-sonnet-4-6 |
-| Review: Gemini | gemini-3.1-flash-lite-preview | gemini-3-flash-preview |
-| Review: Grok | grok-3-mini | grok-3 |
+| Review: Gemini | gemini-3.1-flash-lite-preview | gemini-3.1-pro-preview |
+| Review: Grok | grok-4-1-fast-non-reasoning | grok-4.20-0309-reasoning |
 
 You can override any model from the admin dashboard's "Advanced Model Settings" panel, or by passing the option in the API request body.
 

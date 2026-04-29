@@ -208,6 +208,7 @@ class AgentHandler:
             max_candidates=options.get("max_candidates"),
             target_no_info=options.get("target_no_info", False),
             candidate_names=options.get("candidate_names"),
+            goal=options.get("goal"),
         )
 
         # Save as draft (not published) — admin must explicitly publish

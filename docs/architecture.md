@@ -111,8 +111,8 @@ web/                       # SvelteKit frontend (static, deployed to GitHub Page
 | Provider | Cheap Mode | Full Mode |
 |----------|-----------|-----------|
 | Claude | claude-haiku-4-5-20251001 | claude-sonnet-4-6 |
-| Gemini | gemini-3.1-flash-lite-preview | gemini-3-flash-preview |
-| Grok | grok-3-mini | grok-3 |
+| Gemini | gemini-3.1-flash-lite-preview | gemini-3.1-pro-preview |
+| Grok | grok-4-1-fast-non-reasoning | grok-4.20-0309-reasoning |
 
 **Configuration**: `cheap_mode=true` (default) in RunOptions. Override specific models via `research_model`, `claude_model`, `gemini_model`, `grok_model`.
 

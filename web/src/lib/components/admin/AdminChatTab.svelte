@@ -69,9 +69,12 @@
   let editCheapMode = true;
   let editCandidateNames = "";
   let editNote = "";
+  let editGoal = "";
   let showAdvancedEdit = false;
+  let selectedRaceIds: Set<string> = new Set();
 
   let scrollEl: HTMLElement;
+  let textareaEl: HTMLTextAreaElement;
   let userScrolledUp = false;
 
   // ---- scroll management ---------------------------------------------------
@@ -243,6 +246,9 @@
     const note = editNote.trim();
     if (note) base.note = note;
     else delete base.note;
+    const goal = editGoal.trim();
+    if (goal) base.goal = goal;
+    else delete base.goal;
     return base;
   }
 
@@ -250,7 +256,11 @@
   async function sendMessage(text?: string) {
     const msg = (text ?? input).trim();
     if (!msg || sending) return;
-    if (!text) input = "";
+    if (!text) {
+      input = "";
+      await tick();
+      if (textareaEl) { textareaEl.style.height = "auto"; textareaEl.style.height = "42px"; }
+    }
 
     messages = [...messages, { role: "user", content: msg, ts: Date.now() }];
     userScrolledUp = false;
@@ -295,6 +305,8 @@
           ? (res.action.options!.candidate_names as string[]).join(", ")
           : "";
         editNote = typeof res.action.options?.note === "string" ? res.action.options.note : "";
+        editGoal = typeof res.action.options?.goal === "string" ? res.action.options.goal : "";
+        selectedRaceIds = new Set(res.action.race_ids ?? []);
       } else if (res.question) {
         pendingQuestion = res.question;
       }
@@ -319,18 +331,19 @@
 
   // ---- action confirm/dismiss ----------------------------------------------
   async function confirmAction() {
-    if (!pendingAction) return;
+    if (!pendingAction || selectedRaceIds.size === 0) return;
     confirmingAction = true;
     actionResult = "";
     try {
       const finalOpts = buildFinalOptions();
-      await apiService.queueRaces(pendingAction.race_ids ?? [], finalOpts);
+      const raceIdsToQueue = Array.from(selectedRaceIds);
+      await apiService.queueRaces(raceIdsToQueue, finalOpts);
       actionResult = "\u2713 Queued";
       messages = [
         ...messages,
         {
           role: "system",
-          content: `\u2713 Run queued for: ${(pendingAction.race_ids ?? []).join(", ")}`,
+          content: `\u2713 Run queued for: ${raceIdsToQueue.join(", ")}`,
           ts: Date.now(),
         },
       ];
@@ -340,6 +353,8 @@
         actionResult = "";
         pendingRaceRecords = [];
         showAdvancedEdit = false;
+        editGoal = "";
+        selectedRaceIds = new Set();
       }, 2000);
     } catch (e) {
       actionResult = `Failed: ${e}`;
@@ -353,6 +368,8 @@
     actionResult = "";
     pendingRaceRecords = [];
     showAdvancedEdit = false;
+    editGoal = "";
+    selectedRaceIds = new Set();
   }
 
   function dismissQuestion() {
@@ -380,7 +397,7 @@
   onMount(() => scrollToBottom(true));
 </script>
 
-<div class="flex flex-col gap-3" style="height: calc(100vh - 230px); min-height: 400px;">
+<div class="flex flex-col gap-3 flex-1 min-h-0">
   <!-- Header bar -->
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-2">
@@ -527,38 +544,108 @@
       </div>
       <p class="text-sm text-blue-700 dark:text-blue-300">{pendingActionDescription}</p>
 
-      <!-- Race metadata cards -->
+      <!-- Race metadata: compact table for large batches, cards for small batches -->
       {#if pendingRaceRecords.length > 0}
-        <div class="flex flex-wrap gap-2">
-          {#each pendingRaceRecords as rec}
-            <div class="flex-1 min-w-[180px] rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-950/20 p-2.5 text-xs space-y-1.5">
-              <div class="font-mono font-semibold text-blue-800 dark:text-blue-200 truncate">{rec.race_id}</div>
-              {#if rec.title}
-                <div class="text-content-muted truncate">{rec.title}</div>
-              {/if}
-              <div class="flex flex-wrap gap-1">
-                {#if rec.discovery_only}
-                  <span class="rounded px-1.5 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
-                    discovery only
-                  </span>
-                {/if}
-                {#if rec.quality_grade}
-                  <span class="rounded px-1.5 py-0.5 font-semibold {gradeColor(rec.quality_grade)}">
-                    Grade {rec.quality_grade}
-                    {#if rec.quality_score != null}&nbsp;({rec.quality_score}){/if}
-                  </span>
-                {/if}
-                {#if rec.freshness}
-                  <span class="rounded px-1.5 py-0.5 {freshnessColor(rec.freshness)}">{rec.freshness}</span>
-                {/if}
-                <span class="rounded px-1.5 py-0.5 {statusColor(rec.status)}">{rec.status}</span>
+        {#if pendingRaceRecords.length > 5}
+          <!-- Large batch: scrollable table with per-row checkboxes -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5 px-0.5">
+              <span class="text-xs text-content-subtle">{selectedRaceIds.size} of {pendingRaceRecords.length} selected</span>
+              <div class="flex gap-3">
+                <button type="button" class="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  on:click={() => { selectedRaceIds = new Set(pendingRaceRecords.map(r => r.race_id)); }}>Select all</button>
+                <button type="button" class="text-xs text-content-subtle hover:underline"
+                  on:click={() => { selectedRaceIds = new Set(); }}>Deselect all</button>
               </div>
-              {#if rec.candidate_count}
-                <div class="text-content-subtle">{rec.candidate_count} candidate{rec.candidate_count !== 1 ? 's' : ''}</div>
-              {/if}
             </div>
-          {/each}
-        </div>
+            <div class="max-h-64 overflow-y-auto rounded-lg border border-blue-200 dark:border-blue-800 text-xs">
+              <table class="w-full">
+                <thead class="bg-blue-50 dark:bg-blue-900/30 sticky top-0">
+                  <tr>
+                    <th class="w-8 px-2 py-1.5 text-left">
+                      <input type="checkbox"
+                        checked={selectedRaceIds.size === pendingRaceRecords.length && pendingRaceRecords.length > 0}
+                        on:change={(e) => { selectedRaceIds = e.currentTarget.checked ? new Set(pendingRaceRecords.map(r => r.race_id)) : new Set(); }}
+                        class="rounded"
+                      />
+                    </th>
+                    <th class="px-2 py-1.5 text-left font-medium text-content-subtle">Race</th>
+                    <th class="px-2 py-1.5 text-left font-medium text-content-subtle">Grade</th>
+                    <th class="px-2 py-1.5 text-left font-medium text-content-subtle">Fresh</th>
+                    <th class="px-2 py-1.5 text-left font-medium text-content-subtle">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-blue-100 dark:divide-blue-900 bg-white dark:bg-blue-950/10">
+                  {#each pendingRaceRecords as rec}
+                    <tr class="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-opacity {!selectedRaceIds.has(rec.race_id) ? 'opacity-40' : ''}">
+                      <td class="px-2 py-1.5">
+                        <input type="checkbox"
+                          checked={selectedRaceIds.has(rec.race_id)}
+                          on:change={(e) => {
+                            const next = new Set(selectedRaceIds);
+                            if (e.currentTarget.checked) next.add(rec.race_id);
+                            else next.delete(rec.race_id);
+                            selectedRaceIds = next;
+                          }}
+                          class="rounded"
+                        />
+                      </td>
+                      <td class="px-2 py-1.5">
+                        <div class="font-mono font-medium text-blue-800 dark:text-blue-200">{rec.race_id}</div>
+                        {#if rec.title}<div class="text-content-subtle truncate max-w-[180px]">{rec.title}</div>{/if}
+                      </td>
+                      <td class="px-2 py-1.5">
+                        {#if rec.quality_grade}
+                          <span class="rounded px-1.5 py-0.5 font-semibold {gradeColor(rec.quality_grade)}">{rec.quality_grade}</span>
+                        {/if}
+                      </td>
+                      <td class="px-2 py-1.5">
+                        {#if rec.freshness}
+                          <span class="rounded px-1.5 py-0.5 {freshnessColor(rec.freshness)}">{rec.freshness}</span>
+                        {/if}
+                      </td>
+                      <td class="px-2 py-1.5">
+                        <span class="rounded px-1.5 py-0.5 {statusColor(rec.status)}">{rec.status}</span>
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {:else}
+          <!-- Small batch: card layout -->
+          <div class="flex flex-wrap gap-2 max-h-52 overflow-y-auto pr-0.5">
+            {#each pendingRaceRecords as rec}
+              <div class="flex-1 min-w-[180px] rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-blue-950/20 p-2.5 text-xs space-y-1.5">
+                <div class="font-mono font-semibold text-blue-800 dark:text-blue-200 truncate">{rec.race_id}</div>
+                {#if rec.title}
+                  <div class="text-content-muted truncate">{rec.title}</div>
+                {/if}
+                <div class="flex flex-wrap gap-1">
+                  {#if rec.discovery_only}
+                    <span class="rounded px-1.5 py-0.5 text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700">
+                      discovery only
+                    </span>
+                  {/if}
+                  {#if rec.quality_grade}
+                    <span class="rounded px-1.5 py-0.5 font-semibold {gradeColor(rec.quality_grade)}">
+                      Grade {rec.quality_grade}
+                      {#if rec.quality_score != null}&nbsp;({rec.quality_score}){/if}
+                    </span>
+                  {/if}
+                  {#if rec.freshness}
+                    <span class="rounded px-1.5 py-0.5 {freshnessColor(rec.freshness)}">{rec.freshness}</span>
+                  {/if}
+                  <span class="rounded px-1.5 py-0.5 {statusColor(rec.status)}">{rec.status}</span>
+                </div>
+                {#if rec.candidate_count}
+                  <div class="text-content-subtle">{rec.candidate_count} candidate{rec.candidate_count !== 1 ? 's' : ''}</div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
       {:else}
         <div class="flex flex-wrap gap-1.5">
           {#each (pendingAction.race_ids ?? []) as raceId}
@@ -627,6 +714,16 @@
                 class="w-full text-xs bg-surface border border-stroke rounded-lg px-2.5 py-1.5 text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               />
             </div>
+            <div>
+              <label for="edit-goal" class="block text-[10px] font-medium text-content-subtle mb-1">Goal</label>
+              <input
+                id="edit-goal"
+                type="text"
+                bind:value={editGoal}
+                placeholder="Why is this run being triggered? (e.g. Update after primary)"
+                class="w-full text-xs bg-surface border border-stroke rounded-lg px-2.5 py-1.5 text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
             {#if pendingAction.options && Object.keys(pendingAction.options).length}
               <p class="text-[10px] text-content-subtle">
                 Other options from AI: {formatOptions(pendingAction.options)}
@@ -647,7 +744,7 @@
             type="button"
             class="px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 flex items-center gap-1.5"
             on:click={confirmAction}
-            disabled={confirmingAction}
+            disabled={confirmingAction || selectedRaceIds.size === 0}
           >
             {#if confirmingAction}
               <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -698,9 +795,17 @@
   <!-- Input area -->
   <div class="flex gap-2 items-end">
     <textarea
+      bind:this={textareaEl}
       bind:value={input}
       on:keydown={handleKeydown}
-      rows="2"
+      on:input={() => {
+        if (textareaEl) {
+          textareaEl.style.height = 'auto';
+          textareaEl.style.height = Math.min(textareaEl.scrollHeight, 160) + 'px';
+        }
+      }}
+      rows="1"
+      style="min-height: 42px;"
       placeholder={sending ? "Thinking\u2026" : "Ask about races or request a run\u2026 (Enter to send, Shift+Enter for newline)"}
       class="flex-1 resize-none rounded-xl border border-stroke bg-surface px-3.5 py-2.5 text-sm text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors disabled:opacity-50"
       disabled={sending}

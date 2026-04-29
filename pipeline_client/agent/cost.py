@@ -28,13 +28,13 @@ NANO_MODEL = "gpt-5-nano"
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6"
 CHEAP_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
-# Gemini review models (Flash is already cheap — same model for both modes)
-DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
-CHEAP_GEMINI_MODEL = "gemini-3-flash-preview"
+# Gemini review models
+DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+CHEAP_GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
 
 # Grok review models
-DEFAULT_GROK_MODEL = "grok-3"
-CHEAP_GROK_MODEL = "grok-3-mini"
+DEFAULT_GROK_MODEL = "grok-4.20-0309-reasoning"
+CHEAP_GROK_MODEL = "grok-4-1-fast-non-reasoning"
 
 # ---------------------------------------------------------------------------
 # Approximate list prices per million tokens (USD, as of mid-2025)
@@ -56,12 +56,15 @@ ANTHROPIC_PRICING: Dict[str, Dict[str, float]] = {
 
 GEMINI_PRICING: Dict[str, Dict[str, float]] = {
     "gemini-3-flash-preview":        {"input": 0.10, "output": 0.40},
+    "gemini-3.1-pro-preview":        {"input": 0.10, "output": 0.40},  # approximate
     "gemini-3.1-flash-lite-preview": {"input": 0.05, "output": 0.20},
 }
 
 GROK_PRICING: Dict[str, Dict[str, float]] = {
     "grok-3":      {"input": 3.00, "output": 15.00},
     "grok-3-mini": {"input": 0.30, "output":  0.50},
+    "grok-4.20-0309-reasoning":      {"input": 2.00, "output": 6.00},
+    "grok-4-1-fast-non-reasoning":   {"input": 0.20, "output": 0.50},
 }
 
 _ALL_PRICING = {**OPENAI_PRICING, **ANTHROPIC_PRICING, **GEMINI_PRICING, **GROK_PRICING}

@@ -215,6 +215,8 @@ class LoggingManager:
                 await websocket.send_text(message)
         except Exception as e:
             logger.debug("Failed to send buffered logs to websocket: %s", e)
+
+    async def broadcast_message(self, message_data: dict):
         """Broadcast a structured message to all WebSocket connections."""
         if not self.connections:
             return

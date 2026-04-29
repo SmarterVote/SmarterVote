@@ -161,8 +161,7 @@
               <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
                 <span>{timeAgo(run.started_at)}</span>
                 {#if run.last_step}<span>· {run.last_step}</span>{/if}
-                <span>· {modelLabel(run)}</span>
-              </div>
+                <span>· {modelLabel(run)}</span>                {#if run.options?.goal}<span class="text-content-subtle truncate">\u00b7 {run.options.goal}</span>{/if}              </div>
             </button>
             <button
               type="button"
@@ -239,8 +238,7 @@
               <div class="mt-1 flex items-center gap-3 text-xs text-content-faint">
                 <span>{timeAgo(run.started_at)}</span>
                 {#if run.duration_ms}<span>· {formatMs(run.duration_ms)}</span>{/if}
-                <span>· {modelLabel(run)}</span>
-              </div>
+                <span>· {modelLabel(run)}</span>                {#if run.options?.goal}<span class="text-content-subtle truncate">\u00b7 {run.options.goal}</span>{/if}              </div>
             </button>
             <button
               type="button"

@@ -217,6 +217,7 @@ export const PIPELINE_STEPS: { id: PipelineStepId; label: string; weight: number
 export interface RunOptions {
   save_artifact?: boolean;
   note?: string;
+  goal?: string;
   cheap_mode?: boolean;
   force_fresh?: boolean;
   research_model?: string;

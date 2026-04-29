@@ -19,7 +19,7 @@ export const REVIEWER_DEFS: {
     key: "gemini",
     name: "Gemini",
     options: [
-      { value: "gemini-3-flash-preview", label: "Gemini 3 Flash" },
+      { value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Preview)" },
       { value: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite" },
     ],
   },
@@ -27,8 +27,8 @@ export const REVIEWER_DEFS: {
     key: "grok",
     name: "Grok",
     options: [
-      { value: "grok-3", label: "Grok 3" },
-      { value: "grok-3-mini", label: "Grok 3 mini" },
+      { value: "grok-4.20-0309-reasoning", label: "Grok 4.20 Reasoning" },
+      { value: "grok-4-1-fast-non-reasoning", label: "Grok 4.1 Fast" },
     ],
   },
 ];
@@ -49,9 +49,9 @@ export function createDefaultReviewerEnabled(reviewEnabled: boolean = false): Re
 
 export function createDefaultReviewerModels(): Record<ReviewerKey, string> {
   return {
-    claude: "claude-sonnet-4-6",
-    gemini: "gemini-3-flash-preview",
-    grok: "grok-3",
+    claude: "claude-haiku-4-5-20251001",
+    gemini: "gemini-3.1-flash-lite-preview",
+    grok: "grok-4-1-fast-non-reasoning",
   };
 }
 

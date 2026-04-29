@@ -119,6 +119,7 @@ async def run_agent(
     max_candidates: Optional[int] = None,
     target_no_info: bool = False,
     candidate_names: Optional[List[str]] = None,
+    goal: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the multi-phase research agent for a given race_id.
 
@@ -190,21 +191,27 @@ async def run_agent(
 
     if existing_data:
         log("info", f"ðŸ”„ Update mode for {race_id} (model={model}, small_model={small_model})")
+        if goal:
+            log("info", f"\U0001f3af Run goal: {goal}")
         race_json = await _run_update(
             race_id, existing_data, model=model, small_model=small_model,
             on_log=on_log, max_iterations=max_iterations,
             step_enabled=_step_enabled, track=_track,
             max_candidates=max_candidates, target_no_info=target_no_info,
             target_candidate_names=candidate_names,
+            goal=goal,
         )
     else:
         log("info", f"ðŸ†• New research for {race_id} (model={model}, small_model={small_model})")
+        if goal:
+            log("info", f"\U0001f3af Run goal: {goal}")
         race_json = await _run_fresh(
             race_id, model=model, small_model=small_model,
             on_log=on_log, max_iterations=max_iterations,
             step_enabled=_step_enabled, track=_track,
             max_candidates=max_candidates, target_no_info=target_no_info,
             target_candidate_names=candidate_names,
+            goal=goal,
         )
 
     # LLMs sometimes wrap their output in {"race_json": {...}} â€” unwrap it so

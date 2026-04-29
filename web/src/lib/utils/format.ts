@@ -17,6 +17,7 @@ const MODEL_NAMES: Record<string, string> = {
   "claude-haiku-4-20250514": "Claude Haiku 4",
   // Google Gemini 3
   "gemini-3-flash-preview": "Gemini 3 Flash",
+  "gemini-3.1-pro-preview": "Gemini 3.1 Pro",
   "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash Lite",
   // Legacy Gemini
   "gemini-2.0-flash": "Gemini 2.0 Flash",
@@ -24,6 +25,8 @@ const MODEL_NAMES: Record<string, string> = {
   // Grok
   "grok-3": "Grok 3",
   "grok-3-mini": "Grok 3 Mini",
+  "grok-4.20-0309-reasoning": "Grok 4.20 Reasoning",
+  "grok-4-1-fast-non-reasoning": "Grok 4.1 Fast",
   // Internal pipeline tags
   "pipeline-agent": "GPT-4o Mini",
   "pipeline-v2-agent": "GPT-4o Mini",

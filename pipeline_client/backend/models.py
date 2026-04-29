@@ -60,6 +60,7 @@ class RunOptions(BaseModel):
     cheap_mode: bool = True  # Use cheaper/faster model variants
     save_artifact: bool = True
     note: Optional[str] = None
+    goal: Optional[str] = None  # Short description of why this run is being triggered (shown in Runs tab)
     force_fresh: bool = False  # Ignore existing data and start from scratch
     # Model overrides (None = use default based on cheap_mode)
     research_model: Optional[str] = None   # OpenAI model for research phases

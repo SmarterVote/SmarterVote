@@ -430,6 +430,7 @@ async def _run_fresh(
     max_candidates: Optional[int] = None,
     target_no_info: bool = False,
     target_candidate_names: Optional[List[str]] = None,
+    goal: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Phase 1 → 2 → 3: Discovery → Issue research → Refinement."""
     log = make_logger(on_log)
@@ -444,7 +445,7 @@ async def _run_fresh(
     log("info", "Phase 1/3: Discovering race and candidates...")
     race_json = _ensure_dict(await _agent_loop(
         DISCOVERY_SYSTEM,
-        DISCOVERY_USER.format(race_id=race_id),
+        (f"## Run Goal\n{goal}\n\n" if goal else "") + DISCOVERY_USER.format(race_id=race_id),
         model=model,
         on_log=on_log,
         race_id=race_id,
@@ -506,6 +507,7 @@ async def _run_update(
     max_candidates: Optional[int] = None,
     target_no_info: bool = False,
     target_candidate_names: Optional[List[str]] = None,
+    goal: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Phase-based update mirroring _run_fresh but starting from existing data."""
     log = make_logger(on_log)

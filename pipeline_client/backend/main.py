@@ -1456,6 +1456,7 @@ You are an AI assistant embedded in the SmarterVote admin dashboard. You help ad
 - candidate_names (list[str]): Only research specific named candidates.
 - target_no_info (bool, default false): Prioritise candidates with least existing issue data.
 - note (str): A short label attached to the run for easy identification.
+- goal (str, optional): A brief description of why this run is being triggered (e.g. "Update ahead of primary", "Fix missing polling"). Shown as a subtitle in the Runs tab.
 
 ## Targeted Completion Runs
 When a race has `⚠ PARTIAL` or `⚠ NO ISSUE DATA` annotations, use targeted runs to fill gaps efficiently
@@ -1490,6 +1491,24 @@ Rules for INSPECT:
 - Do not use both ACTION and INSPECT in the same reply — pick the most relevant one.
 - Do not wrap it in markdown code fences.
 
+## Web research
+When the user asks about competitive/swingy races, recent polling, or other live information not
+already in the race list below, search the web BEFORE producing your reply. Append SEARCH and/or
+FETCH blocks at the VERY END of your message — the system will execute them and call you again
+with the results:
+
+SEARCH:{"query":"2026 competitive Senate races toss-up Cook Political Report"}
+FETCH:{"url":"https://www.cookpolitical.com/ratings/senate-race-ratings"}
+
+Rules for SEARCH/FETCH:
+- Maximum 3 SEARCH blocks and 2 FETCH blocks per turn.
+- Blocks go at the very END of your reply, one per line.
+- Do not use SEARCH/FETCH and INSPECT in the same reply — SEARCH/FETCH is for live web data;
+  INSPECT is for existing race file data. If both seem relevant, pick SEARCH/FETCH.
+- Do not wrap in markdown code fences.
+- Use SEARCH for general queries; use FETCH for specific URLs you know are relevant
+  (e.g. Cook Political Report, FiveThirtyEight, Ballotpedia election pages).
+
 ## Clarifying questions
 If you need more information before suggesting a run (e.g. quality level preference, which candidates, force-fresh vs update),
 ask the user first. Append a QUESTION block at the VERY END of your reply:
@@ -1510,6 +1529,8 @@ Rules for ACTION:
 - Only one ACTION block per reply.
 - race_ids must be exact race IDs from the race list below.
 - Always include `cheap_mode` explicitly in options (default: true). Set false only if user asks for high quality.
+- Include `goal` in options when the context implies a clear purpose — derive it from the user's message
+  (e.g. "get me the top 50 swingy races" → goal: "Top 50 competitive races refresh").
 - If you are not triggering a run, omit the ACTION block entirely.
 - Do not wrap the ACTION block in markdown code fences.
 
@@ -1667,7 +1688,7 @@ async def _call_admin_llm(
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: client.messages.create(
-                    model="claude-haiku-4-5",
+                    model="claude-sonnet-4-6",
                     max_tokens=max_tokens,
                     system=system,
                     messages=messages,
@@ -1740,6 +1761,72 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
         except (json.JSONDecodeError, ValueError, KeyError):
             pass
 
+    # Handle SEARCH/FETCH directives — web research pass (only if INSPECT was not used)
+    web_thinking: List[str] = []
+    if not inspect_match:
+        _search_matches = list(re.finditer(r"\nSEARCH:(\{[^\n]+\})", reply_text))[:3]
+        _fetch_matches = list(re.finditer(r"\nFETCH:(\{[^\n]+\})", reply_text))[:2]
+        if _search_matches or _fetch_matches:
+            # Strip all directives from reply text (reverse order to preserve offsets)
+            for _m in sorted(_search_matches + _fetch_matches, key=lambda m: m.start(), reverse=True):
+                reply_text = reply_text[:_m.start()] + reply_text[_m.end():]
+            reply_text = reply_text.rstrip()
+
+            from pipeline_client.agent.web_tools import _fetch_page, _serper_search
+            _tasks: list = []
+            _task_labels: List[tuple] = []
+
+            for _m in _search_matches:
+                try:
+                    _d = json.loads(_m.group(1))
+                    _q = (_d.get("query") or "").strip()
+                    if _q:
+                        _tasks.append(_serper_search(_q, num_results=_d.get("num_results", 6)))
+                        _task_labels.append(("search", _q))
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+            for _m in _fetch_matches:
+                try:
+                    _d = json.loads(_m.group(1))
+                    _url = (_d.get("url") or "").strip()
+                    if _url:
+                        _tasks.append(_fetch_page(_url))
+                        _task_labels.append(("fetch", _url))
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+            if _tasks:
+                _results = await asyncio.gather(*_tasks, return_exceptions=True)
+                _parts: List[str] = []
+                for (_kind, _label), _result in zip(_task_labels, _results):
+                    if isinstance(_result, Exception):
+                        logging.warning("Admin web %s failed for '%s': %s", _kind, _label, _result)
+                        continue
+                    if _kind == "search":
+                        web_thinking.append(f"Searched: {_label}")
+                        _hits = _result  # type: ignore[assignment]
+                        if _hits and not (len(_hits) == 1 and _hits[0].get("error")):
+                            _hit_lines = [f"### Search results: {_label}"]
+                            for _h in _hits[:6]:
+                                _hit_lines.append(
+                                    f"- **{_h.get('title', '')}** ({_h.get('url', '')}): {_h.get('snippet', '')}"
+                                )
+                            _parts.append("\n".join(_hit_lines))
+                    else:
+                        web_thinking.append(f"Fetched: {_label}")
+                        if isinstance(_result, str) and len(_result) > 50:
+                            _parts.append(f"### Page content: {_label}\n{_result[:4000]}")
+
+                if _parts:
+                    _web_context = "\n\n## Web Research Results\n\n" + "\n\n".join(_parts)
+                    _web_system = system_prompt + _web_context
+                    _web_msgs = messages + ([{"role": "assistant", "content": reply_text}] if reply_text else [])
+                    try:
+                        reply_text = await _call_admin_llm(_web_system, _web_msgs)
+                    except Exception as _exc:
+                        logging.warning("Web-assisted LLM pass failed: %s", _exc)
+
     # Parse optional QUESTION block appended by the model
     question: str | None = None
     question_match = re.search(r"\nQUESTION:(\{[^\n]+\})\s*$", reply_text)
@@ -1792,6 +1879,7 @@ async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
     thinking_steps: List[str] = []
     if inspect_match:
         thinking_steps.append("Fetched full race data for inspection")
+    thinking_steps.extend(web_thinking)
     if action:
         thinking_steps.append(f"Prepared run for {len(action.get('race_ids') or [])} race(s)")
     if question:

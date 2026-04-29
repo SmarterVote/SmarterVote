@@ -499,7 +499,7 @@
   <title>Admin Console - SmarterVote</title>
 </svelte:head>
 
-<div class="w-full px-4 py-6 max-w-[1600px] mx-auto">
+<div class="w-full px-4 max-w-[1600px] mx-auto {activeTab === 'agent' ? 'h-dvh flex flex-col overflow-hidden pt-6 pb-2' : 'py-6'}">
   <!-- Header -->
   <div class="mt-2 mb-6 card p-4">
     <div class="flex items-center justify-between">
