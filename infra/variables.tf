@@ -105,7 +105,7 @@ variable "enable_pipeline_client" {
 variable "pipeline_client_public_invoker" {
   description = "Allow unauthenticated Cloud Run invocations. Must be true for browser clients: CORS OPTIONS preflights carry no credentials so GCP-level IAM auth blocks them before the app can respond. Auth0 JWT handles application-layer auth."
   type        = bool
-  default     = false  # Override to true in tfvars for any deployment that serves browser clients
+  default     = false # Override to true in tfvars for any deployment that serves browser clients
 }
 
 # Monitoring / alerting
