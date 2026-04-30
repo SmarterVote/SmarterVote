@@ -102,6 +102,12 @@ class QueueManager:
         """Load queue state from Firestore or local JSON file."""
         if self._use_firestore:
             self._load_from_firestore(mark_interrupted_running=True)
+            logger.info(
+                "QueueManager: started with %d items from Firestore (%d pending, %d running)",
+                len(self._items),
+                self.pending_count(),
+                sum(1 for i in self._items if i.status == "running"),
+            )
         else:
             self._load_from_json()
 
@@ -146,7 +152,7 @@ class QueueManager:
                         item.completed_at = datetime.now(timezone.utc).isoformat()
                         collection.document(item.id).set(item.model_dump(mode="json"))
 
-            logger.info(f"QueueManager: loaded {len(self._items)} items from Firestore")
+            logger.debug("QueueManager: synced %d items from Firestore", len(self._items))
         except Exception:
             logger.exception("Failed to load queue from Firestore; starting with empty queue")
             self._items = []

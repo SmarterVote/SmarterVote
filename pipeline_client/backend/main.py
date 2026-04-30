@@ -660,7 +660,6 @@ async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
 async def cancel_race_queue(race_id: str) -> Dict[str, Any]:
     """Cancel a queued or running race."""
     _validate_race_id(race_id)
-    queue_manager.refresh()
     race = race_manager.get_race(race_id)
     if not race or race.status not in ("queued", "running"):
         raise HTTPException(status_code=404, detail="Race is not queued or running")
@@ -1031,9 +1030,14 @@ async def run_agent_endpoint(request: AgentRequest) -> Dict[str, Any]:
 
 
 @app.get("/queue", dependencies=[Depends(verify_token)])
-async def get_queue() -> Dict[str, Any]:
-    """Get all queue items with their status."""
-    queue_manager.refresh()
+async def get_queue(sync: bool = False) -> Dict[str, Any]:
+    """Get all queue items with their status.
+
+    Pass ?sync=true to force a Firestore re-read (only needed for debugging
+    multi-instance drift; normal polling should omit this).
+    """
+    if sync:
+        queue_manager.refresh()
     items = queue_manager.get_all()
     return {
         "items": [item.model_dump(mode="json") for item in items],
@@ -1045,7 +1049,6 @@ async def get_queue() -> Dict[str, Any]:
 @app.post("/queue", dependencies=[Depends(verify_token)])
 async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
     """Add one or more races to the processing queue."""
-    queue_manager.refresh()
     added = []
     errors = []
     options = request.options.model_dump(exclude_unset=True) if request.options else {}
@@ -1070,7 +1073,6 @@ async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
 @app.delete("/queue/finished", dependencies=[Depends(verify_token)])
 async def clear_finished_queue() -> Dict[str, Any]:
     """Remove completed/failed/cancelled items from the queue."""
-    queue_manager.refresh()
     removed = queue_manager.clear_finished()
     return {"removed": removed}
 
@@ -1078,7 +1080,6 @@ async def clear_finished_queue() -> Dict[str, Any]:
 @app.delete("/queue/pending", dependencies=[Depends(verify_token)])
 async def clear_pending_queue() -> Dict[str, Any]:
     """Remove all pending (not yet started) items from the queue."""
-    queue_manager.refresh()
     removed_items = queue_manager.clear_pending()
     # Dequeue associated races so they don't stay stuck in "queued" status
     for item in removed_items:
@@ -1092,7 +1093,6 @@ async def clear_pending_queue() -> Dict[str, Any]:
 @app.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
 async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
     """Remove or cancel a queue item. Use force=true for stuck/broken items."""
-    queue_manager.refresh()
     if not force:
         if queue_manager.remove(item_id):
             return {"ok": True, "action": "removed"}
