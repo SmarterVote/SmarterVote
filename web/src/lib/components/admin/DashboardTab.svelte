@@ -144,9 +144,62 @@
     await loadData(hours);
   }
 
+  async function handleAcknowledgeAll() {
+    await analyticsService.acknowledgeAllAlerts();
+    alerts = alerts.map((a) => ({ ...a, acknowledged: true }));
+  }
+
   async function handleAcknowledge(alertId: string) {
     await analyticsService.acknowledgeAlert(alertId);
     alerts = alerts.map((a) => (a.id === alertId ? { ...a, acknowledged: true } : a));
+  }
+
+  /** Return the most meaningful detail snippet for an alert. */
+  function alertDetail(alert: Alert): string | null {
+    const d = alert.details as Record<string, unknown>;
+    switch (alert.category) {
+      case "freshness": {
+        const days = d.age_days as number | undefined;
+        const updated = d.updated_utc as string | undefined;
+        if (days != null) return `${days} day${days !== 1 ? "s" : ""} since last update${updated ? ` (${formatDate(updated)})` : ""}`;
+        return null;
+      }
+      case "failures": {
+        const n = d.consecutive_failures as number | undefined;
+        return n != null ? `${n} consecutive failure${n !== 1 ? "s" : ""}` : null;
+      }
+      case "quality": {
+        const covered = d.issues_covered as number | undefined;
+        const conf = d.avg_confidence_score as number | undefined;
+        if (covered != null) return `${covered}/12 issues covered`;
+        if (conf != null) return `Avg confidence score: ${conf}`;
+        return null;
+      }
+      case "analytics": {
+        const rate = d.error_rate as number | undefined;
+        const total = d.total_requests as number | undefined;
+        return rate != null ? `${rate}% error rate${total != null ? ` over ${total.toLocaleString()} requests` : ""}` : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  const categoryLabel: Record<string, string> = {
+    freshness: "Freshness",
+    failures: "Failures",
+    quality: "Quality",
+    analytics: "API Health",
+  };
+
+  function categoryClass(c: string): string {
+    return c === "failures"
+      ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
+      : c === "freshness"
+        ? "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300"
+        : c === "quality"
+          ? "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300"
+          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400";
   }
 
   const gcpLogsUrl = GCP_PROJECT
@@ -339,11 +392,16 @@
     <div class="card p-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-semibold text-content-muted">Alerts</h3>
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center gap-2">
           {#if unacknowledgedAlerts.length > 0}
             <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white">
               {unacknowledgedAlerts.length} active
             </span>
+            <button
+              type="button"
+              class="text-xs px-2 py-0.5 rounded border border-stroke text-content-muted hover:bg-surface-alt transition-colors"
+              on:click={handleAcknowledgeAll}
+            >Ack all</button>
           {/if}
           <button
             type="button"
@@ -355,22 +413,34 @@
 
       {#if error}
         <p class="text-xs text-red-500">{error}</p>
-      {:else if alerts.filter((a) => !a.acknowledged).length === 0}
+      {:else if unacknowledgedAlerts.length === 0}
         <p class="text-sm text-content-faint py-4 text-center">No active alerts ✓</p>
       {:else}
-        <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
-          {#each alerts.filter((a) => !a.acknowledged) as alert (alert.id)}
-            <div class="rounded-lg border px-3 py-2 {severityClass(alert.severity)}">
+        <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {#each unacknowledgedAlerts as alert (alert.id)}
+            {@const detail = alertDetail(alert)}
+            <div class="rounded-lg border px-3 py-2.5 {severityClass(alert.severity)}">
               <div class="flex items-start justify-between gap-2">
-                <div class="flex-1 min-w-0">
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold mr-1.5 {severityBadge(alert.severity)}">
-                    {alert.severity}
-                  </span>
-                  <span class="text-xs">{alert.message}</span>
+                <div class="flex-1 min-w-0 space-y-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold shrink-0 {severityBadge(alert.severity)}">
+                      {alert.severity}
+                    </span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium shrink-0 {categoryClass(alert.category)}">
+                      {categoryLabel[alert.category] ?? alert.category}
+                    </span>
+                    {#if alert.details?.race_id}
+                      <span class="font-mono text-xs opacity-70 truncate">{alert.details.race_id}</span>
+                    {/if}
+                  </div>
+                  <p class="text-xs leading-snug">{alert.message}</p>
+                  {#if detail}
+                    <p class="text-xs opacity-70 font-medium">{detail}</p>
+                  {/if}
                 </div>
                 <button
                   type="button"
-                  class="shrink-0 text-xs underline opacity-70 hover:opacity-100"
+                  class="shrink-0 text-xs underline opacity-60 hover:opacity-100 mt-0.5"
                   on:click={() => handleAcknowledge(alert.id)}
                 >Ack</button>
               </div>

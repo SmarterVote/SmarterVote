@@ -1340,7 +1340,7 @@ async def root():
 # Alerts endpoints
 # ---------------------------------------------------------------------------
 
-from .alerts import acknowledge_alert, evaluate_all  # noqa: E402
+from .alerts import acknowledge_alert, acknowledge_alerts, evaluate_all  # noqa: E402
 
 
 @app.get("/alerts", dependencies=[Depends(verify_token)])
@@ -1373,6 +1373,16 @@ async def ack_alert(alert_id: str) -> Dict[str, Any]:
     """Acknowledge an alert by ID."""
     acknowledge_alert(alert_id)
     return {"ok": True, "alert_id": alert_id}
+
+
+@app.post("/alerts/acknowledge-all", dependencies=[Depends(verify_token)])
+async def ack_all_alerts() -> Dict[str, Any]:
+    """Acknowledge all currently active (unacknowledged) alerts."""
+    alerts = evaluate_all(run_manager, overview=None)
+    alert_ids = [a.id for a in alerts if not a.acknowledged]
+    if alert_ids:
+        acknowledge_alerts(alert_ids)
+    return {"ok": True, "acknowledged_count": len(alert_ids)}
 
 
 # ---------------------------------------------------------------------------

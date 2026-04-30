@@ -82,6 +82,14 @@ def acknowledge_alert(alert_id: str) -> bool:
     return True
 
 
+def acknowledge_alerts(alert_ids: List[str]) -> bool:
+    """Mark multiple alerts as acknowledged in a single write."""
+    ids = _load_acknowledged()
+    ids.update(alert_ids)
+    _save_acknowledged(ids)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Alert evaluation
 # ---------------------------------------------------------------------------

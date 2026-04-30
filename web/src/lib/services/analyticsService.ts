@@ -45,6 +45,15 @@ export const analyticsService = {
     });
   },
 
+  async acknowledgeAllAlerts(): Promise<{ acknowledged_count: number }> {
+    const resp = await fetchWithAuth(`${API_BASE}/alerts/acknowledge-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!resp.ok) throw new Error(`Ack-all failed ${resp.status}`);
+    return resp.json();
+  },
+
   async getPipelineMetrics(limit = 50): Promise<{ records: PipelineRunRecord[]; count: number }> {
     return fetchAdmin<{ records: PipelineRunRecord[]; count: number }>("/pipeline/metrics", { limit });
   },
