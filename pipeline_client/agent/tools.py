@@ -517,11 +517,11 @@ UPDATE_RACE_FIELD_TOOL: Dict = {
     "type": "function",
     "function": {
         "name": "update_race_field",
-        "description": "Update a race-level field. Allowed fields: description, office, election_date, polling_note.",
+        "description": "Update a race-level field. Allowed fields: description, office, election_date, polling_note, ballotpedia_url, register_to_vote_url, how_to_vote_url.",
         "parameters": {
             "type": "object",
             "properties": {
-                "field": {"type": "string", "enum": ["description", "office", "election_date", "polling_note"],
+                "field": {"type": "string", "enum": ["description", "office", "election_date", "polling_note", "ballotpedia_url", "register_to_vote_url", "how_to_vote_url"],
                           "description": "Field to update."},
                 "value": {"type": "string", "description": "New value."},
             },

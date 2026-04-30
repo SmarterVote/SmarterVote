@@ -270,7 +270,7 @@ export const sampleRace: Race = {
             "src:interview:fox-news-immigration",
           ]),
         },
-        "Reproductive Rights": {
+        "Abortion & Reproductive Health": {
           stance:
             "Strongly pro-life, supports overturning Roe v. Wade. Favors federal 20-week abortion ban with exceptions for life of mother. Opposes federal funding for abortion. Supports adoption and crisis pregnancy centers. Backs parental notification laws.",
           confidence: "high",
@@ -280,7 +280,7 @@ export const sampleRace: Race = {
             "src:cosponsorship:life-at-conception-act",
           ]),
         },
-        "Guns & Safety": {
+        "Firearms & Second Amendment": {
           stance:
             "Strong Second Amendment advocate, opposes assault weapons bans and universal background checks. Supports national concealed carry reciprocity. Favors school security measures over gun restrictions. Opposes red flag laws as due process violations.",
           confidence: "high",
@@ -300,7 +300,7 @@ export const sampleRace: Race = {
             "src:op-ed:china-threat-2024",
           ]),
         },
-        "Social Justice": {
+        "Civil Rights & Equality": {
           stance:
             "Opposes affirmative action in college admissions and hiring. Supports law enforcement, opposes defunding police. Favors voter ID laws. Opposes federal LGBTQ+ anti-discrimination laws as states' rights issue. Supports religious freedom protections.",
           confidence: "medium",
@@ -330,7 +330,7 @@ export const sampleRace: Race = {
             "src:op-ed:ai-innovation-2024",
           ]),
         },
-        "Election Reform": {
+        "Election Policy": {
           stance:
             "Supports voter ID requirements, opposes automatic voter registration. Favors cleaning voter rolls. Opposes ranked choice voting. Supports paper ballot backup systems. Opposes federal takeover of election administration.",
           confidence: "high",
@@ -414,7 +414,7 @@ export const sampleRace: Race = {
             "src:statement:dreamer-protection",
           ]),
         },
-        "Reproductive Rights": {
+        "Abortion & Reproductive Health": {
           stance:
             "Strongly pro-choice, supports codifying Roe v. Wade into federal law. Opposes all abortion restrictions, supports federal funding for abortion. Advocates for expanding access to contraception, comprehensive sex education. Supports fertility treatment coverage.",
           confidence: "high",
@@ -424,7 +424,7 @@ export const sampleRace: Race = {
             "src:planned-parenthood:endorsement",
           ]),
         },
-        "Guns & Safety": {
+        "Firearms & Second Amendment": {
           stance:
             "Supports universal background checks, assault weapons ban, high-capacity magazine restrictions. Advocates for red flag laws, mandatory safe storage requirements. Supports funding for gun violence research, community intervention programs.",
           confidence: "high",
@@ -444,7 +444,7 @@ export const sampleRace: Race = {
             "src:vote:war-powers-resolution",
           ]),
         },
-        "Social Justice": {
+        "Civil Rights & Equality": {
           stance:
             "Strong civil rights advocate, supports Equality Act for LGBTQ+ protections. Backs criminal justice reform, ending private prisons. Supports voting rights expansion, opposes voter suppression. Advocates for police accountability, community policing reforms.",
           confidence: "high",
@@ -474,7 +474,7 @@ export const sampleRace: Race = {
             "src:op-ed:ai-regulation-framework",
           ]),
         },
-        "Election Reform": {
+        "Election Policy": {
           stance:
             "Supports automatic voter registration, making Election Day a holiday. Advocates for ending gerrymandering, campaign finance reform. Opposes voter ID requirements as suppression. Supports restoring Voting Rights Act, D.C. statehood.",
           confidence: "high",
@@ -556,7 +556,7 @@ export const sampleRace: Race = {
             "src:website:immigration-plan",
           ]),
         },
-        "Reproductive Rights": {
+        "Abortion & Reproductive Health": {
           stance:
             "Personally pro-life but believes government should have limited role in personal medical decisions. Supports exceptions for rape, incest, and life of mother. Favors state-level decision making on abortion policy.",
           confidence: "low",
@@ -566,7 +566,7 @@ export const sampleRace: Race = {
             "src:statement:roe-decision",
           ]),
         },
-        "Guns & Safety": {
+        "Firearms & Second Amendment": {
           stance:
             "Second Amendment supporter who also backs common-sense safety measures. Supports improved background checks, veteran mental health programs. Opposes assault weapon bans but supports safe storage requirements.",
           confidence: "medium",
@@ -586,7 +586,7 @@ export const sampleRace: Race = {
             "src:veterans-forum:2024",
           ]),
         },
-        "Social Justice": {
+        "Civil Rights & Equality": {
           stance:
             "Supports equal treatment under law regardless of race, gender, or sexual orientation. Backs criminal justice reform, police training improvements. Believes in addressing racial inequities through education and economic opportunity.",
           confidence: "medium",
@@ -616,7 +616,7 @@ export const sampleRace: Race = {
             "src:position-paper:innovation-policy",
           ]),
         },
-        "Election Reform": {
+        "Election Policy": {
           stance:
             "Supports non-partisan redistricting commissions, campaign finance transparency. Backs voter ID with free ID provision. Opposes gerrymandering by both parties. Advocates for ranked choice voting in federal elections.",
           confidence: "medium",

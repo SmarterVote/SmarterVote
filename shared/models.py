@@ -43,15 +43,25 @@ class CanonicalIssue(str, Enum):
     HEALTHCARE = "Healthcare"
     ECONOMY = "Economy"
     CLIMATE_ENERGY = "Climate/Energy"
-    REPRODUCTIVE_RIGHTS = "Reproductive Rights"
+    ABORTION_REPRODUCTIVE_HEALTH = "Abortion & Reproductive Health"
     IMMIGRATION = "Immigration"
-    GUNS_SAFETY = "Guns & Safety"
+    FIREARMS_SECOND_AMENDMENT = "Firearms & Second Amendment"
     FOREIGN_POLICY = "Foreign Policy"
-    SOCIAL_JUSTICE = "Social Justice"
+    CIVIL_RIGHTS_EQUALITY = "Civil Rights & Equality"
     EDUCATION = "Education"
     TECH_AI = "Tech & AI"
-    ELECTION_REFORM = "Election Reform"
+    ELECTION_POLICY = "Election Policy"
     LOCAL_ISSUES = "Local Issues"
+
+
+# Maps legacy (biased) issue names to their current neutral names.
+# Used to migrate old published JSON files transparently.
+LEGACY_ISSUE_NAMES: dict[str, str] = {
+    "Reproductive Rights": "Abortion & Reproductive Health",
+    "Guns & Safety": "Firearms & Second Amendment",
+    "Social Justice": "Civil Rights & Equality",
+    "Election Reform": "Election Policy",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -76,10 +86,18 @@ class Source(BaseModel):
 class IssueStance(BaseModel):
     """Candidate's stance on a canonical issue."""
 
-    issue: CanonicalIssue
+    issue: Optional[CanonicalIssue] = None
     stance: str
     confidence: ConfidenceLevel
     sources: List[Source] = Field(default_factory=list)
+
+    @field_validator("issue", mode="before")
+    @classmethod
+    def migrate_legacy_issue_field(cls, v: Any) -> Any:
+        """Migrate legacy issue name in the issue field itself."""
+        if isinstance(v, str):
+            return LEGACY_ISSUE_NAMES.get(v, v)
+        return v
 
 
 class CandidateLink(BaseModel):
@@ -171,6 +189,14 @@ class Candidate(BaseModel):
     # Policy positions
     issues: Dict[CanonicalIssue, IssueStance] = Field(default_factory=dict)
 
+    @field_validator("issues", mode="before")
+    @classmethod
+    def migrate_legacy_issue_names(cls, v: Any) -> Any:
+        """Transparently rename legacy (biased) issue keys to current neutral names."""
+        if not isinstance(v, dict):
+            return v
+        return {LEGACY_ISSUE_NAMES.get(k, k): val for k, val in v.items()}
+
     # Background
     career_history: List[CareerEntry] = Field(default_factory=list)
     education: List[EducationEntry] = Field(default_factory=list)
@@ -259,6 +285,11 @@ class RaceJSON(BaseModel):
     # Polling data
     polling: List[PollEntry] = Field(default_factory=list)
     polling_note: Optional[str] = None  # set when no public polls are found
+
+    # Voter action links
+    ballotpedia_url: Optional[str] = Field(None, description="URL to the Ballotpedia election page")
+    register_to_vote_url: Optional[str] = Field(None, description="URL for voter registration (state-specific)")
+    how_to_vote_url: Optional[str] = Field(None, description="URL for voting instructions (state-specific)")
 
     # Multi-LLM reviews
     reviews: List[AgentReview] = Field(default_factory=list)

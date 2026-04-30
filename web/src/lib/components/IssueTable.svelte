@@ -2,16 +2,21 @@
   import ConfidenceIndicator from "./ConfidenceIndicator.svelte";
   import SourceLink from "./SourceLink.svelte";
   import NoDataFallback from "./NoDataFallback.svelte";
-  import type { CanonicalIssue, IssueStance } from "$lib/types";
+  import type { IssueKey, IssueStance } from "$lib/types";
+  import { LEGACY_ISSUE_NAMES, RENAMED_ISSUE_NOTES, getIssueDisplayName } from "$lib/types";
 
-  export let issues: Record<CanonicalIssue, IssueStance>;
+  export let issues: Partial<Record<IssueKey, IssueStance>>;
   export let raceId: string = "";
   export let candidateName: string = "";
 
-  $: issueEntries = Object.entries(issues) as [CanonicalIssue, IssueStance][];
+  // Sponsor / donate link shown inside the rename tooltip
+  const SPONSOR_URL = "https://github.com/sponsors/jacobfholland"; // TODO: replace with real sponsor link
+
+  $: issueEntries = Object.entries(issues) as [IssueKey, IssueStance][];
   $: hasIssues = issueEntries.length > 0;
 
   let expandedSources: Set<string> = new Set();
+  let visibleTooltip: string | null = null;
 
   function toggleSources(issue: string) {
     const next = new Set(expandedSources);
@@ -21,6 +26,10 @@
       next.add(issue);
     }
     expandedSources = next;
+  }
+
+  function toggleTooltip(issue: string) {
+    visibleTooltip = visibleTooltip === issue ? null : issue;
   }
 </script>
 
@@ -46,7 +55,41 @@
       <tbody>
         {#each issueEntries as [issue, stance]}
           <tr class="border-b border-stroke hover:bg-surface-alt">
-            <td class="py-3 px-4 font-medium text-content">{issue}</td>
+            <td class="py-3 px-4 font-medium text-content">
+              <span class="inline-flex items-center gap-1">
+                {getIssueDisplayName(issue)}
+                {#if RENAMED_ISSUE_NOTES[issue]}
+                  <span class="relative inline-block">
+                    <button
+                      class="text-blue-500 hover:text-blue-400 focus:outline-none leading-none"
+                      aria-label="About this issue name"
+                      title="About this issue name"
+                      on:click|stopPropagation={() => toggleTooltip(issue)}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                    {#if visibleTooltip === issue}
+                      <div
+                        class="absolute z-10 left-0 top-6 w-72 rounded-lg border border-stroke bg-surface p-3 shadow-lg text-sm text-content-muted"
+                        role="tooltip"
+                      >
+                        <p>{RENAMED_ISSUE_NOTES[issue]}</p>
+                        <p class="mt-2 text-content-faint text-xs">
+                          Trying to pay off student loans 😅 —
+                          <a href={SPONSOR_URL} target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">Sponsor us!</a>
+                        </p>
+                        <button
+                          class="mt-2 text-xs text-content-faint hover:text-content underline"
+                          on:click|stopPropagation={() => { visibleTooltip = null; }}
+                        >Dismiss</button>
+                      </div>
+                    {/if}
+                  </span>
+                {/if}
+              </span>
+            </td>
             <td class="py-3 px-4 text-content-muted w-2/5 whitespace-normal">
               {stance.stance}
             </td>
@@ -86,7 +129,38 @@
     {#each issueEntries as [issue, stance]}
       <div class="bg-surface border border-stroke rounded-lg p-4">
         <div class="flex items-center justify-between mb-2">
-          <h4 class="font-semibold text-content">{issue}</h4>
+          <h4 class="font-semibold text-content inline-flex items-center gap-1">
+            {getIssueDisplayName(issue)}
+            {#if RENAMED_ISSUE_NOTES[issue]}
+              <span class="relative inline-block">
+                <button
+                  class="text-blue-500 hover:text-blue-400 focus:outline-none leading-none"
+                  aria-label="About this issue name"
+                  on:click|stopPropagation={() => toggleTooltip(issue + '-mobile')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+                {#if visibleTooltip === issue + '-mobile'}
+                  <div
+                    class="absolute z-10 left-0 top-6 w-64 rounded-lg border border-stroke bg-surface p-3 shadow-lg text-sm text-content-muted"
+                    role="tooltip"
+                  >
+                    <p>{RENAMED_ISSUE_NOTES[issue]}</p>
+                    <p class="mt-2 text-content-faint text-xs">
+                      Trying to pay off student loans 😅 —
+                      <a href={SPONSOR_URL} target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline">Sponsor us!</a>
+                    </p>
+                    <button
+                      class="mt-2 text-xs text-content-faint hover:text-content underline"
+                      on:click|stopPropagation={() => { visibleTooltip = null; }}
+                    >Dismiss</button>
+                  </div>
+                {/if}
+              </span>
+            {/if}
+          </h4>
           <ConfidenceIndicator confidence={stance.confidence} />
         </div>
         <p class="text-content-muted mb-3">{stance.stance}</p>

@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger("pipeline")
 
 from .handlers import _make_editing_handlers
+from .ballotpedia import lookup_election_page as _ballotpedia_election_lookup
 from .images import resolve_candidate_images
 from .llm import _agent_loop, _ensure_dict, _normalize_candidate, CHEAP_MODEL, DEFAULT_MODEL, NANO_MODEL
 from .patches import (  # noqa: F401 — re-exported for backward compat
@@ -463,6 +464,16 @@ async def _run_fresh(
         track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000))
         return race_json
 
+    # Auto-populate ballotpedia_url if not already set by the discovery agent
+    if not race_json.get("ballotpedia_url"):
+        try:
+            bp_result = await _ballotpedia_election_lookup(race_id)
+            if bp_result.get("found") and bp_result.get("page_url"):
+                race_json["ballotpedia_url"] = bp_result["page_url"]
+                log("info", f"  Auto-set ballotpedia_url: {bp_result['page_url']}")
+        except Exception as _bp_exc:
+            log("debug", f"  Ballotpedia URL auto-set failed: {_bp_exc}")
+
     refine_iters = _scale_iterations(max_iterations, n, per_candidate=2, minimum=12)
     log("info", f"  Iteration budgets — refine:{refine_iters}  (n={n} candidates)")
     track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000))
@@ -542,6 +553,16 @@ async def _run_update(
 
     refine_iters = _scale_iterations(max_iterations, n, per_candidate=2, minimum=12)
     handlers = _make_editing_handlers(race_json, log)
+
+    # Auto-populate ballotpedia_url if not already set in existing data
+    if not race_json.get("ballotpedia_url"):
+        try:
+            bp_result = await _ballotpedia_election_lookup(race_id)
+            if bp_result.get("found") and bp_result.get("page_url"):
+                race_json["ballotpedia_url"] = bp_result["page_url"]
+                log("info", f"  Auto-set ballotpedia_url: {bp_result['page_url']}")
+        except Exception as _bp_exc:
+            log("debug", f"  Ballotpedia URL auto-set failed: {_bp_exc}")
 
     # --- Phase 0+1: Discovery (roster sync + meta update) ---
     if step_enabled("discovery"):

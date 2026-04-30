@@ -17,15 +17,21 @@ export type CanonicalIssue =
   | "Healthcare"
   | "Economy"
   | "Climate/Energy"
-  | "Reproductive Rights"
+  | "Abortion & Reproductive Health"
   | "Immigration"
-  | "Guns & Safety"
+  | "Firearms & Second Amendment"
   | "Foreign Policy"
-  | "Social Justice"
+  | "Civil Rights & Equality"
   | "Education"
   | "Tech & AI"
-  | "Election Reform"
+  | "Election Policy"
   | "Local Issues";
+
+/**
+ * All valid issue keys — includes current canonical names plus legacy names from
+ * pre-rename published data. Used for the Candidate.issues record type.
+ */
+export type IssueKey = CanonicalIssue | "Reproductive Rights" | "Guns & Safety" | "Social Justice" | "Election Reform";
 
 export interface Source {
   url: string;
@@ -40,7 +46,7 @@ export interface Source {
 }
 
 export interface IssueStance {
-  issue?: CanonicalIssue;
+  issue?: IssueKey;
   stance: string;
   confidence: ConfidenceLevel;
   sources: Source[];
@@ -99,7 +105,7 @@ export interface Candidate {
   summary: string;
   summary_sources: Source[];
   image_url?: string;
-  issues: Record<CanonicalIssue, IssueStance>;
+  issues: Partial<Record<IssueKey, IssueStance>>;
   career_history: CareerEntry[];
   education: EducationEntry[];
   voting_summary?: string;
@@ -145,22 +151,56 @@ export interface Race {
   validation_grade?: ValidationGrade;
   post_run_analysis?: { model: string; analyzed_at: string; analysis: string };
   agent_metrics?: AgentMetrics;
+  ballotpedia_url?: string;
+  register_to_vote_url?: string;
+  how_to_vote_url?: string;
 }
 
 export const CANONICAL_ISSUES: CanonicalIssue[] = [
   "Healthcare",
   "Economy",
   "Climate/Energy",
-  "Reproductive Rights",
+  "Abortion & Reproductive Health",
   "Immigration",
-  "Guns & Safety",
+  "Firearms & Second Amendment",
   "Foreign Policy",
-  "Social Justice",
+  "Civil Rights & Equality",
   "Education",
   "Tech & AI",
-  "Election Reform",
+  "Election Policy",
   "Local Issues",
 ];
+
+/**
+ * Maps legacy (biased) issue names to their current neutral display names.
+ * Old published JSON data uses the legacy keys; the frontend resolves them here.
+ */
+export const LEGACY_ISSUE_NAMES: Partial<Record<string, CanonicalIssue>> = {
+  "Reproductive Rights": "Abortion & Reproductive Health",
+  "Guns & Safety": "Firearms & Second Amendment",
+  "Social Justice": "Civil Rights & Equality",
+  "Election Reform": "Election Policy",
+};
+
+/**
+ * Tooltip note shown next to renamed issues so users understand why the name
+ * changed and that existing data was researched under the old terminology.
+ */
+export const RENAMED_ISSUE_NOTES: Partial<Record<string, string>> = {
+  "Reproductive Rights":
+    'Data was researched using the term "Reproductive Rights" which has been renamed to "Abortion & Reproductive Health" in an effort to reduce bias. We are working to update all of our data as quickly as possible!',
+  "Guns & Safety":
+    'Data was researched using the term "Guns & Safety" which has been renamed to "Firearms & Second Amendment" in an effort to reduce bias. We are working to update all of our data as quickly as possible!',
+  "Social Justice":
+    'Data was researched using the term "Social Justice" which has been renamed to "Civil Rights & Equality" in an effort to reduce bias. We are working to update all of our data as quickly as possible!',
+  "Election Reform":
+    'Data was researched using the term "Election Reform" which has been renamed to "Election Policy" in an effort to reduce bias. We are working to update all of our data as quickly as possible!',
+};
+
+/** Returns the current neutral display name for an issue (resolves legacy names). */
+export function getIssueDisplayName(issue: string): string {
+  return (LEGACY_ISSUE_NAMES[issue] as string) ?? issue;
+}
 
 export interface CandidateSummary {
   name: string;

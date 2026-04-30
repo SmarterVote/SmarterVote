@@ -208,10 +208,15 @@ Search for:
 2. Recent polls (last 90 days). Include pollster, date, sample_size, matchups, source_url.
    If no real public polls exist, set polling_note via update_race_field to explain
    (e.g. "No public polling found for this race as of <date>.") and leave polling empty.
+3. Voter resources — use update_race_field to set:
+   - ballotpedia_url: the Ballotpedia election page URL (if not already set)
+   - register_to_vote_url: an official state voter registration page (e.g. sos.state.gov/register)
+   - how_to_vote_url: an official state "how to vote" or elections info page
 
-Use your editing tools (update_race_field for description or polling_note, add_poll for each poll)
+Use your editing tools (update_race_field for description, polling_note, ballotpedia_url,
+register_to_vote_url, or how_to_vote_url; add_poll for each poll)
 to record any improvements directly. When done, reply with a short confirmation
-of what you updated (e.g. "Updated description, added 2 new polls.")."""
+of what you updated (e.g. "Updated description, added 2 new polls, set voter resource links.")."""
 
 # ------------------------------------------------------------------
 # Update prompts — phase-based (mirrors fresh run)
@@ -250,7 +255,8 @@ WHEN TO MAKE NO CHANGES:
 - Do not rephrase existing summaries without a substantive new reason.
 
 When you do find improvements, use your editing tools to record them:
-- update_race_field for description
+- update_race_field for description, and voter resource links (ballotpedia_url,
+  register_to_vote_url, how_to_vote_url) if they are not already set or need correction
 - add_poll for each new poll (after {last_updated} only)
 - set_candidate_summary for updated summaries (new events only)
 - set_donor_summary if new funding milestone or FEC filing is available
@@ -353,7 +359,17 @@ Check for:
 1. Internal consistency – are stated positions consistent with the cited sources
    within the profile itself? (Do not use your own training data to contradict
    a sourced claim — see the epistemological rule in your system prompt.)
-2. Bias – is the language neutral and nonpartisan?
+2. Bias – is the language neutral and nonpartisan? Specific patterns to flag:
+   - Value-laden adjectives applied to one side (e.g. "radical", "extreme", "far-right",
+     "far-left", "woke", "anti-choice", "anti-gun").
+   - Asymmetric framing — describing the same type of behavior more favorably for one
+     candidate than another (e.g. "proposes" vs. "demands", "emphasizes" vs. "insists").
+   - Loaded terminology that carries a partisan connotation (e.g. "pro-abortion" vs.
+     "pro-choice", "illegal immigrant" vs. "undocumented immigrant" — flag if a
+     candidate's stance is summarized using their opponent's preferred framing).
+   - Implying a factual conclusion from a contested premise without attribution
+     (e.g. "voted to weaken environmental protections" rather than "voted against
+     the Clean Energy Act, which supporters say would have strengthened protections").
 3. Completeness – are there missing issues, weak sources, or gaps?
 4. Source quality – are sources credible and current?
 5. Candidate background – is career history and education internally consistent
@@ -442,7 +458,7 @@ Search for campaign finance data using at least 3 of these strategies:
 
 Write a 2-3 sentence donor_summary including:
   - Which industries or sectors dominate (e.g., "real estate", "financial services",
-    "trial lawyers", "tech industry") — be specific, not generic.
+    "plaintiffs' attorneys / legal industry", "tech industry") — be specific, not generic.
   - The approximate total raised and/or the largest disclosed amounts in dollars
     where available (e.g., "$2.1M raised" or "top PAC contribution of $250K").
   - Example good summary: "Raised approximately $3.2M, primarily from real-estate

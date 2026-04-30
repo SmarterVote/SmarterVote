@@ -24,7 +24,10 @@ def _make_editing_handlers(
     ``extra_tool_handlers`` parameter of ``_agent_loop``.
     """
     _ALLOWED_CANDIDATE_FIELDS = {"party", "incumbent", "website", "image_url"}
-    _ALLOWED_RACE_FIELDS = {"description", "office", "election_date", "polling_note"}
+    _ALLOWED_RACE_FIELDS = {
+        "description", "office", "election_date", "polling_note",
+        "ballotpedia_url", "register_to_vote_url", "how_to_vote_url",
+    }
 
     def _find_candidate(name: str) -> Optional[Dict[str, Any]]:
         for c in race_json.get("candidates", []):
