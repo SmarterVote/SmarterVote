@@ -513,6 +513,36 @@ ADD_POLL_TOOL: Dict = {
     },
 }
 
+REMOVE_POLL_TOOL: Dict = {
+    "type": "function",
+    "function": {
+        "name": "remove_poll",
+        "description": (
+            "Remove a poll from the race's polling data. Use this to delete duplicate polls, "
+            "polls with null/missing result data, or polls that are redundant. "
+            "Identify the poll by pollster name (required) and optionally by date."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pollster": {
+                    "type": "string",
+                    "description": "Name of the polling organization whose entry should be removed.",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Optional poll date (YYYY-MM-DD). If provided, only the poll with this exact pollster+date is removed. If omitted, all polls by this pollster are removed.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Brief reason for removal (e.g. 'duplicate', 'null result data', 'superseded by newer poll').",
+                },
+            },
+            "required": ["pollster", "reason"],
+        },
+    },
+}
+
 UPDATE_RACE_FIELD_TOOL: Dict = {
     "type": "function",
     "function": {
@@ -530,7 +560,7 @@ UPDATE_RACE_FIELD_TOOL: Dict = {
     },
 }
 
-RACE_TOOLS: List[Dict] = [ADD_POLL_TOOL, UPDATE_RACE_FIELD_TOOL]
+RACE_TOOLS: List[Dict] = [ADD_POLL_TOOL, REMOVE_POLL_TOOL, UPDATE_RACE_FIELD_TOOL]
 
 # ---------------------------------------------------------------------------
 # Read-only verification tool

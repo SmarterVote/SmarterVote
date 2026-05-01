@@ -50,7 +50,7 @@ def test_editing_tool_schemas_exist():
     assert len(CANDIDATE_TOOLS) == 2
     assert len(ISSUE_TOOLS) == 1
     assert len(RECORD_TOOLS) == 3  # donor_summary, voting_summary, add_link
-    assert len(RACE_TOOLS) == 2
+    assert len(RACE_TOOLS) == 3
     assert READ_PROFILE_TOOL["function"]["name"] == "read_profile"
 
 
@@ -78,6 +78,7 @@ def test_make_editing_handlers():
         "set_voting_summary",
         "add_candidate_link",
         "add_poll",
+        "remove_poll",
         "update_race_field",
         "read_profile",
         "add_education_entry",
@@ -159,6 +160,66 @@ def test_read_profile_handler():
 
     issues = handlers["read_profile"]({"section": "issues"})
     assert "Healthcare" in issues
+
+
+def test_remove_poll_handler():
+    """remove_poll handler deletes polls by pollster+date or pollster alone."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {
+        "candidates": [],
+        "polling": [
+            {"pollster": "SurveyUSA", "date": "2026-03-01", "matchups": [], "source_url": "https://a.com"},
+            {"pollster": "SurveyUSA", "date": "2026-03-01", "matchups": [], "source_url": "https://b.com"},
+            {"pollster": "Emerson", "date": "2026-02-01", "matchups": [], "source_url": "https://c.com"},
+        ],
+    }
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    # Remove by pollster+date removes both duplicates
+    result = handlers["remove_poll"]({"pollster": "SurveyUSA", "date": "2026-03-01", "reason": "duplicate"})
+    assert "2" in result or "Removed" in result
+    assert all(p["pollster"] != "SurveyUSA" for p in race_json["polling"])
+    assert len(race_json["polling"]) == 1
+
+    # Remove by pollster only
+    handlers["remove_poll"]({"pollster": "Emerson", "reason": "null data"})
+    assert race_json["polling"] == []
+
+
+def test_remove_candidate_deletes_malformed_entries():
+    """remove_candidate physically deletes entries whose name looks like a metadata key."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {
+        "candidates": [
+            {"name": "Alice Smith", "issues": {}},
+            {"name": "updated_utc", "issues": {}},
+        ],
+        "polling": [],
+    }
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    result = handlers["remove_candidate"]({"name": "updated_utc", "reason": "metadata key, not a real candidate"})
+    assert "Deleted" in result or "deleted" in result.lower()
+    names = [c["name"] for c in race_json["candidates"]]
+    assert "updated_utc" not in names
+    assert "Alice Smith" in names
+
+
+def test_remove_candidate_does_not_delete_real_names():
+    """remove_candidate marks real candidate names as withdrawn, not deleted."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {
+        "candidates": [{"name": "Bob Jones", "issues": {}}],
+        "polling": [],
+    }
+    handlers = _make_editing_handlers(race_json, lambda l, m: None)
+
+    handlers["remove_candidate"]({"name": "Bob Jones", "reason": "withdrew from race"})
+    assert len(race_json["candidates"]) == 1
+    assert race_json["candidates"][0].get("withdrawn") is True
 
 
 # ---------------------------------------------------------------------------

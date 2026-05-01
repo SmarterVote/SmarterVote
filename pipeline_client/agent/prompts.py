@@ -110,7 +110,7 @@ Return JSON:
     {{
       "name": "<full name>",
       "party": "<party affiliation>",
-      "incumbent": true|false,
+      "incumbent": true|false,  // true ONLY if this person currently holds the EXACT office being contested in this race (e.g. the sitting US Senator running for re-election). A state senator running for US Senate is NOT an incumbent for this race. A former officeholder is NOT an incumbent.
       "summary": "<2-3 sentence nonpartisan summary — plain prose only, no 'Sources:' appended>",
       "summary_sources": [
         {{"url": "<url>", "type": "government|news|website", "title": "<page title>", "last_accessed": "<ISO timestamp>"}}
@@ -143,6 +143,7 @@ Return JSON:
       "issues": {{}}
     }}
   ],
+  "ballotpedia_url": "<Ballotpedia ELECTION page URL — e.g. https://ballotpedia.org/United_States_Senate_election_in_Michigan,_2026 — NOT a candidate biography page>",
   "updated_utc": "<ISO timestamp>",
   "generator": ["pipeline-agent"]
 }}"""
@@ -209,7 +210,11 @@ Search for:
    If no real public polls exist, set polling_note via update_race_field to explain
    (e.g. "No public polling found for this race as of <date>.") and leave polling empty.
 3. Voter resources — use update_race_field to set:
-   - ballotpedia_url: the Ballotpedia election page URL (if not already set)
+   - ballotpedia_url: the Ballotpedia ELECTION page URL, e.g.
+     https://ballotpedia.org/United_States_Senate_election_in_Michigan,_2026
+     This MUST be the race/election page — NOT a candidate biography page. Candidate
+     bio pages (e.g. https://ballotpedia.org/Elissa_Slotkin) are NOT valid here.
+     If the current value is a candidate page, correct it with update_race_field.
    - register_to_vote_url: an official state voter registration page (e.g. sos.state.gov/register)
    - how_to_vote_url: an official state "how to vote" or elections info page
 
@@ -603,9 +608,20 @@ SPECIAL CASES (see system prompt for full rules):
   Use remove_candidate only if the person is clearly NOT in this race with a
   specific source-backed reason. Use rename_candidate for naming corrections.
   Do NOT remove a candidate solely due to sparse issue data.
+- INCUMBENT flag errors: a candidate is only `incumbent: true` if they currently
+  hold the EXACT office being contested (e.g. sitting US Senator for a US Senate
+  race). A state legislator, state senator, or former officeholder running for a
+  different or higher office is NOT an incumbent for this race. If flagged,
+  correct via set_candidate_field.
+- SOURCE URL ACCESSIBILITY flags: if a source URL is reported as broken or
+  inaccessible, use fetch_page to verify. If it returns an error, find a
+  replacement source with web_search and update the stance with the new URL.
 
 Also ensure:
 - All canonical issues covered: {all_issues}
+  For each issue a candidate is missing, search for their public position and
+  add a stance with set_issue_stance (use "no public position found" only after
+  genuinely searching their campaign site and recent news).
 - donor_summary is a plain-text paragraph (not a list of names)
 
 Use your editing tools to record every fix directly. When you have addressed all
@@ -621,11 +637,38 @@ Current polling: {polling_json}
 Review flags to address:
 {review_flags}
 
-Search and fix any flagged issues with the description or polling.
+Search and fix any flagged issues with the description or polling, PLUS perform
+these data-hygiene checks unconditionally:
 
-Use your editing tools (update_race_field for description, add_poll for new polls)
-to record any fixes directly. When done, reply with a short plain-text confirmation
-of what you changed (e.g. "Fixed race description bias, added corrected poll.")."""
+DATA-HYGIENE CHECKLIST (always run, regardless of flags):
+1. MALFORMED CANDIDATE ENTRIES: Use read_profile(section="candidates") and scan
+   for any entry whose "name" looks like a metadata field (e.g. "updated_utc",
+   "id", "generator") rather than a real person's name. Delete such entries
+   immediately with remove_candidate.
+2. DUPLICATE POLLS: Scan the polling list above for entries with the same
+   pollster + date. Remove all but the most complete copy with remove_poll.
+3. NULL / EMPTY POLL DATA: Remove any poll entry where matchups is null, empty,
+   or all percentage values are null/zero, using remove_poll.
+4. REDUNDANT NULL MATCHUPS: Remove poll entries that have no meaningful result
+   data (e.g. percentages field entirely absent or all null) with remove_poll.
+5. BALLOTPEDIA_URL VALIDATION: Use read_profile(section="meta") to check the
+   current ballotpedia_url. If it is pointing to a candidate biography page
+   (e.g. https://ballotpedia.org/Candidate_Name) rather than an election page
+   (e.g. https://ballotpedia.org/United_States_Senate_election_in_Michigan,_2026),
+   use web_search to find the correct election page URL and fix it with
+   update_race_field(field="ballotpedia_url", value="<correct election URL>").
+   Election page URLs typically contain "election_in_" or "primary_election_in_".
+6. INCUMBENT FLAGS: Use read_profile(section="candidates") and check every
+   candidate's "incumbent" field. A candidate is incumbent ONLY if they currently
+   hold the EXACT office being contested (e.g. sitting US Senator in a US Senate
+   race). State senators, state legislators, former officeholders, or challengers
+   must have incumbent=false. Fix any incorrect values with
+   set_candidate_field(candidate_name="...", field="incumbent", value=false).
+
+Use your editing tools (update_race_field for description, add_poll / remove_poll
+for polling) to record any fixes directly. When done, reply with a short
+plain-text confirmation of what you changed (e.g. "Removed 2 duplicate polls,
+deleted malformed candidate entry, fixed race description bias.")."""
 
 
 # ------------------------------------------------------------------

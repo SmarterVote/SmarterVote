@@ -7,8 +7,12 @@ LLM receives as the tool result.
 """
 
 import json
+import re
 from difflib import get_close_matches
 from typing import Any, Callable, Dict, Optional
+
+# Pattern matching metadata field names (snake_case, no spaces) — clearly not human names
+_METADATA_KEY_RE = re.compile(r'^[a-z][a-z0-9_]+$')
 
 from pipeline_client.agent.prompts import CANONICAL_ISSUES
 
@@ -85,7 +89,12 @@ def _make_editing_handlers(
         }
         has_data_fix_signal = any(kw in reason_lower for kw in _DATA_FIX_KEYWORDS)
 
-        if has_data_fix_signal and not has_withdrawal_signal:
+        # Special case: structurally invalid entries (e.g. a metadata key like
+        # "updated_utc" accidentally stored as a candidate name) should be
+        # physically deleted rather than marked withdrawn.
+        is_structural_garbage = bool(_METADATA_KEY_RE.match(name))
+
+        if has_data_fix_signal and not has_withdrawal_signal and not is_structural_garbage:
             log(
                 "warning",
                 f"    ⚠️ remove_candidate('{name}') BLOCKED — reason does not confirm "
@@ -100,6 +109,17 @@ def _make_editing_handlers(
             )
 
         candidates = race_json.get("candidates", [])
+
+        if is_structural_garbage:
+            # Physically delete malformed/non-human entries from the list
+            orig_len = len(candidates)
+            race_json["candidates"] = [c for c in candidates if c.get("name") != name]
+            removed = orig_len - len(race_json["candidates"])
+            if removed:
+                log("info", f"    🗑️ Deleted malformed candidate entry '{name}' ({removed} removed)")
+                return f"Deleted malformed entry '{name}' from candidates list."
+            return f"Entry '{name}' not found — no action taken."
+
         for c in candidates:
             if c.get("name") == name:
                 c["withdrawn"] = True
@@ -344,6 +364,30 @@ def _make_editing_handlers(
         log("info", f"    📊 Added poll: {args['pollster']} ({args['date']})")
         return f"Added poll from {args['pollster']} ({args['date']})."
 
+    def remove_poll(args: Dict[str, Any]) -> str:
+        pollster = args["pollster"]
+        date = args.get("date")
+        reason = args.get("reason", "")
+        polling = race_json.get("polling", [])
+        orig_len = len(polling)
+        if date:
+            race_json["polling"] = [
+                p for p in polling
+                if not (p.get("pollster") == pollster and p.get("date") == date)
+            ]
+            removed = orig_len - len(race_json["polling"])
+            if removed:
+                log("info", f"    🗑️ Removed poll: {pollster} ({date}) — {reason}")
+                return f"Removed {removed} poll(s) from {pollster} ({date})."
+            return f"No poll found matching {pollster} / {date} — no action taken."
+        else:
+            race_json["polling"] = [p for p in polling if p.get("pollster") != pollster]
+            removed = orig_len - len(race_json["polling"])
+            if removed:
+                log("info", f"    🗑️ Removed {removed} poll(s) by '{pollster}' — {reason}")
+                return f"Removed {removed} poll(s) from {pollster}."
+            return f"No polls found for pollster '{pollster}' — no action taken."
+
     def update_race_field(args: Dict[str, Any]) -> str:
         field, value = args["field"], args["value"]
         if field not in _ALLOWED_RACE_FIELDS:
@@ -395,6 +439,7 @@ def _make_editing_handlers(
         "set_voting_summary": set_voting_summary,
         "add_candidate_link": add_candidate_link,
         "add_poll": add_poll,
+        "remove_poll": remove_poll,
         "update_race_field": update_race_field,
         "read_profile": read_profile,
         "add_career_entry": add_career_entry,
