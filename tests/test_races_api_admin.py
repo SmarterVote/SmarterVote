@@ -20,6 +20,9 @@ RACES_API_DIR = pathlib.Path(__file__).parent.parent / "services" / "races-api"
 if str(RACES_API_DIR) not in sys.path:
     sys.path.insert(0, str(RACES_API_DIR))
 
+# Pre-import helper modules so patches target the correct module objects.
+import firestore_helpers  # noqa: E402
+import gcs_helpers  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -32,17 +35,17 @@ def client(monkeypatch):
     monkeypatch.setenv("SKIP_AUTH", "true")
     monkeypatch.setenv("ADMIN_API_KEY", "test-key")
 
-    # Patch firebase/gcs lazily at import boundary
+    # Patch cloud helpers at their actual module locations (routers import them there).
     with (
-        patch("main._get_fs", side_effect=_make_mock_fs),
-        patch("main._get_gcs_admin", return_value=None),
-        patch("main._GCS_BUCKET", ""),
+        patch("firestore_helpers._get_fs", side_effect=_make_mock_fs),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
     ):
         import main as app_module
         from fastapi.testclient import TestClient
 
-        # Reset the Firestore singleton so each test gets a fresh mock
-        app_module._fs_db = None
+        # Reset the Firestore singleton so each test gets a fresh mock.
+        firestore_helpers._fs_db = None
         yield TestClient(app_module.app)
 
 
@@ -174,16 +177,16 @@ def test_queue_race_success():
     if "main" in sys.modules:
         import main as app_module
 
-        app_module._fs_db = None  # reset singleton
+        firestore_helpers._fs_db = None  # reset singleton
     else:
         import main as app_module
 
     from fastapi.testclient import TestClient
 
     with (
-        patch("main._get_fs", return_value=db),
-        patch("main._get_gcs_admin", return_value=None),
-        patch("main._GCS_BUCKET", ""),
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
     ):
         tc = TestClient(app_module.app)
         resp = tc.post(
@@ -212,14 +215,14 @@ def test_queue_race_invalid_id():
 
     import main as app_module
 
-    app_module._fs_db = None
+    firestore_helpers._fs_db = None
 
     from fastapi.testclient import TestClient
 
     with (
-        patch("main._get_fs", return_value=db),
-        patch("main._get_gcs_admin", return_value=None),
-        patch("main._GCS_BUCKET", ""),
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
     ):
         tc = TestClient(app_module.app)
         resp = tc.post(
@@ -276,14 +279,14 @@ def test_get_run_logs_since():
 
     import main as app_module
 
-    app_module._fs_db = None
+    firestore_helpers._fs_db = None
 
     from fastapi.testclient import TestClient
 
     with (
-        patch("main._get_fs", return_value=db),
-        patch("main._get_gcs_admin", return_value=None),
-        patch("main._GCS_BUCKET", ""),
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
     ):
         tc = TestClient(app_module.app)
         resp = tc.get("/runs/run-abc/logs?since=2")
@@ -303,16 +306,13 @@ def test_get_run_logs_since():
 def test_verify_token_skip_auth():
     """With SKIP_AUTH=true, verify_token returns {} without hitting Auth0."""
     os.environ["SKIP_AUTH"] = "true"
-    import importlib
-
-    import main as app_module
-
-    # Reload to pick up env changes if module was already imported
-    importlib.reload(app_module)
 
     import asyncio
 
-    result = asyncio.get_event_loop().run_until_complete(app_module.verify_token(None))
+    import auth
+
+    # verify_token reads SKIP_AUTH at call time — no module reload required.
+    result = asyncio.get_event_loop().run_until_complete(auth.verify_token(None))
     assert result == {}
 
 
@@ -327,17 +327,12 @@ def test_verify_token_missing_credentials():
     os.environ["AUTH0_DOMAIN"] = "example.auth0.com"
     os.environ["AUTH0_AUDIENCE"] = "https://api.example.com"
 
-    import importlib
-
-    import main as app_module
-
-    importlib.reload(app_module)
-
     import asyncio
 
+    import auth
     from fastapi import HTTPException
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.get_event_loop().run_until_complete(app_module.verify_token(None))
+        asyncio.get_event_loop().run_until_complete(auth.verify_token(None))
 
     assert exc_info.value.status_code == 401

@@ -207,7 +207,7 @@ export const pipelineActions = {
   ) => {
     pipelineStore.update((state) => {
       if (!state.selectedRun) return state;
-      const updatedSteps = state.selectedRun.steps.map((s) =>
+      const updatedSteps = (state.selectedRun.steps ?? []).map((s) =>
         s.name === stepName ? { ...s, status, ...extras } : s
       );
       const updatedSelectedRun = {

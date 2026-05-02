@@ -7,7 +7,7 @@ import {
   API_TIMEOUT_DEFAULT,
   API_TIMEOUT_ARTIFACT,
 } from "$lib/config/constants";
-import type { RunInfo, Artifact, RunOptions, RunHistoryItem, RaceRecord } from "$lib/types";
+import type { RunInfo, RunOptions, RunHistoryItem, RaceRecord } from "$lib/types";
 
 export interface AdminChatMessage {
   role: "user" | "assistant";
@@ -48,10 +48,6 @@ export interface AdminChatResponse {
 
 interface RunsResponse {
   runs: RunInfo[];
-}
-
-interface ArtifactsResponse {
-  items: Artifact[];
 }
 
 export interface PublishedRaceSummary {
@@ -118,17 +114,9 @@ export class PipelineApiService {
   constructor(private apiBase: string) {}
 
   /**
-   * Load artifacts
-   */
-  async loadArtifacts(): Promise<Artifact[]> {
-    const res = await fetchWithAuth(`${this.apiBase}/artifacts`, {}, API_TIMEOUT_DEFAULT);
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const data: ArtifactsResponse = await res.json();
-    return data.items || [];
-  }
-
-  /**
-   * Load run history
+   * Load run history from Firestore (via /runs endpoint).
+   * Firestore run docs have: run_id, race_id, status, progress, current_step,
+   * started_at, completed_at, duration_ms, error, options — but NOT steps[] or logs[].
    */
   async loadRunHistory(): Promise<RunHistoryItem[]> {
     const res = await fetchWithAuth(`${this.apiBase}/runs`, {}, API_TIMEOUT_SHORT);
@@ -136,19 +124,18 @@ export class PipelineApiService {
     const data: RunsResponse = await res.json();
     const runs = data.runs || [];
 
-    return runs.map((r: RunInfo, idx: number) => {
-      // Find the currently running step, or the last completed step
-      const runningStep = r.steps?.find((s) => s.status === "running");
-      const completedSteps = r.steps?.filter((s) => s.status === "completed") ?? [];
-      const lastStep = runningStep?.name ?? completedSteps.at(-1)?.name ?? (r as any).step;
-      return {
-        ...(r as any),
-        run_id: (r as any).run_id || (r as any).id || (r as any)._id,
-        display_id: runs.length - idx,
-        updated_at: (r as any).completed_at || (r as any).started_at,
-        last_step: lastStep,
-      } as RunHistoryItem;
-    });
+    return runs.map((r: RunInfo, idx: number) => ({
+      ...(r as any),
+      run_id: (r as any).run_id || (r as any).id,
+      display_id: runs.length - idx,
+      updated_at: (r as any).completed_at || (r as any).started_at,
+      // Firestore runs expose current_step instead of a steps array.
+      last_step: (r as any).current_step ?? undefined,
+      // Fields not present in Firestore run docs — supply safe defaults.
+      steps: [],
+      payload: { race_id: (r as any).race_id },
+      artifact_id: undefined,
+    } as RunHistoryItem));
   }
 
   /**
@@ -176,13 +163,17 @@ export class PipelineApiService {
   }
 
   /**
-   * Get artifact data
+   * Load run logs from Firestore subcollection via /runs/{runId}/logs.
+   * Pass `since` to only fetch entries after that index (incremental polling).
    */
-  async getArtifact(artifactId: string): Promise<any> {
+  async getRunLogs(
+    runId: string,
+    since = 0
+  ): Promise<{ logs: import("$lib/types").LogEntry[]; total: number }> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/artifact/${artifactId}`,
+      `${this.apiBase}/runs/${encodeURIComponent(runId)}/logs?since=${since}`,
       {},
-      API_TIMEOUT_ARTIFACT
+      API_TIMEOUT_SHORT
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
@@ -196,27 +187,6 @@ export class PipelineApiService {
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     const data: PublishedRacesResponse = await res.json();
     return data.races || [];
-  }
-
-  /**
-   * Run the agent pipeline for a race
-   */
-  async runAgent(
-    raceId: string,
-    options: RunOptions = {}
-  ): Promise<{ run_id: string; status: string; step: string }> {
-    const res = await fetchWithAuth(`${this.apiBase}/api/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ race_id: raceId, options }),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error");
-      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
-    }
-
-    return await res.json();
   }
 
   /**

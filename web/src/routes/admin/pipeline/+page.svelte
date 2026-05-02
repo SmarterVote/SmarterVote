@@ -462,18 +462,10 @@
 
   async function handleArtifactClick(event: { detail: Artifact }) {
     const artifact = event.detail;
-    modalLoading = true;
+    modalLoading = false;
     showModal = true;
     modalTitle = "Artifact Details";
-    modalData = null;
-
-    try {
-      const artifactId = artifact.id || (artifact as any).artifact_id || (artifact as any)._id;
-      modalData = artifactId ? await apiService.getArtifact(artifactId) : artifact;
-    } catch (e) {
-      modalData = { error: String(e), ...artifact };
-    }
-    modalLoading = false;
+    modalData = artifact as unknown as Record<string, unknown>;
   }
 
   function closeModal() {
@@ -584,6 +576,7 @@
     {#if showingDetail && detailRunId}
       <RunDetailPanel
         runId={detailRunId}
+        {apiService}
         isLive={pipeline.isExecuting && pipeline.currentRunId === detailRunId}
         liveLogs={logs}
         liveProgress={pipeline.progress}
@@ -626,6 +619,7 @@
     {#if showingDetail && detailRunId}
       <RunDetailPanel
         runId={detailRunId}
+        {apiService}
         isLive={pipeline.isExecuting && pipeline.currentRunId === detailRunId}
         liveLogs={logs}
         liveProgress={pipeline.progress}

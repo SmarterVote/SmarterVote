@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import {
     ArcElement,
@@ -24,7 +24,7 @@
   export let recentRuns: { run_id: string; status: string; payload?: Record<string, unknown>; started_at?: string }[] = [];
   export let apiService: PipelineApiService | undefined = undefined;
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
+  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
   const GCP_PROJECT = import.meta.env.VITE_GCP_PROJECT || "";
 
   let overview: AnalyticsOverview | null = null;
@@ -232,7 +232,7 @@
   }
 
   function formatDate(s?: string) {
-    if (!s) return "—";
+    if (!s) return "â€”";
     return new Date(s).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
   }
 
@@ -307,7 +307,7 @@
           d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         />
       </svg>
-      <span>Loading dashboard…</span>
+      <span>Loading dashboardâ€¦</span>
     </div>
   </div>
 {:else}
@@ -344,7 +344,7 @@
           {discoveryOnlyRaces.length} race{discoveryOnlyRaces.length !== 1 ? "s" : ""} in discovery-only state
         </span>
         <span class="text-xs text-violet-700 dark:text-violet-300 truncate hidden sm:block">
-          — candidates found but issues, research &amp; finance not yet populated
+          â€” candidates found but issues, research &amp; finance not yet populated
         </span>
       </div>
       <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -414,7 +414,7 @@
       {#if error}
         <p class="text-xs text-red-500">{error}</p>
       {:else if unacknowledgedAlerts.length === 0}
-        <p class="text-sm text-content-faint py-4 text-center">No active alerts ✓</p>
+        <p class="text-sm text-content-faint py-4 text-center">No active alerts âœ“</p>
       {:else}
         <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
           {#each unacknowledgedAlerts as alert (alert.id)}
@@ -451,7 +451,7 @@
 
       {#if gcpLogsUrl}
         <a href={gcpLogsUrl} target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center text-xs text-blue-600 hover:underline">
-          View logs in GCP Console →
+          View logs in GCP Console â†’
         </a>
       {/if}
     </div>
@@ -464,7 +464,7 @@
       {:else}
         <div class="space-y-1 max-h-64 overflow-y-auto">
           {#each recentRuns.slice(0, 10) as run (run.run_id)}
-            {@const race_id = run.payload?.race_id ?? "—"}
+            {@const race_id = run.payload?.race_id ?? "â€”"}
             <div class="flex items-center justify-between text-xs py-1 border-b border-stroke last:border-0">
               <span class="font-mono text-content-muted truncate max-w-40">{race_id}</span>
               <div class="flex items-center space-x-2 shrink-0">
@@ -492,7 +492,7 @@
       <!-- Total runs + success rate -->
       <div class="card p-4">
         <p class="text-xs font-medium text-content-subtle uppercase tracking-wide">Total Runs</p>
-        <p class="mt-1 text-2xl font-bold text-content">{pipelineSummary?.total_runs ?? "—"}</p>
+        <p class="mt-1 text-2xl font-bold text-content">{pipelineSummary?.total_runs ?? "â€”"}</p>
         {#if pipelineSummary && pipelineSummary.total_runs > 0}
           <p class="mt-1 text-xs text-content-faint">
             <span class="{(pipelineSummary.success_rate ?? 0) >= 0.9 ? 'text-green-600' : (pipelineSummary.success_rate ?? 0) >= 0.7 ? 'text-yellow-600' : 'text-red-500'}">
@@ -506,7 +506,7 @@
       <div class="card p-4">
         <p class="text-xs font-medium text-content-subtle uppercase tracking-wide">Total Spend</p>
         <p class="mt-1 text-2xl font-bold text-content">
-          {pipelineSummary ? formatUsd(pipelineSummary.total_usd) : "—"}
+          {pipelineSummary ? formatUsd(pipelineSummary.total_usd) : "â€”"}
         </p>
         {#if pipelineSummary}
           <p class="mt-1 text-xs text-content-faint">{formatUsd(pipelineSummary.recent_30d_usd)} last 30d</p>
@@ -532,7 +532,7 @@
             {/if}
           </div>
         {:else}
-          <p class="mt-1 text-2xl font-bold text-content">{pipelineSummary ? formatUsd(pipelineSummary.avg_usd) : "—"}</p>
+          <p class="mt-1 text-2xl font-bold text-content">{pipelineSummary ? formatUsd(pipelineSummary.avg_usd) : "â€”"}</p>
         {/if}
       </div>
 
@@ -542,7 +542,7 @@
         <p class="mt-1 text-2xl font-bold text-content">
           {pipelineSummary && pipelineSummary.avg_usd_per_candidate > 0
             ? formatUsd(pipelineSummary.avg_usd_per_candidate)
-            : "—"}
+            : "â€”"}
         </p>
         {#if pipelineSummary && pipelineSummary.avg_usd_per_candidate > 0}
           <p class="mt-1 text-xs text-content-faint">across runs with tracked candidates</p>
@@ -573,7 +573,7 @@
             <span class="text-xs text-content-faint">Models:</span>
             {#each topModels as [model, count]}
               <span class="text-xs px-1.5 py-0.5 rounded bg-surface-alt text-content-muted font-mono">
-                {model} ×{count}
+                {model} Ã—{count}
               </span>
             {/each}
           </div>
@@ -624,22 +624,22 @@
                     {:else if rec.cheap_mode === false}
                       <span class="px-1.5 py-0.5 rounded text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">full</span>
                     {:else}
-                      <span class="text-content-faint">—</span>
+                      <span class="text-content-faint">â€”</span>
                     {/if}
                   </td>
                   <td class="px-3 py-2 text-content-muted max-w-36">
-                    <span class="truncate block font-mono text-xs" title={rec.model}>{shortModel(rec.model) || "—"}</span>
+                    <span class="truncate block font-mono text-xs" title={rec.model}>{shortModel(rec.model) || "â€”"}</span>
                     {#if rec.model_breakdown && Object.keys(rec.model_breakdown).length > 1}
                       <span class="text-content-faint text-xs">+{Object.keys(rec.model_breakdown).length - 1} model{Object.keys(rec.model_breakdown).length > 2 ? "s" : ""}</span>
                     {/if}
                   </td>
-                  <td class="px-3 py-2 text-right text-content-muted">{rec.candidate_count || "—"}</td>
+                  <td class="px-3 py-2 text-right text-content-muted">{rec.candidate_count || "â€”"}</td>
                   <td class="px-3 py-2 text-right text-content-muted">{formatTokens(rec.total_tokens)}</td>
                   <td class="px-3 py-2 text-right font-medium text-content">{formatUsd(rec.estimated_usd)}</td>
                   <td class="px-3 py-2 text-right text-content-muted">
-                    {perCand != null ? formatUsd(perCand) : "—"}
+                    {perCand != null ? formatUsd(perCand) : "â€”"}
                   </td>
-                  <td class="px-3 py-2 text-right text-content-muted">{rec.duration_s ? `${rec.duration_s}s` : "—"}</td>
+                  <td class="px-3 py-2 text-right text-content-muted">{rec.duration_s ? `${rec.duration_s}s` : "â€”"}</td>
                   <td class="px-3 py-2 text-content-faint">{formatDate(rec.timestamp)}</td>
                 </tr>
               {/each}

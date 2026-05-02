@@ -285,15 +285,16 @@ export interface RunStep {
 
 export interface RunInfo {
   run_id: string;
+  race_id?: string;
   status: RunStatus;
-  payload: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   options: RunOptions;
   started_at: string;
   completed_at?: string;
   duration_ms?: number;
   artifact_id?: string;
   error?: string;
-  steps: RunStep[];
+  steps?: RunStep[];
   logs?: LogEntry[];
 }
 

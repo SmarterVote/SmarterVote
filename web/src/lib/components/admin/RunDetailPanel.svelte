@@ -1,5 +1,5 @@
-<script lang="ts">
-  import { onMount, onDestroy, createEventDispatcher, tick } from "svelte";
+﻿<script lang="ts">
+  import { onMount, createEventDispatcher, tick } from "svelte";
   import { PipelineApiService } from "$lib/services/pipelineApiService";
   import { formatDuration, getStatusClass, safeJsonStringify, downloadAsJson } from "$lib/utils/pipelineUtils";
   import type { RunInfo, RunStep, LogEntry, PipelineStepId } from "$lib/types";
@@ -11,20 +11,25 @@
   export let liveProgress = 0;
   export let liveProgressMessage = "";
   export let liveElapsed = 0;
+  /** Pass the page-level service to avoid a duplicate instance with wrong URL. */
+  export let apiService: PipelineApiService | undefined = undefined;
 
   const dispatch = createEventDispatcher<{ back: void; deleted: string; cancelled: string }>();
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
-  const apiService = new PipelineApiService(API_BASE);
+  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
+  // Use injected service if provided, otherwise create a local one.
+  const _api = apiService ?? new PipelineApiService(API_BASE);
 
   let run: RunInfo | null = null;
   let loading = true;
   let error = "";
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
   let showRawJson = false;
   type SectionId = "steps" | "logs" | "output" | "analysis";
   let activeSection: SectionId = "steps";
-  let artifactData: any = null;
-  let artifactLoading = false;
+  // Logs fetched from /runs/{runId}/logs after a run completes.
+  let fetchedLogs: LogEntry[] = [];
+  // Race JSON loaded from drafts or published after a run completes (dynamic shape, typed as any).
+  let raceJsonData: any = null;
+  let raceJsonLoading = false;
   type LogLevel = "all" | "info" | "warning" | "error";
   const LOG_LEVELS: LogLevel[] = ["all", "info", "warning", "error"];
   let logFilter: LogLevel = "all";
@@ -37,64 +42,72 @@
   /** Canonical step order for sorting */
   const STEP_ORDER = PIPELINE_STEPS.map((s) => s.id);
 
-  $: raceId = (run?.payload?.race_id as string) ?? runId;
+  $: raceId = (run?.race_id as string) ?? runId;
   // A run is only "live" if the backend actually reports it as running/pending.
   // Never show the live spinner for a run the server has already completed.
   $: isRunning = run?.status === "running" || run?.status === "pending";
   $: isLiveAndRunning = isLive && isRunning;
-  // Use live logs while the run is active; once done fall back to stored logs
-  // then to agent_logs embedded in the artifact (GCS blobs strip logs).
-  $: artifactAgentLogs = (() => {
-    const logs = artifactData?.output?.agent_logs;
-    if (!Array.isArray(logs)) return [];
-    return logs.map((l: any) => ({
-      level: (l.level ?? "info").toLowerCase(),
-      message: l.message ?? String(l),
-      timestamp: l.timestamp ?? "",
-    })) as LogEntry[];
+  // Derive step timeline from log entries (Firestore run docs don’t include steps[]).
+  $: derivedSteps = (() => {
+    const logSource = isLiveAndRunning ? liveLogs : fetchedLogs;
+    const stepMap = new Map<string, Partial<RunStep> & { name: PipelineStepId; status: string }>();
+    for (const log of logSource) {
+      const stepId = (log as any).step as PipelineStepId | undefined;
+      if (!stepId) continue;
+      const entry = stepMap.get(stepId) ?? { name: stepId, status: "pending" };
+      const msg = (log as any).message ?? "";
+      if (msg.startsWith("Step started:")) {
+        entry.status = "running";
+        entry.started_at = (log as any).timestamp;
+      } else if (msg.startsWith("Step completed")) {
+        entry.status = "completed";
+        if (!entry.started_at) entry.started_at = (log as any).timestamp;
+        entry.completed_at = (log as any).timestamp;
+        const m = msg.match(/Step completed in (\d+)ms:/);
+        if (m) entry.duration_ms = parseInt(m[1], 10);
+      } else if (msg.startsWith("Step skipped:")) {
+        entry.status = "skipped";
+      }
+      if (log.level === "error") entry.status = "failed";
+      stepMap.set(stepId, entry);
+    }
+    const cs = (run as any)?.current_step as PipelineStepId | undefined;
+    if (cs) {
+      const ex = stepMap.get(cs);
+      if (!ex || !["completed", "failed", "skipped"].includes(ex.status)) {
+        const s = ex ?? { name: cs, status: "running" };
+        s.status = "running";
+        stepMap.set(cs, s);
+      }
+    }
+    return PIPELINE_STEPS
+      .map(s => stepMap.get(s.id as PipelineStepId))
+      .filter((s): s is Partial<RunStep> & { name: PipelineStepId; status: string } => !!s);
   })();
-  // Extract the RaceJSON from the artifact regardless of wrapping structure
-  $: artifactRaceJson = (() => {
-    if (!artifactData || typeof artifactData !== "object") return null;
-    const d = artifactData as any;
-    // Wrapped: { step, input, options, output: { race_json: RaceJSON } }
-    if (d.output?.race_json && Array.isArray(d.output.race_json.candidates)) return d.output.race_json;
-    // Direct RaceJSON at top level
-    if (Array.isArray(d.candidates)) return d;
-    return null;
-  })();
-  // Extract agent metrics from wherever they live in the artifact
-  $: artifactMetrics = (() => {
-    if (!artifactData || typeof artifactData !== "object") return null;
-    const d = artifactData as any;
-    return d.output?.agent_metrics ?? d.output?.race_json?.agent_metrics ?? d.agent_metrics ?? null;
-  })();
-  $: runLogs = isLiveAndRunning ? liveLogs : ((run?.logs ?? []).length > 0 ? (run?.logs ?? []) : artifactAgentLogs);
+  // Logs: use live stream when running, fetched logs after completion.
+  $: runLogs = isLiveAndRunning ? liveLogs : fetchedLogs;
   $: filteredLogs = logFilter === "all" ? runLogs : runLogs.filter((l) => l.level === logFilter);
-  // Post-run analysis: broadcast as a single log entry starting with "[post-run analysis]"
   $: analysisContent = (() => {
-    const all = [...liveLogs, ...(run?.logs ?? []), ...artifactAgentLogs];
+    const all = [...liveLogs, ...fetchedLogs];
     const found = all.find((l) => l.message?.startsWith("[post-run analysis]"));
     return found ? found.message.replace(/^\[post-run analysis\]\n?/, "").trim() : null;
   })();
-  $: steps = run?.steps ?? [];
-  // Filter to only pipeline sub-steps (exclude the top-level "agent" step), sorted by canonical order
-  $: pipelineSteps = steps
-    .filter((s) => s.name !== "agent")
+  $: pipelineSteps = derivedSteps
     .sort((a, b) => {
-      const ai = STEP_ORDER.indexOf(a.name as PipelineStepId);
-      const bi = STEP_ORDER.indexOf(b.name as PipelineStepId);
+      const ai = STEP_ORDER.indexOf(a.name);
+      const bi = STEP_ORDER.indexOf(b.name);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     });
   $: hasPipelineSteps = pipelineSteps.length > 0;
+  $: raceHasCandidates = !!(raceJsonData && Array.isArray(raceJsonData.candidates));
   $: sections = [
     { id: "steps" as SectionId, label: `Steps (${pipelineSteps.length})` },
     { id: "logs" as SectionId, label: `Logs (${runLogs.length})` },
     { id: "output" as SectionId, label: "Output" },
-    ...(analysisContent ? [{ id: "analysis" as SectionId, label: "✦ Analysis" }] : []),
+    ...(analysisContent ? [{ id: "analysis" as SectionId, label: "âœ¦ Analysis" }] : []),
   ];
-  $: progress = isLiveAndRunning ? Math.max(liveProgress, computeProgress(pipelineSteps)) : computeProgress(pipelineSteps);
-  $: progressMsg = isLiveAndRunning && liveProgressMessage ? liveProgressMessage : lastStepMessage(pipelineSteps);
+  $: progress = isLiveAndRunning ? Math.max(liveProgress, computeProgress(pipelineSteps as RunStep[])) : computeProgress(pipelineSteps as RunStep[]);
+  $: progressMsg = isLiveAndRunning && liveProgressMessage ? liveProgressMessage : lastStepMessage(pipelineSteps as RunStep[]);
   $: elapsed = isLiveAndRunning ? liveElapsed : (run?.duration_ms ? Math.floor(run.duration_ms / 1000) : 0);
 
   // Scroll the logs container to the bottom (called via tick to avoid Svelte reactive loop).
@@ -137,11 +150,11 @@
 
   function stepIcon(status: string): string {
     switch (status) {
-      case "completed": return "✓";
-      case "running": return "●";
-      case "failed": return "✗";
-      case "skipped": return "⊘";
-      default: return "○";
+      case "completed": return "âœ“";
+      case "running": return "â—";
+      case "failed": return "âœ—";
+      case "skipped": return "âŠ˜";
+      default: return "â—‹";
     }
   }
 
@@ -168,7 +181,7 @@
   }
 
   function formatTimestamp(iso?: string): string {
-    if (!iso) return "—";
+    if (!iso) return "â€”";
     return new Date(iso).toLocaleString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
     });
@@ -217,7 +230,7 @@
   async function loadRun() {
     try {
       error = "";
-      run = await apiService.getRunDetails(runId);
+      run = await _api.getRunDetails(runId);
     } catch (e) {
       error = String(e);
     } finally {
@@ -225,16 +238,31 @@
     }
   }
 
-  async function loadArtifact() {
-    if (!run?.artifact_id) return;
-    artifactLoading = true;
+  /** After a run completes, fetch its log entries and draft race data. */
+  async function loadCompletedRunData() {
+    await loadRun();
     try {
-      artifactData = await apiService.getArtifact(run.artifact_id);
+      const data = await _api.getRunLogs(runId);
+      fetchedLogs = data.logs ?? [];
     } catch (e) {
-      artifactData = { error: String(e) };
-    } finally {
-      artifactLoading = false;
+      console.warn("Failed to load run logs:", e);
     }
+    const rid = (run?.race_id as string) ?? runId;
+    if (rid) loadRaceData(rid);
+  }
+
+  async function loadRaceData(rid: string) {
+    raceJsonLoading = true;
+    try {
+      raceJsonData = await _api.getDraftRace(rid);
+    } catch {
+      try {
+        raceJsonData = await _api.getPublishedRace(rid);
+      } catch {
+        // No race data available yet.
+      }
+    }
+    raceJsonLoading = false;
   }
 
   async function copyRunId() {
@@ -250,7 +278,7 @@
     if (!confirm(`Cancel run for ${raceId}? The run will be marked as cancelled.`)) return;
     cancelling = true;
     try {
-      await apiService.cancelRace(raceId);
+      await _api.cancelRace(raceId);
       dispatch("cancelled", runId);
       dispatch("back");
     } catch (e) {
@@ -263,12 +291,12 @@
   async function handleDelete() {
     if (!run) return;
     const confirmMsg = isRunning
-      ? `Force-delete running run ${runId.substring(0, 8)}… for ${raceId}? This will cancel and remove it immediately.`
-      : `Delete run ${runId.substring(0, 8)}… for ${raceId}? This cannot be undone.`;
+      ? `Force-delete running run ${runId.substring(0, 8)}â€¦ for ${raceId}? This will cancel and remove it immediately.`
+      : `Delete run ${runId.substring(0, 8)}â€¦ for ${raceId}? This cannot be undone.`;
     if (!confirm(confirmMsg)) return;
     deleting = true;
     try {
-      await apiService.deleteRaceRun(raceId, runId);
+      await _api.deleteRaceRun(raceId, runId);
       dispatch("deleted", runId);
       dispatch("back");
     } catch (e) {
@@ -284,26 +312,22 @@
     autoScrollLogs = scrollHeight - scrollTop - clientHeight < 40;
   }
 
+  // When the run transitions from live+running → complete, fetch logs and race data.
+  let _prevIsLiveAndRunning = false;
+  $: {
+    if (_prevIsLiveAndRunning && !isLiveAndRunning && run) {
+      loadCompletedRunData();
+    }
+    _prevIsLiveAndRunning = isLiveAndRunning;
+  }
+
   onMount(async () => {
     await loadRun();
-    if (isRunning) {
-      pollTimer = setInterval(loadRun, 3000);
-    } else if (run?.artifact_id) {
-      // Auto-load artifact for completed runs so logs are available immediately
-      loadArtifact();
+    // If the run was already complete when we opened the panel, load its data now.
+    if (!isLiveAndRunning) {
+      loadCompletedRunData();
     }
   });
-
-  onDestroy(() => {
-    if (pollTimer) clearInterval(pollTimer);
-  });
-
-  // If the run finishes, stop polling and load artifact
-  $: if (run && !isRunning && pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-    if (run.artifact_id && !artifactData) loadArtifact();
-  }
 </script>
 
 <div class="space-y-4">
@@ -339,7 +363,7 @@
       </div>
       <div class="flex items-center gap-4 mt-0.5 text-xs text-content-subtle">
         <button type="button" class="font-mono hover:text-content-muted transition-colors" on:click={copyRunId} title="Copy run ID">
-          {copiedRunId ? '✓ Copied' : `Run ${runId.substring(0, 8)}`}
+          {copiedRunId ? 'âœ“ Copied' : `Run ${runId.substring(0, 8)}`}
         </button>
         {#if run}
           <span>Started {formatTimestamp(run.started_at)}</span>
@@ -376,7 +400,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
             </svg>
           {/if}
-          {cancelling ? "Cancelling…" : "Cancel Run"}
+          {cancelling ? "Cancellingâ€¦" : "Cancel Run"}
         </button>
       {/if}
       {#if run}
@@ -424,7 +448,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
       </svg>
-      <span class="text-sm text-content-subtle">Loading run details…</span>
+      <span class="text-sm text-content-subtle">Loading run detailsâ€¦</span>
     </div>
   {:else if error}
     <div class="card p-4 text-sm text-red-600">{error}</div>
@@ -432,7 +456,7 @@
     <!-- Progress bar -->
     <div class="card p-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm text-content-muted font-medium">{progressMsg || "Waiting…"}</span>
+        <span class="text-sm text-content-muted font-medium">{progressMsg || "Waitingâ€¦"}</span>
         <div class="flex items-center gap-3 text-sm text-content-subtle">
           <span>{formatDuration(elapsed)}</span>
           <span class="font-semibold">{progress}%</span>
@@ -493,7 +517,7 @@
                     <div class="flex items-center gap-3 mt-0.5 text-[10px] text-content-faint">
                       <span>Started {formatTimestamp(step.started_at)}</span>
                       {#if step.completed_at}
-                        <span>→ {formatTimestamp(step.completed_at)}</span>
+                        <span>â†’ {formatTimestamp(step.completed_at)}</span>
                       {/if}
                     </div>
                   {/if}
@@ -507,7 +531,7 @@
                   {#if step.duration_ms}
                     <span class="text-xs text-content-subtle">{formatDuration(Math.round(step.duration_ms / 1000))}</span>
                   {:else if step.status === "running"}
-                    <span class="text-xs text-blue-500 animate-pulse">running…</span>
+                    <span class="text-xs text-blue-500 animate-pulse">runningâ€¦</span>
                   {:else if isSkipped}
                     <span class="text-xs text-content-faint">skipped</span>
                   {/if}
@@ -518,7 +542,7 @@
         {:else}
           <div class="text-center text-content-faint py-8 text-sm">
             {#if isRunning}
-              Waiting for step data…
+              Waiting for step dataâ€¦
             {:else}
               No step data available for this run
             {/if}
@@ -545,7 +569,7 @@
             class="px-2 py-0.5 rounded text-xs font-medium transition-colors {autoScrollLogs ? 'text-blue-600 dark:text-blue-400' : 'text-content-faint hover:text-content-subtle'}"
             on:click={() => { autoScrollLogs = !autoScrollLogs; if (autoScrollLogs && logsContainer) logsContainer.scrollTop = logsContainer.scrollHeight; }}
             title="{autoScrollLogs ? 'Auto-scroll on' : 'Auto-scroll off'}"
-          >↓ Auto</button>
+          >â†“ Auto</button>
         </div>
         <div
           bind:this={logsContainer}
@@ -569,29 +593,22 @@
     {#if activeSection === "output"}
       <div class="card p-4">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-content-muted">
-            {#if run.artifact_id}
-              Artifact: <span class="font-mono text-content-subtle">{run.artifact_id}</span>
-            {:else}
-              Run Output
-            {/if}
-          </h3>
+          <h3 class="text-sm font-semibold text-content-muted">Race Output</h3>
           <div class="flex items-center gap-2">
-            {#if run.artifact_id && !artifactData}
-              <button
-                type="button"
-                class="px-3 py-1 text-xs border border-stroke rounded-lg hover:bg-surface-alt disabled:opacity-40"
-                disabled={artifactLoading}
-                on:click={loadArtifact}
-              >
-                {artifactLoading ? "Loading…" : "Load Artifact"}
-              </button>
-            {/if}
-            {#if artifactData}
+            {#if !raceJsonData && !raceJsonLoading}
               <button
                 type="button"
                 class="px-3 py-1 text-xs border border-stroke rounded-lg hover:bg-surface-alt"
-                on:click={() => downloadAsJson(artifactData, `${raceId}-${runId.substring(0, 8)}.json`)}
+                on:click={() => loadRaceData(raceId)}
+              >
+                Load Output
+              </button>
+            {/if}
+            {#if raceJsonData}
+              <button
+                type="button"
+                class="px-3 py-1 text-xs border border-stroke rounded-lg hover:bg-surface-alt"
+                on:click={() => downloadAsJson(raceJsonData, `${raceId}-output.json`)}
               >
                 Download JSON
               </button>
@@ -606,13 +623,13 @@
           </div>
         </div>
 
-        {#if artifactLoading}
+        {#if raceJsonLoading}
           <div class="py-6 text-center text-sm text-content-faint">Loading output…</div>
-        {:else if artifactData}
+        {:else if raceJsonData}
           {#if showRawJson}
-            <pre class="bg-surface-alt rounded-lg p-3 text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap break-words text-content">{safeJsonStringify(artifactData).content}</pre>
-          {:else if artifactRaceJson}
-            {@const rj = artifactRaceJson}
+            <pre class="bg-surface-alt rounded-lg p-3 text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap break-words text-content">{safeJsonStringify(raceJsonData).content}</pre>
+          {:else if raceHasCandidates}
+            {@const rj = raceJsonData}
             <div class="space-y-4">
               <!-- Race header card -->
               <div class="rounded-xl border border-stroke p-4 bg-gradient-to-br from-surface to-surface-alt">
@@ -621,8 +638,8 @@
                     <h3 class="text-base font-bold text-content">{rj.title ?? rj.id}</h3>
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs text-content-subtle">
                       {#if rj.office}<span class="font-medium">{rj.office}</span>{/if}
-                      {#if rj.jurisdiction}<span class="text-content-faint">·</span><span>{rj.jurisdiction}</span>{/if}
-                      {#if rj.election_date}<span class="text-content-faint">·</span><span>Election: {rj.election_date}</span>{/if}
+                      {#if rj.jurisdiction}<span class="text-content-faint">Â·</span><span>{rj.jurisdiction}</span>{/if}
+                      {#if rj.election_date}<span class="text-content-faint">Â·</span><span>Election: {rj.election_date}</span>{/if}
                     </div>
                     {#if rj.description}
                       <p class="mt-2 text-xs text-content-muted leading-relaxed">{rj.description}</p>
@@ -648,34 +665,35 @@
               </div>
 
               <!-- Agent metrics -->
-              {#if artifactMetrics}
+              {#if rj.agent_metrics}
+                {@const am = rj.agent_metrics}
                 <div class="rounded-xl border border-stroke p-4">
                   <h4 class="text-[10px] font-semibold uppercase tracking-wider text-content-faint mb-3">Agent Metrics</h4>
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Est. Cost</p>
-                      <p class="text-xl font-bold text-content">{artifactMetrics.estimated_usd != null ? (artifactMetrics.estimated_usd < 0.001 ? '<$0.001' : `$${artifactMetrics.estimated_usd.toFixed(3)}`) : '—'}</p>
+                      <p class="text-xl font-bold text-content">{am.estimated_usd != null ? (am.estimated_usd < 0.001 ? '<$0.001' : `$${am.estimated_usd.toFixed(3)}`) : 'â€”'}</p>
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Tokens</p>
-                      <p class="text-xl font-bold text-content">{(artifactMetrics.total_tokens ?? 0).toLocaleString()}</p>
+                      <p class="text-xl font-bold text-content">{(am.total_tokens ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Duration</p>
-                      <p class="text-xl font-bold text-content">{artifactMetrics.duration_s != null ? `${Math.round(artifactMetrics.duration_s)}s` : '—'}</p>
+                      <p class="text-xl font-bold text-content">{am.duration_s != null ? `${Math.round(am.duration_s)}s` : 'â€”'}</p>
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Model</p>
-                      <p class="text-sm font-semibold text-content truncate">{artifactMetrics.model ?? '—'}</p>
+                      <p class="text-sm font-semibold text-content truncate">{am.model ?? 'â€”'}</p>
                     </div>
                   </div>
-                  {#if artifactMetrics.model_breakdown && Object.keys(artifactMetrics.model_breakdown).length > 0}
+                  {#if am.model_breakdown && Object.keys(am.model_breakdown).length > 0}
                     <div class="border-t border-stroke pt-3">
                       <p class="text-[10px] text-content-faint uppercase tracking-wide mb-2">Token Usage by Model</p>
                       <div class="space-y-1.5">
-                        {#each Object.entries(artifactMetrics.model_breakdown) as [model, counts]}
+                        {#each Object.entries(am.model_breakdown) as [model, counts]}
                           {@const tok = breakdownTokens(counts)}
-                          {@const pct = breakdownPct(artifactMetrics.model_breakdown, counts)}
+                          {@const pct = breakdownPct(am.model_breakdown, counts)}
                           <div class="flex items-center gap-2 text-xs">
                             <span class="font-mono text-content-subtle w-44 truncate shrink-0">{model}</span>
                             <div class="flex-1 h-1.5 bg-surface-alt rounded-full overflow-hidden">
@@ -765,7 +783,7 @@
                               <p class="text-[10px] text-content-faint uppercase tracking-wide mb-1">Finance</p>
                               <p class="text-xs text-content-muted leading-relaxed line-clamp-2">{candidate.donor_summary}</p>
                               {#if candidate.donor_source_url}
-                                <a href={candidate.donor_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source →</a>
+                                <a href={candidate.donor_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source â†’</a>
                               {/if}
                             </div>
                           {/if}
@@ -774,7 +792,7 @@
                               <p class="text-[10px] text-content-faint uppercase tracking-wide mb-1">Voting Record</p>
                               <p class="text-xs text-content-muted leading-relaxed line-clamp-2">{candidate.voting_summary}</p>
                               {#if candidate.voting_source_url}
-                                <a href={candidate.voting_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source →</a>
+                                <a href={candidate.voting_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source â†’</a>
                               {/if}
                             </div>
                           {/if}
@@ -851,7 +869,7 @@
                           <div class="mt-2 space-y-1 border-t border-stroke pt-2">
                             {#each review.flags as flag}
                               <div class="text-xs flex items-start gap-1.5">
-                                <span class="shrink-0 mt-0.5 {flag.severity === 'error' ? 'text-red-500' : flag.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'}">●</span>
+                                <span class="shrink-0 mt-0.5 {flag.severity === 'error' ? 'text-red-500' : flag.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'}">â—</span>
                                 <span class="text-content-muted"><span class="font-medium">{flag.field}:</span> {flag.concern}</span>
                               </div>
                             {/each}
@@ -878,8 +896,8 @@
               {/if}
             </div>
           {:else}
-            <!-- Generic fallback for non-RaceJSON artifacts -->
-            <pre class="bg-surface-alt rounded-lg p-3 text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap break-words text-content">{safeJsonStringify(artifactData).content}</pre>
+            <!-- Generic fallback: raw JSON view -->
+            <pre class="bg-surface-alt rounded-lg p-3 text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap break-words text-content">{safeJsonStringify(raceJsonData).content}</pre>
           {/if}
         {:else if isLiveAndRunning}
           <div class="flex items-center gap-2 p-6 text-content-faint justify-center">
@@ -887,12 +905,10 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <span class="text-sm">Output available when run completes…</span>
+            <span class="text-sm">Output available when run completesâ€¦</span>
           </div>
         {:else}
-          <p class="text-sm text-content-faint py-4 text-center">
-            {run.artifact_id ? "Click \"Load Artifact\" to view output" : "No output recorded for this run"}
-          </p>
+          <p class="text-sm text-content-faint py-4 text-center">No race data available for this run</p>
         {/if}
       </div>
     {/if}
