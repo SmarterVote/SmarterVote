@@ -1,37 +1,53 @@
 import json
+import pathlib
+import sys
 from datetime import datetime, timezone
+from unittest.mock import MagicMock
 
-from pipeline_client.backend import main as main_module
 from pipeline_client.backend.models import RunInfo, RunStatus
 from pipeline_client.backend.race_manager import RaceManager
 
+# Add races-api to path so we can test gcs_helpers directly.
+_RACES_API_DIR = pathlib.Path(__file__).parent.parent / "services" / "races-api"
+if str(_RACES_API_DIR) not in sys.path:
+    sys.path.insert(0, str(_RACES_API_DIR))
 
-def test_load_race_json_prefers_gcs_on_cloud(monkeypatch, tmp_path):
-    local_dir = tmp_path / "published"
-    local_dir.mkdir(parents=True)
-    (local_dir / "ga-senate-2026.json").write_text(json.dumps({"id": "local"}), encoding="utf-8")
+import gcs_helpers  # noqa: E402
 
-    monkeypatch.setattr(main_module.settings, "gcs_bucket", "bucket")
-    monkeypatch.setattr(main_module, "_prefer_cloud_storage", lambda: True)
-    monkeypatch.setattr(main_module, "_get_race_gcs", lambda race_id, prefix: {"id": f"{prefix}:{race_id}:gcs"})
 
-    data = main_module._load_race_json("ga-senate-2026", gcs_prefix="races", local_dir=local_dir)
+def test_gcs_get_race_json_returns_blob_when_bucket_configured(monkeypatch):
+    """When GCS bucket is set and blob exists, _gcs_get_race_json returns the parsed JSON."""
+    mock_blob = MagicMock()
+    mock_blob.exists.return_value = True
+    mock_blob.download_as_text.return_value = json.dumps({"id": "races:ga-senate-2026:gcs"})
+
+    mock_bucket = MagicMock()
+    mock_bucket.blob.return_value = mock_blob
+
+    mock_client = MagicMock()
+    mock_client.bucket.return_value = mock_bucket
+
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "test-bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: mock_client)
+
+    data = gcs_helpers._gcs_get_race_json("ga-senate-2026", "races")
 
     assert data == {"id": "races:ga-senate-2026:gcs"}
+    mock_client.bucket.assert_called_once_with("test-bucket")
+    mock_bucket.blob.assert_called_once_with("races/ga-senate-2026.json")
 
 
-def test_load_race_json_prefers_local_off_cloud(monkeypatch, tmp_path):
-    local_dir = tmp_path / "drafts"
-    local_dir.mkdir(parents=True)
-    (local_dir / "ga-senate-2026.json").write_text(json.dumps({"id": "local"}), encoding="utf-8")
+def test_gcs_get_race_json_returns_none_when_no_bucket(monkeypatch):
+    """When GCS bucket is not configured, _gcs_get_race_json returns None without calling GCS."""
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "")
+    # Ensure _get_gcs_admin is never called
+    called = []
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: called.append(1) or None)
 
-    monkeypatch.setattr(main_module.settings, "gcs_bucket", None)
-    monkeypatch.setattr(main_module, "_prefer_cloud_storage", lambda: False)
-    monkeypatch.setattr(main_module, "_get_race_gcs", lambda race_id, prefix: {"id": f"{prefix}:{race_id}:gcs"})
+    data = gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts")
 
-    data = main_module._load_race_json("ga-senate-2026", gcs_prefix="drafts", local_dir=local_dir)
-
-    assert data == {"id": "local"}
+    assert data is None
+    assert called == [], "_get_gcs_admin should not be called when bucket is empty"
 
 
 def test_race_manager_get_run_prefers_firestore_over_local_cache():
