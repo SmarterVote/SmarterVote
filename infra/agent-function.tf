@@ -56,6 +56,14 @@ resource "google_project_iam_member" "agent_function_run_invoker" {
   member  = "serviceAccount:${google_service_account.agent_function.email}"
 }
 
+# Cloud Functions service agent needs read access to the source object bucket
+# to copy the uploaded zip into the internal gcf-v2-sources bucket.
+resource "google_storage_bucket_iam_member" "gcf_admin_source_reader" {
+  bucket = google_storage_bucket.sv_data.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:service-${data.google_project.project.number}@gcf-admin-robot.iam.gserviceaccount.com"
+}
+
 # Cloud Function v2 (backed by Cloud Run gen2)
 resource "google_cloudfunctions2_function" "agent" {
   name     = "agent-${var.environment}"
@@ -82,7 +90,7 @@ resource "google_cloudfunctions2_function" "agent" {
     # Allow parallel CF invocations so multiple races can be processed simultaneously
     max_instance_request_concurrency = 1
 
-    timeout_seconds  = 3600 # 60 minutes (maximum for gen2)
+    timeout_seconds  = 540 # Event-triggered Cloud Functions max timeout
     available_memory = "2Gi"
     available_cpu    = "2"
 
@@ -93,7 +101,7 @@ resource "google_cloudfunctions2_function" "agent" {
       FIRESTORE_PROJECT      = var.project_id
       GCS_BUCKET             = google_storage_bucket.sv_data.name
       ENVIRONMENT            = var.environment
-      AGENT_DEADLINE_SECONDS = "3300"
+      AGENT_DEADLINE_SECONDS = "480"
     }
 
     secret_environment_variables {
@@ -162,6 +170,7 @@ resource "google_cloudfunctions2_function" "agent" {
     google_project_service.apis,
     google_project_iam_member.agent_function_eventarc,
     google_project_iam_member.agent_function_run_invoker,
+    google_storage_bucket_iam_member.gcf_admin_source_reader,
   ]
 }
 
