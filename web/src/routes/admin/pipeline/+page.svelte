@@ -33,7 +33,7 @@
   import { logger } from "$lib/utils/logger";
   import type { RunHistoryItem, Artifact, RaceRecord } from "$lib/types";
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
+  const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
 
   let apiService: PipelineApiService;
   let racesTabRef: RacesTab;
@@ -227,8 +227,10 @@
           pipelineActions.setRunStatus("running");
           startAutoRefresh();
           startElapsedTimer();
+          if (nowRunning?.run_id) websocketActions.watchRun(nowRunning.run_id);
         } else if (nowRunning?.run_id && pipeline.currentRunId !== nowRunning.run_id) {
           pipelineActions.setCurrentRun(nowRunning.run_id, "agent");
+          websocketActions.watchRun(nowRunning.run_id);
         }
       } else {
         if (pipeline.isExecuting) {
@@ -306,6 +308,7 @@
         pipelineActions.setExecutionState(true);
         pipelineActions.setRunStatus("running");
         pipelineActions.updateRunProgress(0, "Initializing...");
+        websocketActions.watchRun(data.run_id);
         startAutoRefresh();
         startElapsedTimer();
         break;

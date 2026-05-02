@@ -9,9 +9,28 @@ import logging
 import os
 import re
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Optional, Set
+
+
+class HandoffTriggered(Exception):
+    """Raised when the agent hands off to a continuation Cloud Function invocation.
+
+    Caught by the CF entry point (functions/agent/main.py); treated as a clean
+    exit rather than a failure so the queue item is marked 'continued', not
+    'failed'.
+    """
+
+    def __init__(self, continuation_item_id: str, remaining_steps: List[str]):
+        self.continuation_item_id = continuation_item_id
+        self.remaining_steps = remaining_steps
+        super().__init__(f"Handoff to continuation item {continuation_item_id}")
+
+
+# Default deadline: 55 minutes (gives 5-min buffer before CF's 60-min hard limit)
+DEFAULT_DEADLINE_SECONDS: int = 3300
 
 
 def _compute_overall_progress(
@@ -91,6 +110,15 @@ class AgentHandler:
         else:
             existing_data = await self._load_existing_from_gcs(race_id)
 
+        # Deadline for Cloud Function handoff.  Callers (CF entry point) can
+        # inject a tighter deadline via options; default is 55 min from now.
+        deadline_at: float = options.get(
+            "deadline_at", time.time() + DEFAULT_DEADLINE_SECONDS
+        )
+
+        # Firestore logger (fire-and-forget; no-ops locally when Firestore is absent)
+        from pipeline_client.backend.firestore_logger import FirestoreLogger
+
         # Get run context for broadcasting
         run_id: str | None = None
         _safe_broadcast: Any = None
@@ -120,6 +148,13 @@ class AgentHandler:
                 except Exception as _e:
                     logger.debug("Failed to initialise step '%s': %s", step_name, _e)
 
+        # Initialise Firestore logger once we have (or might have) a run_id.
+        # We create it speculatively here; it no-ops gracefully if run_id is None.
+        _fs_logger: Any = None  # set after run_id is resolved below
+
+        # Compute completed steps so far (used for remaining_steps on handoff)
+        _completed_steps: List[str] = []
+
         # --- Step tracker callbacks ---
         def _on_step_start(step: str, **_kw):
             if not run_id or not _run_manager:
@@ -127,21 +162,53 @@ class AgentHandler:
             try:
                 _run_manager.update_step_status(run_id, step, RunStatus.RUNNING)
                 label = STEP_LABELS.get(step, step)
-                weight = STEP_WEIGHTS.get(step, 0)
-                # Compute cumulative progress: sum of completed step weights + 0% of current
                 pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
+                if _fs_logger:
+                    _fs_logger.update_progress(pct, current_step=step)
+                    _fs_logger.log("info", f"Step started: {label}", step=step, race_id=race_id)
             except Exception as _e:
                 logger.debug("_on_step_start tracking failed for '%s': %s", step, _e)
 
         def _on_step_complete(step: str, *, duration_ms: int = 0, **_kw):
+            nonlocal _completed_steps
             if not run_id or not _run_manager:
                 return
             try:
                 _run_manager.update_step_status(run_id, step, RunStatus.COMPLETED, duration_ms=duration_ms)
+                _completed_steps.append(step)
                 pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
                 label = STEP_LABELS.get(step, step) + " ✓"
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
+
+                # --- Checkpoint / handoff check ---
+                # Must happen AFTER the step is marked complete so the saved
+                # race_json is the latest version.
+                if time.time() > deadline_at:
+                    _remaining = [
+                        s for s in enabled_steps
+                        if s not in _completed_steps
+                    ]
+                    if _remaining:
+                        logger.warning(
+                            "Deadline exceeded after step '%s'; handing off to continuation. "
+                            "Remaining steps: %s",
+                            step,
+                            _remaining,
+                        )
+                        _trigger_handoff(run_id, race_id, _remaining, pct)
+
+                if _fs_logger:
+                    remaining = [s for s in enabled_steps if s not in _completed_steps]
+                    _fs_logger.update_progress(pct, current_step=step, remaining_steps=remaining)
+                    _fs_logger.log(
+                        "info",
+                        f"Step completed in {duration_ms}ms: {label}",
+                        step=step,
+                        race_id=race_id,
+                    )
+            except HandoffTriggered:
+                raise
             except Exception as _e:
                 logger.debug("_on_step_complete tracking failed for '%s': %s", step, _e)
 
@@ -150,6 +217,8 @@ class AgentHandler:
                 return
             try:
                 _run_manager.update_step_status(run_id, step, RunStatus.SKIPPED)
+                if _fs_logger:
+                    _fs_logger.log("info", f"Step skipped: {step}", step=step, race_id=race_id)
             except Exception as _e:
                 logger.debug("_on_step_skip tracking failed for '%s': %s", step, _e)
 
@@ -167,6 +236,8 @@ class AgentHandler:
                 overall = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set, step, pct)
                 label = message or STEP_LABELS.get(step, step)
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": overall, "message": label})
+                if _fs_logger:
+                    _fs_logger.update_progress(overall, current_step=step)
             except Exception as _e:
                 logger.debug("_on_step_progress tracking failed for '%s': %s", step, _e)
 
@@ -176,6 +247,73 @@ class AgentHandler:
             "skip": _on_step_skip,
             "progress": _on_step_progress,
         }
+
+        # Initialise FirestoreLogger now that run_id is resolved
+        if run_id:
+            _fs_logger = FirestoreLogger(run_id)
+        else:
+            _fs_logger = None
+
+        def _trigger_handoff(current_run_id: str, current_race_id: str, remaining: List[str], current_pct: int) -> None:
+            """Save checkpoint to GCS, write continuation queue item, raise HandoffTriggered."""
+            from pipeline_client.backend.firestore_logger import FirestoreLogger as _FL
+            from pipeline_client.backend.settings import settings
+
+            item_id = uuid.uuid4().hex[:8]
+            checkpoint_gcs_path: Optional[str] = None
+
+            # Try to save the latest race_json to GCS as a checkpoint
+            # (race_json is captured from the enclosing scope at handoff time)
+            try:
+                gcs_bucket = settings.gcs_bucket
+                if gcs_bucket and race_json_holder:
+                    from pipeline_client.backend.main import _get_gcs_client
+                    client = _get_gcs_client()
+                    if client:
+                        path = f"checkpoints/{current_run_id}.json"
+                        client.bucket(gcs_bucket).blob(path).upload_from_string(
+                            json.dumps(race_json_holder[0], default=str),
+                            content_type="application/json",
+                        )
+                        checkpoint_gcs_path = f"gs://{gcs_bucket}/{path}"
+                        logger.info("Checkpoint saved to %s", checkpoint_gcs_path)
+            except Exception as _e:
+                logger.warning("Failed to save checkpoint to GCS: %s", _e)
+
+            # Write continuation queue item to Firestore
+            try:
+                from pipeline_client.backend.firestore_logger import _get_db
+                db = _get_db()
+                if db:
+                    continuation_options = dict(options)
+                    continuation_options["enabled_steps"] = remaining
+                    continuation_options["is_continuation"] = True
+                    continuation_options["parent_run_id"] = current_run_id
+                    if checkpoint_gcs_path:
+                        continuation_options["existing_data_gcs_path"] = checkpoint_gcs_path
+                    db.collection("pipeline_queue").document(item_id).set({
+                        "id": item_id,
+                        "race_id": current_race_id,
+                        "status": "pending",
+                        "options": continuation_options,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "is_continuation": True,
+                        "parent_run_id": current_run_id,
+                    })
+                    logger.info("Continuation queue item %s written for steps: %s", item_id, remaining)
+            except Exception as _e:
+                logger.warning("Failed to write continuation queue item: %s", _e)
+
+            # Mark current run as continued in Firestore
+            if _fs_logger:
+                _fs_logger.mark_continued(item_id)
+
+            raise HandoffTriggered(item_id, remaining)
+
+        # Mutable holder so _trigger_handoff can read the latest race_json
+        # (which is only known after run_agent returns, but we need the ref
+        # before we define on_log below)
+        race_json_holder: List[Optional[Dict[str, Any]]] = [None]
 
         # --- Log collector ---
         agent_logs: list[Dict[str, Any]] = []
@@ -192,6 +330,9 @@ class AgentHandler:
                     _run_manager.add_run_log(run_id, log_entry)
                 except Exception as _e:
                     logger.debug("Failed to persist run log entry: %s", _e)
+            # Also write to Firestore so frontend can use onSnapshot
+            if _fs_logger:
+                _fs_logger.log(level, message, race_id=race_id)
 
         # Run the agent
         race_json = await run_agent(
@@ -210,6 +351,9 @@ class AgentHandler:
             candidate_names=options.get("candidate_names"),
             goal=options.get("goal"),
         )
+
+        # Update checkpoint holder so handoff (if somehow triggered post-agent) has latest data
+        race_json_holder[0] = race_json
 
         # Save as draft (not published) — admin must explicitly publish
         draft_path = await self._save_draft(race_id, race_json)
@@ -238,6 +382,9 @@ class AgentHandler:
             )
         except Exception:
             logger.warning("Failed to record pipeline metrics", exc_info=True)
+
+        if _fs_logger:
+            _fs_logger.mark_completed(duration_ms=duration_ms)
 
         return {
             "race_id": race_id,

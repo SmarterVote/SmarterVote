@@ -51,10 +51,27 @@ resource "google_cloud_run_v2_service" "races_api" {
         }
       }
 
+      # Auth0 JWT for admin endpoint protection (replaces pipeline-client auth)
+      env {
+        name  = "AUTH0_DOMAIN"
+        value = var.auth0_domain
+      }
+
+      env {
+        name  = "AUTH0_AUDIENCE"
+        value = var.auth0_audience
+      }
+
+      # GCS bucket name (also exposed as GCS_BUCKET for admin GCS helpers)
+      env {
+        name  = "GCS_BUCKET"
+        value = google_storage_bucket.sv_data.name
+      }
+
       resources {
         limits = {
           cpu    = "1000m"
-          memory = "512Mi"
+          memory = "1Gi"
         }
       }
 

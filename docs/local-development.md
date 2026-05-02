@@ -103,7 +103,7 @@ npx vite dev --port 5173 --host
 1. Go to http://localhost:5173/admin/pipeline
 2. Enter a race ID (e.g. `az-senate-2024` or a new slug like `pa-senate-2024`)
 3. Click "Research Race"
-4. Watch live logs via WebSocket — the pipeline will:
+4. Watch live progress — the admin dashboard polls the pipeline API every few seconds. The pipeline will:
    - **Step 1 (Discovery)**: Identify candidates, career history, polls, images
    - **Step 2 (Image Resolution)**: Verify/find candidate headshot URLs
    - **Step 3 (Issue Research)**: 12 per-candidate sub-agent calls, one per canonical issue
@@ -124,6 +124,8 @@ Invoke-WebRequest -Uri "http://localhost:8001/api/run" `
     -Headers @{"Content-Type"="application/json"} `
     -Body $body
 ```
+
+> **Note**: The local dev setup runs the pipeline in-process via `pipeline_client/backend/main.py`. In production (GCP), runs are triggered by queuing a race via `races-api` → Firestore → Cloud Function. See [Pipeline Modes](../PIPELINE_MODES.md) for details.
 
 ### Understanding Race IDs
 

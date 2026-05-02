@@ -1,0 +1,185 @@
+# ---------------------------------------------------------------------------
+# Agent Cloud Function (gen2)
+# Triggered by Firestore document creation in pipeline_queue/{item_id}
+# Replaces the retired pipeline-client Cloud Run service for AI processing
+# ---------------------------------------------------------------------------
+
+# Upload the source zip to GCS so Cloud Functions can build from it.
+# The zip is created by the CI workflow before `terraform apply` runs.
+# Using the git SHA in the object name forces a rebuild on every deploy.
+resource "google_storage_bucket_object" "agent_function_source" {
+  name         = "functions/agent-source-${var.app_version}.zip"
+  bucket       = google_storage_bucket.sv_data.name
+  source       = "${path.module}/functions-agent-source.zip"
+  content_type = "application/zip"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Service account for the agent function
+resource "google_service_account" "agent_function" {
+  project      = var.project_id
+  account_id   = "agent-function-${var.environment}"
+  display_name = "SmarterVote Agent Cloud Function SA (${var.environment})"
+}
+
+# IAM roles for the agent function SA
+resource "google_project_iam_member" "agent_function_firestore" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.agent_function.email}"
+}
+
+resource "google_project_iam_member" "agent_function_gcs" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.agent_function.email}"
+}
+
+resource "google_project_iam_member" "agent_function_secret" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.agent_function.email}"
+}
+
+resource "google_project_iam_member" "agent_function_eventarc" {
+  project = var.project_id
+  role    = "roles/eventarc.eventReceiver"
+  member  = "serviceAccount:${google_service_account.agent_function.email}"
+}
+
+resource "google_project_iam_member" "agent_function_run_invoker" {
+  project = var.project_id
+  role    = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.agent_function.email}"
+}
+
+# Cloud Function v2 (backed by Cloud Run gen2)
+resource "google_cloudfunctions2_function" "agent" {
+  name     = "agent-${var.environment}"
+  location = var.region
+  project  = var.project_id
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "process_queue_item"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.sv_data.name
+        object = google_storage_bucket_object.agent_function_source.name
+      }
+    }
+    environment_variables = {
+      # Force rebuild when source changes
+      BUILD_ID = var.app_version
+    }
+  }
+
+  service_config {
+    max_instance_count = 10
+    # Allow parallel CF invocations so multiple races can be processed simultaneously
+    max_instance_request_concurrency = 1
+
+    timeout_seconds  = 3600 # 60 minutes (maximum for gen2)
+    available_memory = "2Gi"
+    available_cpu    = "2"
+
+    service_account_email = google_service_account.agent_function.email
+
+    environment_variables = {
+      PROJECT_ID             = var.project_id
+      FIRESTORE_PROJECT      = var.project_id
+      GCS_BUCKET             = google_storage_bucket.sv_data.name
+      ENVIRONMENT            = var.environment
+      AGENT_DEADLINE_SECONDS = "3300"
+    }
+
+    secret_environment_variables {
+      key        = "OPENAI_API_KEY"
+      project_id = var.project_id
+      secret     = google_secret_manager_secret.openai_key.secret_id
+      version    = "latest"
+    }
+
+    secret_environment_variables {
+      key        = "SERPER_API_KEY"
+      project_id = var.project_id
+      secret     = google_secret_manager_secret.serper_key.secret_id
+      version    = "latest"
+    }
+
+    dynamic "secret_environment_variables" {
+      for_each = length(google_secret_manager_secret.anthropic_key) > 0 ? [1] : []
+      content {
+        key        = "ANTHROPIC_API_KEY"
+        project_id = var.project_id
+        secret     = google_secret_manager_secret.anthropic_key[0].secret_id
+        version    = "latest"
+      }
+    }
+
+    dynamic "secret_environment_variables" {
+      for_each = length(google_secret_manager_secret.gemini_key) > 0 ? [1] : []
+      content {
+        key        = "GEMINI_API_KEY"
+        project_id = var.project_id
+        secret     = google_secret_manager_secret.gemini_key[0].secret_id
+        version    = "latest"
+      }
+    }
+
+    dynamic "secret_environment_variables" {
+      for_each = length(google_secret_manager_secret.xai_key) > 0 ? [1] : []
+      content {
+        key        = "XAI_API_KEY"
+        project_id = var.project_id
+        secret     = google_secret_manager_secret.xai_key[0].secret_id
+        version    = "latest"
+      }
+    }
+  }
+
+  # Firestore (Eventarc) trigger — fires on every new document in pipeline_queue
+  event_trigger {
+    trigger_region = var.region
+    event_type     = "google.cloud.firestore.document.v1.created"
+    event_filters {
+      attribute = "database"
+      value     = "(default)"
+    }
+    event_filters {
+      attribute = "document"
+      value     = "pipeline_queue/{item_id}"
+      operator  = "match-path-pattern"
+    }
+    service_account_email = google_service_account.agent_function.email
+    retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"
+  }
+
+  depends_on = [
+    google_project_service.apis,
+    google_project_iam_member.agent_function_eventarc,
+    google_project_iam_member.agent_function_run_invoker,
+  ]
+}
+
+# Allow Eventarc SA to invoke the Cloud Run service backing the function
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+resource "google_cloud_run_v2_service_iam_member" "agent_function_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloudfunctions2_function.agent.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-eventarc.iam.gserviceaccount.com"
+}
+
+# Output the function URL for reference
+output "agent_function_url" {
+  description = "URL of the agent Cloud Function (not publicly invocable — Eventarc only)"
+  value       = google_cloudfunctions2_function.agent.service_config[0].uri
+}

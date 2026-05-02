@@ -7,7 +7,7 @@
 import { fetchWithAuth } from "$lib/stores/apiStore";
 import type { Alert, AnalyticsOverview, PipelineMetricsSummary, PipelineRunRecord, RaceAnalytics } from "$lib/types";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8001";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
 
 async function fetchAdmin<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);

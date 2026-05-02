@@ -102,6 +102,12 @@ variable "enable_pipeline_client" {
   default     = false
 }
 
+variable "enable_agent_function" {
+  description = "Enable the agent Cloud Function (gen2) that processes pipeline_queue items via Eventarc"
+  type        = bool
+  default     = true
+}
+
 variable "pipeline_client_public_invoker" {
   description = "Allow unauthenticated Cloud Run invocations. Must be true for browser clients: CORS OPTIONS preflights carry no credentials so GCP-level IAM auth blocks them before the app can respond. Auth0 JWT handles application-layer auth."
   type        = bool

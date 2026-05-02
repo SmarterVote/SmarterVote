@@ -58,7 +58,11 @@ When a published profile already exists for a race, the agent enters update mode
 ## Components
 
 ```
-pipeline_client/agent/              # AI research agent
+functions/agent/                    # Cloud Function entry point (production)
+├── main.py               # gen2 CF — Firestore Eventarc trigger → AgentHandler
+└── requirements.txt      # CF runtime dependencies (includes pipeline_client)
+
+pipeline_client/agent/              # AI research agent (used by CF and local dev)
 ├── agent.py              # Agent loop, multi-phase orchestration, search + fetch
 ├── prompts.py            # Phase-specific prompt templates
 ├── tools.py              # Tool definitions for agent tool-use loop
@@ -70,11 +74,12 @@ pipeline_client/agent/              # AI research agent
 ├── cost.py               # Token counting + cost estimation per model
 └── utils.py              # Logging, JSON extraction utilities
 
-pipeline_client/          # Execution engine
+pipeline_client/          # Execution engine (shared by CF and local dev server)
 ├── backend/
 │   ├── handlers/
-│   │   └── agent.py      # AgentHandler — wraps run_agent() with progress updates
-│   ├── main.py            # FastAPI app — 40+ endpoints, Auth0, WebSocket
+│   │   └── agent.py      # AgentHandler — wraps run_agent() with progress + Firestore logging
+│   ├── firestore_logger.py# Streams run logs + progress to Firestore (pipeline_runs/)
+│   ├── main.py            # FastAPI local dev server (Auth0, WebSocket, :8001)
 │   ├── models.py          # PipelineStep enum, RunOptions, RunInfo, RunStep
 │   ├── pipeline_runner.py # Async step execution, logging, artifact saving
 │   ├── step_registry.py   # Handler registry (step name → StepHandler)
@@ -82,7 +87,7 @@ pipeline_client/          # Execution engine
 │   ├── queue_manager.py   # Persistent queue (Firestore cloud / JSON local)
 │   ├── race_manager.py    # Unified race records + metadata + run history
 │   ├── settings.py        # Pydantic Settings from env (storage mode, auth, etc.)
-│   ├── logging_manager.py # WebSocket log broadcasting
+│   ├── logging_manager.py # WebSocket log broadcasting (local dev)
 │   ├── storage.py         # Artifact + race JSON storage routing
 │   ├── storage_backend.py # LocalStorageBackend / GCPStorageBackend
 │   ├── alerts.py          # Monitoring and alerting (optional)
@@ -90,7 +95,7 @@ pipeline_client/          # Execution engine
 └── run.py                 # CLI entry point
 
 services/
-└── races-api/             # Public REST API serving published data
+└── races-api/             # Public REST API + admin endpoints
 
 shared/
 └── models.py              # Pydantic v2 models (RaceJSON, Candidate, CanonicalIssue)
@@ -135,6 +140,26 @@ Web search results are cached in a SQLite database to avoid redundant Serper API
 
 ## Data Flow
 
+### Production (GCP)
+```
+Admin → races-api POST /queue/{race_id}
+    ↓
+Firestore pipeline_queue (document created)
+    ↓
+Eventarc trigger → Cloud Function (functions/agent/main.py)
+    ↓
+AgentHandler.handle() runs all pipeline steps
+    ↓
+(If CF nears 60-min limit: checkpoint → write continuation doc → HandoffTriggered)
+    ↓
+GCS drafts/{race_id}.json  (saved after last step)
+    ↓
+Admin → races-api POST /admin/races/{race_id}/publish → GCS races/{race_id}.json
+    ↓
+Races API serves published data; frontend polls /runs/{id} + /runs/{id}/logs
+```
+
+### Local Dev
 ```
 Race ID (e.g., ga-senate-2026)
     ↓
@@ -165,7 +190,6 @@ Save draft RaceJSON → admin publishes → Races API serves it
 | `data/drafts/` | Agent output before publish |
 | `data/cache/` | Search cache (SQLite, 7-day TTL) |
 | `pipeline_client/artifacts/` | Per-run RunResponse snapshots |
-| `pipeline_client/queue.json` | Queue state (JSON file) |
 | In-memory | Active runs + race records (lost on restart) |
 
 ### Cloud (GCP)
@@ -179,7 +203,9 @@ Save draft RaceJSON → admin publishes → Races API serves it
 | Firestore `pipeline_queue` | Queue items |
 | Secret Manager | API keys |
 
-## Pipeline Client API Endpoints (Auth0-protected except `/health`)
+## Pipeline Client API Endpoints (local dev, Auth0-protected except `/health`)
+
+The `pipeline_client` FastAPI server (`:8001`) is used for **local development only**. In production, the same agent logic runs inside the Cloud Function.
 
 ### Race Management (`/api/races/`)
 
@@ -187,31 +213,10 @@ Save draft RaceJSON → admin publishes → Races API serves it
 |--------|------|---------|
 | GET | `/api/races` | List all races with metadata |
 | GET | `/api/races/{race_id}` | Get race metadata + status |
-| DELETE | `/api/races/{race_id}` | Delete a race |
-| POST | `/api/races/queue` | Add race_ids to batch queue |
 | POST | `/api/races/{race_id}/run` | Run agent for a race |
-| POST | `/api/races/{race_id}/cancel` | Cancel queued/running race |
-| POST | `/api/races/{race_id}/recheck` | Re-check race status |
 | POST | `/api/races/{race_id}/publish` | Promote draft → published |
 | POST | `/api/races/{race_id}/unpublish` | Move published → draft |
 | GET | `/api/races/{race_id}/runs` | List runs for a race |
-| GET | `/api/races/{race_id}/runs/{run_id}` | Get specific run for a race |
-| DELETE | `/api/races/{race_id}/runs/{run_id}` | Delete a run |
-| GET | `/api/races/{race_id}/data` | Get race JSON data |
-
-### Legacy / Quick-access
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/run` | Start agent run (legacy) |
-| GET | `/races` | List published races |
-| GET | `/races/{race_id}` | Get published race |
-| DELETE | `/races/{race_id}` | Delete published race |
-| GET | `/drafts` | List all drafts |
-| GET | `/drafts/{race_id}` | Get a draft |
-| DELETE | `/drafts/{race_id}` | Delete a draft |
-| POST | `/drafts/{race_id}/publish` | Publish a draft |
-| POST | `/races/{race_id}/unpublish` | Unpublish a race |
 
 ### Pipeline Infrastructure
 
@@ -219,61 +224,52 @@ Save draft RaceJSON → admin publishes → Races API serves it
 |--------|------|---------|
 | GET | `/queue` | List queue items |
 | POST | `/queue` | Add to queue |
-| DELETE | `/queue/{item_id}` | Remove queue item |
-| DELETE | `/queue/finished` | Clear finished queue items |
 | GET | `/runs` | List recent runs |
-| GET | `/runs/active` | List active runs |
 | GET | `/runs/{run_id}` | Get run details |
-| DELETE | `/runs/{run_id}` | Delete a run |
-| GET | `/run/{run_id}` | Get run info (alt) |
-| POST | `/run/{step}` | Run a named pipeline step |
-| GET | `/steps` | List available pipeline steps |
-| GET | `/artifacts` | List artifacts |
-| GET | `/artifacts/{artifact_id}` | Get artifact |
-| GET | `/artifact/{artifact_id}` | Get artifact (alt) |
 | GET | `/health` | Health check (unauthenticated) |
 
-### Monitoring
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/alerts` | Active alerts |
-| POST | `/alerts/{alert_id}/acknowledge` | Acknowledge alert |
-| GET | `/analytics/overview` | Request analytics overview |
-| GET | `/analytics/races` | Per-race request counts |
-| GET | `/analytics/timeseries` | Request timeseries |
-| GET | `/pipeline/metrics` | Token usage + cost metrics |
-| GET | `/pipeline/metrics/summary` | Metrics summary |
-
-### WebSocket
+### Live Logs (local dev)
 
 | Path | Purpose |
 |------|---------|
-| `/ws/logs` | Live log streaming (all runs) |
-| `/ws/logs/{run_id}` | Live logs for a specific run |
+| `/ws/logs` | WebSocket — live log streaming (all runs) |
+| `/ws/logs/{run_id}` | WebSocket — live logs for a specific run |
 
-## Races API Endpoints (Public)
+## Races API Endpoints
 
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| GET | `/races` | None | List race IDs |
-| GET | `/races/summaries` | None | Race summaries for search |
-| GET | `/races/{race_id}` | None | Full race data |
-| POST | `/cache/clear` | X-Admin-Key | Clear GCS cache |
-| GET | `/analytics/overview` | X-Admin-Key | Request stats |
-| GET | `/analytics/races` | X-Admin-Key | Per-race request counts |
-| GET | `/analytics/timeseries` | X-Admin-Key | Request timeseries |
+### Admin Endpoints (X-Admin-Key required)
+
+The `races-api` service hosts both public and admin endpoints. Admin endpoints manage the pipeline in production.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/queue/{race_id}` | Queue a race for the CF pipeline |
+| GET | `/runs/{run_id}` | Get run status + metadata |
+| GET | `/runs/{run_id}/logs` | Get run log entries (supports `?since=N`) |
+| POST | `/admin/races/{race_id}/publish` | Publish a draft from GCS |
+| POST | `/admin/races/{race_id}/unpublish` | Move published → draft |
+| GET | `/admin/races` | List all races with pipeline status |
+
+### Public Endpoints (no auth)
+
+| Method | Path | Purpose |
+|--------|------|--------|
+| GET | `/races` | List race IDs |
+| GET | `/races/summaries` | Race summaries for search |
+| GET | `/races/{race_id}` | Full race data |
+| GET | `/health` | Health check |
 
 ## Infrastructure (Terraform)
 
-Located in `infra/`. Pipeline client disabled by default (`enable_pipeline_client = false`).
+Located in `infra/`.
 
-When enabled:
-- **Cloud Run**: races-api (public), pipeline-client (Auth0-protected)
-- **GCS**: Data bucket (`races/`, `drafts/`, `analytics/`)
-- **Firestore**: Run history, race metadata, queue persistence
+- **Cloud Run**: `races-api` (public + admin); optional `pipeline-client` server (`enable_pipeline_client = false` by default)
+- **Cloud Function** (gen2): Agent CF triggered by Firestore Eventarc (`enable_agent_function = true` by default)
+- **GCS**: Data bucket (`races/`, `drafts/`, `checkpoints/`, `analytics/`)
+- **Firestore**: `pipeline_queue` (CF trigger), `pipeline_runs/` (run logs + status), `races/` (metadata)
 - **Secret Manager**: API keys (openai, serper, anthropic, gemini, xai, admin)
 - **Artifact Registry**: Docker images (keeps 5 versions, deletes >30 days)
+- **Eventarc**: Trigger on `pipeline_queue` Firestore document creation → CF
 
 ## Canonical Issues
 
