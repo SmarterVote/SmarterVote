@@ -1,22 +1,34 @@
 """Shared test fixtures for the SmarterVote test suite."""
 
+import asyncio
+import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+# On Windows, the default ProactorEventLoop causes a KeyboardInterrupt during
+# pytest-asyncio teardown (Python 3.10 bug). Use the SelectorEventLoop instead.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 @pytest.fixture(autouse=True)
 def mock_wikipedia_image_lookup():
-    """Prevent real HTTP calls to the Wikipedia API during unit tests.
-
-    _lookup_wikipedia_image is called during image resolution for every
-    candidate. Without this mock, tests that include candidates would make
-    live network requests and could either fail (no connectivity) or
-    unexpectedly resolve images, breaking assertions about image_url=None.
-    """
+    """Prevent real HTTP calls to the Wikipedia API during unit tests."""
     with patch(
         "pipeline_client.agent.images._lookup_wikipedia_image",
         new_callable=AsyncMock,
         return_value=None,
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def mock_ballotpedia_election_lookup():
+    """Prevent real HTTP calls to Ballotpedia during unit tests."""
+    with patch(
+        "pipeline_client.agent.phases._ballotpedia_election_lookup",
+        new_callable=AsyncMock,
+        return_value={"found": False, "candidates": [], "page_url": None, "description": None},
     ):
         yield

@@ -23,6 +23,7 @@ google-cloud-storage==2.19.0
 
 # Races API
 # (uses fastapi/uvicorn/pydantic already above)
+slowapi==0.1.9
 
 # Shared models
 # pydantic already above

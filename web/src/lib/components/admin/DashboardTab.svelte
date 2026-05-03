@@ -78,6 +78,7 @@
 
   // Discovery-only races
   let allRaces: RaceRecord[] = [];
+  $: raceById = new Map(allRaces.map((r) => [r.race_id, r]));
   $: discoveryOnlyRaces = allRaces.filter((r) => {
     const opts = (r.last_run_options ?? r.queue_options) as { enabled_steps?: string[] } | undefined;
     if (!opts) return false;
@@ -467,8 +468,13 @@
         <div class="space-y-1 max-h-64 overflow-y-auto">
           {#each recentRuns.slice(0, 10) as run (run.run_id)}
             {@const race_id = run.payload?.race_id ?? "-"}
+            {@const raceMeta = raceById.get(String(race_id))}
+            {@const raceTitle = raceMeta?.title || raceMeta?.office || String(race_id)}
             <div class="flex items-center justify-between text-xs py-1 border-b border-stroke last:border-0">
-              <span class="font-mono text-content-muted truncate max-w-40">{race_id}</span>
+              <div class="min-w-0 max-w-56">
+                <p class="text-content truncate">{raceTitle}</p>
+                <p class="font-mono text-content-faint truncate">{race_id}</p>
+              </div>
               <div class="flex items-center space-x-2 shrink-0">
                 <span
                   class="px-1.5 py-0.5 rounded text-xs font-medium

@@ -74,6 +74,15 @@ class AgentHandler:
     def __init__(self, storage_backend=None):
         self.storage_backend = storage_backend
 
+    def _get_storage_client(self):
+        """Return a GCS storage client without importing FastAPI app modules."""
+        try:
+            from google.cloud import storage  # type: ignore
+
+            return storage.Client()
+        except Exception:
+            return None
+
     async def handle(self, payload: Dict[str, Any], options: Dict[str, Any]) -> Any:
         """Run the agent for a race_id and publish the result.
 
@@ -267,8 +276,7 @@ class AgentHandler:
             try:
                 gcs_bucket = settings.gcs_bucket
                 if gcs_bucket and race_json_holder:
-                    from pipeline_client.backend.main import _get_gcs_client
-                    client = _get_gcs_client()
+                    client = self._get_storage_client()
                     if client:
                         path = f"checkpoints/{current_run_id}.json"
                         client.bucket(gcs_bucket).blob(path).upload_from_string(
@@ -448,9 +456,7 @@ class AgentHandler:
             return False
 
         try:
-            from pipeline_client.backend.main import _get_gcs_client
-
-            client = _get_gcs_client()
+            client = self._get_storage_client()
             if client is None:
                 return False
             bucket = client.bucket(gcs_bucket)
@@ -487,9 +493,7 @@ class AgentHandler:
             return
 
         try:
-            from pipeline_client.backend.main import _get_gcs_client
-
-            client = _get_gcs_client()
+            client = self._get_storage_client()
             if client is None:
                 return
             bucket = client.bucket(gcs_bucket)
@@ -514,9 +518,7 @@ class AgentHandler:
             return None
 
         try:
-            from pipeline_client.backend.main import _get_gcs_client
-
-            client = _get_gcs_client()
+            client = self._get_storage_client()
             if client is None:
                 return None
             bucket = client.bucket(gcs_bucket)

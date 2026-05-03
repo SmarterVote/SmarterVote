@@ -4,6 +4,7 @@ Runs are stored in Firestore `pipeline_runs` collection by the Cloud Function.
 Logs are stored in the `pipeline_runs/{run_id}/logs` subcollection.
 """
 
+from datetime import datetime
 from typing import Any, Dict
 
 import firestore_helpers
@@ -11,6 +12,23 @@ from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
 
 router = APIRouter()
+
+
+def _log_sort_key(entry: Dict[str, Any]) -> tuple[float, str]:
+    """Return a stable ascending sort key for mixed legacy/new log schemas."""
+    ts_val = entry.get("timestamp")
+    if isinstance(ts_val, str):
+        try:
+            return (datetime.fromisoformat(ts_val.replace("Z", "+00:00")).timestamp(), "")
+        except ValueError:
+            pass
+
+    legacy_ts = entry.get("ts")
+    if isinstance(legacy_ts, (int, float)):
+        return (float(legacy_ts), "")
+
+    # Firestore doc IDs from FirestoreLogger are millisecond-prefix sortable.
+    return (0.0, str(entry.get("id") or ""))
 
 
 @router.get("/runs", dependencies=[Depends(verify_token)])
@@ -55,9 +73,10 @@ async def get_run_logs(run_id: str, since: int = 0) -> Dict[str, Any]:
     Entries are sorted ascending by their timestamp sort key.
     """
     db = firestore_helpers._get_fs()
-    logs_ref = db.collection("pipeline_runs").document(run_id).collection("logs").order_by("ts", direction="ASCENDING")
+    logs_ref = db.collection("pipeline_runs").document(run_id).collection("logs")
     entries = [firestore_helpers._doc_to_plain(d) for d in logs_ref.stream()]
     entries = [e for e in entries if e is not None]
+    entries.sort(key=_log_sort_key)
     sliced = entries[since:] if since < len(entries) else []
     return {"logs": sliced, "total": len(entries)}
 

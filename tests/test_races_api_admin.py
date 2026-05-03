@@ -247,7 +247,7 @@ def test_get_run_logs_since():
     os.environ["SKIP_AUTH"] = "true"
     os.environ["ADMIN_API_KEY"] = "test-key"
 
-    entries = [{"ts": i, "level": "info", "message": f"msg {i}"} for i in range(5)]
+    entries = [{"timestamp": f"2026-01-01T00:00:0{i}Z", "level": "info", "message": f"msg {i}"} for i in range(5)]
 
     def _make_log_doc(data):
         doc = MagicMock()
@@ -261,7 +261,6 @@ def test_get_run_logs_since():
 
     # Build nested subcollection mock: pipeline_runs → {run_id} → logs
     log_coll = MagicMock()
-    log_coll.order_by.return_value = log_coll
     log_coll.stream.return_value = iter(log_docs)
 
     run_doc_ref = MagicMock()
@@ -295,7 +294,7 @@ def test_get_run_logs_since():
     body = resp.json()
     assert body["total"] == 5
     assert len(body["logs"]) == 3  # entries 2, 3, 4
-    assert body["logs"][0]["ts"] == 2
+    assert body["logs"][0]["message"] == "msg 2"
 
 
 # ---------------------------------------------------------------------------
