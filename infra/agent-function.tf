@@ -64,6 +64,13 @@ resource "google_storage_bucket_iam_member" "gcf_admin_source_reader" {
   member = "serviceAccount:service-${data.google_project.project.number}@gcf-admin-robot.iam.gserviceaccount.com"
 }
 
+# Ensure Eventarc's Google-managed service agent has its required project role.
+resource "google_project_iam_member" "eventarc_service_agent" {
+  project = var.project_id
+  role    = "roles/eventarc.serviceAgent"
+  member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-eventarc.iam.gserviceaccount.com"
+}
+
 # Cloud Function v2 (backed by Cloud Run gen2)
 resource "google_cloudfunctions2_function" "agent" {
   name     = "agent-${var.environment}"
@@ -170,6 +177,7 @@ resource "google_cloudfunctions2_function" "agent" {
     google_project_service.apis,
     google_project_iam_member.agent_function_eventarc,
     google_project_iam_member.agent_function_run_invoker,
+    google_project_iam_member.eventarc_service_agent,
     google_storage_bucket_iam_member.gcf_admin_source_reader,
   ]
 }

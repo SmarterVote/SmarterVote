@@ -89,6 +89,8 @@ resource "google_storage_bucket" "terraform_state" {
 # Enable required GCP APIs for the project
 resource "google_project_service" "apis" {
   for_each = toset([
+    "cloudfunctions.googleapis.com",
+    "eventarc.googleapis.com",
     "run.googleapis.com",
     "pubsub.googleapis.com",
     "storage.googleapis.com",
