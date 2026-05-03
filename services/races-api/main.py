@@ -59,8 +59,15 @@ async def _require_admin_access(
     x_admin_key: str = Header(default=""),
 ) -> None:
     """Dependency: authorize with bearer token OR legacy X-Admin-Key."""
-    if _ADMIN_API_KEY and x_admin_key and secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
-        return
+    if _ADMIN_API_KEY:
+        if x_admin_key:
+            if secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
+                return
+            # Keep legacy semantics for key-auth callers when bearer token is absent.
+            if credentials is None:
+                raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key")
+        elif credentials is None:
+            raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key")
 
     # Fall back to Auth0 bearer auth used by the admin frontend.
     await verify_token(credentials)
