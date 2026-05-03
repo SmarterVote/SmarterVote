@@ -183,10 +183,9 @@ export class PipelineApiService {
    * Load published race summaries
    */
   async loadPublishedRaces(): Promise<PublishedRaceSummary[]> {
-    const res = await fetchWithAuth(`${this.apiBase}/races`, {}, API_TIMEOUT_SHORT);
+    const res = await fetchWithAuth(`${this.apiBase}/races/summaries`, {}, API_TIMEOUT_SHORT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const data: PublishedRacesResponse = await res.json();
-    return data.races || [];
+    return await res.json();
   }
 
   /**
@@ -207,7 +206,7 @@ export class PipelineApiService {
    */
   async deletePublishedRace(raceId: string): Promise<void> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/races/${encodeURIComponent(raceId)}`,
+      `${this.apiBase}/races/${encodeURIComponent(raceId)}/admin`,
       { method: "DELETE" },
       API_TIMEOUT_DEFAULT
     );
@@ -262,7 +261,7 @@ export class PipelineApiService {
    */
   async unpublishRace(raceId: string): Promise<void> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/races/${encodeURIComponent(raceId)}/unpublish`,
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/unpublish`,
       { method: "POST" },
       API_TIMEOUT_DEFAULT
     );

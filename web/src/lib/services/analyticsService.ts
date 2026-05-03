@@ -39,10 +39,11 @@ export const analyticsService = {
   },
 
   async acknowledgeAlert(alertId: string): Promise<void> {
-    await fetchWithAuth(`${API_BASE}/alerts/${encodeURIComponent(alertId)}/acknowledge`, {
+    const resp = await fetchWithAuth(`${API_BASE}/alerts/${encodeURIComponent(alertId)}/acknowledge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
+    if (!resp.ok) throw new Error(`Acknowledge failed ${resp.status}`);
   },
 
   async acknowledgeAllAlerts(): Promise<{ acknowledged_count: number }> {
