@@ -150,8 +150,13 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> None:
 
     _gcs_archive_race(race_id, "races", "published")
     _gcs_archive_race(race_id, "drafts", "draft")
-    _gcs_put_race_json(race_id, "races", data)
-    _gcs_delete_race_json(race_id, "drafts")
+    if not _gcs_put_race_json(race_id, "races", data):
+        raise RuntimeError(f"Failed to write published race blob for {race_id}")
+
+    # Publish is only considered successful if the source draft is gone.
+    if not _gcs_delete_race_json(race_id, "drafts") and _gcs_get_race_json(race_id, "drafts") is not None:
+        raise RuntimeError(f"Published race {race_id} but failed to remove draft blob")
+
     firestore_helpers._fs_update_race(
         race_id,
         {

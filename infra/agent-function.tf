@@ -107,6 +107,7 @@ resource "google_cloudfunctions2_function" "agent" {
       PROJECT_ID             = var.project_id
       FIRESTORE_PROJECT      = var.project_id
       GCS_BUCKET             = google_storage_bucket.sv_data.name
+      STORAGE_MODE           = "gcp"
       ENVIRONMENT            = var.environment
       AGENT_DEADLINE_SECONDS = "480"
     }
