@@ -1,6 +1,8 @@
 """Tests for FirestoreLogger (pipeline_client/backend/firestore_logger.py)."""
 
-from unittest.mock import MagicMock, call, patch
+import sys
+import types
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -87,3 +89,63 @@ def test_mark_continued(mock_db):
     data = run_ref.set.call_args[0][0]
     assert data["status"] == "continued"
     assert data["continuation_run_id"] == "run-007"
+
+
+def test_get_db_falls_back_to_default_project_client():
+    """_get_db() should use firestore.Client() when project env vars are absent."""
+    client_mock = MagicMock()
+    firestore_mod = types.ModuleType("google.cloud.firestore")
+    setattr(firestore_mod, "Client", client_mock)
+    cloud_mod = types.ModuleType("google.cloud")
+    setattr(cloud_mod, "firestore", firestore_mod)
+    google_mod = types.ModuleType("google")
+    setattr(google_mod, "cloud", cloud_mod)
+
+    with (
+        patch("pipeline_client.backend.firestore_logger._db", None),
+        patch("pipeline_client.backend.firestore_logger.os.getenv", return_value=None),
+        patch.dict(
+            sys.modules,
+            {
+                "google": google_mod,
+                "google.cloud": cloud_mod,
+                "google.cloud.firestore": firestore_mod,
+            },
+            clear=False,
+        ),
+    ):
+        from pipeline_client.backend import firestore_logger as fl
+
+        fl._get_db()
+
+    client_mock.assert_called_once_with()
+
+
+def test_get_db_uses_project_when_configured():
+    """_get_db() should pass project when FIRESTORE_PROJECT/PROJECT_ID is set."""
+    client_mock = MagicMock()
+    firestore_mod = types.ModuleType("google.cloud.firestore")
+    setattr(firestore_mod, "Client", client_mock)
+    cloud_mod = types.ModuleType("google.cloud")
+    setattr(cloud_mod, "firestore", firestore_mod)
+    google_mod = types.ModuleType("google")
+    setattr(google_mod, "cloud", cloud_mod)
+
+    with (
+        patch("pipeline_client.backend.firestore_logger._db", None),
+        patch("pipeline_client.backend.firestore_logger.os.getenv", return_value="smartervote"),
+        patch.dict(
+            sys.modules,
+            {
+                "google": google_mod,
+                "google.cloud": cloud_mod,
+                "google.cloud.firestore": firestore_mod,
+            },
+            clear=False,
+        ),
+    ):
+        from pipeline_client.backend import firestore_logger as fl
+
+        fl._get_db()
+
+    client_mock.assert_called_once_with(project="smartervote")

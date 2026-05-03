@@ -28,12 +28,10 @@ def _get_db():
     if _db is not None:
         return _db
     project = os.getenv("FIRESTORE_PROJECT") or os.getenv("PROJECT_ID")
-    if not project:
-        return None
     try:
         from google.cloud import firestore  # type: ignore
 
-        _db = firestore.Client(project=project)
+        _db = firestore.Client(project=project) if project else firestore.Client()
         return _db
     except Exception as exc:
         logger.debug("FirestoreLogger: could not init Firestore client: %s", exc)

@@ -18,6 +18,165 @@ _ADMIN_CHAT_MODEL = os.getenv("ADMIN_CHAT_MODEL", "gpt-4o-mini")
 _OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 
+def _as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_pipeline_run(raw: Dict[str, Any], fallback_run_id: str) -> Dict[str, Any]:
+    """Project heterogeneous pipeline_runs docs into a stable dashboard schema."""
+    payload = raw.get("payload") if isinstance(raw.get("payload"), dict) else {}
+    options = raw.get("options") if isinstance(raw.get("options"), dict) else {}
+    agent_metrics = payload.get("agent_metrics") if isinstance(payload.get("agent_metrics"), dict) else {}
+
+    race_id = raw.get("race_id") or payload.get("race_id") or ""
+    run_id = raw.get("run_id") or fallback_run_id
+    status = raw.get("status") or "unknown"
+    timestamp = raw.get("started_at") or raw.get("completed_at")
+
+    cheap_mode = raw.get("cheap_mode")
+    if cheap_mode is None:
+        cheap_mode = options.get("cheap_mode")
+
+    model_breakdown = raw.get("model_breakdown")
+    if not isinstance(model_breakdown, dict):
+        model_breakdown = agent_metrics.get("model_breakdown")
+    if not isinstance(model_breakdown, dict):
+        model_breakdown = {}
+
+    model = (
+        raw.get("model")
+        or agent_metrics.get("model")
+        or options.get("research_model")
+        or options.get("claude_model")
+        or options.get("gemini_model")
+        or options.get("grok_model")
+        or ""
+    )
+
+    total_tokens = _as_int(raw.get("total_tokens"), _as_int(agent_metrics.get("total_tokens"), 0))
+    prompt_tokens = _as_int(raw.get("prompt_tokens"), _as_int(agent_metrics.get("prompt_tokens"), 0))
+    completion_tokens = _as_int(raw.get("completion_tokens"), _as_int(agent_metrics.get("completion_tokens"), 0))
+
+    estimated_usd = _as_float(
+        raw.get("estimated_usd"),
+        _as_float(raw.get("cost_usd"), _as_float(agent_metrics.get("estimated_usd"), 0.0)),
+    )
+
+    candidate_count = _as_int(raw.get("candidate_count"), 0)
+    if candidate_count <= 0 and isinstance(payload.get("candidates"), list):
+        candidate_count = len(payload.get("candidates") or [])
+
+    duration_s = _as_float(raw.get("duration_s"), 0.0)
+    if duration_s <= 0:
+        duration_ms = _as_float(raw.get("duration_ms"), 0.0)
+        if duration_ms > 0:
+            duration_s = round(duration_ms / 1000.0, 2)
+
+    return {
+        "run_id": run_id,
+        "race_id": race_id,
+        "status": status,
+        "timestamp": timestamp,
+        "model": model,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+        "estimated_usd": round(estimated_usd, 6),
+        "model_breakdown": model_breakdown,
+        "duration_s": duration_s,
+        "candidate_count": candidate_count,
+        "cheap_mode": cheap_mode,
+    }
+
+
+def _to_epoch_seconds(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if hasattr(value, "timestamp"):
+        try:
+            return float(value.timestamp())
+        except Exception:
+            return 0.0
+    if isinstance(value, str):
+        try:
+            normalized = value.replace("Z", "+00:00")
+            return datetime.fromisoformat(normalized).timestamp()
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def _compute_metrics_summary(records: list[Dict[str, Any]]) -> Dict[str, Any]:
+    total_runs = len(records)
+    successful_runs = 0
+    total_usd = 0.0
+    recent_usd = 0.0
+    cheap_runs = 0
+    cheap_total_usd = 0.0
+    full_runs = 0
+    full_total_usd = 0.0
+    candidate_count_runs = 0
+    total_candidate_count = 0
+
+    cutoff = datetime.now(timezone.utc).timestamp() - 30 * 86400
+    for rec in records:
+        if rec.get("status") == "completed":
+            successful_runs += 1
+
+        cost = _as_float(rec.get("estimated_usd"), 0.0)
+        total_usd += cost
+
+        ts = _to_epoch_seconds(rec.get("timestamp"))
+        if ts > cutoff:
+            recent_usd += cost
+
+        if rec.get("cheap_mode") is True:
+            cheap_runs += 1
+            cheap_total_usd += cost
+        elif rec.get("cheap_mode") is False:
+            full_runs += 1
+            full_total_usd += cost
+
+        candidate_count = _as_int(rec.get("candidate_count"), 0)
+        if candidate_count > 0:
+            candidate_count_runs += 1
+            total_candidate_count += candidate_count
+
+    avg_usd = total_usd / total_runs if total_runs > 0 else 0.0
+    success_rate = successful_runs / total_runs if total_runs > 0 else 0.0
+    avg_cheap_usd = cheap_total_usd / cheap_runs if cheap_runs > 0 else 0.0
+    avg_full_usd = full_total_usd / full_runs if full_runs > 0 else 0.0
+    avg_usd_per_candidate = total_usd / total_candidate_count if total_candidate_count > 0 else 0.0
+
+    return {
+        "total_runs": total_runs,
+        "total_usd": round(total_usd, 4),
+        "avg_usd": round(avg_usd, 4),
+        "recent_30d_usd": round(recent_usd, 4),
+        "success_rate": round(success_rate, 4),
+        "cheap_runs": cheap_runs,
+        "avg_cheap_usd": round(avg_cheap_usd, 4),
+        "full_runs": full_runs,
+        "avg_full_usd": round(avg_full_usd, 4),
+        "avg_usd_per_candidate": round(avg_usd_per_candidate, 6),
+        "runs_with_candidate_count": candidate_count_runs,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Pipeline metrics (token usage / cost)
 # ---------------------------------------------------------------------------
@@ -27,9 +186,28 @@ _OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 async def get_pipeline_metrics(limit: int = 50) -> Dict[str, Any]:
     """Return recent pipeline run records with token usage and cost data."""
     db = firestore_helpers._get_fs()
-    docs = db.collection("pipeline_runs").order_by("started_at", direction="DESCENDING").limit(limit).stream()
-    records = [firestore_helpers._doc_to_plain(d) for d in docs]
-    records = [r for r in records if r is not None]
+    records: list[Dict[str, Any]] = []
+
+    # Primary source: pipeline_metrics (includes tokens/cost/model fields).
+    try:
+        docs = db.collection("pipeline_metrics").order_by("timestamp", direction="DESCENDING").limit(limit).stream()
+        for doc in docs:
+            plain = firestore_helpers._doc_to_plain(doc)
+            if plain is None:
+                continue
+            records.append(_normalize_pipeline_run(plain, doc.id))
+    except Exception as exc:
+        logging.warning("Failed to load pipeline_metrics: %s", exc)
+
+    # Fallback source: pipeline_runs (legacy docs without full metrics).
+    if not records:
+        docs = db.collection("pipeline_runs").order_by("started_at", direction="DESCENDING").limit(limit).stream()
+        for doc in docs:
+            plain = firestore_helpers._doc_to_plain(doc)
+            if plain is None:
+                continue
+            records.append(_normalize_pipeline_run(plain, doc.id))
+
     return {"records": records, "count": len(records)}
 
 
@@ -37,27 +215,27 @@ async def get_pipeline_metrics(limit: int = 50) -> Dict[str, Any]:
 async def get_pipeline_metrics_summary() -> Dict[str, Any]:
     """Return aggregate pipeline cost stats."""
     db = firestore_helpers._get_fs()
-    docs = db.collection("pipeline_runs").stream()
-    total_runs = 0
-    total_usd = 0.0
-    recent_usd = 0.0
-    cutoff = datetime.now(timezone.utc).timestamp() - 30 * 86400
-    for doc in docs:
-        d = doc.to_dict() or {}
-        total_runs += 1
-        cost = d.get("cost_usd") or 0.0
-        total_usd += cost
-        started = d.get("started_at")
-        ts = started.timestamp() if hasattr(started, "timestamp") else 0
-        if ts > cutoff:
-            recent_usd += cost
-    avg_usd = total_usd / total_runs if total_runs > 0 else 0.0
-    return {
-        "total_runs": total_runs,
-        "total_usd": round(total_usd, 4),
-        "avg_usd": round(avg_usd, 4),
-        "recent_30d_usd": round(recent_usd, 4),
-    }
+    records: list[Dict[str, Any]] = []
+
+    try:
+        docs = db.collection("pipeline_metrics").stream()
+        for doc in docs:
+            plain = firestore_helpers._doc_to_plain(doc)
+            if plain is None:
+                continue
+            records.append(_normalize_pipeline_run(plain, doc.id))
+    except Exception as exc:
+        logging.warning("Failed to summarize pipeline_metrics: %s", exc)
+
+    if not records:
+        docs = db.collection("pipeline_runs").stream()
+        for doc in docs:
+            plain = firestore_helpers._doc_to_plain(doc)
+            if plain is None:
+                continue
+            records.append(_normalize_pipeline_run(plain, doc.id))
+
+    return _compute_metrics_summary(records)
 
 
 # ---------------------------------------------------------------------------
