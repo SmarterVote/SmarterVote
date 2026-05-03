@@ -51,6 +51,7 @@ jobs:
         env:
           NODE_ENV: production
           VITE_RACES_API_URL: https://races-api-dev-ddsvfazica-uc.a.run.app
+          VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
