@@ -4,9 +4,10 @@ import re
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 _RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
+_PIPELINE_STEPS = {"discovery", "images", "issues", "finance", "refinement", "review", "iteration"}
 
 
 def validate_race_id(race_id: str) -> None:
@@ -18,14 +19,39 @@ def validate_race_id(race_id: str) -> None:
 class RunOptions(BaseModel):
     cheap_mode: Optional[bool] = None
     force_fresh: Optional[bool] = None
+    save_artifact: Optional[bool] = None
     enabled_steps: Optional[List[str]] = None
     research_model: Optional[str] = None
     claude_model: Optional[str] = None
+    gemini_model: Optional[str] = None
+    grok_model: Optional[str] = None
     max_candidates: Optional[int] = None
     candidate_names: Optional[List[str]] = None
     target_no_info: Optional[bool] = None
     note: Optional[str] = None
     goal: Optional[str] = None
+
+    @field_validator("enabled_steps")
+    @classmethod
+    def validate_enabled_steps(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return None
+        normalized = [step.strip() for step in value if isinstance(step, str) and step.strip()]
+        if not normalized:
+            raise ValueError("enabled_steps cannot be empty when provided")
+        deduped = list(dict.fromkeys(normalized))
+        invalid = [step for step in deduped if step not in _PIPELINE_STEPS]
+        if invalid:
+            raise ValueError(f"Unknown enabled_steps: {', '.join(invalid)}")
+        return deduped
+
+    @field_validator("candidate_names")
+    @classmethod
+    def normalize_candidate_names(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return None
+        normalized = [name.strip() for name in value if isinstance(name, str) and name.strip()]
+        return list(dict.fromkeys(normalized)) or None
 
 
 class RaceQueueRequest(BaseModel):

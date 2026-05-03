@@ -132,7 +132,6 @@ async function _pollLogs(runId: string): Promise<void> {
       const ts = entry.timestamp;
       const rid = entry.run_id ?? runId;
       _onLog?.(level, message, ts, rid);
-      _onMessage?.({ type: "log", level, message, timestamp: ts, run_id: rid });
     }
   } catch {
     // Silently ignore

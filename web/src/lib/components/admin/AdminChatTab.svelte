@@ -695,10 +695,11 @@
         {#if showAdvancedEdit}
           <div class="px-3 py-2.5 space-y-2.5">
             <div>
-              <label class="block text-[10px] font-medium text-content-subtle mb-1">
+              <label for="edit-candidate-names" class="block text-[10px] font-medium text-content-subtle mb-1">
                 Candidate names (comma-separated, leave blank for all)
               </label>
               <input
+                id="edit-candidate-names"
                 type="text"
                 bind:value={editCandidateNames}
                 placeholder="e.g. Jordan Koteras, Paul Berry III"
@@ -706,8 +707,9 @@
               />
             </div>
             <div>
-              <label class="block text-[10px] font-medium text-content-subtle mb-1">Note</label>
+              <label for="edit-note" class="block text-[10px] font-medium text-content-subtle mb-1">Note</label>
               <input
+                id="edit-note"
                 type="text"
                 bind:value={editNote}
                 placeholder="Short label for this run"

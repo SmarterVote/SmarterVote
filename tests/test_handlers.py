@@ -99,3 +99,41 @@ async def test_v2_handler_uses_run_id_for_firestore_logs_when_pipeline_import_fa
 
     mock_fs_logger_cls.assert_called_with("run-123")
     mock_fs_logger_cls.return_value.log.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_v2_handler_tracks_step_progress_in_firestore_without_run_manager():
+    """Step tracker should still write current_step/progress when run_manager imports fail."""
+    handler = AgentHandler()
+    fake_result = {
+        "id": "test-race",
+        "candidates": [{"name": "Alice", "issues": {}}],
+    }
+
+    async def _fake_run_agent(*_args, **kwargs):
+        tracker = kwargs.get("step_tracker")
+        assert tracker is not None
+        tracker["start"]("issues")
+        tracker["progress"]("issues", pct=42, message="Working issues")
+        tracker["complete"]("issues", duration_ms=123)
+        return fake_result
+
+    with (
+        patch("pipeline_client.agent.agent.run_agent", new_callable=AsyncMock) as mock_agent,
+        patch.object(handler, "_save_draft", new_callable=AsyncMock) as mock_save_draft,
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger") as mock_fs_logger_cls,
+        patch.dict(sys.modules, {"pipeline_client.backend.pipeline_runner": None}),
+    ):
+        mock_agent.side_effect = _fake_run_agent
+        mock_save_draft.return_value = Path("/tmp/test-race.json")
+
+        await handler.handle(
+            {"race_id": "test-race"},
+            {"cheap_mode": True, "run_id": "run-steps"},
+        )
+
+    mock_fs_logger_cls.assert_called_with("run-steps")
+    # start + progress + complete callbacks should all update progress fields
+    assert mock_fs_logger_cls.return_value.update_progress.call_count >= 3
+    args_list = mock_fs_logger_cls.return_value.update_progress.call_args_list
+    assert any(call.kwargs.get("current_step") == "issues" for call in args_list)

@@ -270,6 +270,9 @@ web/.vscode/*
 infra/secrets.tfvars
 infra/.terraform.*
 infra/.terraform
+infra/tfplan
+infra/*.tfplan
+infra/*-source.zip
 terraform_*.zip
 
 # Pre-commit
@@ -292,6 +295,6 @@ services/races-api/data/analytics.db-wal
 services/races-api/data/analytics.db-shm
 data/analytics.db
 data/analytics.db-shm
-.gitignore
 data/analytics.db-wal
 .claude/settings.local.json
+.tmp_cf_staging/

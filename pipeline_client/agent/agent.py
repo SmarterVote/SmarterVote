@@ -267,7 +267,7 @@ async def run_agent(
             log("info", f"  {model_name}: {verdict} (score {score}/100, {n_flags} flags)")
             if summary:
                 log("info", f"    â†’ {summary}")
-        _track("complete", "review", duration_ms=int((time.perf_counter() - review_t0) * 1000))
+        _track("complete", "review", duration_ms=int((time.perf_counter() - review_t0) * 1000), race_json=race_json)
 
         # --- Phase 5: Iterate on review feedback (up to 2 cycles) ---
         if should_iterate:
@@ -329,7 +329,7 @@ async def run_agent(
             if not did_iterate:
                 _track("skip", "iteration")
             else:
-                _track("complete", "iteration", duration_ms=int((time.perf_counter() - iter_t0) * 1000))
+                _track("complete", "iteration", duration_ms=int((time.perf_counter() - iter_t0) * 1000), race_json=race_json)
         else:
             _track("skip", "iteration")
     else:

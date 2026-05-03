@@ -232,15 +232,32 @@ def test_analytics_timeseries_correct_key(client):
         main_mod._ADMIN_API_KEY = original
 
 
-def test_analytics_no_key_configured(client):
-    """When no admin key is configured, analytics endpoints return 503 (not accessible)."""
+def test_analytics_no_key_or_auth_configured(client, monkeypatch):
+    """When neither admin key nor Auth0 is configured, admin endpoints return 503."""
     import main as main_mod
 
     original = main_mod._ADMIN_API_KEY
     main_mod._ADMIN_API_KEY = None
+    monkeypatch.delenv("AUTH0_DOMAIN", raising=False)
+    monkeypatch.delenv("AUTH0_AUDIENCE", raising=False)
     try:
         resp = client.get("/analytics/overview")
         assert resp.status_code == 503
+    finally:
+        main_mod._ADMIN_API_KEY = original
+
+
+def test_analytics_no_key_falls_back_to_bearer_auth(client, monkeypatch):
+    """When Auth0 is configured, missing bearer credentials return 401."""
+    import main as main_mod
+
+    original = main_mod._ADMIN_API_KEY
+    main_mod._ADMIN_API_KEY = None
+    monkeypatch.setenv("AUTH0_DOMAIN", "example.auth0.com")
+    monkeypatch.setenv("AUTH0_AUDIENCE", "https://api.example.com")
+    try:
+        resp = client.get("/analytics/overview")
+        assert resp.status_code == 401
     finally:
         main_mod._ADMIN_API_KEY = original
 

@@ -201,6 +201,39 @@ def test_queue_race_success():
     assert body["errors"] == []
 
 
+def test_run_options_accept_cloud_function_review_fields():
+    """Production races-api RunOptions should accept all UI/agent option fields."""
+    from request_models import RunOptions
+
+    opts = RunOptions(
+        cheap_mode=False,
+        save_artifact=True,
+        enabled_steps=["review", "iteration"],
+        research_model="gpt-test",
+        claude_model="claude-test",
+        gemini_model="gemini-test",
+        grok_model="grok-test",
+    )
+
+    dumped = opts.model_dump(exclude_none=True)
+    assert dumped["save_artifact"] is True
+    assert dumped["gemini_model"] == "gemini-test"
+    assert dumped["grok_model"] == "grok-test"
+
+
+def test_run_options_normalize_and_validate_pipeline_controls():
+    """Production RunOptions should enforce the same controls as the agent handler."""
+    from pydantic import ValidationError
+    from request_models import RunOptions
+
+    opts = RunOptions(enabled_steps=[" discovery ", "issues", "issues"], candidate_names=[" Alice ", "", "Alice"])
+    assert opts.enabled_steps == ["discovery", "issues"]
+    assert opts.candidate_names == ["Alice"]
+
+    with pytest.raises(ValidationError):
+        RunOptions(enabled_steps=["not-a-step"])
+
+
 # ---------------------------------------------------------------------------
 # /api/races/queue — invalid race_id rejected
 # ---------------------------------------------------------------------------
@@ -235,6 +268,84 @@ def test_queue_race_invalid_id():
     assert body["added"] == []
     assert len(body["errors"]) == 1
     assert "invalid" in body["errors"][0]["error"].lower()
+
+
+def test_list_drafts_returns_summaries_not_ids():
+    """The web dashboard expects /drafts to return race summary objects."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    draft_json = {
+        "id": "az-senate-2026",
+        "title": "Arizona Senate 2026",
+        "office": "U.S. Senate",
+        "jurisdiction": "Arizona",
+        "state": "AZ",
+        "election_date": "2026-11-03",
+        "updated_utc": "2026-05-01T00:00:00Z",
+        "candidates": [{"name": "Alice Example", "party": "D", "incumbent": False, "image_url": "https://example.com/a.jpg"}],
+    }
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_list_race_ids", return_value=["az-senate-2026"]),
+        patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.get("/drafts")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["races"][0]["id"] == "az-senate-2026"
+    assert body["races"][0]["title"] == "Arizona Senate 2026"
+    assert body["races"][0]["candidates"][0]["name"] == "Alice Example"
+
+
+def test_admin_chat_reply_parser_extracts_action():
+    """Production admin chat should return the action shape consumed by the frontend."""
+    from routers.pipeline import _parse_admin_chat_reply
+
+    parsed = _parse_admin_chat_reply(
+        'Queue this race.\nACTION:{"type":"queue_run","race_ids":["az-senate-2026"],"options":{},"description":"Refresh Arizona"}'
+    )
+
+    assert parsed["reply"] == "Queue this race."
+    assert parsed["action"]["type"] == "queue_run"
+    assert parsed["action"]["options"]["cheap_mode"] is True
+    assert parsed["question"] is None
+    assert parsed["thinking_steps"]
+
+
+def test_admin_chat_action_race_records_from_context():
+    """Admin chat responses should include record details for proposed race actions."""
+    from routers.pipeline import _race_records_for_action
+
+    action = {"type": "queue_run", "race_ids": ["az-senate-2026"]}
+    context = [
+        {"race_id": "az-senate-2026", "title": "Arizona Senate 2026", "status": "draft"},
+        {"race_id": "ga-governor-2026", "title": "Georgia Governor 2026", "status": "published"},
+    ]
+
+    records = _race_records_for_action(action, context)
+
+    assert records == [{"race_id": "az-senate-2026", "title": "Arizona Senate 2026", "status": "draft"}]
+
+
+def test_admin_chat_reply_parser_extracts_question():
+    """Production admin chat should support clarification questions."""
+    from routers.pipeline import _parse_admin_chat_reply
+
+    parsed = _parse_admin_chat_reply('Need detail.\nQUESTION:{"text":"Which race?"}')
+
+    assert parsed["reply"] == "Need detail."
+    assert parsed["question"] == "Which race?"
+    assert parsed["action"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +422,7 @@ def test_verify_token_skip_auth():
     import auth
 
     # verify_token reads SKIP_AUTH at call time — no module reload required.
-    result = asyncio.get_event_loop().run_until_complete(auth.verify_token(None))
+    result = asyncio.run(auth.verify_token(None))
     assert result == {}
 
 
@@ -332,6 +443,6 @@ def test_verify_token_missing_credentials():
     from fastapi import HTTPException
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.get_event_loop().run_until_complete(auth.verify_token(None))
+        asyncio.run(auth.verify_token(None))
 
     assert exc_info.value.status_code == 401

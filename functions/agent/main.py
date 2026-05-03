@@ -183,7 +183,13 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
             len(exc.remaining_steps),
         )
         item_ref.update({"status": "continued", "continuation_item_id": exc.continuation_item_id})
-        run_ref.update({"status": "continued", "continuation_run_id": exc.continuation_item_id})
+        run_ref.update(
+            {
+                "status": "continued",
+                "continuation_item_id": exc.continuation_item_id,
+                "continuation_run_id": getattr(exc, "continuation_run_id", None) or exc.continuation_item_id,
+            }
+        )
         return
     except Exception as exc:
         error_msg = str(exc)
@@ -226,9 +232,10 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
 class _HandoffExit(Exception):
     """Wraps HandoffTriggered so it can be caught separately from normal exceptions."""
 
-    def __init__(self, continuation_item_id: str, remaining_steps: list):
+    def __init__(self, continuation_item_id: str, remaining_steps: list, continuation_run_id: str | None = None):
         self.continuation_item_id = continuation_item_id
         self.remaining_steps = remaining_steps
+        self.continuation_run_id = continuation_run_id
 
 
 def _gen_id() -> str:

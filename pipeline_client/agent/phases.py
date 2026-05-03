@@ -270,7 +270,7 @@ async def _run_shared_phases(
             max_iterations=min(max_iterations, 10),
             on_progress=_on_image_progress,
         )
-        track("complete", "images", duration_ms=int((time.perf_counter() - img_t0) * 1000))
+        track("complete", "images", duration_ms=int((time.perf_counter() - img_t0) * 1000), race_json=race_json)
     else:
         log("info", f"{prefix} 1b: Image resolution — SKIPPED")
         track("skip", "images")
@@ -308,7 +308,7 @@ async def _run_shared_phases(
                 last_updated=last_updated,
                 on_issue_progress=_make_issue_tracker(),
             )
-        track("complete", "issues", duration_ms=int((time.perf_counter() - iss_t0) * 1000))
+        track("complete", "issues", duration_ms=int((time.perf_counter() - iss_t0) * 1000), race_json=race_json)
     else:
         log("info", f"{prefix} 2: Issue research — SKIPPED")
         track("skip", "issues")
@@ -339,7 +339,7 @@ async def _run_shared_phases(
                 log("warning", "  Finance/voting phase returned non-dict — skipping")
         except Exception as exc:
             log("warning", f"  Finance/voting phase failed: {exc} — continuing without")
-        track("complete", "finance", duration_ms=int((time.perf_counter() - fin_t0) * 1000))
+        track("complete", "finance", duration_ms=int((time.perf_counter() - fin_t0) * 1000), race_json=race_json)
     else:
         log("info", f"{prefix} 2b: Finance & voting — SKIPPED")
         track("skip", "finance")
@@ -408,7 +408,7 @@ async def _run_shared_phases(
             )
         except Exception as exc:
             log("warning", f"  Refine meta failed: {exc} — keeping existing meta")
-        track("complete", "refinement", duration_ms=int((time.perf_counter() - ref_t0) * 1000))
+        track("complete", "refinement", duration_ms=int((time.perf_counter() - ref_t0) * 1000), race_json=race_json)
     else:
         log("info", f"{prefix} 3: Refinement — SKIPPED")
         track("skip", "refinement")
@@ -461,7 +461,7 @@ async def _run_fresh(
     n = len(candidate_names)
     if not candidate_names:
         log("warning", "No candidates found in discovery phase")
-        track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000))
+        track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000), race_json=race_json)
         return race_json
 
     # Auto-populate ballotpedia_url if not already set by the discovery agent
@@ -476,7 +476,7 @@ async def _run_fresh(
 
     refine_iters = _scale_iterations(max_iterations, n, per_candidate=2, minimum=12)
     log("info", f"  Iteration budgets — refine:{refine_iters}  (n={n} candidates)")
-    track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000))
+    track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000), race_json=race_json)
 
     await _run_shared_phases(
         race_json,
@@ -638,7 +638,7 @@ async def _run_update(
         except Exception as exc:
             log("warning", f"  Update meta phase failed: {exc} — keeping existing meta")
 
-        track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000))
+        track("complete", "discovery", duration_ms=int((time.perf_counter() - disc_t0) * 1000), race_json=race_json)
     else:
         log("info", "Update Phase 0+1: Discovery — SKIPPED")
         track("skip", "discovery")

@@ -23,9 +23,10 @@ class HandoffTriggered(Exception):
     'failed'.
     """
 
-    def __init__(self, continuation_item_id: str, remaining_steps: List[str]):
+    def __init__(self, continuation_item_id: str, remaining_steps: List[str], continuation_run_id: str | None = None):
         self.continuation_item_id = continuation_item_id
         self.remaining_steps = remaining_steps
+        self.continuation_run_id = continuation_run_id
         super().__init__(f"Handoff to continuation item {continuation_item_id}")
 
 
@@ -164,15 +165,37 @@ class AgentHandler:
         # Compute completed steps so far (used for remaining_steps on handoff)
         _completed_steps: List[str] = []
 
+        def _fallback_progress(current_step: str | None = None, current_step_pct: int = 0) -> int:
+            """Compute weighted progress without run_manager state."""
+            total_weight = sum(STEP_WEIGHTS.get(s, 0) for s in ALL_STEPS if s in enabled_set)
+            if total_weight <= 0:
+                return 0
+
+            done_weight = sum(STEP_WEIGHTS.get(s, 0) for s in _completed_steps if s in enabled_set)
+            partial_weight = 0.0
+            if current_step and current_step in enabled_set and current_step not in _completed_steps:
+                partial_weight = STEP_WEIGHTS.get(current_step, 0) * max(0, min(current_step_pct, 100)) / 100
+
+            return min(98, int((done_weight + partial_weight) / total_weight * 100))
+
+        def _broadcast_progress(pct: int, label: str) -> None:
+            if run_id and _safe_broadcast:
+                _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
+
         # --- Step tracker callbacks ---
         def _on_step_start(step: str, **_kw):
-            if not run_id or not _run_manager:
+            if not run_id:
                 return
             try:
-                _run_manager.update_step_status(run_id, step, RunStatus.RUNNING)
+                if _run_manager:
+                    _run_manager.update_step_status(run_id, step, RunStatus.RUNNING)
                 label = STEP_LABELS.get(step, step)
-                pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
-                _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
+                pct = (
+                    _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
+                    if _run_manager
+                    else _fallback_progress(step, 1)
+                )
+                _broadcast_progress(pct, label)
                 if _fs_logger:
                     _fs_logger.update_progress(pct, current_step=step)
                     _fs_logger.log("info", f"Step started: {label}", step=step, race_id=race_id)
@@ -181,14 +204,23 @@ class AgentHandler:
 
         def _on_step_complete(step: str, *, duration_ms: int = 0, **_kw):
             nonlocal _completed_steps
-            if not run_id or not _run_manager:
+            if not run_id:
                 return
             try:
-                _run_manager.update_step_status(run_id, step, RunStatus.COMPLETED, duration_ms=duration_ms)
+                latest_race_json = _kw.get("race_json")
+                if isinstance(latest_race_json, dict):
+                    race_json_holder[0] = latest_race_json
+
+                if _run_manager:
+                    _run_manager.update_step_status(run_id, step, RunStatus.COMPLETED, duration_ms=duration_ms)
                 _completed_steps.append(step)
-                pct = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
+                pct = (
+                    _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set)
+                    if _run_manager
+                    else _fallback_progress()
+                )
                 label = STEP_LABELS.get(step, step) + " ✓"
-                _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
+                _broadcast_progress(pct, label)
 
                 # --- Checkpoint / handoff check ---
                 # Must happen AFTER the step is marked complete so the saved
@@ -222,29 +254,35 @@ class AgentHandler:
                 logger.debug("_on_step_complete tracking failed for '%s': %s", step, _e)
 
         def _on_step_skip(step: str, **_kw):
-            if not run_id or not _run_manager:
+            if not run_id:
                 return
             try:
-                _run_manager.update_step_status(run_id, step, RunStatus.SKIPPED)
+                if _run_manager:
+                    _run_manager.update_step_status(run_id, step, RunStatus.SKIPPED)
                 if _fs_logger:
                     _fs_logger.log("info", f"Step skipped: {step}", step=step, race_id=race_id)
             except Exception as _e:
                 logger.debug("_on_step_skip tracking failed for '%s': %s", step, _e)
 
         def _on_step_progress(step: str, *, pct: int = 0, message: str = "", **_kw):
-            if not run_id or not _run_manager:
+            if not run_id:
                 return
             try:
                 # Update per-step progress
-                run_info = _run_manager.get_run(run_id)
-                if run_info:
-                    for s in run_info.steps:
-                        if s.name == step:
-                            s.progress_pct = pct
-                            break
-                overall = _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set, step, pct)
+                if _run_manager:
+                    run_info = _run_manager.get_run(run_id)
+                    if run_info:
+                        for s in run_info.steps:
+                            if s.name == step:
+                                s.progress_pct = pct
+                                break
+                overall = (
+                    _compute_overall_progress(run_id, _run_manager, ALL_STEPS, STEP_WEIGHTS, enabled_set, step, pct)
+                    if _run_manager
+                    else _fallback_progress(step, pct)
+                )
                 label = message or STEP_LABELS.get(step, step)
-                _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": overall, "message": label})
+                _broadcast_progress(overall, label)
                 if _fs_logger:
                     _fs_logger.update_progress(overall, current_step=step)
             except Exception as _e:
@@ -269,6 +307,7 @@ class AgentHandler:
             from pipeline_client.backend.settings import settings
 
             item_id = uuid.uuid4().hex[:8]
+            continuation_run_id = str(uuid.uuid4())
             checkpoint_gcs_path: Optional[str] = None
 
             # Try to save the latest race_json to GCS as a checkpoint
@@ -297,16 +336,16 @@ class AgentHandler:
                     continuation_options["enabled_steps"] = remaining
                     continuation_options["is_continuation"] = True
                     continuation_options["parent_run_id"] = current_run_id
-                    if checkpoint_gcs_path:
-                        continuation_options["existing_data_gcs_path"] = checkpoint_gcs_path
                     db.collection("pipeline_queue").document(item_id).set({
                         "id": item_id,
                         "race_id": current_race_id,
+                        "run_id": continuation_run_id,
                         "status": "pending",
                         "options": continuation_options,
                         "created_at": datetime.now(timezone.utc).isoformat(),
                         "is_continuation": True,
                         "parent_run_id": current_run_id,
+                        "existing_data_gcs_path": checkpoint_gcs_path,
                     })
                     logger.info("Continuation queue item %s written for steps: %s", item_id, remaining)
             except Exception as _e:
@@ -316,7 +355,7 @@ class AgentHandler:
             if _fs_logger:
                 _fs_logger.mark_continued(item_id)
 
-            raise HandoffTriggered(item_id, remaining)
+            raise HandoffTriggered(item_id, remaining, continuation_run_id)
 
         # Mutable holder so _trigger_handoff can read the latest race_json
         # (which is only known after run_agent returns, but we need the ref

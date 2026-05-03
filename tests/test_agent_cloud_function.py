@@ -273,6 +273,37 @@ def test_marks_continued_on_handoff():
     assert "item-continuation-abc" in continuation_ids
 
 
+def test_handoff_records_continuation_run_id():
+    """Continuation metadata should distinguish queue item ID from run ID."""
+    import functions.agent.main as cf_main
+    from functions.agent.main import _HandoffExit
+
+    item_data = {
+        "status": "pending",
+        "race_id": "az-01-senate-2026",
+        "run_id": "run-handoff",
+        "options": {"enabled_steps": ["discovery", "issues"]},
+    }
+    db, item_ref, run_ref, race_ref = _make_firestore_mock(item_data=item_data)
+
+    ev = _make_cloud_event("item-handoff")
+
+    with (
+        patch("functions.agent.main._get_fs", return_value=db),
+        patch(
+            "functions.agent.main._run_agent",
+            side_effect=_HandoffExit("item-continuation-abc", ["issues"], "run-continuation-xyz"),
+        ),
+    ):
+        cf_main.process_queue_item(ev)
+
+    run_updates = [c[0][0] for c in run_ref.update.call_args_list]
+    continued_updates = [u for u in run_updates if u.get("status") == "continued"]
+    assert continued_updates
+    assert continued_updates[-1]["continuation_item_id"] == "item-continuation-abc"
+    assert continued_updates[-1]["continuation_run_id"] == "run-continuation-xyz"
+
+
 # ---------------------------------------------------------------------------
 # Unit: _load_gcs_json
 # ---------------------------------------------------------------------------

@@ -1,274 +1,146 @@
 # Local Development
 
-Complete setup guide for running SmarterVote locally — pipeline client, races API, and web frontend.
+This guide runs the web app, the production-shaped `races-api`, and the local-only pipeline development API.
 
 ## Prerequisites
 
-- **Python 3.10+** (tested with 3.10.6)
-- **Node.js 22+** (tested with 22.18.0)
-- **Git**
+- Python 3.10+
+- Node.js 22+
+- Git
+- `OPENAI_API_KEY` and `SERPER_API_KEY` for real agent runs
 
-## 1. API Keys (Required)
+Optional review keys:
 
-You need **two** API keys to run the pipeline. Get them from:
+- `ANTHROPIC_API_KEY`
+- `GEMINI_API_KEY`
+- `XAI_API_KEY`
 
-| Key | Service | Get it at | Cost |
-|-----|---------|-----------|------|
-| `OPENAI_API_KEY` | GPT-4o-mini/GPT-4o for candidate research | https://platform.openai.com/api-keys | Pay-as-you-go (check billing!) |
-| `SERPER_API_KEY` | Web search via Google | https://serper.dev | Free tier: 2,500 searches |
+## Environment Setup
 
-**Optional keys** (only needed if you enable the review phase):
-
-| Key | Service | Purpose |
-|-----|---------|---------|
-| `ANTHROPIC_API_KEY` | Claude Sonnet 4 | Independent fact-check review |
-| `GEMINI_API_KEY` | Google Gemini | Independent fact-check review |
-| `XAI_API_KEY` | xAI Grok | Independent fact-check review |
-
-> **Important**: Your OpenAI account must have billing credits. A `429 insufficient_quota` error means you need to add funds at https://platform.openai.com/settings/organization/billing.
-
-## 2. Environment Setup
+From the project root, the directory that contains `pyproject.toml`:
 
 ```powershell
-cd SmarterVote      # project root (contains pyproject.toml)
-
-# Create/verify .env file
-copy .env.example .env    # if starting fresh
-```
-
-Edit `.env` and set at minimum:
-```env
-OPENAI_API_KEY=sk-proj-your-key-here
-SERPER_API_KEY=your-serper-key-here
-```
-
-### Python Virtual Environment
-
-```powershell
+copy .env.example .env
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install -e shared/
-```
 
-### Web Frontend
-
-```powershell
 cd web
 npm install
 cd ..
 ```
 
-## 3. Running All Services
+Edit `.env` and set at minimum:
 
-### Option A: One-command start (recommended)
+```env
+OPENAI_API_KEY=sk-proj-your-key-here
+SERPER_API_KEY=your-serper-key-here
+```
+
+## One-command Start
 
 ```powershell
 .\dev-start.ps1
 ```
 
-This starts all three services as background jobs. Use `Get-Job` to monitor and `Receive-Job -Name <name>` to see logs.
+Expected services:
 
-### Option B: Manual start (three terminals)
+| Service | Port | Notes |
+|---------|------|-------|
+| Web | 5173 | SvelteKit app |
+| Races API | 8080 | Production-shaped API used by the frontend |
+| Pipeline dev API | 8001 | Local-only in-process agent runner |
 
-**Terminal 1 — Pipeline Client** (port 8001):
+## Manual Start
+
+Terminal 1, pipeline dev API:
+
 ```powershell
 .venv\Scripts\Activate.ps1
 python -m uvicorn pipeline_client.backend.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-**Terminal 2 — Races API** (port 8080):
+Terminal 2, races API:
+
 ```powershell
 .venv\Scripts\Activate.ps1
-python -m uvicorn services.races-api.main:app --host 0.0.0.0 --port 8080 --reload
+python -m uvicorn main:app --app-dir services/races-api --host 0.0.0.0 --port 8080 --reload
 ```
 
-**Terminal 3 — Web Frontend** (port 5173):
+The `services/races-api` directory is not currently an importable Python package because of the hyphen in its name, so use `--app-dir` for local uvicorn runs.
+
+Terminal 3, web:
+
 ```powershell
 cd web
 npx vite dev --port 5173 --host
 ```
 
-## 4. Using the Application
+## Using the App
 
-### Web Frontend
-- **Homepage**: http://localhost:5173 — browse published races
-- **Race detail**: http://localhost:5173/race/tx-governor-2024 — view candidate comparison
-- **About page**: http://localhost:5173/about
-- **Admin dashboard**: http://localhost:5173/admin/pipeline — trigger pipeline runs
+- Homepage: `http://localhost:5173`
+- Admin dashboard: `http://localhost:5173/admin/pipeline`
+- Races API health: `http://localhost:8080/health`
+- Pipeline dev API health: `http://localhost:8001/health`
 
-### Running a Pipeline Job
+The admin UI should target `races-api` for production-shaped admin behavior. The pipeline dev API is retained for local direct runs and debugging while the Cloud Function migration is completed.
 
-**Via the admin dashboard** (recommended):
-1. Go to http://localhost:5173/admin/pipeline
-2. Enter a race ID (e.g. `az-senate-2024` or a new slug like `pa-senate-2024`)
-3. Click "Research Race"
-4. Watch live progress — the admin dashboard polls the pipeline API every few seconds. The pipeline will:
-   - **Step 1 (Discovery)**: Identify candidates, career history, polls, images
-   - **Step 2 (Image Resolution)**: Verify/find candidate headshot URLs
-   - **Step 3 (Issue Research)**: 12 per-candidate sub-agent calls, one per canonical issue
-   - **Step 4 (Finance & Voting)**: Research donor records and voting history
-   - **Step 5 (Refinement)**: Tools-mode cleanup per candidate and meta
-   - **Step 6 (Review)**: Optional fact-check via Claude, Gemini, and Grok (if "AI Review" is checked)
-   - **Step 7 (Iteration)**: Address review flags (up to 2 cycles)
+## Race IDs
 
-   Toggle **Cheap Mode** for faster/cheaper runs, or expand **Advanced Model Settings** to override specific models.
-5. Results are automatically published to `data/published/{race_id}.json`
-6. The races API serves the new data immediately — refresh the homepage
+Race IDs should match:
 
-**Via curl/API**:
+```text
+{state}-{office}-{year}
+```
+
+Examples:
+
+- `az-senate-2026`
+- `ga-governor-2026`
+- `ny-04-house-2026`
+
+## Checks
+
 ```powershell
-$body = '{"race_id": "pa-senate-2024", "options": {"save_artifact": true}}'
-Invoke-WebRequest -Uri "http://localhost:8001/api/run" `
-    -Method POST `
-    -Headers @{"Content-Type"="application/json"} `
-    -Body $body
+pytest -q
+
+cd web
+npm run check
+npm run test:unit
 ```
 
-> **Note**: The local dev setup runs the pipeline in-process via `pipeline_client/backend/main.py`. In production (GCP), runs are triggered by queuing a race via `races-api` → Firestore → Cloud Function. See [Pipeline Modes](../PIPELINE_MODES.md) for details.
+## Troubleshooting
 
-### Understanding Race IDs
+### `OPENAI_API_KEY is not set`
 
-Race IDs follow the format `{state}-{office}-{year}`, e.g.:
-- `az-senate-2024` — Arizona Senate 2024
-- `tx-governor-2024` — Texas Governor 2024
-- `ny-house-03-2024` — New York House District 3, 2024
+Make sure `.env` exists in the project root and that the server was started from the project root or with the documented `--app-dir` command.
 
-You can use any race ID — if no published data exists, the pipeline runs a full fresh research. If data already exists, it enters **update mode**, improving the existing profile.
+### OpenAI `429 insufficient_quota`
 
-## 5. Configuration Reference
+The key is valid but the account lacks credits or quota. Add billing credits in the OpenAI dashboard.
 
-### Key Environment Variables
+### Port Conflicts
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `OPENAI_API_KEY` | GPT models (required) | — |
-| `SERPER_API_KEY` | Web search (required) | — |
-| `ANTHROPIC_API_KEY` | Claude review (optional) | — |
-| `GEMINI_API_KEY` | Gemini review (optional) | — |
-| `XAI_API_KEY` | Grok review (optional) | — |
-| `SEARCH_CACHE_TTL_HOURS` | Search cache TTL | `168` (7 days) |
-
-### Pipeline Options
-
-When triggering a run, the `options` object supports:
-
-| Option | Type | Default | Purpose |
-|--------|------|---------|---------|
-| `cheap_mode` | bool | `true` | Use cheaper/faster model variants |
-| `save_artifact` | bool | `true` | Save full run artifact for later inspection |
-| `enabled_steps` | string[] | `null` (all steps) | Select which pipeline steps to run; include `review` (and optionally `iteration`) to run multi-model review |
-| `research_model` | string | `null` | Override OpenAI research model |
-| `claude_model` | string | `null` | Override Claude review model |
-| `gemini_model` | string | `null` | Override Gemini review model |
-| `grok_model` | string | `null` | Override Grok review model |
-
-### Model Defaults
-
-| Phase | Cheap Mode (default) | Full Mode |
-|-------|---------------------|----------|
-| Research (OpenAI) | gpt-5.4-mini | gpt-5.4 |
-| Sub-tasks (OpenAI) | gpt-5-nano | gpt-5.4-mini |
-| Review: Claude | claude-haiku-4-5-20251001 | claude-sonnet-4-6 |
-| Review: Gemini | gemini-3.1-flash-lite-preview | gemini-3.1-pro-preview |
-| Review: Grok | grok-4-1-fast-non-reasoning | grok-4.20-0309-reasoning |
-
-You can override any model from the admin dashboard's "Advanced Model Settings" panel, or by passing the option in the API request body.
-
-### Ports
-
-| Service | Port | Health Check |
-|---------|------|-------------|
-| Pipeline Client | 8001 | `GET /health` |
-| Races API | 8080 | `GET /races` |
-| Web Frontend | 5173 | — |
-
-### Frontend Environment (`web/.env`)
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `VITE_RACES_API_URL` | Races API URL | `http://localhost:8080` |
-| `VITE_API_BASE` | Pipeline Client URL | `http://localhost:8001` |
-| `VITE_SKIP_AUTH` | Bypass Auth0 login locally | `true` |
-
-## 6. Project Structure
-
-```
-data/
-├── cache/          # SQLite search cache (auto-created)
-├── drafts/         # Agent output before publish
-└── published/      # Published JSON files (served by races API)
-
-pipeline_client/
-├── agent/          # AI research agent
-│   ├── agent.py    # Multi-phase agent loop (7 steps)
-│   ├── prompts.py  # Prompt templates for each phase
-│   ├── tools.py    # Agent tool definitions
-│   ├── handlers.py # LLM request/response handling
-│   ├── review.py   # Multi-LLM review (Claude, Gemini, Grok)
-│   ├── images.py   # Candidate image URL resolution
-│   ├── ballotpedia.py # Ballotpedia lookup helper
-│   ├── cost.py     # Token counting + cost estimation
-│   └── search_cache.py # SQLite search result cache (7-day TTL)
-├── backend/        # FastAPI app, WebSocket logging, run management
-│   ├── main.py     # API endpoints (40+)
-│   ├── models.py   # PipelineStep, RunOptions, RunInfo
-│   ├── pipeline_runner.py # Async step execution
-│   ├── run_manager.py  # Run lifecycle management
-│   ├── queue_manager.py # Persistent queue (Firestore/JSON)
-│   ├── race_manager.py # Unified race records + metadata
-│   ├── settings.py # App settings from env
-│   ├── storage.py  # Storage routing
-│   ├── storage_backend.py # Local/GCP storage abstraction
-│   ├── handlers/   # Pipeline step handlers (agent.py)
-│   └── ...
-└── run.py          # CLI entry point
-
-services/
-└── races-api/      # FastAPI REST API serving published race data
-
-shared/
-└── models.py       # Pydantic v2 models (RaceJSON v0.3 schema)
-
-web/                # SvelteKit + Tailwind frontend
-├── src/routes/     # Pages (home, race detail, admin)
-├── src/lib/        # Components, stores, services
-└── .env            # Frontend env vars
-```
-
-## 7. Troubleshooting
-
-### "insufficient_quota" / 429 from OpenAI
-Your OpenAI API key has no billing credits. Add funds at https://platform.openai.com/settings/organization/billing.
-
-### "OPENAI_API_KEY is not set"
-The `.env` file is not being loaded. Make sure:
-1. `.env` exists in the project root (same directory as `pyproject.toml`)
-2. You're starting the pipeline client from the project root
-
-### Port conflicts
-Kill existing processes on a port:
 ```powershell
-Get-NetTCPConnection -LocalPort 8001 -State Listen |
+Get-NetTCPConnection -LocalPort 8080 -State Listen |
     ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
 
-### Import errors
-Ensure the virtual environment is active and `shared` package is installed:
+### Import Errors
+
 ```powershell
 .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 pip install -e shared/
 ```
 
-### Search cache
-Cached search results are stored in `data/cache/`. Delete the cache to force fresh web searches:
+### Force Fresh Search Results
+
 ```powershell
 Remove-Item -Recurse -Force data\cache
 ```
 
-### Auth0 in production
-For production deployment with Auth0 authentication, see [auth0-configuration.md](auth0-configuration.md). Local development bypasses auth via `VITE_SKIP_AUTH=true`.
+## Production Notes
 
-## 8. Terraform / Infrastructure (Not Required Locally)
-
-The `infra/` directory contains Terraform configs for GCP deployment (Cloud Run, Pub/Sub, Cloud Storage). You do **not** need Terraform for local development. See [deployment-guide.md](deployment-guide.md) for production setup.
+In production, the admin dashboard queues races through `services/races-api`. A Firestore `pipeline_queue` document triggers the Cloud Function in `functions/agent`, which calls `AgentHandler` and writes draft output to GCS. The local pipeline API does not run in production.

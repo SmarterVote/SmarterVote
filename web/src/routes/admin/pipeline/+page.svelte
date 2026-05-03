@@ -215,6 +215,7 @@
           pipelineActions.setRunStatus("running");
           startAutoRefresh();
           startElapsedTimer();
+          if (running?.run_id) websocketActions.watchRun(running.run_id);
         } else {
           pipelineActions.setExecutionState(false);
           pipelineActions.setRunStatus("idle");

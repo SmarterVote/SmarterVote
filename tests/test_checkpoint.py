@@ -36,7 +36,7 @@ def test_handoff_triggered_is_exception():
 # ---------------------------------------------------------------------------
 
 
-def _make_run_agent_calling_tracker(step: str, *, complete: bool = True):
+def _make_run_agent_calling_tracker(step: str, *, complete: bool = True, race_json: dict | None = None):
     """
     Returns an async mock of run_agent that calls step_tracker callbacks for
     the given step, simulating what the real agent does at runtime.
@@ -46,7 +46,10 @@ def _make_run_agent_calling_tracker(step: str, *, complete: bool = True):
         if step_tracker:
             step_tracker["start"](step)
             if complete:
-                step_tracker["complete"](step, duration_ms=100)
+                kwargs = {"duration_ms": 100}
+                if race_json is not None:
+                    kwargs["race_json"] = race_json
+                step_tracker["complete"](step, **kwargs)
         return {"id": race_id, "candidates": []}
 
     return _fake_run_agent
@@ -91,6 +94,60 @@ async def test_handoff_raised_when_deadline_exceeded():
     exc = exc_info.value
     # "issues" was not yet completed, so it should be in remaining_steps
     assert "issues" in exc.remaining_steps
+
+
+@pytest.mark.asyncio
+async def test_handoff_writes_continuation_run_and_checkpoint_path():
+    """Continuation queue docs must match what the Cloud Function reads."""
+    from pipeline_client.backend.handlers.agent import AgentHandler
+
+    handler = AgentHandler()
+    past_deadline = time.time() - 10.0
+    latest_race_json = {"id": "az-01-senate-2026", "candidates": [{"name": "Alice"}]}
+
+    options = {
+        "run_id": "run-handoff-test",
+        "deadline_at": past_deadline,
+        "enabled_steps": ["discovery", "issues"],
+    }
+    payload = {"race_id": "az-01-senate-2026"}
+
+    queue_doc_ref = MagicMock()
+    queue_collection = MagicMock()
+    queue_collection.document.return_value = queue_doc_ref
+    mock_db = MagicMock()
+    mock_db.collection.return_value = queue_collection
+
+    mock_blob = MagicMock()
+    mock_bucket = MagicMock()
+    mock_bucket.blob.return_value = mock_blob
+    mock_storage_client = MagicMock()
+    mock_storage_client.bucket.return_value = mock_bucket
+
+    with (
+        patch(
+            "pipeline_client.agent.agent.run_agent",
+            side_effect=_make_run_agent_calling_tracker("discovery", race_json=latest_race_json),
+        ),
+        patch.object(handler, "_save_draft", new_callable=AsyncMock),
+        patch.object(handler, "_get_storage_client", return_value=mock_storage_client),
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+        patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
+        patch("pipeline_client.backend.settings.settings.gcs_bucket", "test-bucket"),
+    ):
+        with pytest.raises(HandoffTriggered) as exc_info:
+            await handler.handle(payload, options)
+
+    continuation_doc = queue_doc_ref.set.call_args.args[0]
+    assert continuation_doc["race_id"] == "az-01-senate-2026"
+    assert continuation_doc["run_id"]
+    assert continuation_doc["is_continuation"] is True
+    assert continuation_doc["parent_run_id"] == "run-handoff-test"
+    assert continuation_doc["existing_data_gcs_path"] == "gs://test-bucket/checkpoints/run-handoff-test.json"
+    assert continuation_doc["options"]["enabled_steps"] == ["issues"]
+    assert "existing_data_gcs_path" not in continuation_doc["options"]
+    assert exc_info.value.continuation_run_id == continuation_doc["run_id"]
+    mock_blob.upload_from_string.assert_called_once()
 
 
 @pytest.mark.asyncio

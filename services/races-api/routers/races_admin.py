@@ -15,6 +15,31 @@ from request_models import BatchPublishRequest, RaceQueueRequest, RunOptions, va
 router = APIRouter()
 
 
+def _race_summary(data: Dict[str, Any], fallback_id: str) -> Dict[str, Any]:
+    """Build the admin race summary shape expected by the web dashboard."""
+    candidates = data.get("candidates") or []
+    return {
+        "id": data.get("id") or fallback_id,
+        "title": data.get("title"),
+        "office": data.get("office"),
+        "jurisdiction": data.get("jurisdiction"),
+        "state": data.get("state"),
+        "election_date": data.get("election_date") or "",
+        "updated_utc": data.get("updated_utc") or "",
+        "candidates": [
+            {
+                "name": c.get("name", ""),
+                "party": c.get("party"),
+                "incumbent": c.get("incumbent"),
+                "image_url": c.get("image_url"),
+            }
+            for c in candidates
+            if isinstance(c, dict)
+        ],
+        "agent_metrics": data.get("agent_metrics"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Race records (Firestore metadata)
 # ---------------------------------------------------------------------------
@@ -137,9 +162,14 @@ async def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> 
 
 @router.get("/drafts", dependencies=[Depends(verify_token)])
 async def list_draft_races() -> Dict[str, Any]:
-    """List all draft race IDs from GCS."""
+    """List all draft race summaries from GCS."""
     ids = gcs_helpers._gcs_list_race_ids("drafts")
-    return {"races": ids or []}
+    races = []
+    for race_id in ids or []:
+        data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
+        if isinstance(data, dict):
+            races.append(_race_summary(data, race_id))
+    return {"races": races}
 
 
 @router.get("/drafts/{race_id}", dependencies=[Depends(verify_token)])
@@ -160,6 +190,10 @@ async def publish_draft(race_id: str) -> Dict[str, Any]:
     if data is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     gcs_helpers._publish_race_gcs(race_id, data)
+    firestore_helpers._fs_update_race(
+        race_id,
+        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+    )
     return {"message": f"Race {race_id} published", "id": race_id}
 
 
@@ -193,6 +227,10 @@ async def publish_race(race_id: str) -> Dict[str, Any]:
     if data is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     gcs_helpers._publish_race_gcs(race_id, data)
+    firestore_helpers._fs_update_race(
+        race_id,
+        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+    )
     return {"message": f"Race {race_id} published", "id": race_id}
 
 
@@ -220,6 +258,10 @@ async def batch_publish_races(request: BatchPublishRequest) -> Dict[str, Any]:
                 errors.append({"race_id": race_id, "error": "Draft not found"})
                 continue
             gcs_helpers._publish_race_gcs(race_id, data)
+            firestore_helpers._fs_update_race(
+                race_id,
+                {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+            )
             published.append(race_id)
         except HTTPException as exc:
             errors.append({"race_id": race_id, "error": exc.detail})

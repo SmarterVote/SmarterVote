@@ -4,9 +4,6 @@
   import { getStatusClass } from "$lib/utils/pipelineUtils";
   import type { RunHistoryItem } from "$lib/types";
 
-  // Note: steps prop received from parent but used from selectedRun.steps instead
-  // svelte-ignore unused-export-let
-  export let steps: string[] = [];
   export let inputJson = "";
   export let useCloudStorage = false;
   export let executionMode: "single" | "range" = "single";
