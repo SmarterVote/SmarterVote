@@ -129,14 +129,14 @@ class AgentHandler:
         from pipeline_client.backend.firestore_logger import FirestoreLogger
 
         # Get run context for broadcasting
-        run_id: str | None = None
+        # Resolve run_id from options first so Firestore logging still works
+        # even if optional local pipeline imports fail in Cloud Function.
+        run_id: str | None = options.get("run_id")
         _safe_broadcast: Any = None
         _run_manager: Any = None
         try:
             from pipeline_client.backend.pipeline_runner import _safe_broadcast
             from pipeline_client.backend.run_manager import run_manager as _run_manager
-            # Use explicit run_id passed via options (set by pipeline_runner)
-            run_id = options.get("run_id")
             if not run_id:
                 # Fallback: pick the first active run (legacy path)
                 active = next(iter(_run_manager.list_active_runs()), None)
