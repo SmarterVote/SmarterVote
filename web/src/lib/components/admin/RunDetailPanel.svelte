@@ -181,7 +181,7 @@
   }
 
   function formatTimestamp(iso?: string): string {
-    if (!iso) return "â€”";
+    if (!iso) return "-";
     return new Date(iso).toLocaleString(undefined, {
       month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
     });
@@ -291,8 +291,8 @@
   async function handleDelete() {
     if (!run) return;
     const confirmMsg = isRunning
-      ? `Force-delete running run ${runId.substring(0, 8)}â€¦ for ${raceId}? This will cancel and remove it immediately.`
-      : `Delete run ${runId.substring(0, 8)}â€¦ for ${raceId}? This cannot be undone.`;
+      ? `Force-delete running run ${runId.substring(0, 8)}... for ${raceId}? This will cancel and remove it immediately.`
+      : `Delete run ${runId.substring(0, 8)}... for ${raceId}? This cannot be undone.`;
     if (!confirm(confirmMsg)) return;
     deleting = true;
     try {
@@ -400,7 +400,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
             </svg>
           {/if}
-          {cancelling ? "Cancellingâ€¦" : "Cancel Run"}
+          {cancelling ? "Cancelling..." : "Cancel Run"}
         </button>
       {/if}
       {#if run}
@@ -448,7 +448,7 @@
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
         <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
       </svg>
-      <span class="text-sm text-content-subtle">Loading run detailsâ€¦</span>
+      <span class="text-sm text-content-subtle">Loading run details...</span>
     </div>
   {:else if error}
     <div class="card p-4 text-sm text-red-600">{error}</div>
@@ -456,7 +456,7 @@
     <!-- Progress bar -->
     <div class="card p-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm text-content-muted font-medium">{progressMsg || "Waitingâ€¦"}</span>
+        <span class="text-sm text-content-muted font-medium">{progressMsg || "Waiting..."}</span>
         <div class="flex items-center gap-3 text-sm text-content-subtle">
           <span>{formatDuration(elapsed)}</span>
           <span class="font-semibold">{progress}%</span>
@@ -531,7 +531,7 @@
                   {#if step.duration_ms}
                     <span class="text-xs text-content-subtle">{formatDuration(Math.round(step.duration_ms / 1000))}</span>
                   {:else if step.status === "running"}
-                    <span class="text-xs text-blue-500 animate-pulse">runningâ€¦</span>
+                    <span class="text-xs text-blue-500 animate-pulse">running...</span>
                   {:else if isSkipped}
                     <span class="text-xs text-content-faint">skipped</span>
                   {/if}
@@ -542,7 +542,7 @@
         {:else}
           <div class="text-center text-content-faint py-8 text-sm">
             {#if isRunning}
-              Waiting for step dataâ€¦
+              Waiting for step data...
             {:else}
               No step data available for this run
             {/if}
@@ -672,7 +672,7 @@
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-3">
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Est. Cost</p>
-                      <p class="text-xl font-bold text-content">{am.estimated_usd != null ? (am.estimated_usd < 0.001 ? '<$0.001' : `$${am.estimated_usd.toFixed(3)}`) : 'â€”'}</p>
+                      <p class="text-xl font-bold text-content">{am.estimated_usd != null ? (am.estimated_usd < 0.001 ? '<$0.001' : `$${am.estimated_usd.toFixed(3)}`) : '-'}</p>
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Tokens</p>
@@ -680,11 +680,11 @@
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Duration</p>
-                      <p class="text-xl font-bold text-content">{am.duration_s != null ? `${Math.round(am.duration_s)}s` : 'â€”'}</p>
+                      <p class="text-xl font-bold text-content">{am.duration_s != null ? `${Math.round(am.duration_s)}s` : '-'}</p>
                     </div>
                     <div>
                       <p class="text-[10px] text-content-faint uppercase tracking-wide">Model</p>
-                      <p class="text-sm font-semibold text-content truncate">{am.model ?? 'â€”'}</p>
+                      <p class="text-sm font-semibold text-content truncate">{am.model ?? '-'}</p>
                     </div>
                   </div>
                   {#if am.model_breakdown && Object.keys(am.model_breakdown).length > 0}
@@ -905,7 +905,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
               <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <span class="text-sm">Output available when run completesâ€¦</span>
+            <span class="text-sm">Output available when run completes...</span>
           </div>
         {:else}
           <p class="text-sm text-content-faint py-4 text-center">No race data available for this run</p>

@@ -206,7 +206,7 @@
   }
 
   function formatDate(s?: string) {
-    if (!s) return "â€”";
+    if (!s) return "-";
     return new Date(s).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
@@ -231,7 +231,7 @@
         type="text"
         bind:value={addInput}
         on:keydown={handleAddKeydown}
-        placeholder="Add races: ga-senate-2026, tx-governor-2026â€¦"
+        placeholder="Add races: ga-senate-2026, tx-governor-2026..."
         class="flex-1 px-3 py-2 border border-stroke rounded-lg text-sm font-mono bg-surface text-content focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
       <button
@@ -252,7 +252,7 @@
       <input
         type="search"
         bind:value={search}
-        placeholder="Search by race ID, title, jurisdictionâ€¦"
+        placeholder="Search by race ID, title, jurisdiction..."
         class="flex-1 min-w-48 px-3 py-2 text-sm border border-stroke rounded-lg bg-surface text-content focus:outline-none focus:border-blue-500"
       />
       <select
@@ -280,7 +280,7 @@
             disabled={bulkPublishing}
             on:click={handleBulkPublish}
           >
-            {bulkPublishing ? "Publishingâ€¦" : `Publish ${selectedWithDrafts.length} Draft${selectedWithDrafts.length !== 1 ? "s" : ""}`}
+            {bulkPublishing ? "Publishing..." : `Publish ${selectedWithDrafts.length} Draft${selectedWithDrafts.length !== 1 ? "s" : ""}`}
           </button>
         {/if}
       {/if}
@@ -297,7 +297,7 @@
   {#if error}
     <div class="card p-4 text-sm text-red-600">{error}</div>
   {:else if loading}
-    <div class="card p-8 text-center text-content-faint text-sm">Loading racesâ€¦</div>
+    <div class="card p-8 text-center text-content-faint text-sm">Loading races...</div>
   {:else if filteredRows.length === 0}
     <div class="card p-8 text-center text-content-faint text-sm">No races found</div>
   {:else}
@@ -370,9 +370,9 @@
                     </span>
                   {/if}
                 </td>
-                <td class="px-3 py-3 text-content max-w-40 truncate" title={row.title ?? ""}>{row.title ?? "â€”"}</td>
-                <td class="px-3 py-3 text-content-muted max-w-32 truncate">{row.jurisdiction ?? "â€”"}</td>
-                <td class="px-3 py-3 text-content-muted text-center font-mono">{row.candidate_count || "â€”"}</td>
+                <td class="px-3 py-3 text-content max-w-40 truncate" title={row.title ?? ""}>{row.title ?? "-"}</td>
+                <td class="px-3 py-3 text-content-muted max-w-32 truncate">{row.jurisdiction ?? "-"}</td>
+                <td class="px-3 py-3 text-content-muted text-center font-mono">{row.candidate_count || "-"}</td>
                 <td class="px-3 py-3 text-content-muted whitespace-nowrap">{formatDate(row.draft_updated_at)}</td>
                 <td class="px-3 py-3">
                   <div class="flex items-center gap-1.5">
@@ -382,7 +382,7 @@
                     {#if isDiscoveryOnly(row)}
                       <span
                         class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700"
-                        title="Last run was discovery-only â€” candidates found but issues/research/finance not yet populated"
+                        title="Last run was discovery-only - candidates found but issues/research/finance not yet populated"
                       >
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -393,7 +393,7 @@
                     {#if hasPendingDraft(row)}
                       <span
                         class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
-                        title="Draft available â€” newer than published version"
+                        title="Draft available - newer than published version"
                       >
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -412,7 +412,7 @@
                   {:else if row.quality_score != null}
                     <QualityBadge score={row.quality_score} />
                   {:else}
-                    <span class="text-content-faint">â€”</span>
+                    <span class="text-content-faint">-</span>
                   {/if}
                 </td>
                 <td class="px-3 py-3" on:click|stopPropagation>
@@ -424,7 +424,7 @@
                         disabled={publishing.has(row.race_id)}
                         on:click={() => handlePublish(row.race_id)}
                       >
-                        {publishing.has(row.race_id) ? "â€¦" : "Publish"}
+                        {publishing.has(row.race_id) ? "..." : "Publish"}
                       </button>
                     {/if}
                     {#if row.status === "published"}

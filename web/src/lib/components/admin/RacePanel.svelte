@@ -260,7 +260,7 @@
   }
 
   async function handleDeleteRun(runId: string) {
-    if (!confirm(`Delete run ${runId.substring(0, 8)}â€¦? This cannot be undone.`)) return;
+    if (!confirm(`Delete run ${runId.substring(0, 8)}...? This cannot be undone.`)) return;
     deletingRunId = runId;
     error = "";
     try {
@@ -282,7 +282,7 @@
   }
 
   function formatDate(s?: string): string {
-    if (!s) return "â€”";
+    if (!s) return "-";
     return new Date(s).toLocaleString(undefined, {
       month: "short", day: "numeric", year: "numeric",
       hour: "2-digit", minute: "2-digit",
@@ -300,7 +300,7 @@
   }
 
   function formatDuration(ms?: number): string {
-    if (!ms) return "â€”";
+    if (!ms) return "-";
     if (ms < 60000) return `${Math.round(ms / 1000)}s`;
     return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
   }
@@ -355,7 +355,7 @@
                 <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
             {/if}
-            {cancelling ? "Stoppingâ€¦" : race.status === "running" ? "Stop Run" : "Remove from Queue"}
+            {cancelling ? "Stopping..." : race.status === "running" ? "Stop Run" : "Remove from Queue"}
           </button>
         {/if}
         {#if hasDraft}
@@ -408,7 +408,7 @@
           on:click={handleDeleteRace}
           title="Delete this race entirely"
         >
-          {deletingRace ? "Deletingâ€¦" : "Delete Race"}
+          {deletingRace ? "Deleting..." : "Delete Race"}
         </button>
       </div>
 
@@ -442,7 +442,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 </svg>
-                <span class="flex-1">Draft is newer than published â€” unpublished changes exist.</span>
+                <span class="flex-1">Draft is newer than published - unpublished changes exist.</span>
                 <button
                   type="button"
                   class="shrink-0 text-xs font-semibold underline hover:no-underline"
@@ -467,19 +467,19 @@
             <div class="grid grid-cols-2 gap-x-6 gap-y-3">
               <div>
                 <span class="text-xs text-content-muted font-medium">Office</span>
-                <p class="mt-0.5 text-sm text-content">{race.office ?? "â€”"}</p>
+                <p class="mt-0.5 text-sm text-content">{race.office ?? "-"}</p>
               </div>
               <div>
                 <span class="text-xs text-content-muted font-medium">Jurisdiction</span>
-                <p class="mt-0.5 text-sm text-content">{race.jurisdiction ?? "â€”"}</p>
+                <p class="mt-0.5 text-sm text-content">{race.jurisdiction ?? "-"}</p>
               </div>
               <div>
                 <span class="text-xs text-content-muted font-medium">Election Date</span>
-                <p class="mt-0.5 text-sm text-content">{race.election_date ?? "â€”"}</p>
+                <p class="mt-0.5 text-sm text-content">{race.election_date ?? "-"}</p>
               </div>
               <div>
                 <span class="text-xs text-content-muted font-medium">Candidates</span>
-                <p class="mt-0.5 text-sm text-content">{race.candidate_count || "â€”"}</p>
+                <p class="mt-0.5 text-sm text-content">{race.candidate_count || "-"}</p>
               </div>
             </div>
 
@@ -520,18 +520,18 @@
                       class="text-xs text-red-500 dark:text-red-400 hover:underline font-medium disabled:opacity-40"
                       disabled={deletingDraft}
                       on:click={handleDeleteDraft}
-                    >{deletingDraft ? "Deletingâ€¦" : "Delete"}</button>
+                    >{deletingDraft ? "Deleting..." : "Delete"}</button>
                   </div>
                 </div>
               {/if}
 
               {#if !race.published_at && !hasDraft}
-                <p class="text-xs text-content-faint py-1">No versions yet â€” run the pipeline to generate a draft.</p>
+                <p class="text-xs text-content-faint py-1">No versions yet - run the pipeline to generate a draft.</p>
               {/if}
 
               <!-- Retired versions -->
               {#if retiredLoading}
-                <p class="text-xs text-content-faint py-1">Loading retired versionsâ€¦</p>
+                <p class="text-xs text-content-faint py-1">Loading retired versions...</p>
               {:else if retiredError}
                 <p class="text-xs text-red-500 py-1">{retiredError}</p>
               {:else if retiredVersions.length > 0}
@@ -555,7 +555,7 @@
                             class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0 disabled:opacity-40"
                             disabled={restoringVersion === ver.filename}
                             on:click={() => handleRestoreVersion(ver.filename)}
-                          >{restoringVersion === ver.filename ? "Restoringâ€¦" : "Restore as draft"}</button>
+                          >{restoringVersion === ver.filename ? "Restoring..." : "Restore as draft"}</button>
                           <button
                             type="button"
                             class="text-xs text-content-muted hover:underline font-medium shrink-0"
@@ -591,7 +591,7 @@
         {:else if activeTab === "runs"}
           <div class="space-y-2">
             {#if runsLoading}
-              <div class="py-8 text-center text-content-faint text-sm">Loading runsâ€¦</div>
+              <div class="py-8 text-center text-content-faint text-sm">Loading runs...</div>
             {:else if runsError}
               <div class="py-4 text-sm text-red-600">{runsError}</div>
             {:else if runs.length === 0}
@@ -606,7 +606,7 @@
                       on:click={() => handleViewRun(run.run_id)}
                     >
                       <div class="flex items-center justify-between">
-                        <span class="text-sm font-mono text-content">{run.run_id.substring(0, 12)}â€¦</span>
+                        <span class="text-sm font-mono text-content">{run.run_id.substring(0, 12)}...</span>
                         <span class="text-xs px-2 py-0.5 rounded-full {statusBadge(run.status)}">{run.status}</span>
                       </div>
                       <div class="flex items-center gap-3 mt-1 text-xs text-content-faint">
@@ -777,9 +777,9 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Queuingâ€¦
+                  Queuing...
                 {:else if race.status === "running"}
-                  Running â€” use Stop above to cancel
+                  Running - use Stop above to cancel
                 {:else if race.status === "queued"}
                   Already Queued
                 {:else}
