@@ -113,8 +113,13 @@ async def clear_pending_queue() -> Dict[str, Any]:
 
 
 @router.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
-async def remove_queue_item(item_id: str) -> Dict[str, Any]:
-    """Cancel or remove a specific queue item."""
+async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
+    """Cancel or remove a specific queue item.
+
+    When ``force=true`` this endpoint always deletes the queue document, even
+    if the item is currently running. This matches admin UI recovery behavior
+    for stuck queue items.
+    """
     db = firestore_helpers._get_fs()
     doc = db.collection("pipeline_queue").document(item_id).get()
     if not doc.exists:
@@ -122,6 +127,12 @@ async def remove_queue_item(item_id: str) -> Dict[str, Any]:
     data = doc.to_dict() or {}
     status = data.get("status", "")
     race_id = data.get("race_id")
+
+    if force:
+        doc.reference.delete()
+        if race_id:
+            firestore_helpers._fs_update_race(race_id, {"status": "cancelled"})
+        return {"ok": True, "action": "force_removed", "id": item_id}
 
     if status == "pending":
         doc.reference.update({"status": "cancelled"})

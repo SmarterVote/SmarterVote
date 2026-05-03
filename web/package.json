@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "build:gh-pages": "npm run build && touch build/.nojekyll",
+    "build:gh-pages": "npm run build && node -e \"const fs=require('fs'); fs.copyFileSync('build/index.html','build/404.html'); fs.writeFileSync('build/.nojekyll','');\"",
     "preview": "vite preview",
     "deploy": "npm run build:gh-pages && gh-pages -d build",
     "test": "npm run test:unit",
