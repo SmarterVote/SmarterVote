@@ -244,9 +244,9 @@
     return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
   }
 
-  function shortModel(m: string): string {
+  function shortModel(m: string | undefined | null): string {
     // Shorten common model names for compact display
-    return m
+    return (m ?? "")
       .replace("gpt-5.4-mini", "GPT-5 mini")
       .replace("gpt-5-nano", "GPT-5 nano")
       .replace("gpt-5.4", "GPT-5")
@@ -628,7 +628,7 @@
                     {/if}
                   </td>
                   <td class="px-3 py-2 text-content-muted max-w-36">
-                    <span class="truncate block font-mono text-xs" title={rec.model}>{shortModel(rec.model) || "-"}</span>
+                    <span class="truncate block font-mono text-xs" title={rec.model}>{shortModel(rec.model ?? "") || "-"}</span>
                     {#if rec.model_breakdown && Object.keys(rec.model_breakdown).length > 1}
                       <span class="text-content-faint text-xs">+{Object.keys(rec.model_breakdown).length - 1} model{Object.keys(rec.model_breakdown).length > 2 ? "s" : ""}</span>
                     {/if}

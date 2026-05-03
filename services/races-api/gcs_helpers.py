@@ -159,3 +159,7 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> None:
             "published_at": datetime.now(timezone.utc).isoformat(),
         },
     )
+
+
+# Alias used by races_admin router
+_publish_race_gcs = publish_race_to_gcs
