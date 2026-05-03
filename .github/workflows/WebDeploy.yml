@@ -46,7 +46,7 @@ jobs:
         working-directory: web
 
       - name: Build site
-        run: npm run build
+        run: npm run build:gh-pages
         working-directory: web
         env:
           NODE_ENV: production
