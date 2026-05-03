@@ -104,7 +104,7 @@
     { id: "steps" as SectionId, label: `Steps (${pipelineSteps.length})` },
     { id: "logs" as SectionId, label: `Logs (${runLogs.length})` },
     { id: "output" as SectionId, label: "Output" },
-    ...(analysisContent ? [{ id: "analysis" as SectionId, label: "âœ¦ Analysis" }] : []),
+    ...(analysisContent ? [{ id: "analysis" as SectionId, label: "Analysis" }] : []),
   ];
   $: progress = isLiveAndRunning ? Math.max(liveProgress, computeProgress(pipelineSteps as RunStep[])) : computeProgress(pipelineSteps as RunStep[]);
   $: progressMsg = isLiveAndRunning && liveProgressMessage ? liveProgressMessage : lastStepMessage(pipelineSteps as RunStep[]);
@@ -150,11 +150,11 @@
 
   function stepIcon(status: string): string {
     switch (status) {
-      case "completed": return "âœ“";
-      case "running": return "â—";
-      case "failed": return "âœ—";
-      case "skipped": return "âŠ˜";
-      default: return "â—‹";
+      case "completed": return "✓";
+      case "running": return "●";
+      case "failed": return "✗";
+      case "skipped": return "⊘";
+      default: return "○";
     }
   }
 
@@ -363,7 +363,7 @@
       </div>
       <div class="flex items-center gap-4 mt-0.5 text-xs text-content-subtle">
         <button type="button" class="font-mono hover:text-content-muted transition-colors" on:click={copyRunId} title="Copy run ID">
-          {copiedRunId ? 'âœ“ Copied' : `Run ${runId.substring(0, 8)}`}
+          {copiedRunId ? '✓ Copied' : `Run ${runId.substring(0, 8)}`}
         </button>
         {#if run}
           <span>Started {formatTimestamp(run.started_at)}</span>
@@ -517,7 +517,7 @@
                     <div class="flex items-center gap-3 mt-0.5 text-[10px] text-content-faint">
                       <span>Started {formatTimestamp(step.started_at)}</span>
                       {#if step.completed_at}
-                        <span>â†’ {formatTimestamp(step.completed_at)}</span>
+                        <span>-> {formatTimestamp(step.completed_at)}</span>
                       {/if}
                     </div>
                   {/if}
@@ -569,7 +569,7 @@
             class="px-2 py-0.5 rounded text-xs font-medium transition-colors {autoScrollLogs ? 'text-blue-600 dark:text-blue-400' : 'text-content-faint hover:text-content-subtle'}"
             on:click={() => { autoScrollLogs = !autoScrollLogs; if (autoScrollLogs && logsContainer) logsContainer.scrollTop = logsContainer.scrollHeight; }}
             title="{autoScrollLogs ? 'Auto-scroll on' : 'Auto-scroll off'}"
-          >â†“ Auto</button>
+          >v Auto</button>
         </div>
         <div
           bind:this={logsContainer}
@@ -638,8 +638,8 @@
                     <h3 class="text-base font-bold text-content">{rj.title ?? rj.id}</h3>
                     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs text-content-subtle">
                       {#if rj.office}<span class="font-medium">{rj.office}</span>{/if}
-                      {#if rj.jurisdiction}<span class="text-content-faint">Â·</span><span>{rj.jurisdiction}</span>{/if}
-                      {#if rj.election_date}<span class="text-content-faint">Â·</span><span>Election: {rj.election_date}</span>{/if}
+                      {#if rj.jurisdiction}<span class="text-content-faint">·</span><span>{rj.jurisdiction}</span>{/if}
+                      {#if rj.election_date}<span class="text-content-faint">·</span><span>Election: {rj.election_date}</span>{/if}
                     </div>
                     {#if rj.description}
                       <p class="mt-2 text-xs text-content-muted leading-relaxed">{rj.description}</p>
@@ -783,7 +783,7 @@
                               <p class="text-[10px] text-content-faint uppercase tracking-wide mb-1">Finance</p>
                               <p class="text-xs text-content-muted leading-relaxed line-clamp-2">{candidate.donor_summary}</p>
                               {#if candidate.donor_source_url}
-                                <a href={candidate.donor_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source â†’</a>
+                                <a href={candidate.donor_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source -></a>
                               {/if}
                             </div>
                           {/if}
@@ -792,7 +792,7 @@
                               <p class="text-[10px] text-content-faint uppercase tracking-wide mb-1">Voting Record</p>
                               <p class="text-xs text-content-muted leading-relaxed line-clamp-2">{candidate.voting_summary}</p>
                               {#if candidate.voting_source_url}
-                                <a href={candidate.voting_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source â†’</a>
+                                <a href={candidate.voting_source_url} target="_blank" rel="noopener noreferrer" class="text-[10px] text-blue-600 hover:underline mt-0.5 inline-block">View source -></a>
                               {/if}
                             </div>
                           {/if}
@@ -869,7 +869,7 @@
                           <div class="mt-2 space-y-1 border-t border-stroke pt-2">
                             {#each review.flags as flag}
                               <div class="text-xs flex items-start gap-1.5">
-                                <span class="shrink-0 mt-0.5 {flag.severity === 'error' ? 'text-red-500' : flag.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'}">â—</span>
+                                <span class="shrink-0 mt-0.5 {flag.severity === 'error' ? 'text-red-500' : flag.severity === 'warning' ? 'text-yellow-500' : 'text-blue-500'}">●</span>
                                 <span class="text-content-muted"><span class="font-medium">{flag.field}:</span> {flag.concern}</span>
                               </div>
                             {/each}

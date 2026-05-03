@@ -179,8 +179,8 @@
   }
 
   function sortIcon(key: keyof RaceRecord) {
-    if (sortKey !== key) return "â†•";
-    return sortAsc ? "â†‘" : "â†“";
+    if (sortKey !== key) return "<->";
+    return sortAsc ? "^" : "v";
   }
 
   function statusBadgeClass(s: RaceStatusType) {
@@ -243,7 +243,7 @@
         + Queue
       </button>
     </div>
-    <p class="mt-1 text-xs text-content-faint">Comma-separate IDs Â· <kbd class="px-1 py-0.5 bg-surface-alt rounded text-xs">Enter</kbd> to add</p>
+    <p class="mt-1 text-xs text-content-faint">Comma-separate IDs · <kbd class="px-1 py-0.5 bg-surface-alt rounded text-xs">Enter</kbd> to add</p>
   </div>
 
   <!-- Toolbar -->
@@ -464,14 +464,14 @@
         <span>
           {filteredRows.length} race{filteredRows.length !== 1 ? "s" : ""}
           {#if search} matching "{search}"{/if}
-          {#if statusFilter !== "all"} Â· filtered by {statusFilter}{/if}
+          {#if statusFilter !== "all"} · filtered by {statusFilter}{/if}
         </span>
         <span>
-          {rows.filter((r) => r.status === "published").length} published Â·
-          {rows.filter((r) => r.status === "draft").length} draft Â·
+          {rows.filter((r) => r.status === "published").length} published ·
+          {rows.filter((r) => r.status === "draft").length} draft ·
           {rows.filter((r) => r.status === "queued" || r.status === "running").length} active
           {#if rows.filter(isDiscoveryOnly).length > 0}
-            Â· <span class="text-violet-600 dark:text-violet-400">{rows.filter(isDiscoveryOnly).length} discovery-only</span>
+            · <span class="text-violet-600 dark:text-violet-400">{rows.filter(isDiscoveryOnly).length} discovery-only</span>
           {/if}
         </span>
       </div>

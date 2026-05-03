@@ -398,7 +398,7 @@
             class="ml-auto text-xs text-blue-600 hover:underline font-medium"
             on:click={() => (activeTab = "output")}
           >
-            Configure &amp; Run â†’
+            Configure &amp; Run ->
           </button>
         {/if}
         <button
@@ -498,7 +498,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                  >View page â†’</a>
+                  >View page -></a>
                 </div>
               {/if}
 
@@ -514,7 +514,7 @@
                       target="_blank"
                       rel="noopener noreferrer"
                       class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                    >View draft â†’</a>
+                    >View draft -></a>
                     <button
                       type="button"
                       class="text-xs text-red-500 dark:text-red-400 hover:underline font-medium disabled:opacity-40"
@@ -612,7 +612,7 @@
                       <div class="flex items-center gap-3 mt-1 text-xs text-content-faint">
                         <span>{formatDate(run.started_at)}</span>
                         {#if run.duration_ms}
-                          <span>Â· {formatDuration(run.duration_ms)}</span>
+                          <span>· {formatDuration(run.duration_ms)}</span>
                         {/if}
                         {#if run.options?.research_model}
                           <span class="ml-auto font-mono">{run.options.research_model}</span>

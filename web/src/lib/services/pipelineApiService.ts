@@ -296,7 +296,7 @@ export class PipelineApiService {
    * Get current queue state
    */
   async loadQueue(): Promise<QueueResponse> {
-    const res = await fetchWithAuth(`${this.apiBase}/queue`, {}, API_TIMEOUT_SHORT);
+    const res = await fetchWithAuth(`${this.apiBase}/queue?active_only=true&limit=200`, {}, API_TIMEOUT_SHORT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
   }

@@ -236,12 +236,14 @@
     return new Date(s).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
   }
 
-  function formatUsd(n: number) {
+  function formatUsd(n: number | null | undefined) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return "-";
     return n < 0.001 ? "<$0.001" : `$${n.toFixed(4)}`;
   }
 
-  function formatTokens(n: number) {
-    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  function formatTokens(n: number | null | undefined) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return "-";
+    return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(Math.round(n));
   }
 
   function shortModel(m: string | undefined | null): string {
@@ -414,7 +416,7 @@
       {#if error}
         <p class="text-xs text-red-500">{error}</p>
       {:else if unacknowledgedAlerts.length === 0}
-        <p class="text-sm text-content-faint py-4 text-center">No active alerts âœ“</p>
+        <p class="text-sm text-content-faint py-4 text-center">No active alerts ✓</p>
       {:else}
         <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
           {#each unacknowledgedAlerts as alert (alert.id)}
@@ -451,7 +453,7 @@
 
       {#if gcpLogsUrl}
         <a href={gcpLogsUrl} target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center text-xs text-blue-600 hover:underline">
-          View logs in GCP Console â†’
+          View logs in GCP Console ->
         </a>
       {/if}
     </div>
@@ -573,7 +575,7 @@
             <span class="text-xs text-content-faint">Models:</span>
             {#each topModels as [model, count]}
               <span class="text-xs px-1.5 py-0.5 rounded bg-surface-alt text-content-muted font-mono">
-                {model} Ã—{count}
+                {model} x{count}
               </span>
             {/each}
           </div>

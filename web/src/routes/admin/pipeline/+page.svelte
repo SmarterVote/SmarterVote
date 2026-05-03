@@ -120,6 +120,18 @@
   // Reactive computed
   $: queueRunning = queueItems.find((i) => i.status === "running");
   $: queuePending = queueItems.filter((i) => i.status === "pending").length;
+  $: oldestPendingMs = (() => {
+    const pending = queueItems.filter((i) => i.status === "pending");
+    if (pending.length === 0) return 0;
+    const ages = pending
+      .map((i) => {
+        const created = i.created_at ? Date.parse(i.created_at) : NaN;
+        return Number.isFinite(created) ? Date.now() - created : 0;
+      })
+      .filter((v) => v > 0);
+    return ages.length ? Math.max(...ages) : 0;
+  })();
+  $: queueLikelyStalled = queuePending > 0 && !queueRunning && oldestPendingMs >= 180000;
 
   // Reactive subscriptions
   $: pipeline = $pipelineStore;
@@ -145,8 +157,11 @@
         websocketActions.connect(API_BASE, api.token);
       }
 
-      // Start polling queue state every 4s
-      queuePollTimer = setInterval(refreshQueue, 4000);
+      // Poll queue state at a lower rate to reduce API churn.
+      queuePollTimer = setInterval(() => {
+        if (document.hidden) return;
+        void refreshQueue();
+      }, 12000);
 
       // Restore tab and run detail from URL params
       const params = new URLSearchParams(window.location.search);
@@ -560,6 +575,16 @@
         <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: {pipeline.progress}%" />
       </div>
     </button>
+  {/if}
+
+  {#if queueLikelyStalled}
+    <div class="mb-4 card p-3 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+      <p class="text-sm font-medium text-amber-800 dark:text-amber-200">Queue appears stalled</p>
+      <p class="text-xs text-amber-700 dark:text-amber-300 mt-1">
+        {queuePending} pending item{queuePending !== 1 ? "s" : ""} and no active runner for over 3 minutes.
+        This usually means the queue worker is not consuming Firestore queue documents.
+      </p>
+    </div>
   {/if}
 
   <!-- Dashboard tab -->

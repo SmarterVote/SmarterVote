@@ -76,7 +76,7 @@
   $: activeRuns = runs.filter(
     (r) => r.status === "running" || r.status === "pending" || liveRunIds.has(r.run_id)
   );
-  $: pendingQueue = queueItems.filter((q) => q.status === "pending" && !q.run_id);
+  $: pendingQueue = queueItems.filter((q) => q.status === "pending");
   $: historicalRuns = runs.filter(
     (r) => r.status !== "running" && r.status !== "pending" && !liveRunIds.has(r.run_id)
   );

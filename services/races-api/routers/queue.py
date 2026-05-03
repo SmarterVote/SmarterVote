@@ -25,12 +25,19 @@ async def list_steps() -> Dict[str, Any]:
 
 
 @router.get("/queue", dependencies=[Depends(verify_token)])
-async def get_queue() -> Dict[str, Any]:
-    """List all pipeline queue items from Firestore."""
+async def get_queue(active_only: bool = False, limit: int = 200) -> Dict[str, Any]:
+    """List queue items from Firestore.
+
+    When ``active_only=true``, only pending/running items are returned.
+    """
     db = firestore_helpers._get_fs()
     docs = db.collection("pipeline_queue").order_by("created_at").stream()
     items = [firestore_helpers._doc_to_plain(d) for d in docs]
     items = [i for i in items if i is not None]
+    if active_only:
+        items = [i for i in items if i.get("status") in ("pending", "running")]
+    if limit > 0:
+        items = items[-limit:]
     running = sum(1 for i in items if i.get("status") == "running")
     pending = sum(1 for i in items if i.get("status") == "pending")
     return {"items": items, "running": running > 0, "pending": pending}
