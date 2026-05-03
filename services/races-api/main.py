@@ -22,9 +22,11 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message
 import schemas
 from analytics_middleware import AnalyticsMiddleware
 from analytics_store import AnalyticsStore
+from auth import verify_token
 from config import DATA_DIR
-from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from routers import pipeline as pipeline_router_module
 from routers import queue as queue_router_module
 from routers import races_admin as races_admin_router_module
@@ -41,6 +43,7 @@ publish_service = SimplePublishService(data_directory=DATA_DIR)
 limiter = Limiter(key_func=get_remote_address)
 
 _ADMIN_API_KEY = os.getenv("ADMIN_API_KEY")
+_http_bearer = HTTPBearer(auto_error=False)
 
 
 def _require_admin_key(x_admin_key: str = Header(default="")) -> None:
@@ -49,6 +52,18 @@ def _require_admin_key(x_admin_key: str = Header(default="")) -> None:
         raise HTTPException(status_code=503, detail="Admin API key not configured")
     if not secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid or missing X-Admin-Key")
+
+
+async def _require_admin_access(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_http_bearer),
+    x_admin_key: str = Header(default=""),
+) -> None:
+    """Dependency: authorize with bearer token OR legacy X-Admin-Key."""
+    if _ADMIN_API_KEY and x_admin_key and secrets.compare_digest(x_admin_key, _ADMIN_API_KEY):
+        return
+
+    # Fall back to Auth0 bearer auth used by the admin frontend.
+    await verify_token(credentials)
 
 
 @asynccontextmanager
@@ -138,13 +153,12 @@ def get_race(request: Request, response: Response, race_id: str):
 
 @app.post("/cache/clear")
 @limiter.limit("10/minute")
-def clear_cache(request: Request, x_admin_key: str = Header(default="")):
+async def clear_cache(request: Request, _auth: None = Depends(_require_admin_access)):
     """Clear the in-memory GCS response cache so the next request re-fetches fresh data.
 
     Call this after pushing new race data to GCS so the API reflects the update
     without waiting for the TTL to expire.
     """
-    _require_admin_key(x_admin_key)
     publish_service.clear_cache()
     return {"message": "Cache cleared", "cache_ttl_seconds": publish_service.cache_ttl}
 
@@ -154,10 +168,9 @@ def clear_cache(request: Request, x_admin_key: str = Header(default="")):
 async def analytics_overview(
     request: Request,
     hours: int = Query(default=24, ge=1, le=720),
-    x_admin_key: str = Header(default=""),
+    _auth: None = Depends(_require_admin_access),
 ):
     """Summary stats: total requests, unique visitors, avg latency, error rate, timeseries."""
-    _require_admin_key(x_admin_key)
     return await request.app.state.analytics.get_overview(hours=hours)
 
 
@@ -166,10 +179,9 @@ async def analytics_overview(
 async def analytics_races(
     request: Request,
     hours: int = Query(default=24, ge=1, le=720),
-    x_admin_key: str = Header(default=""),
+    _auth: None = Depends(_require_admin_access),
 ):
     """Per-race request counts for the last *hours* hours."""
-    _require_admin_key(x_admin_key)
     stats = await request.app.state.analytics.get_race_stats(hours=hours)
     # Batch-load summaries once to avoid N+1 per-race lookups
     summaries = publish_service.get_race_summaries()
@@ -187,10 +199,9 @@ async def analytics_timeseries(
     request: Request,
     hours: int = Query(default=24, ge=1, le=720),
     bucket: int = Query(default=60, ge=5, le=360),
-    x_admin_key: str = Header(default=""),
+    _auth: None = Depends(_require_admin_access),
 ):
     """Bucketed request counts for charting. *bucket* is the bucket size in minutes."""
-    _require_admin_key(x_admin_key)
     return {
         "timeseries": await request.app.state.analytics.get_timeseries(hours=hours, bucket_minutes=bucket),
         "hours": hours,
