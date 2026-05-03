@@ -85,6 +85,9 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
     # ---------------------------------------------------------------------------
     item_ref = db.collection("pipeline_queue").document(item_id)
 
+    from google.cloud import firestore as _fs_module  # type: ignore
+
+    @_fs_module.transactional
     def _claim(transaction, item_ref):
         doc = item_ref.get(transaction=transaction)
         if not doc.exists:
@@ -101,7 +104,7 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
         )
         return data
 
-    item_data: Optional[Dict[str, Any]] = db.run_transaction(_claim, item_ref)
+    item_data: Optional[Dict[str, Any]] = _claim(db.transaction(), item_ref)
 
     if item_data is None:
         logger.info("Queue item %s already claimed or missing — skipping", item_id)

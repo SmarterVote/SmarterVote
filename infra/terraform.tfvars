@@ -9,8 +9,8 @@ region      = "us-central1"
 # Development Settings
 force_update                   = false
 prevent_destroy_prod           = true
-enable_pipeline_client         = true
-pipeline_client_public_invoker = true # Auth0 JWT enforces auth at the app layer; Cloud Run must be publicly reachable for CORS preflights
+enable_pipeline_client         = false
+pipeline_client_public_invoker = false # pipeline_client disabled — agent Cloud Function handles queue via Eventarc
 
 # CORS (explicit origins required for Auth0 credential-mode requests)
 allowed_origins = [
