@@ -24,7 +24,7 @@
   export let recentRuns: { run_id: string; status: string; payload?: Record<string, unknown>; started_at?: string }[] = [];
   export let apiService: PipelineApiService | undefined = undefined;
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
+  const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
   const GCP_PROJECT = import.meta.env.VITE_GCP_PROJECT || "";
 
   let overview: AnalyticsOverview | null = null;

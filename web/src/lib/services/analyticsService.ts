@@ -1,13 +1,13 @@
 /**
  * Analytics and alert API service for the admin dashboard.
- * All requests route through the pipeline-client backend (Auth0-protected)
+ * All requests route through the races-api backend (Auth0-protected)
  * so the ADMIN_API_KEY never reaches the browser.
  */
 
 import { fetchWithAuth } from "$lib/stores/apiStore";
 import type { Alert, AnalyticsOverview, PipelineMetricsSummary, PipelineRunRecord, RaceAnalytics } from "$lib/types";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
+const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
 
 async function fetchAdmin<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);

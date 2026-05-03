@@ -15,7 +15,7 @@
   export let apiService: PipelineApiService | undefined = undefined;
 
   const dispatch = createEventDispatcher<{ back: void; deleted: string; cancelled: string }>();
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
+  const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
   // Use injected service if provided, otherwise create a local one.
   const _api = apiService ?? new PipelineApiService(API_BASE);
 

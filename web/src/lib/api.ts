@@ -4,7 +4,6 @@ import { logger } from "./utils/logger";
 import { fetchWithAuth } from "$lib/stores/apiStore";
 
 const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://localhost:8080";
-const PIPELINE_API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8080";
 
 export async function getRace(
   id: string,
@@ -112,11 +111,11 @@ export async function getAllRaces(
 }
 
 /**
- * Fetch draft race data from the pipeline-client API (admin-only, requires auth).
+ * Fetch draft race data from the races-api backend (admin-only, requires auth).
  * Used for admin preview of un-published races via ?draft=true query param.
  */
 export async function getDraftRace(id: string): Promise<Race> {
-  const res = await fetchWithAuth(`${PIPELINE_API_BASE}/drafts/${id}`, {}, 15000);
+  const res = await fetchWithAuth(`${API_BASE}/drafts/${id}`, {}, 15000);
   if (!res.ok) {
     throw new Error(`Failed to fetch draft race: ${res.status}`);
   }

@@ -33,7 +33,7 @@
   import { logger } from "$lib/utils/logger";
   import type { RunHistoryItem, Artifact, RaceRecord } from "$lib/types";
 
-  const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
+  const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
 
   let apiService: PipelineApiService;
   let racesTabRef: RacesTab;
