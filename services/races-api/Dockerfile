@@ -12,6 +12,11 @@ COPY services/races-api/schemas.py .
 COPY services/races-api/simple_publish_service.py .
 COPY services/races-api/analytics_middleware.py .
 COPY services/races-api/analytics_store.py .
+COPY services/races-api/auth.py .
+COPY services/races-api/request_models.py .
+COPY services/races-api/firestore_helpers.py .
+COPY services/races-api/gcs_helpers.py .
+COPY services/races-api/routers ./routers
 COPY shared /app/shared
 # data/published is NOT baked into the image — deployed instances read from GCS.
 # For local dev, mount or copy data/published manually.
