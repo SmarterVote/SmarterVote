@@ -39,7 +39,7 @@ resource "google_cloud_run_v2_service" "races_api" {
       }
 
       dynamic "env" {
-        for_each = var.openai_api_key != "" ? { openai_api_key = true } : {}
+        for_each = var.openai_api_key != "" ? [1] : []
         content {
           name = "OPENAI_API_KEY"
           value_source {
