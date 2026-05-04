@@ -162,6 +162,7 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> None:
         {
             "status": "published",
             "published_at": datetime.now(timezone.utc).isoformat(),
+            "draft_updated_at": None,
         },
     )
 

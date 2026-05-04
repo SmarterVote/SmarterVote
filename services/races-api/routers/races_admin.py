@@ -199,7 +199,7 @@ async def publish_draft(race_id: str) -> Dict[str, Any]:
     gcs_helpers._publish_race_gcs(race_id, data)
     firestore_helpers._fs_update_race(
         race_id,
-        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat(), "draft_updated_at": None},
     )
     return {"message": f"Race {race_id} published", "id": race_id}
 
@@ -236,7 +236,7 @@ async def publish_race(race_id: str) -> Dict[str, Any]:
     gcs_helpers._publish_race_gcs(race_id, data)
     firestore_helpers._fs_update_race(
         race_id,
-        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat(), "draft_updated_at": None},
     )
     return {"message": f"Race {race_id} published", "id": race_id}
 
@@ -267,7 +267,7 @@ async def batch_publish_races(request: BatchPublishRequest) -> Dict[str, Any]:
             gcs_helpers._publish_race_gcs(race_id, data)
             firestore_helpers._fs_update_race(
                 race_id,
-                {"status": "published", "published_at": datetime.now(timezone.utc).isoformat()},
+                {"status": "published", "published_at": datetime.now(timezone.utc).isoformat(), "draft_updated_at": None},
             )
             published.append(race_id)
         except HTTPException as exc:

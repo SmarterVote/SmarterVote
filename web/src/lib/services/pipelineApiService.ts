@@ -303,15 +303,7 @@ export class PipelineApiService {
    * Publish a draft race (copy from drafts/ to races/)
    */
   async publishDraft(raceId: string): Promise<void> {
-    const res = await fetchWithAuth(
-      `${this.apiBase}/drafts/${encodeURIComponent(raceId)}/publish`,
-      { method: "POST" },
-      API_TIMEOUT_DEFAULT
-    );
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error");
-      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
-    }
+    return this.publishRace(raceId);
   }
 
   /**

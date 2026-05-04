@@ -114,8 +114,9 @@ export async function fetchWithAuth(
       const timeoutText = actualTimeout
         ? `after ${actualTimeout / 1000} seconds`
         : "due to abort signal";
-      throw new Error(`Request timed out ${timeoutText}`);
+      throw new Error(`Request timed out ${timeoutText}: ${options.method ?? "GET"} ${url}`);
     }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Network request failed: ${options.method ?? "GET"} ${url}. ${message}`);
   }
 }

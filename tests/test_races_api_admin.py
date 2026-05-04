@@ -494,6 +494,34 @@ def test_list_drafts_returns_summaries_not_ids():
     assert body["races"][0]["candidates"][0]["name"] == "Alice Example"
 
 
+def test_publish_race_clears_draft_timestamp():
+    """Publishing should clear draft metadata so the UI no longer shows a stale publishable draft."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    draft_json = {"id": "az-senate-2026", "title": "Arizona Senate 2026", "candidates": [{"name": "Alice"}]}
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
+        patch("gcs_helpers._publish_race_gcs"),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/az-senate-2026/publish")
+
+    assert resp.status_code == 200
+    update = mock_update.call_args.args[1]
+    assert update["status"] == "published"
+    assert update["draft_updated_at"] is None
+
+
 def test_admin_chat_reply_parser_extracts_action():
     """Production admin chat should return the action shape consumed by the frontend."""
     from routers.pipeline import _parse_admin_chat_reply

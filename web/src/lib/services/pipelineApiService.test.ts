@@ -82,6 +82,19 @@ describe("PipelineApiService production admin API contract", () => {
     });
   });
 
+  it("publishes drafts through the production race publish endpoint", async () => {
+    fetchWithAuth.mockResolvedValueOnce(jsonResponse({ message: "published" }));
+
+    const api = new PipelineApiService("https://api.example.test");
+    await api.publishDraft("az-senate-2026");
+
+    expect(fetchWithAuth).toHaveBeenCalledWith(
+      "https://api.example.test/api/races/az-senate-2026/publish",
+      { method: "POST" },
+      expect.any(Number)
+    );
+  });
+
   it("parses admin chat action responses", async () => {
     fetchWithAuth.mockResolvedValueOnce(
       jsonResponse({

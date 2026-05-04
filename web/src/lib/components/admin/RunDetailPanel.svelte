@@ -15,7 +15,7 @@
   /** Pass the page-level service to avoid a duplicate instance with wrong URL. */
   export let apiService: PipelineApiService | undefined = undefined;
 
-  const dispatch = createEventDispatcher<{ back: void; deleted: string; cancelled: string }>();
+  const dispatch = createEventDispatcher<{ back: void; deleted: string; cancelled: string; published: string }>();
   const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
   // Use injected service if provided, otherwise create a local one.
   const _api = apiService ?? new PipelineApiService(API_BASE);
@@ -37,6 +37,8 @@
   let copiedRunId = false;
   let deleting = false;
   let cancelling = false;
+  let publishing = false;
+  let outputSource: "draft" | "published" | null = null;
   let logsContainer: HTMLDivElement;
   let autoScrollLogs = true;
 
@@ -144,6 +146,8 @@
     });
   $: hasPipelineSteps = pipelineSteps.length > 0;
   $: raceHasCandidates = !!(raceJsonData && Array.isArray(raceJsonData.candidates));
+  $: hasDraftOutput = outputSource === "draft";
+  $: canPublishOutput = !!raceId && hasDraftOutput && !isRunning;
   $: sections = [
     { id: "steps" as SectionId, label: `Steps (${pipelineSteps.length})` },
     { id: "logs" as SectionId, label: `Logs (${runLogs.length})` },
@@ -302,11 +306,15 @@
 
   async function loadRaceData(rid: string) {
     raceJsonLoading = true;
+    raceJsonData = null;
+    outputSource = null;
     try {
       raceJsonData = await _api.getDraftRace(rid);
+      outputSource = "draft";
     } catch {
       try {
         raceJsonData = await _api.getPublishedRace(rid);
+        outputSource = "published";
       } catch {
         // No race data available yet.
       }
@@ -334,6 +342,23 @@
       error = `Cancel failed: ${e}`;
     } finally {
       cancelling = false;
+    }
+  }
+
+  async function handlePublish() {
+    if (!raceId) return;
+    publishing = true;
+    error = "";
+    try {
+      await _api.publishRace(raceId);
+      outputSource = "published";
+      await loadRun();
+      await loadRaceData(raceId);
+      dispatch("published", raceId);
+    } catch (e) {
+      error = `Publish failed: ${e}`;
+    } finally {
+      publishing = false;
     }
   }
 
@@ -430,6 +455,24 @@
     </div>
     <!-- Action buttons -->
     <div class="flex items-center gap-2 shrink-0">
+      {#if canPublishOutput}
+        <a
+          href="/races/{raceId}?draft=true"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="px-3 py-1.5 text-sm rounded-lg border border-stroke text-content-muted hover:bg-surface-alt transition-colors"
+        >
+          View Draft
+        </a>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm rounded-lg border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40 transition-colors"
+          on:click={handlePublish}
+          disabled={publishing || deleting}
+        >
+          {publishing ? "Publishing..." : "Publish Draft"}
+        </button>
+      {/if}
       {#if run && isRunning}
         <button
           type="button"
@@ -654,6 +697,29 @@
               </button>
             {/if}
             {#if raceJsonData}
+              {#if outputSource}
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold {outputSource === 'draft' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'}">
+                  {outputSource}
+                </span>
+              {/if}
+              {#if canPublishOutput}
+                <a
+                  href="/races/{raceId}?draft=true"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="px-3 py-1 text-xs border border-stroke rounded-lg hover:bg-surface-alt"
+                >
+                  View Draft
+                </a>
+                <button
+                  type="button"
+                  class="px-3 py-1 text-xs border border-green-300 dark:border-green-700 rounded-lg text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40"
+                  on:click={handlePublish}
+                  disabled={publishing}
+                >
+                  {publishing ? "Publishing..." : "Publish Draft"}
+                </button>
+              {/if}
               <button
                 type="button"
                 class="px-3 py-1 text-xs border border-stroke rounded-lg hover:bg-surface-alt"
