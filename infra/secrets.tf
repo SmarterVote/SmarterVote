@@ -161,10 +161,17 @@ resource "google_secret_manager_secret_iam_member" "races_api_admin_key" {
   member    = "serviceAccount:${google_service_account.races_api.email}"
 }
 
-resource "google_project_iam_member" "races_api_storage" {
-  project = var.project_id
-  role    = "roles/storage.objectViewer"
-  member  = "serviceAccount:${google_service_account.races_api.email}"
+resource "google_secret_manager_secret_iam_member" "races_api_openai_key" {
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.openai_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.races_api.email}"
+}
+
+resource "google_storage_bucket_iam_member" "races_api_storage" {
+  bucket = google_storage_bucket.sv_data.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.races_api.email}"
 }
 
 resource "google_project_iam_member" "races_api_artifact_registry" {

@@ -149,6 +149,11 @@
     await loadData(hours);
   }
 
+  export async function refresh() {
+    loading = true;
+    await loadData(selectedHours);
+  }
+
   async function handleAcknowledgeAll() {
     await analyticsService.acknowledgeAllAlerts();
     alerts = alerts.map((a) => ({ ...a, acknowledged: true }));
