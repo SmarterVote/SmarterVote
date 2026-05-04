@@ -599,8 +599,9 @@
   {#if activeTab === "dashboard"}
     <DashboardTab
       onAlertCountChange={(n) => (alertBadgeCount = n)}
-      recentRuns={pipeline.runHistory ?? []}
       {apiService}
+      on:view-runs={() => (activeTab = "runs")}
+      on:view-run={(event) => openRunDetail(event.detail.runId, event.detail.raceId)}
     />
   {/if}
 

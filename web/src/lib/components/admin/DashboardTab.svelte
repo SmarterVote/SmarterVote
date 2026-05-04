@@ -1,5 +1,5 @@
 ﻿<script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { createEventDispatcher, onDestroy, onMount } from "svelte";
   import {
     ArcElement,
     CategoryScale,
@@ -21,8 +21,12 @@
   ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
   export let onAlertCountChange: (n: number) => void = () => {};
-  export let recentRuns: { run_id: string; status: string; payload?: Record<string, unknown>; started_at?: string }[] = [];
   export let apiService: PipelineApiService | undefined = undefined;
+
+  const dispatch = createEventDispatcher<{
+    "view-run": { runId: string; raceId: string | null };
+    "view-runs": void;
+  }>();
 
   const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
   const GCP_PROJECT = import.meta.env.VITE_GCP_PROJECT || "";
@@ -389,10 +393,8 @@
     </div>
   </div>
 
-  <!-- Alerts + Recent Runs row -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <!-- Alerts panel -->
-    <div class="card p-4">
+  <!-- Alerts -->
+  <div class="card p-4">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-semibold text-content-muted">Alerts</h3>
         <div class="flex items-center gap-2">
@@ -457,38 +459,6 @@
           View logs in GCP Console ->
         </a>
       {/if}
-    </div>
-
-    <!-- Recent pipeline runs -->
-    <div class="card p-4">
-      <h3 class="text-sm font-semibold text-content-muted mb-3">Recent Pipeline Runs</h3>
-      {#if recentRuns.length === 0}
-        <p class="text-sm text-content-faint py-4 text-center">No recent runs</p>
-      {:else}
-        <div class="space-y-1 max-h-64 overflow-y-auto">
-          {#each recentRuns.slice(0, 10) as run (run.run_id)}
-            {@const race_id = run.payload?.race_id ?? "-"}
-            {@const raceMeta = raceById.get(String(race_id))}
-            {@const raceTitle = raceMeta?.title || raceMeta?.office || String(race_id)}
-            <div class="flex items-center justify-between text-xs py-1 border-b border-stroke last:border-0">
-              <div class="min-w-0 max-w-56">
-                <p class="text-content truncate">{raceTitle}</p>
-                <p class="font-mono text-content-faint truncate">{race_id}</p>
-              </div>
-              <div class="flex items-center space-x-2 shrink-0">
-                <span
-                  class="px-1.5 py-0.5 rounded text-xs font-medium
-                    {run.status === 'completed' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200' : run.status === 'failed' ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200' : run.status === 'running' ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200' : 'bg-surface-alt text-content-muted'}"
-                >
-                  {run.status}
-                </span>
-                <span class="text-content-faint">{formatDate(run.started_at)}</span>
-              </div>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
   </div>
 
   <!-- Pipeline Research Metrics -->
@@ -591,8 +561,15 @@
 
     <!-- Per-run table -->
     <div class="card overflow-hidden">
-      <div class="px-4 py-3 border-b border-stroke">
+      <div class="px-4 py-3 border-b border-stroke flex items-center justify-between gap-3">
         <h3 class="text-sm font-semibold text-content-muted">Recent Runs</h3>
+        <button
+          type="button"
+          class="text-xs text-blue-600 hover:underline"
+          on:click={() => dispatch("view-runs")}
+        >
+          View all runs
+        </button>
       </div>
       {#if pipelineRecords.length === 0}
         <p class="text-sm text-content-faint py-6 text-center">No pipeline metrics recorded yet</p>
@@ -611,6 +588,7 @@
                 <th class="px-3 py-2 text-right font-medium text-content-subtle">$/Cand</th>
                 <th class="px-3 py-2 text-right font-medium text-content-subtle">Duration</th>
                 <th class="px-3 py-2 text-left font-medium text-content-subtle">Time</th>
+                <th class="px-3 py-2 text-right font-medium text-content-subtle">Detail</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-stroke">
@@ -649,6 +627,15 @@
                   </td>
                   <td class="px-3 py-2 text-right text-content-muted">{rec.duration_s ? `${rec.duration_s}s` : "-"}</td>
                   <td class="px-3 py-2 text-content-faint">{formatDate(rec.timestamp)}</td>
+                  <td class="px-3 py-2 text-right">
+                    <button
+                      type="button"
+                      class="text-xs text-blue-600 hover:underline font-medium"
+                      on:click={() => dispatch("view-run", { runId: rec.run_id, raceId: rec.race_id || null })}
+                    >
+                      Open
+                    </button>
+                  </td>
                 </tr>
               {/each}
             </tbody>
