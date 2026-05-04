@@ -39,6 +39,19 @@ resource "google_cloud_run_v2_service" "races_api" {
       }
 
       dynamic "env" {
+        for_each = var.openai_api_key != "" ? { openai_api_key = true } : {}
+        content {
+          name = "OPENAI_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.openai_key[0].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "env" {
         for_each = (var.admin_api_key != null && var.admin_api_key != "") ? { admin_api_key = true } : {}
         content {
           name = "ADMIN_API_KEY"
