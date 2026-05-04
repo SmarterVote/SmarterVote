@@ -30,6 +30,10 @@ class HandoffTriggered(Exception):
         super().__init__(f"Handoff to continuation item {continuation_item_id}")
 
 
+class HandoffFailed(RuntimeError):
+    """Raised when a deadline handoff cannot safely create its continuation item."""
+
+
 class AgentCancelled(Exception):
     """Raised when a running queue item has been cancelled by an admin."""
 
@@ -271,7 +275,7 @@ class AgentHandler:
                         step=step,
                         race_id=race_id,
                     )
-            except HandoffTriggered:
+            except (HandoffTriggered, HandoffFailed):
                 raise
             except Exception as _e:
                 logger.debug("_on_step_complete tracking failed for '%s': %s", step, _e)
@@ -352,28 +356,33 @@ class AgentHandler:
                 logger.warning("Failed to save checkpoint to GCS: %s", _e)
 
             # Write continuation queue item to Firestore
+            wrote_continuation = False
             try:
                 from pipeline_client.backend.firestore_logger import _get_db
                 db = _get_db()
-                if db:
-                    continuation_options = dict(options)
-                    continuation_options["enabled_steps"] = remaining
-                    continuation_options["is_continuation"] = True
-                    continuation_options["parent_run_id"] = current_run_id
-                    db.collection("pipeline_queue").document(item_id).set({
-                        "id": item_id,
-                        "race_id": current_race_id,
-                        "run_id": continuation_run_id,
-                        "status": "pending",
-                        "options": continuation_options,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "is_continuation": True,
-                        "parent_run_id": current_run_id,
-                        "existing_data_gcs_path": checkpoint_gcs_path,
-                    })
-                    logger.info("Continuation queue item %s written for steps: %s", item_id, remaining)
+                if not db:
+                    raise RuntimeError("Firestore is not available for continuation handoff")
+                continuation_options = dict(options)
+                continuation_options["enabled_steps"] = remaining
+                continuation_options["is_continuation"] = True
+                continuation_options["parent_run_id"] = current_run_id
+                db.collection("pipeline_queue").document(item_id).set({
+                    "id": item_id,
+                    "race_id": current_race_id,
+                    "run_id": continuation_run_id,
+                    "status": "pending",
+                    "options": continuation_options,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "is_continuation": True,
+                    "parent_run_id": current_run_id,
+                    "existing_data_gcs_path": checkpoint_gcs_path,
+                })
+                wrote_continuation = True
+                logger.info("Continuation queue item %s written for steps: %s", item_id, remaining)
             except Exception as _e:
                 logger.warning("Failed to write continuation queue item: %s", _e)
+            if not wrote_continuation:
+                raise HandoffFailed("Failed to create continuation queue item")
 
             # Mark current run as continued in Firestore
             if _fs_logger:

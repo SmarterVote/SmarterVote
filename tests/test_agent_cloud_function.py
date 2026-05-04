@@ -440,6 +440,11 @@ def test_handoff_records_continuation_run_id():
     assert continued_updates[-1]["continuation_item_id"] == "item-continuation-abc"
     assert continued_updates[-1]["continuation_run_id"] == "run-continuation-xyz"
 
+    race_sets = [c[0][0] for c in race_ref.set.call_args_list]
+    assert any(
+        update.get("status") == "queued" and update.get("current_run_id") == "run-continuation-xyz" for update in race_sets
+    )
+
 
 # ---------------------------------------------------------------------------
 # Unit: _load_gcs_json

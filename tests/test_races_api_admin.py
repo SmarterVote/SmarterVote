@@ -339,6 +339,52 @@ def test_queue_rejects_already_running_race():
     assert body["errors"] == [{"race_id": "az-senate-2026", "error": "Race is already running"}]
 
 
+def test_single_race_run_rejects_already_running_race():
+    """The single-race run endpoint should enforce the same active-race guard as batch queueing."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    running_doc = _make_existing_doc({"race_id": "az-senate-2026", "status": "running"})
+    running_ref = MagicMock()
+    running_ref.get.return_value = running_doc
+
+    coll_races = MagicMock()
+    coll_races.document.return_value = running_ref
+
+    queue_doc_ref = MagicMock()
+    coll_queue = MagicMock()
+    coll_queue.document.return_value = queue_doc_ref
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "races":
+            return coll_races
+        if name == "pipeline_queue":
+            return coll_queue
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/az-senate-2026/run", json={"cheap_mode": True})
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "Race is already running"
+    queue_doc_ref.set.assert_not_called()
+
+
 def test_run_options_accept_cloud_function_review_fields():
     """Production races-api RunOptions should accept all UI/agent option fields."""
     from request_models import RunOptions
@@ -547,6 +593,124 @@ def test_get_run_logs_since():
     assert body["total"] == 5
     assert len(body["logs"]) == 3  # entries 2, 3, 4
     assert body["logs"][0]["message"] == "msg 2"
+
+
+def test_delete_active_run_cancels_matching_queue_item():
+    """Deleting an active run should cancel its Firestore queue item so the Cloud Function stops."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    run_doc = _make_existing_doc({"run_id": "run-active", "race_id": "az-senate-2026", "status": "running"})
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-active", "status": "running"}
+    queue_doc.reference = MagicMock()
+
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    race_ref = MagicMock()
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "pipeline_runs":
+            return runs_coll
+        if name == "pipeline_queue":
+            return queue_coll
+        if name == "races":
+            return races_coll
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.delete("/runs/run-active")
+
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    run_ref.update.assert_called_with({"status": "cancelled"})
+    queue_doc.reference.update.assert_called_with({"status": "cancelled"})
+    race_ref.set.assert_called()
+
+
+def test_delete_race_scoped_active_run_cancels_matching_queue_item():
+    """Race-scoped run deletion should cancel the same queue item as the global run endpoint."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    run_doc = _make_existing_doc({"run_id": "run-active", "race_id": "az-senate-2026", "status": "running"})
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-active", "status": "pending"}
+    queue_doc.reference = MagicMock()
+
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    race_doc = _make_existing_doc({"race_id": "az-senate-2026", "status": "running"})
+    race_ref = MagicMock()
+    race_ref.get.return_value = race_doc
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "pipeline_runs":
+            return runs_coll
+        if name == "pipeline_queue":
+            return queue_coll
+        if name == "races":
+            return races_coll
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.delete("/api/races/az-senate-2026/runs/run-active")
+
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    run_ref.update.assert_called_with({"status": "cancelled"})
+    queue_doc.reference.update.assert_called_with({"status": "cancelled"})
+    race_ref.set.assert_called()
 
 
 # ---------------------------------------------------------------------------

@@ -93,9 +93,14 @@ async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
     status = data.get("status", "")
     if status in ("pending", "running"):
         doc_ref.update({"status": "cancelled"})
+        for queue_doc in db.collection("pipeline_queue").where("run_id", "==", run_id).stream():
+            queue_data = queue_doc.to_dict() or {}
+            if queue_data.get("status") in ("pending", "running"):
+                queue_doc.reference.update({"status": "cancelled"})
         race_id = data.get("race_id")
         if race_id:
             firestore_helpers._fs_update_race(race_id, {"status": "cancelled"})
+        return {"message": "Run cancelled", "run_id": run_id}
     else:
         doc_ref.delete()
     return {"message": "Run deleted", "run_id": run_id}

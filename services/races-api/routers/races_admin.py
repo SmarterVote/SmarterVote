@@ -139,6 +139,13 @@ async def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> 
     opts = options.model_dump(exclude_none=True) if options else {}
     from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
 
+    db = firestore_helpers._get_fs()
+    race_doc = db.collection("races").document(race_id).get()
+    if race_doc.exists:
+        race_data = race_doc.to_dict() or {}
+        if race_data.get("status") in ("queued", "running"):
+            raise HTTPException(status_code=409, detail=f"Race is already {race_data.get('status')}")
+
     item_id = str(uuid.uuid4())
     run_id = str(uuid.uuid4())
     item = {
@@ -150,7 +157,7 @@ async def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> 
         "is_continuation": False,
         "created_at": SERVER_TIMESTAMP,
     }
-    firestore_helpers._get_fs().collection("pipeline_queue").document(item_id).set(item)
+    db.collection("pipeline_queue").document(item_id).set(item)
     firestore_helpers._fs_update_race(race_id, {"status": "queued", "current_run_id": run_id})
     return {"run_id": run_id, "status": "queued", "race_id": race_id}
 
@@ -325,9 +332,14 @@ async def delete_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
         status = (run_doc.to_dict() or {}).get("status", "")
         if status in ("pending", "running"):
             run_ref.update({"status": "cancelled"})
+            for queue_doc in db.collection("pipeline_queue").where("run_id", "==", run_id).stream():
+                queue_data = queue_doc.to_dict() or {}
+                if queue_data.get("status") in ("pending", "running"):
+                    queue_doc.reference.update({"status": "cancelled"})
             race_doc = db.collection("races").document(race_id).get()
             if race_doc.exists and (race_doc.to_dict() or {}).get("status") in ("running", "queued"):
                 firestore_helpers._fs_update_race(race_id, {"status": "cancelled"})
+            return {"message": "Run cancelled", "run_id": run_id}
         else:
             run_ref.delete()
         return {"message": "Run deleted", "run_id": run_id}

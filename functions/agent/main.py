@@ -184,12 +184,17 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
             len(exc.remaining_steps),
         )
         item_ref.update({"status": "continued", "continuation_item_id": exc.continuation_item_id})
+        continuation_run_id = getattr(exc, "continuation_run_id", None) or exc.continuation_item_id
         run_ref.update(
             {
                 "status": "continued",
                 "continuation_item_id": exc.continuation_item_id,
-                "continuation_run_id": getattr(exc, "continuation_run_id", None) or exc.continuation_item_id,
+                "continuation_run_id": continuation_run_id,
             }
+        )
+        db.collection("races").document(race_id).set(
+            {"status": "queued", "current_run_id": continuation_run_id},
+            merge=True,
         )
         return
     except _CancelledExit as exc:
