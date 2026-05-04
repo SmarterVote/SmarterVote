@@ -236,6 +236,143 @@ def test_marks_failed_on_exception():
     assert any("boom" in (e or "") for e in errors)
 
 
+def test_marks_cancelled_on_agent_cancelled():
+    """A handler cancellation should not be converted into a failed run."""
+    import functions.agent.main as cf_main
+    from functions.agent.main import _CancelledExit
+
+    item_data = {
+        "status": "pending",
+        "race_id": "az-01-senate-2026",
+        "run_id": "run-cancel",
+        "options": {},
+    }
+    db, item_ref, run_ref, race_ref = _make_firestore_mock(item_data=item_data)
+
+    ev = _make_cloud_event("item-cancel")
+
+    with (
+        patch("functions.agent.main._get_fs", return_value=db),
+        patch("functions.agent.main._run_agent", side_effect=_CancelledExit("cancelled by admin")),
+    ):
+        cf_main.process_queue_item(ev)
+
+    item_updates = [c[0][0] for c in item_ref.update.call_args_list]
+    run_updates = [c[0][0] for c in run_ref.update.call_args_list]
+    race_sets = [c[0][0] for c in race_ref.set.call_args_list]
+
+    assert any(update.get("status") == "cancelled" for update in item_updates)
+    assert any(update.get("status") == "cancelled" for update in run_updates)
+    assert any(update.get("status") == "cancelled" for update in race_sets)
+
+
+def test_passes_queue_item_id_to_agent_options():
+    """AgentHandler must receive queue_item_id so it can observe admin cancellation."""
+    import functions.agent.main as cf_main
+
+    item_data = {
+        "status": "pending",
+        "race_id": "az-01-senate-2026",
+        "run_id": "run-ok",
+        "options": {"cheap_mode": True},
+    }
+    db, item_ref, run_ref, race_ref = _make_firestore_mock(item_data=item_data)
+
+    ev = _make_cloud_event("item-ok")
+
+    with (
+        patch("functions.agent.main._get_fs", return_value=db),
+        patch("functions.agent.main._run_agent") as mock_run,
+    ):
+        cf_main.process_queue_item(ev)
+
+    options = mock_run.call_args.args[2]
+    assert options["run_id"] == "run-ok"
+    assert options["queue_item_id"] == "item-ok"
+
+
+def test_processes_multiple_queue_items_with_isolated_run_ids():
+    """Separate Eventarc queue items should initialise and execute separate runs."""
+    import functions.agent.main as cf_main
+
+    item_data_by_id = {
+        "item-az": {
+            "status": "pending",
+            "race_id": "az-senate-2026",
+            "run_id": "run-az",
+            "options": {"cheap_mode": True},
+        },
+        "item-ga": {
+            "status": "pending",
+            "race_id": "ga-governor-2026",
+            "run_id": "run-ga",
+            "options": {"cheap_mode": False},
+        },
+    }
+
+    item_refs: dict[str, MagicMock] = {}
+    run_refs: dict[str, MagicMock] = {}
+    race_refs: dict[str, MagicMock] = {}
+
+    def _make_item_ref(item_id: str):
+        if item_id not in item_refs:
+            doc = MagicMock()
+            doc.exists = item_id in item_data_by_id
+            doc.to_dict.return_value = dict(item_data_by_id.get(item_id, {}))
+            ref = MagicMock()
+            ref.get.return_value = doc
+            item_refs[item_id] = ref
+        return item_refs[item_id]
+
+    def _make_run_ref(run_id: str):
+        if run_id not in run_refs:
+            doc = MagicMock()
+            doc.exists = False
+            ref = MagicMock()
+            ref.get.return_value = doc
+            run_refs[run_id] = ref
+        return run_refs[run_id]
+
+    def _make_race_ref(race_id: str):
+        if race_id not in race_refs:
+            race_refs[race_id] = MagicMock()
+        return race_refs[race_id]
+
+    def _collection(name):
+        coll = MagicMock()
+        if name == "pipeline_queue":
+            coll.document.side_effect = _make_item_ref
+        elif name == "pipeline_runs":
+            coll.document.side_effect = _make_run_ref
+        elif name == "races":
+            coll.document.side_effect = _make_race_ref
+        return coll
+
+    db = MagicMock()
+    db.collection.side_effect = _collection
+
+    with (
+        patch("functions.agent.main._get_fs", return_value=db),
+        patch("functions.agent.main._run_agent") as mock_run,
+    ):
+        cf_main.process_queue_item(_make_cloud_event("item-az"))
+        cf_main.process_queue_item(_make_cloud_event("item-ga"))
+
+    calls = mock_run.call_args_list
+    assert [call.args[0] for call in calls] == ["az-senate-2026", "ga-governor-2026"]
+    assert [call.args[1] for call in calls] == ["run-az", "run-ga"]
+    assert calls[0].args[2]["queue_item_id"] == "item-az"
+    assert calls[1].args[2]["queue_item_id"] == "item-ga"
+    assert run_refs["run-az"].set.call_args.args[0]["race_id"] == "az-senate-2026"
+    assert run_refs["run-ga"].set.call_args.args[0]["race_id"] == "ga-governor-2026"
+    assert any(
+        update.get("status") == "completed" for update in (c.args[0] for c in item_refs["item-az"].update.call_args_list)
+    )
+    assert any(
+        update.get("status") == "completed" for update in (c.args[0] for c in item_refs["item-ga"].update.call_args_list)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Unit: handoff / continuation path
 # ---------------------------------------------------------------------------

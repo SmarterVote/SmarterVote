@@ -64,7 +64,7 @@ def _make_editing_handlers(
             "issues": {},
         }
         race_json.setdefault("candidates", []).append(candidate)
-        log("info", f"    ✅ Added candidate: {name} ({args.get('party', '?')})")
+        log("info", f"    Added candidate: {name} ({args.get('party', '?')})")
         return f"Added candidate '{name}'."
 
     def remove_candidate(args: Dict[str, Any]) -> str:
@@ -134,7 +134,7 @@ def _make_editing_handlers(
         if not c:
             return f"Candidate '{old_name}' not found."
         c["name"] = new_name
-        log("info", f"    📝 Renamed: {old_name} → {new_name}")
+        log("info", f"    Renamed: {old_name} -> {new_name}")
         return f"Renamed '{old_name}' to '{new_name}'."
 
     # --- Candidate field handlers ---
@@ -147,7 +147,7 @@ def _make_editing_handlers(
         if not c:
             return f"Candidate '{name}' not found."
         c[field] = value
-        log("info", f"    📝 {name}.{field} = {value!r}")
+        log("info", f"    {name}.{field} = {value!r}")
         return f"Set {name}.{field} = {value!r}."
 
     def set_candidate_summary(args: Dict[str, Any]) -> str:
@@ -158,7 +158,7 @@ def _make_editing_handlers(
         c["summary"] = args["summary"]
         if args.get("sources"):
             c["summary_sources"] = args["sources"]
-        log("info", f"    📝 Updated summary for {name}")
+        log("info", f"    Updated summary for {name}")
         return f"Updated summary for '{name}'."
 
     # --- Issue handler ---
@@ -179,7 +179,7 @@ def _make_editing_handlers(
         if args.get("sources"):
             stance_data["sources"] = args["sources"]
         c.setdefault("issues", {})[issue] = stance_data
-        log("info", f"    📝 {name} / {issue} [{args['confidence']}]")
+        log("info", f"    {name} / {issue} [{args['confidence']}]")
         return f"Set {name}'s {issue} stance (confidence: {args['confidence']})."
 
     # --- Career, education, social media handlers ---
@@ -196,7 +196,7 @@ def _make_editing_handlers(
             "end_year": args.get("end_year"),
             "description": args.get("description", ""),
         }
-        # Dedup: same org + overlapping years → skip
+        # Dedup: same org + overlapping years -> skip
         org_lower = args["organization"].lower()
         start = args.get("start_year")
         for existing in c.get("career_history", []):
@@ -205,7 +205,7 @@ def _make_editing_handlers(
             if same_org and same_start:
                 return f"Career entry for '{args['organization']}' ({start}) already exists for '{name}' — skipping duplicate."
         c.setdefault("career_history", []).append(entry)
-        log("info", f"    📝 Added career entry for {name}: {args['title']} at {args['organization']}")
+        log("info", f"    Added career entry for {name}: {args['title']} at {args['organization']}")
         return f"Added career entry for '{name}': {args['title']} at {args['organization']}."
 
     def add_education_entry(args: Dict[str, Any]) -> str:
@@ -219,7 +219,7 @@ def _make_editing_handlers(
             "field": args.get("field"),
             "year": args.get("year"),
         }
-        # Dedup: same institution + degree → skip
+        # Dedup: same institution + degree -> skip
         inst_lower = args["institution"].lower()
         deg_lower = args["degree"].lower()
         for existing in c.get("education", []):
@@ -227,7 +227,7 @@ def _make_editing_handlers(
                     and deg_lower in existing.get("degree", "").lower()):
                 return f"Education entry for '{args['institution']}' ({args['degree']}) already exists for '{name}' — skipping duplicate."
         c.setdefault("education", []).append(entry)
-        log("info", f"    📝 Added education for {name}: {args['degree']} from {args['institution']}")
+        log("info", f"    Added education for {name}: {args['degree']} from {args['institution']}")
         return f"Added education for '{name}': {args['degree']} from {args['institution']}."
 
     def set_social_media(args: Dict[str, Any]) -> str:
@@ -237,7 +237,7 @@ def _make_editing_handlers(
             return f"Candidate '{name}' not found."
         platform = args["platform"].lower()
         c.setdefault("social_media", {})[platform] = args["url"]
-        log("info", f"    📝 {name}.social_media.{platform} = {args['url']}")
+        log("info", f"    {name}.social_media.{platform} = {args['url']}")
         return f"Set {name}'s {platform} to {args['url']}."
 
     def remove_career_entry(args: Dict[str, Any]) -> str:
@@ -314,7 +314,7 @@ def _make_editing_handlers(
         c["donor_summary"] = args["summary"]
         if args.get("source_url"):
             c["donor_source_url"] = args["source_url"]
-        log("info", f"    📝 Updated donor summary for {name}")
+        log("info", f"    Updated donor summary for {name}")
         return f"Updated donor summary for '{name}'."
 
     def set_voting_summary(args: Dict[str, Any]) -> str:
@@ -325,7 +325,7 @@ def _make_editing_handlers(
         c["voting_summary"] = args["summary"]
         if args.get("source_url"):
             c["voting_source_url"] = args["source_url"]
-        log("info", f"    📝 Updated voting summary for {name}")
+        log("info", f"    Updated voting summary for {name}")
         return f"Updated voting summary for '{name}'."
 
     def add_candidate_link(args: Dict[str, Any]) -> str:
@@ -393,7 +393,7 @@ def _make_editing_handlers(
         if field not in _ALLOWED_RACE_FIELDS:
             return f"Field '{field}' not allowed. Allowed: {', '.join(sorted(_ALLOWED_RACE_FIELDS))}."
         race_json[field] = value
-        log("info", f"    📝 race.{field} updated")
+        log("info", f"    race.{field} updated")
         return f"Updated race.{field}."
 
     # --- Read-only verification handler ---

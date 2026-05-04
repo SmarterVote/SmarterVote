@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -155,3 +155,40 @@ async def test_v2_handler_tracks_step_progress_in_firestore_without_run_manager(
     assert mock_fs_logger_cls.return_value.update_progress.call_count >= 3
     args_list = mock_fs_logger_cls.return_value.update_progress.call_args_list
     assert any(call.kwargs.get("current_step") == "issues" for call in args_list)
+
+
+@pytest.mark.asyncio
+async def test_v2_handler_stops_when_queue_item_cancelled():
+    """Cloud Function runs should stop at the next step boundary after cancellation."""
+    from pipeline_client.backend.handlers.agent import AgentCancelled
+
+    handler = AgentHandler()
+
+    async def _fake_run_agent(*_args, **kwargs):
+        tracker = kwargs.get("step_tracker")
+        assert tracker is not None
+        tracker["start"]("issues")
+        return {"id": "test-race", "candidates": [{"name": "Alice", "issues": {}}]}
+
+    queue_doc = MagicMock()
+    queue_doc.exists = True
+    queue_doc.to_dict.return_value = {"status": "cancelled"}
+    queue_ref = MagicMock()
+    queue_ref.get.return_value = queue_doc
+    queue_coll = MagicMock()
+    queue_coll.document.return_value = queue_ref
+    mock_db = MagicMock()
+    mock_db.collection.return_value = queue_coll
+
+    with (
+        patch("pipeline_client.agent.agent.run_agent", new_callable=AsyncMock) as mock_agent,
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+        patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
+        patch.dict(sys.modules, {"pipeline_client.backend.pipeline_runner": None}),
+    ):
+        mock_agent.side_effect = _fake_run_agent
+        with pytest.raises(AgentCancelled):
+            await handler.handle(
+                {"race_id": "test-race"},
+                {"cheap_mode": True, "run_id": "run-cancel", "queue_item_id": "item-cancel"},
+            )

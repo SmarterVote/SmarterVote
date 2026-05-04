@@ -266,6 +266,7 @@ async def test_run_agent_on_log_callback():
     assert len(log_messages) >= 2
     assert any("New research" in msg for _, msg in log_messages)
     assert any("finished" in msg for _, msg in log_messages)
+    assert all("ð" not in msg for _, msg in log_messages)
 
 
 @pytest.mark.asyncio

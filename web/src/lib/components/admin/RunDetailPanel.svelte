@@ -11,6 +11,7 @@
   export let liveProgress = 0;
   export let liveProgressMessage = "";
   export let liveElapsed = 0;
+  export let liveRun: Partial<RunInfo> | null = null;
   /** Pass the page-level service to avoid a duplicate instance with wrong URL. */
   export let apiService: PipelineApiService | undefined = undefined;
 
@@ -42,23 +43,56 @@
   /** Canonical step order for sorting */
   const STEP_ORDER = PIPELINE_STEPS.map((s) => s.id);
 
-  $: raceId = (run?.race_id as string) ?? runId;
+  $: activeRun = run ? (isLive && liveRun ? { ...run, ...liveRun, options: liveRun.options ?? run.options } : run) : null;
+  $: raceId = (activeRun?.race_id as string) ?? runId;
   // A run is only "live" if the backend actually reports it as running/pending.
   // Never show the live spinner for a run the server has already completed.
-  $: isRunning = run?.status === "running" || run?.status === "pending";
+  $: isRunning = activeRun?.status === "running" || activeRun?.status === "pending";
   $: isLiveAndRunning = isLive && isRunning;
   // Derive step timeline from log entries (Firestore run docs don’t include steps[]).
   $: derivedSteps = (() => {
     const logSource = isLiveAndRunning ? liveLogs : fetchedLogs;
     const stepMap = new Map<string, Partial<RunStep> & { name: PipelineStepId; status: string }>();
-    for (const step of run?.steps ?? []) {
+    const options = activeRun?.options ?? {};
+    const enabledSteps = Array.isArray(options.enabled_steps) && options.enabled_steps.length
+      ? options.enabled_steps
+      : PIPELINE_STEPS.map((s) => s.id);
+    const remainingSteps = Array.isArray(activeRun?.remaining_steps)
+      ? activeRun.remaining_steps.map(String)
+      : undefined;
+    const currentStep = typeof activeRun?.current_step === "string" ? activeRun.current_step : undefined;
+    const runStatus = activeRun?.status;
+
+    for (const meta of PIPELINE_STEPS) {
+      const enabled = enabledSteps.includes(meta.id);
+      let status: RunStep["status"] = enabled ? "pending" : "skipped";
+      if (enabled && remainingSteps && !remainingSteps.includes(meta.id) && meta.id !== currentStep) {
+        status = "completed";
+      }
+      if (enabled && meta.id === currentStep && (runStatus === "running" || runStatus === "pending")) {
+        status = "running";
+      }
+      if (enabled && runStatus === "completed") {
+        status = "completed";
+      }
+      stepMap.set(meta.id, {
+        name: meta.id,
+        label: meta.label,
+        weight: meta.weight,
+        status,
+      });
+    }
+
+    for (const step of activeRun?.steps ?? []) {
       const meta = PIPELINE_STEPS.find((s) => s.id === step.name);
-      stepMap.set(step.name, {
+      const current = stepMap.get(step.name as PipelineStepId);
+      stepMap.set(step.name as PipelineStepId, {
+        ...current,
         ...step,
         name: step.name as PipelineStepId,
-        label: step.label ?? meta?.label,
-        weight: step.weight ?? meta?.weight,
-        status: step.status ?? "pending",
+        label: step.label ?? current?.label ?? meta?.label,
+        weight: step.weight ?? current?.weight ?? meta?.weight,
+        status: current?.status && current.status !== "pending" ? current.status : (step.status ?? current?.status ?? "pending"),
       });
     }
     for (const log of logSource) {
@@ -81,7 +115,7 @@
       if (log.level === "error") entry.status = "failed";
       stepMap.set(stepId, entry);
     }
-    const cs = (run as any)?.current_step as PipelineStepId | undefined;
+    const cs = activeRun?.current_step as PipelineStepId | undefined;
     if (cs) {
       const ex = stepMap.get(cs);
       if (!ex || !["completed", "failed", "skipped"].includes(ex.status)) {
@@ -117,12 +151,12 @@
     ...(analysisContent ? [{ id: "analysis" as SectionId, label: "Analysis" }] : []),
   ];
   $: computedProgress = computeProgress(pipelineSteps as RunStep[]);
-  $: serverProgress = typeof run?.progress === "number" ? run.progress : undefined;
+  $: serverProgress = typeof activeRun?.progress === "number" ? activeRun.progress : undefined;
   $: progress = isLiveAndRunning
     ? Math.max(liveProgress, serverProgress ?? 0, computedProgress)
     : (serverProgress ?? computedProgress);
   $: progressMsg = isLiveAndRunning && liveProgressMessage ? liveProgressMessage : lastStepMessage(pipelineSteps as RunStep[]);
-  $: elapsed = isLiveAndRunning ? liveElapsed : (run?.duration_ms ? Math.floor(run.duration_ms / 1000) : 0);
+  $: elapsed = isLiveAndRunning ? liveElapsed : (activeRun?.duration_ms ? Math.floor(activeRun.duration_ms / 1000) : 0);
 
   // Scroll the logs container to the bottom (called via tick to avoid Svelte reactive loop).
   // Must be a named function so that logsContainer is NOT syntactically inside the $: block;
@@ -262,7 +296,7 @@
     } catch (e) {
       console.warn("Failed to load run logs:", e);
     }
-    const rid = (run?.race_id as string) ?? runId;
+    const rid = (activeRun?.race_id as string) ?? runId;
     if (rid) loadRaceData(rid);
   }
 
@@ -361,9 +395,9 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-3">
         <h2 class="text-lg font-bold text-content truncate">{raceId}</h2>
-        {#if run}
-          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold {statusBadge(run.status)}">
-            {run.status}
+        {#if activeRun}
+          <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold {statusBadge(activeRun.status)}">
+            {activeRun.status}
           </span>
         {/if}
         {#if isLiveAndRunning}
@@ -380,16 +414,16 @@
         <button type="button" class="font-mono hover:text-content-muted transition-colors" on:click={copyRunId} title="Copy run ID">
           {copiedRunId ? '✓ Copied' : `Run ${runId.substring(0, 8)}`}
         </button>
-        {#if run}
-          <span>Started {formatTimestamp(run.started_at)}</span>
-          {#if run.completed_at}
-            <span>Finished {formatTimestamp(run.completed_at)}</span>
+        {#if activeRun}
+          <span>Started {formatTimestamp(activeRun.started_at)}</span>
+          {#if activeRun.completed_at}
+            <span>Finished {formatTimestamp(activeRun.completed_at)}</span>
           {/if}
-          {#if run.options?.research_model}
-            <span class="font-mono">{run.options.research_model}</span>
+          {#if activeRun.options?.research_model}
+            <span class="font-mono">{activeRun.options.research_model}</span>
           {/if}
-          {#if run.options?.note}
-            <span class="italic text-content-faint">"{run.options.note}"</span>
+          {#if activeRun.options?.note}
+            <span class="italic text-content-faint">"{activeRun.options.note}"</span>
           {/if}
         {/if}
       </div>
@@ -435,24 +469,24 @@
   </div>
 
   <!-- Run configuration summary (when options are interesting) -->
-  {#if run && (run.options?.cheap_mode === false || run.options?.max_candidates || run.options?.target_no_info || run.options?.candidate_names || run.options?.enabled_steps)}
+  {#if activeRun && (activeRun.options?.cheap_mode === false || activeRun.options?.max_candidates || activeRun.options?.target_no_info || activeRun.options?.candidate_names || activeRun.options?.enabled_steps)}
     <div class="flex flex-wrap items-center gap-2 text-xs">
-      {#if run.options.cheap_mode === false}
+      {#if activeRun.options.cheap_mode === false}
         <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-medium">Full Mode</span>
       {/if}
-      {#if run.options.max_candidates}
-        <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">Max {run.options.max_candidates} candidates</span>
+      {#if activeRun.options.max_candidates}
+        <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">Max {activeRun.options.max_candidates} candidates</span>
       {/if}
-      {#if run.options.target_no_info}
+      {#if activeRun.options.target_no_info}
         <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">No-info priority</span>
       {/if}
-      {#if run.options.candidate_names && run.options.candidate_names.length > 0}
+      {#if activeRun.options.candidate_names && activeRun.options.candidate_names.length > 0}
         <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">
-          Targets: {run.options.candidate_names.join(", ")}
+          Targets: {activeRun.options.candidate_names.join(", ")}
         </span>
       {/if}
-      {#if run.options.enabled_steps && run.options.enabled_steps.length < 7}
-        <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">{run.options.enabled_steps.length} steps enabled</span>
+      {#if activeRun.options.enabled_steps && activeRun.options.enabled_steps.length < 7}
+        <span class="px-2 py-0.5 rounded-full bg-surface-alt text-content-muted font-medium">{activeRun.options.enabled_steps.length} steps enabled</span>
       {/if}
     </div>
   {/if}
@@ -479,12 +513,12 @@
       </div>
       <div class="w-full bg-stroke rounded-full h-2.5">
         <div
-          class="h-2.5 rounded-full transition-all duration-700 ease-out {run.status === 'failed' ? 'bg-red-500' : run.status === 'completed' ? 'bg-green-500' : 'bg-blue-600'}"
+          class="h-2.5 rounded-full transition-all duration-700 ease-out {activeRun?.status === 'failed' ? 'bg-red-500' : activeRun?.status === 'completed' ? 'bg-green-500' : 'bg-blue-600'}"
           style="width: {progress}%"
         />
       </div>
-      {#if run.error}
-        <p class="mt-2 text-sm text-red-600">{run.error}</p>
+      {#if activeRun?.error}
+        <p class="mt-2 text-sm text-red-600">{activeRun.error}</p>
       {/if}
     </div>
 

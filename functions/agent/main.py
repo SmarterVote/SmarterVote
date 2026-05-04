@@ -163,6 +163,7 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
 
     # Pass run_id and deadline into options for the handler
     options["run_id"] = run_id
+    options["queue_item_id"] = item_id
     options["deadline_at"] = time.time() + int(os.getenv("AGENT_DEADLINE_SECONDS", "3300"))
 
     # ---------------------------------------------------------------------------
@@ -189,6 +190,15 @@ def process_queue_item(cloud_event: CloudEvent) -> None:
                 "continuation_item_id": exc.continuation_item_id,
                 "continuation_run_id": getattr(exc, "continuation_run_id", None) or exc.continuation_item_id,
             }
+        )
+        return
+    except _CancelledExit as exc:
+        logger.info("Agent run %s cancelled: %s", run_id, exc)
+        item_ref.update({"status": "cancelled", "completed_at": datetime.now(timezone.utc).isoformat()})
+        run_ref.update({"status": "cancelled", "completed_at": SERVER_TIMESTAMP})
+        db.collection("races").document(race_id).set(
+            {"status": "cancelled", "current_run_id": run_id},
+            merge=True,
         )
         return
     except Exception as exc:
@@ -236,6 +246,10 @@ class _HandoffExit(Exception):
         self.continuation_item_id = continuation_item_id
         self.remaining_steps = remaining_steps
         self.continuation_run_id = continuation_run_id
+
+
+class _CancelledExit(Exception):
+    """Wraps AgentCancelled from the handler."""
 
 
 def _gen_id() -> str:
@@ -293,7 +307,7 @@ def _run_agent(
     # Import here to avoid module-level import failures if pipeline_client
     # packages aren't fully initialised at module import time
     try:
-        from pipeline_client.backend.handlers.agent import AgentHandler, HandoffTriggered
+        from pipeline_client.backend.handlers.agent import AgentHandler, AgentCancelled, HandoffTriggered
     except ImportError as exc:
         raise RuntimeError(f"Failed to import AgentHandler: {exc}") from exc
 
@@ -310,7 +324,7 @@ def _run_agent(
             loop.close()
     except Exception as exc:
         # Re-raise HandoffTriggered as _HandoffExit so caller can distinguish it
-        from pipeline_client.backend.handlers.agent import HandoffTriggered
+        from pipeline_client.backend.handlers.agent import AgentCancelled, HandoffTriggered
 
         if isinstance(exc, HandoffTriggered):
             raise _HandoffExit(
@@ -318,4 +332,6 @@ def _run_agent(
                 exc.remaining_steps,
                 exc.continuation_run_id,
             ) from exc
+        if isinstance(exc, AgentCancelled):
+            raise _CancelledExit(str(exc)) from exc
         raise

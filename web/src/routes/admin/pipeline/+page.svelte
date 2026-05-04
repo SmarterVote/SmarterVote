@@ -31,7 +31,7 @@
   // Utilities
   import { debounce, safeJsonStringify } from "$lib/utils/pipelineUtils";
   import { logger } from "$lib/utils/logger";
-  import type { RunHistoryItem, Artifact, RaceRecord } from "$lib/types";
+  import type { RunHistoryItem, Artifact, RaceRecord, RunInfo } from "$lib/types";
 
   const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://127.0.0.1:8080";
 
@@ -65,6 +65,7 @@
   // Run detail view
   let detailRunId: string | null = null;
   let detailRaceId: string | null = null;
+  let liveRun: Partial<RunInfo> | null = null;
   $: showingDetail = !!detailRunId;
 
   function openRunDetail(runId: string, raceId: string | null = null) {
@@ -83,6 +84,7 @@
     const raceId = detailRaceId;
     detailRunId = null;
     detailRaceId = null;
+    liveRun = null;
     if (browser && !skipHistoryUpdate) {
       const url = new URL(window.location.href);
       url.searchParams.delete("run");
@@ -333,6 +335,11 @@
           data.progress ?? pipeline.progress,
           data.message ?? pipeline.progressMessage
         );
+        break;
+      case "run_status":
+        if (data.data?.run_id === pipeline.currentRunId || data.data?.run_id === detailRunId) {
+          liveRun = data.data;
+        }
         break;
       case "run_completed":
         pipelineActions.setRunStatus("completed");
@@ -608,6 +615,7 @@
         liveProgress={pipeline.progress}
         liveProgressMessage={pipeline.progressMessage}
         liveElapsed={pipeline.elapsedTime}
+        {liveRun}
         on:back={() => closeRunDetail()}
         on:deleted={() => { closeRunDetail(); racesTabRef?.refresh(); debouncedRefresh(); refreshQueue(); }}
         on:cancelled={() => { closeRunDetail(); refreshQueue(); debouncedRefresh(); racesTabRef?.refresh(); }}
@@ -651,6 +659,7 @@
         liveProgress={pipeline.progress}
         liveProgressMessage={pipeline.progressMessage}
         liveElapsed={pipeline.elapsedTime}
+        {liveRun}
         on:back={() => closeRunDetail()}
         on:deleted={() => { closeRunDetail(); debouncedRefresh(); refreshQueue(); }}
         on:cancelled={() => { closeRunDetail(); refreshQueue(); debouncedRefresh(); }}

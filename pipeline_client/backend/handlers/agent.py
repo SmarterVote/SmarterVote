@@ -30,6 +30,10 @@ class HandoffTriggered(Exception):
         super().__init__(f"Handoff to continuation item {continuation_item_id}")
 
 
+class AgentCancelled(Exception):
+    """Raised when a running queue item has been cancelled by an admin."""
+
+
 # Default deadline: 55 minutes (gives 5-min buffer before CF's 60-min hard limit)
 DEFAULT_DEADLINE_SECONDS: int = 3300
 
@@ -102,6 +106,7 @@ class AgentHandler:
 
         cheap_mode = options.get("cheap_mode", True)
         enabled_steps_raw = options.get("enabled_steps")
+        queue_item_id = options.get("queue_item_id")
         t0 = time.perf_counter()
 
         logger.info(f"Agent: researching race {race_id} (cheap_mode={cheap_mode})")
@@ -182,8 +187,26 @@ class AgentHandler:
             if run_id and _safe_broadcast:
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
 
+        def _raise_if_cancelled() -> None:
+            if not queue_item_id:
+                return
+            try:
+                from pipeline_client.backend.firestore_logger import _get_db
+
+                db = _get_db()
+                if db is None:
+                    return
+                doc = db.collection("pipeline_queue").document(queue_item_id).get()
+                if doc.exists and (doc.to_dict() or {}).get("status") == "cancelled":
+                    raise AgentCancelled(f"Run {run_id or ''} for {race_id} was cancelled")
+            except AgentCancelled:
+                raise
+            except Exception as exc:
+                logger.debug("Cancellation check failed for queue item %s: %s", queue_item_id, exc)
+
         # --- Step tracker callbacks ---
         def _on_step_start(step: str, **_kw):
+            _raise_if_cancelled()
             if not run_id:
                 return
             try:
@@ -219,7 +242,7 @@ class AgentHandler:
                     if _run_manager
                     else _fallback_progress()
                 )
-                label = STEP_LABELS.get(step, step) + " ✓"
+                label = STEP_LABELS.get(step, step) + " complete"
                 _broadcast_progress(pct, label)
 
                 # --- Checkpoint / handoff check ---
@@ -265,6 +288,7 @@ class AgentHandler:
                 logger.debug("_on_step_skip tracking failed for '%s': %s", step, _e)
 
         def _on_step_progress(step: str, *, pct: int = 0, message: str = "", **_kw):
+            _raise_if_cancelled()
             if not run_id:
                 return
             try:

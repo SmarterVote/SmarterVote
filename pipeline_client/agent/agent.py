@@ -1,13 +1,13 @@
 ﻿"""Multi-phase candidate research agent with web search & caching.
 
 Phases (fresh run):
-1. **Discovery** â€“ identify the race, candidates, career history, images.
-1b. **Image resolution** â€“ verify/find direct image URLs per candidate.
-2. **Issue research** â€“ 12 per-candidate sub-agent calls (one per canonical issue).
-2b. **Finance & voting** â€“ dedicated donor and voting-record research.
-3. **Refinement** â€“ tools-mode per-candidate and meta cleanup.
-4. **Review** (optional) â€“ send to Claude, Gemini, and Grok for fact-checking.
-5. **Iteration** â€“ tools-mode pass to address review flags (up to 2 cycles).
+1. **Discovery** - identify the race, candidates, career history, images.
+1b. **Image resolution** - verify/find direct image URLs per candidate.
+2. **Issue research** - 12 per-candidate sub-agent calls (one per canonical issue).
+2b. **Finance & voting** - dedicated donor and voting-record research.
+3. **Refinement** - tools-mode per-candidate and meta cleanup.
+4. **Review** (optional) - send to Claude, Gemini, and Grok for fact-checking.
+5. **Iteration** - tools-mode pass to address review flags (up to 2 cycles).
 
 Update run adds Phase 0 (roster sync) before Phase 1 (meta update).
 
@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .cost import _cost_ctx, estimate_cost
-from .handlers import _make_editing_handlers  # noqa: F401 â€” re-exported for tests
-from .llm import (  # noqa: F401 â€” re-exported for backward compat
+from .handlers import _make_editing_handlers  # noqa: F401 - re-exported for tests
+from .llm import (  # noqa: F401 - re-exported for backward compat
     CHEAP_MODEL,
     DEFAULT_MODEL,
     NANO_MODEL,
@@ -35,7 +35,7 @@ from .llm import (  # noqa: F401 â€” re-exported for backward compat
     _ensure_dict,
     _normalize_candidate,
 )
-from .phases import (  # noqa: F401 â€” re-exported for backward compat
+from .phases import (  # noqa: F401 - re-exported for backward compat
     _candidate_source_hints,
     _has_actionable_flags,
     _run_fresh,
@@ -45,7 +45,7 @@ from .phases import (  # noqa: F401 â€” re-exported for backward compat
     _select_target_candidates,
 )
 from .review import compute_validation_grade, run_reviews
-from .tools import (  # noqa: F401 â€” re-exported for tests
+from .tools import (  # noqa: F401 - re-exported for tests
     ADD_CANDIDATE_TOOL,
     ADD_LINK_TOOL,
     ADD_POLL_TOOL,
@@ -69,8 +69,8 @@ from .tools import (  # noqa: F401 â€” re-exported for tests
     SET_VOTING_SUMMARY_TOOL,
     UPDATE_RACE_FIELD_TOOL,
 )
-from .utils import _extract_json, make_logger  # noqa: F401 â€” _extract_json re-exported for tests
-from .web_tools import (  # noqa: F401 â€” re-exported for backward compat
+from .utils import _extract_json, make_logger  # noqa: F401 - _extract_json re-exported for tests
+from .web_tools import (  # noqa: F401 - re-exported for backward compat
     _fetch_page,
     _get_fetch_client,
     _get_search_cache,
@@ -168,7 +168,7 @@ async def run_agent(
     log = make_logger(on_log)
     t0 = time.perf_counter()
 
-    # Step enablement check â€” None means all enabled
+    # Step enablement check - None means all enabled
     _all_steps = {"discovery", "images", "issues", "finance", "refinement", "review", "iteration"}
     _enabled = set(enabled_steps) if enabled_steps else _all_steps
 
@@ -190,9 +190,9 @@ async def run_agent(
         existing_data = _load_existing(race_id)
 
     if existing_data:
-        log("info", f"ðŸ”„ Update mode for {race_id} (model={model}, small_model={small_model})")
+        log("info", f"Update mode for {race_id} (model={model}, small_model={small_model})")
         if goal:
-            log("info", f"\U0001f3af Run goal: {goal}")
+            log("info", f"Run goal: {goal}")
         race_json = await _run_update(
             race_id, existing_data, model=model, small_model=small_model,
             on_log=on_log, max_iterations=max_iterations,
@@ -202,9 +202,9 @@ async def run_agent(
             goal=goal,
         )
     else:
-        log("info", f"ðŸ†• New research for {race_id} (model={model}, small_model={small_model})")
+        log("info", f"New research for {race_id} (model={model}, small_model={small_model})")
         if goal:
-            log("info", f"\U0001f3af Run goal: {goal}")
+            log("info", f"Run goal: {goal}")
         race_json = await _run_fresh(
             race_id, model=model, small_model=small_model,
             on_log=on_log, max_iterations=max_iterations,
@@ -214,10 +214,10 @@ async def run_agent(
             goal=goal,
         )
 
-    # LLMs sometimes wrap their output in {"race_json": {...}} â€” unwrap it so
+    # LLMs sometimes wrap their output in {"race_json": {...}} - unwrap it so
     # metadata we add below lands at the top level, not buried inside a key.
     if "race_json" in race_json and isinstance(race_json.get("race_json"), dict):
-        log("warning", "LLM wrapped output in 'race_json' key â€” unwrapping")
+        log("warning", "LLM wrapped output in 'race_json' key; unwrapping")
         race_json = race_json["race_json"]
 
     race_json.setdefault("id", race_id)
@@ -227,7 +227,7 @@ async def run_agent(
     should_review = _step_enabled("review")
     should_iterate = should_review and _step_enabled("iteration")
 
-    # Record the models actually used (deduplicated â€” nano == model in full mode)
+    # Record the models actually used (deduplicated - nano == model in full mode)
     generators = list(dict.fromkeys([model, small_model]))  # preserves order, drops duplicates
     if should_review:
         if os.getenv("ANTHROPIC_API_KEY"):
@@ -266,7 +266,7 @@ async def run_agent(
             n_flags = len(rev.get("flags", []))
             log("info", f"  {model_name}: {verdict} (score {score}/100, {n_flags} flags)")
             if summary:
-                log("info", f"    â†’ {summary}")
+                log("info", f"    -> {summary}")
         _track("complete", "review", duration_ms=int((time.perf_counter() - review_t0) * 1000), race_json=race_json)
 
         # --- Phase 5: Iterate on review feedback (up to 2 cycles) ---
@@ -280,9 +280,9 @@ async def run_agent(
                 min_severity = "error" if cycle > 1 else "warning"
                 if not _has_actionable_flags(reviews, min_severity=min_severity):
                     if cycle == 1:
-                        log("info", "  No actionable review flags â€” skipping iteration")
+                        log("info", "  No actionable review flags; skipping iteration")
                     else:
-                        log("info", f"  Cycle {cycle}: no remaining {min_severity}+ flags â€” done")
+                        log("info", f"  Cycle {cycle}: no remaining {min_severity}+ flags; done")
                     break
 
                 did_iterate = True
@@ -322,9 +322,9 @@ async def run_agent(
                         n_flags = len(rev.get("flags", []))
                         log("info", f"  {model_name}: {verdict} (score {score}/100, {n_flags} flags)")
                         if summary:
-                            log("info", f"    â†’ {summary}")
+                            log("info", f"    -> {summary}")
                 else:
-                    log("warning", f"  Cycle {cycle}: iteration failed â€” stopping")
+                    log("warning", f"  Cycle {cycle}: iteration failed; stopping")
                     break
             if not did_iterate:
                 _track("skip", "iteration")
@@ -369,7 +369,7 @@ async def run_agent(
     race_json["agent_metrics"] = agent_metrics
     log(
         "info",
-        f"✅ Agent finished in {elapsed:.1f}s — "
+        f"Agent finished in {elapsed:.1f}s; "
         f"${total_cost:.4f} estimated "
         f"({pt:,} in + {ct:,} out = {total_tokens:,} tokens)",
     )
@@ -378,7 +378,7 @@ async def run_agent(
     _candidates = race_json.get("candidates")
     if not isinstance(_candidates, list):
         raise ValueError(
-            f"Agent output for '{race_id}' has no 'candidates' — looks like a partial "
+            f"Agent output for '{race_id}' has no 'candidates'; looks like a partial "
             f"LLM response was returned instead of the full race profile. "
             f"Top-level keys present: {list(race_json.keys())}. Re-queue the race to retry."
         )
@@ -389,7 +389,7 @@ async def run_agent(
     try:
         from shared.models import RaceJSON as _RaceJSONModel
         _RaceJSONModel.model_validate(race_json)
-        log("info", "Schema validation passed — output conforms to RaceJSON v0.3")
+        log("info", "Schema validation passed; output conforms to RaceJSON v0.3")
     except Exception as schema_exc:
         log("warning", f"Schema validation warnings (non-fatal): {schema_exc}")
 

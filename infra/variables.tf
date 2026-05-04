@@ -72,19 +72,19 @@ variable "prevent_destroy_prod" {
 }
 
 variable "auth0_domain" {
-  description = "Auth0 domain for pipeline client authentication"
+  description = "Auth0 domain for races-api admin authentication"
   type        = string
   default     = ""
 }
 
 variable "auth0_audience" {
-  description = "Auth0 audience for pipeline client authentication"
+  description = "Auth0 audience for races-api admin authentication"
   type        = string
   default     = ""
 }
 
 variable "allowed_origins" {
-  description = "Allowed CORS origins for pipeline client"
+  description = "Allowed CORS origins for the optional legacy pipeline client"
   type        = list(string)
   default = [
     "https://smarter.vote",
@@ -94,10 +94,10 @@ variable "allowed_origins" {
   ]
 }
 
-# Pipeline Client Deployment Toggle
-# Set to true when ready to deploy pipeline processing to cloud
+# Legacy Pipeline Client Deployment Toggle
+# Keep false for normal production; the agent Cloud Function processes queue items.
 variable "enable_pipeline_client" {
-  description = "Enable pipeline client cloud deployment (expensive - runs AI processing)"
+  description = "Enable the legacy pipeline client Cloud Run service for local/debug workflows"
   type        = bool
   default     = false
 }

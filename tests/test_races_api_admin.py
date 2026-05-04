@@ -202,6 +202,143 @@ def test_queue_race_success():
     assert body["errors"] == []
 
 
+def test_queue_multiple_races_creates_independent_queue_items():
+    """Batch queueing should create one queue document and run_id per race."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    db = _build_empty_firestore_mock()
+    queue_docs: dict[str, dict] = {}
+    race_updates: dict[str, dict] = {}
+
+    def _queue_document(doc_id):
+        ref = MagicMock()
+        ref.set.side_effect = lambda data, **_kw: queue_docs.__setitem__(doc_id, data)
+        return ref
+
+    coll_queue = MagicMock()
+    coll_queue.document.side_effect = _queue_document
+    coll_queue.stream.return_value = iter([])
+    coll_queue.order_by.return_value = coll_queue
+
+    def _race_document(race_id):
+        ref = MagicMock()
+        ref.set.side_effect = lambda data, **_kw: race_updates.__setitem__(race_id, data)
+        return ref
+
+    coll_races = MagicMock()
+    coll_races.document.side_effect = _race_document
+
+    def _coll(name):
+        if name == "pipeline_queue":
+            return coll_queue
+        if name == "races":
+            return coll_races
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post(
+            "/api/races/queue",
+            json={"race_ids": ["az-senate-2026", "ga-governor-2026"], "options": {"cheap_mode": True}},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [item["race_id"] for item in body["added"]] == ["az-senate-2026", "ga-governor-2026"]
+    assert len(queue_docs) == 2
+    assert len({doc["run_id"] for doc in queue_docs.values()}) == 2
+    assert {doc["race_id"] for doc in queue_docs.values()} == {"az-senate-2026", "ga-governor-2026"}
+    assert race_updates["az-senate-2026"]["current_run_id"] != race_updates["ga-governor-2026"]["current_run_id"]
+
+
+def test_queue_rejects_duplicate_race_ids_in_same_batch():
+    """A batch should not create two active queue docs for the same race."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post(
+            "/api/races/queue",
+            json={"race_ids": ["az-senate-2026", "az-senate-2026"]},
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["added"]) == 1
+    assert body["errors"] == [{"race_id": "az-senate-2026", "error": "Duplicate race_id in request"}]
+
+
+def test_queue_rejects_already_running_race():
+    """Do not queue a race already marked queued/running."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    running_doc = _make_existing_doc({"race_id": "az-senate-2026", "status": "running"})
+    running_ref = MagicMock()
+    running_ref.get.return_value = running_doc
+
+    coll_races = MagicMock()
+    coll_races.document.return_value = running_ref
+
+    coll_queue = MagicMock()
+    coll_queue.stream.return_value = iter([])
+    coll_queue.order_by.return_value = coll_queue
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "races":
+            return coll_races
+        if name == "pipeline_queue":
+            return coll_queue
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/queue", json={"race_ids": ["az-senate-2026"]})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["added"] == []
+    assert body["errors"] == [{"race_id": "az-senate-2026", "error": "Race is already running"}]
+
+
 def test_run_options_accept_cloud_function_review_fields():
     """Production races-api RunOptions should accept all UI/agent option fields."""
     from request_models import RunOptions

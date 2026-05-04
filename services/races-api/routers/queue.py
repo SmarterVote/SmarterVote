@@ -59,11 +59,16 @@ async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
     options = request.options.model_dump(exclude_none=True) if request.options else {}
     added = []
     errors = []
+    seen_race_ids = set()
 
     for raw_id in request.race_ids:
         race_id = raw_id.strip()
         if not race_id:
             continue
+        if race_id in seen_race_ids:
+            errors.append({"race_id": race_id, "error": "Duplicate race_id in request"})
+            continue
+        seen_race_ids.add(race_id)
         try:
             validate_race_id(race_id)
         except HTTPException:
@@ -71,6 +76,13 @@ async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
             continue
         try:
             from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
+
+            race_doc = db.collection("races").document(race_id).get()
+            if getattr(race_doc, "exists", False) is True:
+                race_data = race_doc.to_dict() or {}
+                if race_data.get("status") in ("queued", "running"):
+                    errors.append({"race_id": race_id, "error": f"Race is already {race_data.get('status')}"})
+                    continue
 
             item_id = str(uuid.uuid4())
             run_id = str(uuid.uuid4())
@@ -155,7 +167,7 @@ async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]
         if race_id:
             firestore_helpers._fs_update_race(race_id, {"status": "idle"})
         return {"ok": True, "action": "cancelled", "id": item_id}
-    elif status in ("completed", "failed", "cancelled"):
+    elif status in ("completed", "failed", "cancelled", "continued"):
         doc.reference.delete()
         return {"ok": True, "action": "removed", "id": item_id}
     else:
