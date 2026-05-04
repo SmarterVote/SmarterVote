@@ -38,15 +38,12 @@ resource "google_cloud_run_v2_service" "races_api" {
         value = var.project_id
       }
 
-      dynamic "env" {
-        for_each = var.openai_api_key != "" ? [1] : []
-        content {
-          name = "OPENAI_API_KEY"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.openai_key[0].secret_id
-              version = "latest"
-            }
+      env {
+        name = "OPENAI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.openai_key.secret_id
+            version = "latest"
           }
         }
       }
