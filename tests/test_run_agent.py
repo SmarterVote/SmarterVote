@@ -9,6 +9,15 @@ import pytest
 
 from pipeline_client.agent.agent import _load_existing, run_agent
 
+
+@pytest.fixture(autouse=True)
+def no_review_provider_keys(monkeypatch):
+    """Unit tests mock agent phases; never call real review providers."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("XAI_API_KEY", raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Load existing data tests
 # ---------------------------------------------------------------------------

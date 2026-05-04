@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { getRace } from "./api";
 import { sampleRaces } from "./sampleData";
 
 describe("API Fallback Functionality", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("should return live data when API is available", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

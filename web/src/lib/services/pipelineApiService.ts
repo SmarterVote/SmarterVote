@@ -7,7 +7,8 @@ import {
   API_TIMEOUT_DEFAULT,
   API_TIMEOUT_ARTIFACT,
 } from "$lib/config/constants";
-import type { RunInfo, RunOptions, RunHistoryItem, RaceRecord } from "$lib/types";
+import { PIPELINE_STEPS } from "$lib/types";
+import type { RunInfo, RunOptions, RunHistoryItem, RaceRecord, RunStep } from "$lib/types";
 
 export interface AdminChatMessage {
   role: "user" | "assistant";
@@ -69,7 +70,7 @@ interface PublishedRacesResponse {
 export interface QueueItem {
   id: string;
   race_id: string;
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  status: "pending" | "running" | "completed" | "failed" | "cancelled" | "continued";
   options: Record<string, unknown>;
   run_id?: string;
   created_at: string;
@@ -113,6 +114,59 @@ export interface RaceVersion {
 export class PipelineApiService {
   constructor(private apiBase: string) {}
 
+  private normalizeRun(raw: RunInfo | Record<string, unknown>): RunInfo {
+    const r = raw as RunInfo & Record<string, unknown>;
+    const runId = String(r.run_id || r.id || "");
+    const payloadRaceId = (r.payload as Record<string, unknown> | undefined)?.race_id;
+    const raceId = typeof r.race_id === "string"
+      ? r.race_id
+      : typeof payloadRaceId === "string"
+        ? payloadRaceId
+        : undefined;
+    const options = r.options ?? {};
+    const existingSteps = Array.isArray(r.steps) ? (r.steps as RunStep[]) : [];
+    const enabledSteps = Array.isArray(options.enabled_steps) && options.enabled_steps.length
+      ? options.enabled_steps
+      : PIPELINE_STEPS.map((s) => s.id);
+    const remainingSteps = Array.isArray(r.remaining_steps) ? r.remaining_steps.map(String) : undefined;
+    const currentStep = typeof r.current_step === "string" ? r.current_step : undefined;
+    const status = (r.status || "pending") as RunInfo["status"];
+    const steps = existingSteps.length
+      ? existingSteps
+      : PIPELINE_STEPS.map((step) => {
+          const enabled = enabledSteps.includes(step.id);
+          let stepStatus: RunStep["status"] = enabled ? "pending" : "skipped";
+          if (enabled && remainingSteps && !remainingSteps.includes(step.id) && step.id !== currentStep) {
+            stepStatus = "completed";
+          }
+          if (enabled && step.id === currentStep && (status === "running" || status === "pending")) {
+            stepStatus = "running";
+          }
+          if (status === "completed" && enabled) {
+            stepStatus = "completed";
+          }
+          return {
+            name: step.id,
+            label: step.label,
+            weight: step.weight,
+            status: stepStatus,
+          };
+        });
+
+    return {
+      ...(r as RunInfo),
+      run_id: runId,
+      race_id: raceId,
+      status,
+      payload: r.payload ?? (raceId ? { race_id: raceId } : {}),
+      options,
+      progress: typeof r.progress === "number" ? r.progress : undefined,
+      current_step: currentStep ?? null,
+      remaining_steps: remainingSteps,
+      steps,
+    };
+  }
+
   /**
    * Load run history from Firestore (via /runs endpoint).
    * Firestore run docs have: run_id, race_id, status, progress, current_step,
@@ -124,18 +178,22 @@ export class PipelineApiService {
     const data: RunsResponse = await res.json();
     const runs = data.runs || [];
 
-    return runs.map((r: RunInfo, idx: number) => ({
-      ...(r as any),
-      run_id: (r as any).run_id || (r as any).id,
-      display_id: runs.length - idx,
-      updated_at: (r as any).completed_at || (r as any).started_at,
+    return runs.map((r: RunInfo, idx: number) => {
+      const normalized = this.normalizeRun(r);
+      return ({
+        ...normalized,
+        run_id: normalized.run_id,
+        display_id: runs.length - idx,
+        updated_at: normalized.completed_at || normalized.started_at,
       // Firestore runs expose current_step instead of a steps array.
-      last_step: (r as any).current_step ?? undefined,
+        last_step: normalized.current_step ?? undefined,
       // Fields not present in Firestore run docs — supply safe defaults.
-      steps: [],
-      payload: { race_id: (r as any).race_id },
-      artifact_id: undefined,
-    } as RunHistoryItem));
+        steps: normalized.steps,
+        payload: normalized.payload,
+        progress: normalized.progress,
+        current_step: normalized.current_step,
+      } as RunHistoryItem);
+    });
   }
 
   /**
@@ -159,7 +217,7 @@ export class PipelineApiService {
   async getRunDetails(runId: string): Promise<RunInfo> {
     const res = await fetchWithAuth(`${this.apiBase}/run/${runId}`, {}, API_TIMEOUT_DEFAULT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    return await res.json();
+    return this.normalizeRun(await res.json());
   }
 
   /**
@@ -511,7 +569,7 @@ export class PipelineApiService {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     const data: RaceRunsResponse = await res.json();
-    return data.runs || [];
+    return (data.runs || []).map((run) => this.normalizeRun(run));
   }
 
   /**
@@ -524,7 +582,7 @@ export class PipelineApiService {
       API_TIMEOUT_DEFAULT
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    return await res.json();
+    return this.normalizeRun(await res.json());
   }
 
   /**

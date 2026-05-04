@@ -232,6 +232,7 @@ export type RunStatus =
   | "completed"
   | "failed"
   | "cancelled"
+  | "continued"
   | "skipped";
 
 // Canonical pipeline step identifiers
@@ -287,6 +288,9 @@ export interface RunInfo {
   run_id: string;
   race_id?: string;
   status: RunStatus;
+  progress?: number;
+  current_step?: PipelineStepId | string | null;
+  remaining_steps?: string[];
   payload?: Record<string, unknown>;
   options: RunOptions;
   started_at: string;

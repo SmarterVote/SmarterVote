@@ -51,6 +51,16 @@
   $: derivedSteps = (() => {
     const logSource = isLiveAndRunning ? liveLogs : fetchedLogs;
     const stepMap = new Map<string, Partial<RunStep> & { name: PipelineStepId; status: string }>();
+    for (const step of run?.steps ?? []) {
+      const meta = PIPELINE_STEPS.find((s) => s.id === step.name);
+      stepMap.set(step.name, {
+        ...step,
+        name: step.name as PipelineStepId,
+        label: step.label ?? meta?.label,
+        weight: step.weight ?? meta?.weight,
+        status: step.status ?? "pending",
+      });
+    }
     for (const log of logSource) {
       const stepId = (log as any).step as PipelineStepId | undefined;
       if (!stepId) continue;
@@ -106,7 +116,11 @@
     { id: "output" as SectionId, label: "Output" },
     ...(analysisContent ? [{ id: "analysis" as SectionId, label: "Analysis" }] : []),
   ];
-  $: progress = isLiveAndRunning ? Math.max(liveProgress, computeProgress(pipelineSteps as RunStep[])) : computeProgress(pipelineSteps as RunStep[]);
+  $: computedProgress = computeProgress(pipelineSteps as RunStep[]);
+  $: serverProgress = typeof run?.progress === "number" ? run.progress : undefined;
+  $: progress = isLiveAndRunning
+    ? Math.max(liveProgress, serverProgress ?? 0, computedProgress)
+    : (serverProgress ?? computedProgress);
   $: progressMsg = isLiveAndRunning && liveProgressMessage ? liveProgressMessage : lastStepMessage(pipelineSteps as RunStep[]);
   $: elapsed = isLiveAndRunning ? liveElapsed : (run?.duration_ms ? Math.floor(run.duration_ms / 1000) : 0);
 
@@ -174,6 +188,7 @@
       case "running": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
       case "failed": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
       case "cancelled": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+      case "continued": return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
       case "skipped": return "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-500";
       case "pending": return "bg-surface-alt text-content-subtle";
       default: return "bg-surface-alt text-content-subtle";

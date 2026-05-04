@@ -9,6 +9,24 @@ import pytest
 from pipeline_client.backend.handlers.agent import AgentHandler
 
 
+@pytest.fixture(autouse=True)
+def fast_handler_side_effects(monkeypatch, tmp_path):
+    """Keep AgentHandler tests from touching real metrics/race metadata backends."""
+    monkeypatch.delenv("FIRESTORE_PROJECT", raising=False)
+    monkeypatch.setenv("PIPELINE_METRICS_DB_PATH", str(tmp_path / "pipeline_metrics.db"))
+    with (
+        patch(
+            "pipeline_client.backend.handlers.agent.AgentHandler._load_existing_from_gcs",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch("pipeline_client.backend.race_manager.race_manager.update_race_metadata"),
+        patch("pipeline_client.backend.pipeline_metrics.get_pipeline_metrics_store") as metrics_store,
+    ):
+        metrics_store.return_value.record_run = AsyncMock()
+        yield
+
+
 @pytest.mark.asyncio
 async def test_v2_handler_raises_on_missing_race_id():
     """AgentHandler raises ValueError when race_id is missing."""

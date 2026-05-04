@@ -353,7 +353,7 @@ class AgentHandler:
 
             # Mark current run as continued in Firestore
             if _fs_logger:
-                _fs_logger.mark_continued(item_id)
+                _fs_logger.mark_continued(continuation_run_id)
 
             raise HandoffTriggered(item_id, remaining, continuation_run_id)
 

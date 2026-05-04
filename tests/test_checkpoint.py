@@ -14,6 +14,26 @@ import pytest
 
 from pipeline_client.backend.handlers.agent import HandoffTriggered
 
+
+@pytest.fixture(autouse=True)
+def fast_handler_side_effects(monkeypatch, tmp_path):
+    """Keep AgentHandler unit tests focused on handoff behavior."""
+    monkeypatch.delenv("FIRESTORE_PROJECT", raising=False)
+    monkeypatch.setenv("PIPELINE_METRICS_DB_PATH", str(tmp_path / "pipeline_metrics.db"))
+    with (
+        patch(
+            "pipeline_client.backend.handlers.agent.AgentHandler._load_existing_from_gcs",
+            new_callable=AsyncMock,
+            return_value=None,
+        ),
+        patch("pipeline_client.backend.handlers.agent.AgentHandler._get_storage_client", return_value=None),
+        patch("pipeline_client.backend.race_manager.race_manager.update_race_metadata"),
+        patch("pipeline_client.backend.pipeline_metrics.get_pipeline_metrics_store") as metrics_store,
+    ):
+        metrics_store.return_value.record_run = AsyncMock()
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Exception class
 # ---------------------------------------------------------------------------
@@ -131,7 +151,7 @@ async def test_handoff_writes_continuation_run_and_checkpoint_path():
         ),
         patch.object(handler, "_save_draft", new_callable=AsyncMock),
         patch.object(handler, "_get_storage_client", return_value=mock_storage_client),
-        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger") as mock_fs_logger_cls,
         patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
         patch("pipeline_client.backend.settings.settings.gcs_bucket", "test-bucket"),
     ):
@@ -147,6 +167,7 @@ async def test_handoff_writes_continuation_run_and_checkpoint_path():
     assert continuation_doc["options"]["enabled_steps"] == ["issues"]
     assert "existing_data_gcs_path" not in continuation_doc["options"]
     assert exc_info.value.continuation_run_id == continuation_doc["run_id"]
+    mock_fs_logger_cls.return_value.mark_continued.assert_called_with(continuation_doc["run_id"])
     mock_blob.upload_from_string.assert_called_once()
 
 

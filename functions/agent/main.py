@@ -313,5 +313,9 @@ def _run_agent(
         from pipeline_client.backend.handlers.agent import HandoffTriggered
 
         if isinstance(exc, HandoffTriggered):
-            raise _HandoffExit(exc.continuation_item_id, exc.remaining_steps) from exc
+            raise _HandoffExit(
+                exc.continuation_item_id,
+                exc.remaining_steps,
+                exc.continuation_run_id,
+            ) from exc
         raise

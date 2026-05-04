@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 _RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
 _PIPELINE_STEPS = {"discovery", "images", "issues", "finance", "refinement", "review", "iteration"}
@@ -52,6 +52,12 @@ class RunOptions(BaseModel):
             return None
         normalized = [name.strip() for name in value if isinstance(name, str) and name.strip()]
         return list(dict.fromkeys(normalized)) or None
+
+    @model_validator(mode="after")
+    def validate_step_dependencies(self) -> "RunOptions":
+        if self.enabled_steps and "iteration" in self.enabled_steps and "review" not in self.enabled_steps:
+            raise ValueError("'iteration' requires 'review' in enabled_steps")
+        return self
 
 
 class RaceQueueRequest(BaseModel):

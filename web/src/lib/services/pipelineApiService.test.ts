@@ -105,4 +105,28 @@ describe("PipelineApiService production admin API contract", () => {
     expect(result.action?.race_ids).toEqual(["az-senate-2026"]);
     expect(result.thinking_steps).toEqual(["Prepared run for 1 race(s)"]);
   });
+
+  it("normalizes Firestore run stage fields into steps", async () => {
+    fetchWithAuth.mockResolvedValueOnce(
+      jsonResponse({
+        run_id: "run-1",
+        race_id: "az-senate-2026",
+        status: "running",
+        progress: 20,
+        current_step: "issues",
+        remaining_steps: ["issues", "finance"],
+        started_at: "2026-05-01T00:00:00Z",
+        options: { enabled_steps: ["discovery", "issues", "finance"] },
+      })
+    );
+
+    const api = new PipelineApiService("https://api.example.test");
+    const run = await api.getRunDetails("run-1");
+
+    expect(run.current_step).toBe("issues");
+    expect(run.progress).toBe(20);
+    expect(run.steps?.find((s) => s.name === "discovery")?.status).toBe("completed");
+    expect(run.steps?.find((s) => s.name === "issues")?.status).toBe("running");
+    expect(run.steps?.find((s) => s.name === "images")?.status).toBe("skipped");
+  });
 });

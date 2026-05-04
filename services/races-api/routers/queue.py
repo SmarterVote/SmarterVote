@@ -16,12 +16,21 @@ from request_models import RaceQueueRequest, validate_race_id
 router = APIRouter()
 
 _PIPELINE_STEPS = ["discovery", "images", "issues", "finance", "refinement", "review", "iteration"]
+_PIPELINE_STEP_DETAILS = [
+    {"id": "discovery", "label": "Discovery", "weight": 15},
+    {"id": "images", "label": "Image Resolution", "weight": 5},
+    {"id": "issues", "label": "Issue Research", "weight": 35},
+    {"id": "finance", "label": "Finance & Voting", "weight": 10},
+    {"id": "refinement", "label": "Refinement", "weight": 15},
+    {"id": "review", "label": "AI Review", "weight": 12},
+    {"id": "iteration", "label": "Review Iteration", "weight": 8},
+]
 
 
 @router.get("/steps", dependencies=[Depends(verify_token)])
 async def list_steps() -> Dict[str, Any]:
     """Return the ordered list of available pipeline steps."""
-    return {"steps": _PIPELINE_STEPS}
+    return {"steps": _PIPELINE_STEPS, "step_details": _PIPELINE_STEP_DETAILS}
 
 
 @router.get("/queue", dependencies=[Depends(verify_token)])
@@ -93,7 +102,7 @@ async def add_to_queue(request: RaceQueueRequest) -> Dict[str, Any]:
 async def clear_finished_queue() -> Dict[str, Any]:
     """Delete completed/failed/cancelled queue items."""
     db = firestore_helpers._get_fs()
-    finished_statuses = {"completed", "failed", "cancelled"}
+    finished_statuses = {"completed", "failed", "cancelled", "continued"}
     removed = 0
     for doc in db.collection("pipeline_queue").stream():
         data = doc.to_dict() or {}

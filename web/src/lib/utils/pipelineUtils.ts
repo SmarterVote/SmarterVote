@@ -24,6 +24,10 @@ export function getStatusClass(status: RunStatus | string): string {
       return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-200 dark:border-green-700";
     case "failed":
       return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-200 dark:border-red-700";
+    case "cancelled":
+      return "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700";
+    case "continued":
+      return "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-700";
     default:
       return "bg-surface-alt text-content border-stroke";
   }

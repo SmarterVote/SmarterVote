@@ -117,6 +117,7 @@ def test_list_steps(client):
     body = resp.json()
     assert "steps" in body
     assert "discovery" in body["steps"]
+    assert body["step_details"][0] == {"id": "discovery", "label": "Discovery", "weight": 15}
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +233,9 @@ def test_run_options_normalize_and_validate_pipeline_controls():
 
     with pytest.raises(ValidationError):
         RunOptions(enabled_steps=["not-a-step"])
+
+    with pytest.raises(ValidationError):
+        RunOptions(enabled_steps=["iteration"])
 
 
 # ---------------------------------------------------------------------------
