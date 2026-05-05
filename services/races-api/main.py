@@ -5,10 +5,10 @@ This service exposes public read endpoints for race data, analytics, and
 admin management endpoints for the SmarterVote pipeline.
 
 Admin endpoints are split into routers:
-  routers/queue.py        â€” queue management
-  routers/runs.py         â€” run details and logs
-  routers/races_admin.py  â€” race record CRUD, drafts, publish, versions
-  routers/pipeline.py     â€” metrics, alerts, admin chat
+    routers/queue.py        - queue management
+    routers/runs.py         - run details and logs
+    routers/races_admin.py  - race record CRUD, drafts, publish, versions
+    routers/pipeline.py     - metrics, alerts, admin chat
 """
 
 import logging
@@ -84,10 +84,10 @@ app = FastAPI(title="SmarterVote Races API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Analytics middleware â€” runs before CORS, records every tracked request
+# Analytics middleware - runs before CORS, records every tracked request
 app.add_middleware(AnalyticsMiddleware)
 
-# Enable CORS â€” public read API + authenticated admin writes
+# Enable CORS - public read API + authenticated admin writes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -112,13 +112,13 @@ app.include_router(pipeline_router_module.router)
 
 @app.get("/health", include_in_schema=False)
 def health():
-    """Liveness probe â€” always returns OK if the process is up."""
+    """Liveness probe - always returns OK if the process is up."""
     return {"status": "ok"}
 
 
 @app.get("/health/ready", include_in_schema=False)
 def readiness():
-    """Readiness probe â€” checks that the publish service can serve data."""
+    """Readiness probe - checks that the publish service can serve data."""
     races = publish_service.get_published_races()
     return {"ready": True, "race_count": len(races)}
 
