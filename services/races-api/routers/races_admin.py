@@ -52,6 +52,34 @@ async def list_all_races() -> Dict[str, Any]:
     docs = db.collection("races").limit(500).stream()
     races = [firestore_helpers._doc_to_plain(d) for d in docs]
     races = [r for r in races if r is not None]
+    draft_id_list = gcs_helpers._gcs_list_race_ids("drafts")
+    published_id_list = gcs_helpers._gcs_list_race_ids("races")
+    draft_ids = set(draft_id_list or [])
+    published_ids = set(published_id_list or [])
+    storage_state_known = draft_id_list is not None and published_id_list is not None
+
+    for race in races:
+        race_id = race.get("race_id") or race.get("id")
+        draft_exists = race_id in draft_ids
+        published_exists = race_id in published_ids
+
+        # Storage is the source of truth for publishability. Firestore metadata can
+        # drift after failed publishes, deletes, or legacy admin flows.
+        status = race.get("status")
+        if storage_state_known:
+            race["draft_exists"] = draft_exists
+            race["published_exists"] = published_exists
+        if storage_state_known and status not in ("queued", "running"):
+            if published_exists:
+                race["status"] = "published"
+                if not draft_exists:
+                    race["draft_updated_at"] = None
+            elif draft_exists:
+                race["status"] = "draft"
+            elif status in ("draft", "published"):
+                race["status"] = "empty"
+                race["draft_updated_at"] = None
+                race["published_at"] = None
     return {"races": races}
 
 
@@ -126,8 +154,14 @@ async def recheck_race_status(race_id: str) -> Dict[str, Any]:
         if not run_actually_active:
             has_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
             has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
-            new_status = "published" if has_published else ("draft" if has_draft else "idle")
-            firestore_helpers._fs_update_race(race_id, {"status": new_status})
+            new_status = "published" if has_published else ("draft" if has_draft else "empty")
+            firestore_helpers._fs_update_race(
+                race_id,
+                {
+                    "status": new_status,
+                    "draft_updated_at": None if not has_draft else race_data.get("draft_updated_at"),
+                },
+            )
     updated_doc = db.collection("races").document(race_id).get()
     return {"message": f"Race {race_id} rechecked", "race": firestore_helpers._doc_to_plain(updated_doc)}
 
@@ -211,7 +245,8 @@ async def delete_draft_race(race_id: str) -> Dict[str, Any]:
     deleted = gcs_helpers._gcs_delete_race_json(race_id, "drafts")
     if not deleted:
         raise HTTPException(status_code=404, detail="Draft not found")
-    firestore_helpers._fs_update_race(race_id, {"status": "idle", "draft_updated_at": None})
+    has_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
+    firestore_helpers._fs_update_race(race_id, {"status": "published" if has_published else "empty", "draft_updated_at": None})
     return {"message": f"Draft {race_id} deleted", "id": race_id}
 
 
@@ -219,10 +254,18 @@ async def delete_draft_race(race_id: str) -> Dict[str, Any]:
 async def delete_published_race_admin(race_id: str) -> Dict[str, Any]:
     """Delete a published race from GCS (admin — keeps draft)."""
     validate_race_id(race_id)
+    has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
     deleted = gcs_helpers._gcs_delete_race_json(race_id, "races")
     if not deleted:
         raise HTTPException(status_code=404, detail="Published race not found")
-    firestore_helpers._fs_update_race(race_id, {"status": "draft", "published_at": None})
+    firestore_helpers._fs_update_race(
+        race_id,
+        {
+            "status": "draft" if has_draft else "empty",
+            "published_at": None,
+            "draft_updated_at": datetime.now(timezone.utc).isoformat() if has_draft else None,
+        },
+    )
     return {"message": f"Race {race_id} unpublished", "id": race_id}
 
 
@@ -245,10 +288,18 @@ async def publish_race(race_id: str) -> Dict[str, Any]:
 async def unpublish_race(race_id: str) -> Dict[str, Any]:
     """Remove a race from published (keeps draft)."""
     validate_race_id(race_id)
+    has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
     deleted = gcs_helpers._gcs_delete_race_json(race_id, "races")
     if not deleted:
         raise HTTPException(status_code=404, detail="Published race not found")
-    firestore_helpers._fs_update_race(race_id, {"status": "draft", "published_at": None})
+    firestore_helpers._fs_update_race(
+        race_id,
+        {
+            "status": "draft" if has_draft else "empty",
+            "published_at": None,
+            "draft_updated_at": datetime.now(timezone.utc).isoformat() if has_draft else None,
+        },
+    )
     return {"message": f"Race {race_id} unpublished (draft retained)", "id": race_id}
 
 

@@ -428,6 +428,8 @@ export interface RaceRecord {
   status: RaceStatusType;
   published_at?: string;
   draft_updated_at?: string;
+  draft_exists?: boolean;
+  published_exists?: boolean;
 
   candidate_count: number;
   quality_score?: number;

@@ -4,6 +4,7 @@ import type { RaceRecord } from "$lib/types";
 
 const mockApi = vi.hoisted(() => ({
   listRaceRuns: vi.fn(),
+  listRaceVersions: vi.fn(),
   publishRace: vi.fn(),
   unpublishRaceRecord: vi.fn(),
   cancelRace: vi.fn(),
@@ -11,12 +12,14 @@ const mockApi = vi.hoisted(() => ({
   deleteDraftRace: vi.fn(),
   deleteRaceRecord: vi.fn(),
   deleteRaceRun: vi.fn(),
+  restoreVersionAsDraft: vi.fn(),
 }));
 
 vi.mock("$lib/services/pipelineApiService", () => {
   return {
     PipelineApiService: class {
       listRaceRuns = mockApi.listRaceRuns;
+      listRaceVersions = mockApi.listRaceVersions;
       publishRace = mockApi.publishRace;
       unpublishRaceRecord = mockApi.unpublishRaceRecord;
       cancelRace = mockApi.cancelRace;
@@ -24,6 +27,7 @@ vi.mock("$lib/services/pipelineApiService", () => {
       deleteDraftRace = mockApi.deleteDraftRace;
       deleteRaceRecord = mockApi.deleteRaceRecord;
       deleteRaceRun = mockApi.deleteRaceRun;
+      restoreVersionAsDraft = mockApi.restoreVersionAsDraft;
     },
   };
 });
@@ -55,6 +59,7 @@ describe("RacePanel status flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApi.listRaceRuns.mockResolvedValue([]);
+    mockApi.listRaceVersions.mockResolvedValue([]);
   });
 
   beforeEach(async () => {
@@ -104,6 +109,24 @@ describe("RacePanel status flow", () => {
 
     expect(getByText("Unpublish")).toBeTruthy();
     expect(queryByText("Publish")).toBeNull();
+    expect(queryByText("Publish Draft")).toBeNull();
+    expect(queryByText("Publish Now")).toBeNull();
+  });
+
+  it("trusts explicit storage flags over stale draft metadata", () => {
+    const race = makeRace({
+      status: "published",
+      published_at: "2026-03-01T00:00:00Z",
+      draft_updated_at: "2026-03-02T00:00:00Z",
+      draft_exists: false,
+      published_exists: true,
+    });
+
+    const { getByText, queryByText } = render(RacePanel, { race, open: true });
+
+    expect(getByText("Unpublish")).toBeTruthy();
+    expect(getByText("View Page")).toBeTruthy();
+    expect(queryByText("View Draft")).toBeNull();
     expect(queryByText("Publish Draft")).toBeNull();
     expect(queryByText("Publish Now")).toBeNull();
   });

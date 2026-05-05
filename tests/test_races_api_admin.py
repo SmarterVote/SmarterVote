@@ -494,6 +494,60 @@ def test_list_drafts_returns_summaries_not_ids():
     assert body["races"][0]["candidates"][0]["name"] == "Alice Example"
 
 
+def test_list_races_uses_storage_state_for_draft_flags():
+    """Race list should not expose stale Firestore draft metadata as publishable state."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    stale_doc = _make_existing_doc(
+        {
+            "race_id": "ga-senate-2026",
+            "status": "draft",
+            "draft_updated_at": "2026-05-01T00:00:00Z",
+            "published_at": "2026-04-01T00:00:00Z",
+        }
+    )
+    active_draft_doc = _make_existing_doc(
+        {
+            "race_id": "az-senate-2026",
+            "status": "published",
+            "draft_updated_at": "2026-05-01T00:00:00Z",
+            "published_at": "2026-04-01T00:00:00Z",
+        }
+    )
+    coll_races = MagicMock()
+    coll_races.limit.return_value = coll_races
+    coll_races.stream.return_value = iter([stale_doc, active_draft_doc])
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: coll_races if name == "races" else MagicMock()
+
+    def _list_ids(prefix):
+        return ["az-senate-2026"] if prefix == "drafts" else ["ga-senate-2026", "az-senate-2026"]
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._gcs_list_race_ids", side_effect=_list_ids),
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.get("/api/races")
+
+    assert resp.status_code == 200
+    by_id = {race["race_id"]: race for race in resp.json()["races"]}
+    assert by_id["ga-senate-2026"]["status"] == "published"
+    assert by_id["ga-senate-2026"]["draft_exists"] is False
+    assert by_id["ga-senate-2026"]["published_exists"] is True
+    assert by_id["ga-senate-2026"]["draft_updated_at"] is None
+    assert by_id["az-senate-2026"]["status"] == "published"
+    assert by_id["az-senate-2026"]["draft_exists"] is True
+    assert by_id["az-senate-2026"]["published_exists"] is True
+
+
 def test_publish_race_clears_draft_timestamp():
     """Publishing should clear draft metadata so the UI no longer shows a stale publishable draft."""
     os.environ["SKIP_AUTH"] = "true"
@@ -519,6 +573,33 @@ def test_publish_race_clears_draft_timestamp():
     assert resp.status_code == 200
     update = mock_update.call_args.args[1]
     assert update["status"] == "published"
+    assert update["draft_updated_at"] is None
+
+
+def test_unpublish_without_draft_does_not_create_phantom_draft():
+    """Unpublish should not mark a race draft unless a draft blob actually exists."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("gcs_helpers._gcs_delete_race_json", return_value=True),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/ga-senate-2026/unpublish")
+
+    assert resp.status_code == 200
+    update = mock_update.call_args.args[1]
+    assert update["status"] == "empty"
+    assert update["published_at"] is None
     assert update["draft_updated_at"] is None
 
 

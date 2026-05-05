@@ -100,9 +100,21 @@
     if (e.key === "Enter") handleAddRaces();
   }
 
+  function hasDraft(row: RaceRecord): boolean {
+    if (typeof row.draft_exists === "boolean") return row.draft_exists;
+    return row.status === "draft" || !!row.draft_updated_at;
+  }
+
+  function hasPublished(row: RaceRecord): boolean {
+    if (typeof row.published_exists === "boolean") return row.published_exists;
+    return row.status === "published" || !!row.published_at;
+  }
+
   function hasPendingDraft(row: RaceRecord): boolean {
-    if (row.status === "draft") return true;
-    return !!row.draft_updated_at && row.status === "published" && !!row.published_at && row.draft_updated_at > row.published_at;
+    if (!hasDraft(row)) return false;
+    if (!hasPublished(row)) return true;
+    if (!row.draft_updated_at || !row.published_at) return true;
+    return row.draft_updated_at > row.published_at;
   }
 
   function isDiscoveryOnly(row: RaceRecord): boolean {
@@ -114,7 +126,7 @@
 
   $: selectedWithDrafts = [...selected].filter((id) => {
     const row = rows.find((r) => r.race_id === id);
-    return row && hasPendingDraft(row);
+    return row && hasDraft(row);
   });
 
   async function handleBulkPublish() {
@@ -174,8 +186,15 @@
     }
   }
 
-  function handlePreview(race_id: string) {
-    window.open(`/races/${race_id}?draft=true`, "_blank");
+  function previewUrl(row: RaceRecord): string | null {
+    if (hasDraft(row)) return `/races/${row.race_id}?draft=true`;
+    if (hasPublished(row)) return `/races/${row.race_id}`;
+    return null;
+  }
+
+  function handlePreview(row: RaceRecord) {
+    const url = previewUrl(row);
+    if (url) window.open(url, "_blank");
   }
 
   function sortIcon(key: keyof RaceRecord) {
@@ -373,7 +392,7 @@
                 <td class="px-3 py-3 text-content max-w-40 truncate" title={row.title ?? ""}>{row.title ?? "-"}</td>
                 <td class="px-3 py-3 text-content-muted max-w-32 truncate">{row.jurisdiction ?? "-"}</td>
                 <td class="px-3 py-3 text-content-muted text-center font-mono">{row.candidate_count || "-"}</td>
-                <td class="px-3 py-3 text-content-muted whitespace-nowrap">{formatDate(row.draft_updated_at)}</td>
+                <td class="px-3 py-3 text-content-muted whitespace-nowrap">{hasDraft(row) ? formatDate(row.draft_updated_at) : "-"}</td>
                 <td class="px-3 py-3">
                   <div class="flex items-center gap-1.5">
                     <span class="px-2 py-0.5 rounded-full text-xs font-medium {statusBadgeClass(row.status)}">
@@ -390,10 +409,10 @@
                         discovery
                       </span>
                     {/if}
-                    {#if hasPendingDraft(row)}
+                    {#if hasDraft(row)}
                       <span
                         class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-200 border border-amber-300 dark:border-amber-700"
-                        title="Draft available - newer than published version"
+                        title={hasPublished(row) ? "Draft available" : "Unpublished draft available"}
                       >
                         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -417,7 +436,7 @@
                 </td>
                 <td class="px-3 py-3" on:click|stopPropagation>
                   <div class="flex items-center space-x-1">
-                    {#if hasPendingDraft(row)}
+                    {#if hasDraft(row)}
                       <button
                         type="button"
                         class="px-2 py-1 text-xs border border-green-300 dark:border-green-700 rounded text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40 font-medium"
@@ -440,9 +459,11 @@
                     <button
                       type="button"
                       class="px-2 py-1 text-xs border border-stroke rounded text-content-muted hover:bg-surface-alt"
-                      on:click={() => handlePreview(row.race_id)}
+                      disabled={!previewUrl(row)}
+                      title={hasDraft(row) ? "Open draft preview" : hasPublished(row) ? "Open published page" : "No draft or published page exists"}
+                      on:click={() => handlePreview(row)}
                     >
-                      View
+                      {hasDraft(row) ? "View Draft" : "View Page"}
                     </button>
                     {#if row.status !== "running" && row.status !== "queued"}
                       <button

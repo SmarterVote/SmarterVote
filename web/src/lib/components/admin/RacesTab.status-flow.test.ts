@@ -26,6 +26,7 @@ function makeRace(overrides: Partial<RaceRecord> = {}): RaceRecord {
 describe("RacesTab status flow", () => {
   let rows: RaceRecord[] = [];
   let mockFetchWithAuth: any;
+  let openSpy: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,10 +46,12 @@ describe("RacesTab status flow", () => {
       };
     });
 
+    openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
   });
 
   afterEach(() => {
     cleanup();
+    openSpy.mockRestore();
     vi.doUnmock("$lib/stores/apiStore");
   });
 
@@ -115,5 +118,47 @@ describe("RacesTab status flow", () => {
 
     expect(getByText("Publish")).toBeTruthy();
     expect(getByText("Unpublish")).toBeTruthy();
+  });
+
+  it("does not publish or open draft previews from stale draft metadata", async () => {
+    rows = [
+      makeRace({
+        race_id: "stale-draft-metadata",
+        status: "published",
+        published_at: "2026-03-01T00:00:00Z",
+        draft_updated_at: "2026-03-02T00:00:00Z",
+        draft_exists: false,
+        published_exists: true,
+      }),
+    ];
+
+    const { component, getByText, queryByText } = await renderTab();
+
+    await component.refresh();
+    await waitFor(() => expect(getByText("stale-draft-metadata")).toBeTruthy());
+
+    expect(queryByText("Publish")).toBeNull();
+
+    await fireEvent.click(getByText("View Page"));
+    expect(openSpy).toHaveBeenCalledWith("/races/stale-draft-metadata", "_blank");
+  });
+
+  it("opens draft previews only when storage confirms a draft exists", async () => {
+    rows = [
+      makeRace({
+        race_id: "active-draft",
+        status: "draft",
+        draft_exists: true,
+        published_exists: false,
+      }),
+    ];
+
+    const { component, getByText } = await renderTab();
+
+    await component.refresh();
+    await waitFor(() => expect(getByText("active-draft")).toBeTruthy());
+
+    await fireEvent.click(getByText("View Draft"));
+    expect(openSpy).toHaveBeenCalledWith("/races/active-draft?draft=true", "_blank");
   });
 });

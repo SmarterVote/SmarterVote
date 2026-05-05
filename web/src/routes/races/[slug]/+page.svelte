@@ -25,7 +25,13 @@
 
     try {
       if (isDraftPreview) {
-        race = await getDraftRace(slug);
+        try {
+          race = await getDraftRace(slug);
+        } catch {
+          race = await getRace(slug, fetch, false);
+          isDraftPreview = false;
+          window.history.replaceState({}, "", `/races/${slug}`);
+        }
       } else {
         race = await getRace(slug);
       }

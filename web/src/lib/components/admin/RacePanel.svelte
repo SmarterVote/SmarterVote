@@ -200,15 +200,14 @@
     }
   }
 
-  // True when a draft exists and is newer than the published version
-  $: hasPendingUpdate =
-    !!race.draft_updated_at &&
-    !!race.published_at &&
-    race.draft_updated_at > race.published_at;
+  $: hasDraft = typeof race.draft_exists === "boolean" ? race.draft_exists : race.status === "draft" || !!race.draft_updated_at;
+  $: hasPublished = typeof race.published_exists === "boolean" ? race.published_exists : race.status === "published" || !!race.published_at;
 
-  // True when a draft exists (regardless of publish state).
-  // Include status="draft" to tolerate legacy records missing draft_updated_at.
-  $: hasDraft = race.status === "draft" || !!race.draft_updated_at;
+  // True when a draft exists and is newer than, or separate from, the published version.
+  $: hasPendingUpdate =
+    hasDraft &&
+    hasPublished &&
+    (!race.draft_updated_at || !race.published_at || race.draft_updated_at > race.published_at);
 
   let deletingDraft = false;
   let deletingRace = false;
@@ -368,7 +367,7 @@
             Publish{race.status !== "draft" ? " Draft" : ""}
           </button>
         {/if}
-        {#if race.status === "published"}
+        {#if hasPublished}
           <button
             type="button"
             class="px-3 py-1.5 text-sm border border-amber-300 dark:border-amber-700 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-40"
@@ -378,20 +377,40 @@
             Unpublish
           </button>
         {/if}
-        <button
-          type="button"
-          class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
-          on:click={handleExport}
-        >
-          Export
-        </button>
-        <a
-          href="/races/{race.race_id}"
-          target="_blank"
-          class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
-        >
-          View Page
-        </a>
+        {#if hasPublished}
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
+            on:click={handleExport}
+          >
+            Export Published
+          </button>
+          <a
+            href="/races/{race.race_id}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
+          >
+            View Page
+          </a>
+        {/if}
+        {#if hasDraft}
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
+            on:click={handleExportDraft}
+          >
+            Export Draft
+          </button>
+          <a
+            href="/races/{race.race_id}?draft=true"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-3 py-1.5 text-sm border border-stroke rounded-lg text-content-muted hover:bg-surface-alt"
+          >
+            View Draft
+          </a>
+        {/if}
         {#if race.status !== "running" && race.status !== "queued"}
           <button
             type="button"
@@ -487,7 +506,7 @@
             <div class="border-t border-stroke pt-3 space-y-2">
               <span class="text-xs font-semibold text-content-muted uppercase tracking-wide">Versions</span>
 
-              {#if race.published_at}
+              {#if hasPublished}
                 <div class="flex items-center justify-between rounded-md px-3 py-2 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800">
                   <div>
                     <span class="text-xs font-medium text-green-700 dark:text-green-300">Published</span>
@@ -505,7 +524,9 @@
               {#if hasDraft}
                 <div class="flex items-center justify-between rounded-md px-3 py-2 {hasPendingUpdate ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800' : 'bg-surface-alt border border-stroke'}">
                   <div>
-                    <span class="text-xs font-medium {hasPendingUpdate ? 'text-amber-700 dark:text-amber-300' : 'text-content-muted'}">Draft</span>
+                    <span class="text-xs font-medium {hasPendingUpdate ? 'text-amber-700 dark:text-amber-300' : 'text-content-muted'}">
+                      {hasPublished ? "Draft changes" : "Draft"}
+                    </span>
                     <p class="text-xs text-content-faint">{formatDate(race.draft_updated_at)}</p>
                   </div>
                   <div class="flex items-center gap-2">
@@ -525,7 +546,7 @@
                 </div>
               {/if}
 
-              {#if !race.published_at && !hasDraft}
+              {#if !hasPublished && !hasDraft}
                 <p class="text-xs text-content-faint py-1">No versions yet - run the pipeline to generate a draft.</p>
               {/if}
 
