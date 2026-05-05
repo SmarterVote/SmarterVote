@@ -33,6 +33,7 @@
   let rows: RaceRecord[] = [];
   let loading = true;
   let error = "";
+  let notice = "";
   let globalFilter = "";
   let statusFilter: RaceStatusType | "all" = "all";
   let sorting: SortingState = [{ id: "draft_updated_at", desc: true }];
@@ -40,6 +41,7 @@
   let selected = new Set<string>();
   let publishing = new Set<string>();
   let bulkPublishing = false;
+  let rechecking = false;
   let addInput = "";
 
   function hasDraft(row: RaceRecord): boolean {
@@ -245,6 +247,7 @@
   async function loadData() {
     try {
       error = "";
+      notice = "";
       rows = await apiService.listRaces();
       updateTableState();
     } catch (e) {
@@ -316,6 +319,20 @@
       error = `Bulk publish failed: ${e}`;
     } finally {
       bulkPublishing = false;
+    }
+  }
+
+  async function handleRecheckAll() {
+    if (rechecking) return;
+    rechecking = true;
+    try {
+      const result = await apiService.recheckAllRaces();
+      await loadData();
+      notice = `Rechecked ${result.checked} races; updated ${result.updated}.`;
+    } catch (e) {
+      error = `Recheck failed: ${e}`;
+    } finally {
+      rechecking = false;
     }
   }
 
@@ -498,11 +515,21 @@
       >
         Refresh
       </button>
+      <button
+        type="button"
+        class="px-3 py-2 text-sm border border-stroke rounded-lg hover:bg-surface-alt text-content disabled:opacity-40"
+        disabled={rechecking}
+        on:click={handleRecheckAll}
+      >
+        {rechecking ? "Rechecking..." : "Recheck All"}
+      </button>
     </div>
   </div>
 
   {#if error}
     <div class="card p-4 text-sm text-red-600">{error}</div>
+  {:else if notice}
+    <div class="card p-4 text-sm text-content">{notice}</div>
   {:else if loading}
     <div class="card p-8 text-center text-content-faint text-sm">Loading races...</div>
   {:else if filteredCount === 0}

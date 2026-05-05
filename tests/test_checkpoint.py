@@ -8,6 +8,7 @@ The handoff logic lives inside `AgentHandler.handle()` as a nested closure
 """
 
 import time
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -73,6 +74,33 @@ def _make_run_agent_calling_tracker(step: str, *, complete: bool = True, race_js
         return {"id": race_id, "candidates": []}
 
     return _fake_run_agent
+
+
+@pytest.mark.asyncio
+async def test_continuation_uses_checkpoint_payload_instead_of_gcs():
+    """Continuation runs must resume from the checkpoint loaded by the Cloud Function."""
+    from pipeline_client.backend.handlers.agent import AgentHandler
+
+    handler = AgentHandler()
+    checkpoint = {"id": "az-01-senate-2026", "candidates": [{"name": "Alice"}]}
+
+    async def _fake_run_agent(_race_id, *, existing_data=None, **_kw):
+        assert existing_data == checkpoint
+        return {"id": "az-01-senate-2026", "candidates": [{"name": "Alice"}]}
+
+    with (
+        patch("pipeline_client.agent.agent.run_agent", side_effect=_fake_run_agent),
+        patch.object(handler, "_load_existing_from_gcs", new_callable=AsyncMock) as mock_load_existing,
+        patch.object(handler, "_save_draft", new_callable=AsyncMock, return_value=Path("drafts/az-01-senate-2026.json")),
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+    ):
+        result = await handler.handle(
+            {"race_id": "az-01-senate-2026", "existing_data": checkpoint},
+            {"run_id": "run-continuation", "enabled_steps": ["issues"]},
+        )
+
+    assert result["status"] == "draft"
+    mock_load_existing.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

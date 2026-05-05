@@ -482,6 +482,19 @@ export class PipelineApiService {
   }
 
   /**
+   * Recheck all race statuses from storage and clear stale active runs
+   */
+  async recheckAllRaces(): Promise<{ checked: number; updated: number; races: import("$lib/types").RaceRecord[] }> {
+    const res = await fetchWithAuth(
+      `${this.apiBase}/api/races/recheck`,
+      { method: "POST" },
+      API_TIMEOUT_ARTIFACT
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    return await res.json();
+  }
+
+  /**
    * Run pipeline for a single race (direct, not queued)
    */
   async runRace(

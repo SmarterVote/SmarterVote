@@ -122,10 +122,14 @@ class AgentHandler:
             enabled_steps = list(ALL_STEPS)
         enabled_set = set(enabled_steps)
 
-        # Pre-load existing data from GCS if running in cloud
-        # force_fresh: pass empty dict to skip update mode entirely
+        # Pre-load existing data. Continuation runs receive checkpoint data from
+        # the Cloud Function payload; that is more precise than drafts/races GCS.
+        # force_fresh: pass empty dict to skip update mode entirely.
         if options.get("force_fresh"):
             existing_data = {}
+        elif isinstance(payload.get("existing_data"), dict):
+            existing_data = payload["existing_data"]
+            logger.info("Agent: loaded checkpoint payload for continuation %s", race_id)
         else:
             existing_data = await self._load_existing_from_gcs(race_id)
 

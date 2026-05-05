@@ -2,8 +2,9 @@
 
 import json
 import logging
+import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import firestore_helpers
@@ -13,6 +14,114 @@ from fastapi import APIRouter, Depends, HTTPException
 from request_models import BatchPublishRequest, RaceQueueRequest, RunOptions, validate_race_id
 
 router = APIRouter()
+
+STALE_ACTIVE_RUN_SECONDS = int(os.getenv("STALE_ACTIVE_RUN_SECONDS", "7200"))
+
+
+def _coerce_datetime(value: Any) -> datetime | None:
+    """Parse Firestore timestamps and ISO strings into aware datetimes."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _latest_activity_at(data: Dict[str, Any]) -> datetime | None:
+    for key in ("progress_updated_at", "started_at", "created_at", "updated_at"):
+        parsed = _coerce_datetime(data.get(key))
+        if parsed:
+            return parsed
+    return None
+
+
+def _active_doc_is_fresh(data: Dict[str, Any], now: datetime) -> bool:
+    """Return True when a pending/running queue or run doc is recent enough."""
+    if data.get("status") not in ("pending", "running"):
+        return False
+    activity_at = _latest_activity_at(data)
+    if activity_at is None:
+        # Old docs without timestamps are not strong evidence that a Cloud
+        # Function is still alive.
+        return False
+    return now - activity_at <= timedelta(seconds=STALE_ACTIVE_RUN_SECONDS)
+
+
+def _derive_storage_status(race_id: str, race_data: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    has_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
+    has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
+    new_status = "published" if has_published else ("draft" if has_draft else "failed")
+    update: Dict[str, Any] = {
+        "status": new_status,
+        "current_run_id": None,
+        "last_run_status": "failed" if new_status == "failed" else race_data.get("last_run_status"),
+        "draft_updated_at": race_data.get("draft_updated_at") if has_draft else None,
+    }
+    if not has_published:
+        update["published_at"] = None
+    return new_status, update
+
+
+def _recheck_race_status(db: Any, race_id: str, race_data: Dict[str, Any]) -> tuple[Dict[str, Any] | None, bool]:
+    """Reconcile one race record and return its latest Firestore shape."""
+    current_status = race_data.get("status", "idle")
+    updated = False
+    if current_status in ("running", "queued"):
+        run_id = race_data.get("current_run_id")
+        run_actually_active = False
+        run_ref = None
+        now = datetime.now(timezone.utc)
+        if run_id:
+            run_ref = db.collection("pipeline_runs").document(run_id)
+            run_doc = run_ref.get()
+            if run_doc.exists:
+                run_actually_active = _active_doc_is_fresh(run_doc.to_dict() or {}, now)
+            if run_actually_active:
+                queue_docs = db.collection("pipeline_queue").where("run_id", "==", run_id).stream()
+                active_queue_docs = [doc for doc in queue_docs if _active_doc_is_fresh(doc.to_dict() or {}, now)]
+                run_actually_active = bool(active_queue_docs)
+        if not run_actually_active:
+            _new_status, update = _derive_storage_status(race_id, race_data)
+            if run_ref is not None:
+                try:
+                    run_ref.update(
+                        {
+                            "status": "failed",
+                            "error": f"Marked stale by recheck after {STALE_ACTIVE_RUN_SECONDS} seconds without activity",
+                            "completed_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+                except Exception as exc:
+                    logging.warning("Failed to mark stale run %s failed: %s", run_id, exc)
+            if run_id:
+                for doc in db.collection("pipeline_queue").where("run_id", "==", run_id).stream():
+                    try:
+                        data = doc.to_dict() or {}
+                        if data.get("status") in ("pending", "running"):
+                            doc.reference.update(
+                                {
+                                    "status": "failed",
+                                    "error": "Marked stale by race recheck",
+                                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                                }
+                            )
+                    except Exception as exc:
+                        logging.warning("Failed to mark stale queue item for %s failed: %s", run_id, exc)
+            firestore_helpers._fs_update_race(race_id, update)
+            updated = True
+    updated_doc = db.collection("races").document(race_id).get()
+    return firestore_helpers._doc_to_plain(updated_doc), updated
 
 
 def _race_summary(data: Dict[str, Any], fallback_id: str) -> Dict[str, Any]:
@@ -95,6 +204,28 @@ async def list_draft_races() -> Dict[str, Any]:
     return {"races": races}
 
 
+@router.post("/api/races/recheck", dependencies=[Depends(verify_token)])
+async def recheck_all_race_statuses() -> Dict[str, Any]:
+    """Re-derive status for all race records and clear stale active runs."""
+    db = firestore_helpers._get_fs()
+    docs = db.collection("races").limit(500).stream()
+    races: list[Dict[str, Any]] = []
+    updated = 0
+    for doc in docs:
+        race_data = firestore_helpers._doc_to_plain(doc)
+        if not race_data:
+            continue
+        race_id = race_data.get("race_id") or race_data.get("id")
+        if not race_id:
+            continue
+        latest, changed = _recheck_race_status(db, race_id, race_data)
+        if latest:
+            races.append(latest)
+        if changed:
+            updated += 1
+    return {"message": f"Rechecked {len(races)} races", "checked": len(races), "updated": updated, "races": races}
+
+
 @router.get("/api/races/{race_id}", dependencies=[Depends(verify_token)])
 async def get_race_record(race_id: str) -> Dict[str, Any]:
     """Get a single race record from Firestore."""
@@ -154,28 +285,8 @@ async def recheck_race_status(race_id: str) -> Dict[str, Any]:
     if not race_doc.exists:
         raise HTTPException(status_code=404, detail="Race not found")
     race_data = race_doc.to_dict() or {}
-    current_status = race_data.get("status", "idle")
-    if current_status in ("running", "queued"):
-        run_id = race_data.get("current_run_id")
-        run_actually_active = False
-        if run_id:
-            run_doc = db.collection("pipeline_runs").document(run_id).get()
-            if run_doc.exists:
-                run_status = (run_doc.to_dict() or {}).get("status", "")
-                run_actually_active = run_status in ("pending", "running")
-        if not run_actually_active:
-            has_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
-            has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
-            new_status = "published" if has_published else ("draft" if has_draft else "empty")
-            firestore_helpers._fs_update_race(
-                race_id,
-                {
-                    "status": new_status,
-                    "draft_updated_at": None if not has_draft else race_data.get("draft_updated_at"),
-                },
-            )
-    updated_doc = db.collection("races").document(race_id).get()
-    return {"message": f"Race {race_id} rechecked", "race": firestore_helpers._doc_to_plain(updated_doc)}
+    latest, _changed = _recheck_race_status(db, race_id, race_data)
+    return {"message": f"Race {race_id} rechecked", "race": latest}
 
 
 @router.post("/api/races/{race_id}/run", dependencies=[Depends(verify_token)])

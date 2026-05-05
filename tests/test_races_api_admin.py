@@ -12,6 +12,7 @@ import os
 # ---------------------------------------------------------------------------
 import pathlib
 import sys
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -546,6 +547,164 @@ def test_list_races_uses_storage_state_for_draft_flags():
     assert by_id["az-senate-2026"]["status"] == "published"
     assert by_id["az-senate-2026"]["draft_exists"] is True
     assert by_id["az-senate-2026"]["published_exists"] is True
+
+
+def test_recheck_marks_stale_running_race_failed():
+    """A dead Cloud Function should not leave a race permanently running."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    stale_at = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+    race_doc = _make_existing_doc(
+        {
+            "race_id": "az-senate-2026",
+            "status": "running",
+            "current_run_id": "run-stale",
+        }
+    )
+    race_ref = MagicMock()
+    race_ref.get.return_value = race_doc
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    run_doc = _make_existing_doc(
+        {
+            "run_id": "run-stale",
+            "race_id": "az-senate-2026",
+            "status": "running",
+            "progress_updated_at": stale_at,
+        }
+    )
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-stale", "status": "running", "started_at": stale_at}
+    queue_doc.reference = MagicMock()
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "races":
+            return races_coll
+        if name == "pipeline_runs":
+            return runs_coll
+        if name == "pipeline_queue":
+            return queue_coll
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/az-senate-2026/recheck")
+
+    assert resp.status_code == 200
+    run_update = run_ref.update.call_args.args[0]
+    assert run_update["status"] == "failed"
+    queue_update = queue_doc.reference.update.call_args.args[0]
+    assert queue_update["status"] == "failed"
+    race_update = mock_update.call_args.args[1]
+    assert race_update["status"] == "failed"
+    assert race_update["current_run_id"] is None
+
+
+def test_recheck_all_marks_stale_running_races_failed():
+    """Bulk recheck should reconcile every race record, not just one race."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+
+    stale_at = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+    race_docs = [
+        _make_existing_doc({"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-az"}),
+        _make_existing_doc({"race_id": "ga-governor-2026", "status": "draft"}),
+    ]
+
+    race_refs: dict[str, MagicMock] = {}
+
+    def _race_document(race_id):
+        if race_id not in race_refs:
+            ref = MagicMock()
+            doc_data = next((d.to_dict() for d in race_docs if d.to_dict().get("race_id") == race_id), {})
+            ref.get.return_value = _make_existing_doc(doc_data)
+            race_refs[race_id] = ref
+        return race_refs[race_id]
+
+    races_coll = MagicMock()
+    races_coll.limit.return_value = races_coll
+    races_coll.stream.return_value = iter(race_docs)
+    races_coll.document.side_effect = _race_document
+
+    run_doc = _make_existing_doc(
+        {
+            "run_id": "run-az",
+            "race_id": "az-senate-2026",
+            "status": "running",
+            "progress_updated_at": stale_at,
+        }
+    )
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-az", "status": "running", "started_at": stale_at}
+    queue_doc.reference = MagicMock()
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    db = _build_empty_firestore_mock()
+
+    def _coll(name):
+        if name == "races":
+            return races_coll
+        if name == "pipeline_runs":
+            return runs_coll
+        if name == "pipeline_queue":
+            return queue_coll
+        return MagicMock()
+
+    db.collection.side_effect = _coll
+
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        tc = TestClient(app_module.app)
+        resp = tc.post("/api/races/recheck")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["checked"] == 2
+    assert body["updated"] == 1
+    run_ref.update.assert_called()
+    queue_doc.reference.update.assert_called()
+    assert mock_update.call_args.args[0] == "az-senate-2026"
+    assert mock_update.call_args.args[1]["status"] == "failed"
 
 
 def test_publish_race_clears_draft_timestamp():
