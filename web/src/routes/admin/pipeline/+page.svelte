@@ -499,6 +499,13 @@
     modalLoading = false;
   }
 
+  function handleActiveRunClick(runId: string | undefined, raceId: string | undefined) {
+    if (runId) {
+      activeTab = "races";
+      openRunDetail(runId, raceId ?? null);
+    }
+  }
+
   $: modalDataTooLarge = (() => {
     if (!modalData) return false;
     try {
@@ -574,11 +581,11 @@
           <button
             type="button"
             class="w-full text-left px-4 py-2.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-            on:click={() => { if (item.run_id) { activeTab = "races"; openRunDetail(item.run_id, item.race_id ?? null); } }}
+            on:click={() => handleActiveRunClick(item.run_id, item.race_id)}
             title="View run details"
           >
             <div class="flex items-center gap-3">
-              <span class="font-mono text-sm font-medium text-blue-900 dark:text-blue-100 truncate flex-1">{item.race_id}</span>
+              <span class="font-mono text-sm font-medium text-blue-900 dark:text-blue-100 truncate flex-1">{item.race_id || item.run_id || 'Unknown race'}</span>
               {#if isPrimary && pipeline.progress > 0}
                 <span class="text-sm font-bold text-blue-800 dark:text-blue-200 shrink-0">{pipeline.progress}%</span>
               {/if}
