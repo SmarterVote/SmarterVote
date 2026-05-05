@@ -120,7 +120,8 @@
   }
 
   // Reactive computed
-  $: queueRunning = queueItems.find((i) => i.status === "running");
+  $: queueRunningItems = queueItems.filter((i) => i.status === "running");
+  $: queueRunning = queueRunningItems[0] ?? null;
   $: queuePending = queueItems.filter((i) => i.status === "pending").length;
   $: oldestPendingMs = (() => {
     const pending = queueItems.filter((i) => i.status === "pending");
@@ -133,7 +134,7 @@
       .filter((v) => v > 0);
     return ages.length ? Math.max(...ages) : 0;
   })();
-  $: queueLikelyStalled = queuePending > 0 && !queueRunning && oldestPendingMs >= 180000;
+  $: queueLikelyStalled = queuePending > 0 && queueRunningItems.length === 0 && oldestPendingMs >= 180000;
 
   // Reactive subscriptions
   $: pipeline = $pipelineStore;
@@ -550,39 +551,56 @@
     runsBadgeCount={queueItems.filter((q) => q.status === "running" || q.status === "pending").length}
   />
 
-  <!-- Running banner (visible across tabs) — clickable to open run detail -->
-  {#if pipeline.isExecuting}
-    <button
-      type="button"
-      class="mb-4 card p-4 border-blue-200 bg-blue-50 dark:bg-blue-900/20 w-full text-left hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
-      on:click={() => { if (pipeline.currentRunId) { activeTab = "races"; openRunDetail(pipeline.currentRunId, null); } }}
-      title="View run details"
-    >
-      <div class="flex items-center gap-3">
-        <svg class="animate-spin h-5 w-5 text-blue-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+  <!-- Running banner (visible across tabs) — shows all active runs -->
+  {#if pipeline.isExecuting || queueRunningItems.length > 0}
+    <div class="mb-4 card border-blue-200 bg-blue-50 dark:bg-blue-900/20 overflow-hidden">
+      <!-- Header row -->
+      <div class="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-blue-200 dark:border-blue-800">
+        <svg class="animate-spin h-4 w-4 text-blue-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
           <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
         </svg>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold text-blue-900 dark:text-blue-200">
-            Researching{queueRunning ? ` ${queueRunning.race_id}` : ''}…
-          </p>
-          <p class="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-            {pipeline.progressMessage || 'Running'}
-            {#if queuePending > 0} · {queuePending} more in queue{/if}
-          </p>
-        </div>
-        <div class="flex items-center gap-3 shrink-0">
-          <p class="text-lg font-bold text-blue-800 dark:text-blue-200">{pipeline.progress}%</p>
-          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
+        <span class="text-sm font-semibold text-blue-900 dark:text-blue-200">
+          {queueRunningItems.length} run{queueRunningItems.length !== 1 ? 's' : ''} in progress
+          {#if queuePending > 0}
+            <span class="font-normal text-blue-700 dark:text-blue-300">· {queuePending} queued</span>
+          {/if}
+        </span>
       </div>
-      <div class="mt-2 w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5">
-        <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-700" style="width: {pipeline.progress}%" />
+      <!-- One row per running item -->
+      <div class="divide-y divide-blue-100 dark:divide-blue-900/40">
+        {#each queueRunningItems as item (item.id)}
+          {@const isPrimary = item.run_id === pipeline.currentRunId}
+          <button
+            type="button"
+            class="w-full text-left px-4 py-2.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+            on:click={() => { if (item.run_id) { activeTab = "races"; openRunDetail(item.run_id, item.race_id ?? null); } }}
+            title="View run details"
+          >
+            <div class="flex items-center gap-3">
+              <span class="font-mono text-sm font-medium text-blue-900 dark:text-blue-100 truncate flex-1">{item.race_id}</span>
+              {#if isPrimary && pipeline.progress > 0}
+                <span class="text-sm font-bold text-blue-800 dark:text-blue-200 shrink-0">{pipeline.progress}%</span>
+              {/if}
+              <svg class="w-4 h-4 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+            {#if isPrimary && (pipeline.progressMessage || pipeline.elapsedTime)}
+              <div class="mt-1.5">
+                <p class="text-xs text-blue-700 dark:text-blue-300 truncate">
+                  {pipeline.progressMessage || 'Running'}
+                  {#if pipeline.elapsedTime > 0}· {Math.floor(pipeline.elapsedTime / 60) > 0 ? `${Math.floor(pipeline.elapsedTime / 60)}m ` : ''}{pipeline.elapsedTime % 60}s{/if}
+                </p>
+                <div class="mt-1 w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1">
+                  <div class="bg-blue-600 h-1 rounded-full transition-all duration-700" style="width: {pipeline.progress}%" />
+                </div>
+              </div>
+            {/if}
+          </button>
+        {/each}
       </div>
-    </button>
+    </div>
   {/if}
 
   {#if queueLikelyStalled}
