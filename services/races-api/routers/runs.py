@@ -52,8 +52,6 @@ async def list_active_runs() -> Dict[str, Any]:
     return {"runs": runs, "count": len(runs)}
 
 
-# Dual path: both /run/{id} (legacy) and /runs/{id} resolve to the same handler.
-@router.get("/run/{run_id}", dependencies=[Depends(verify_token)])
 @router.get("/runs/{run_id}", dependencies=[Depends(verify_token)])
 async def get_run(run_id: str) -> Dict[str, Any]:
     """Get details of a specific run from Firestore."""

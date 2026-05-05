@@ -9,7 +9,7 @@
     filteredLogs,
     safeOutputDisplay,
   } from "$lib/stores/pipelineStore";
-  import { websocketStore, websocketActions } from "$lib/stores/websocketStore";
+  import { runPollingStore, runPollingActions } from "$lib/stores/runPollingStore";
   import { apiStore, initializeAuth } from "$lib/stores/apiStore";
 
   // Services
@@ -137,7 +137,7 @@
 
   // Reactive subscriptions
   $: pipeline = $pipelineStore;
-  $: websocket = $websocketStore;
+  $: polling = $runPollingStore;
   $: api = $apiStore;
   $: logs = $filteredLogs;
 
@@ -148,15 +148,15 @@
       await initializeAuth();
       apiService = new PipelineApiService(API_BASE);
 
-      websocketActions.setHandlers({
-        onMessage: handleWebSocketMessage,
+      runPollingActions.setHandlers({
+        onMessage: handlePollingMessage,
         onLog: addLog,
       });
 
       await loadInitialData();
 
       if (api.token) {
-        websocketActions.connect(API_BASE, api.token);
+        runPollingActions.connect(API_BASE, api.token);
       }
 
       // Poll queue state at a lower rate to reduce API churn.
@@ -191,7 +191,7 @@
     stopElapsedTimer();
     stopAutoRefresh();
     if (queuePollTimer) clearInterval(queuePollTimer);
-    websocketActions.disconnect();
+    runPollingActions.disconnect();
     if (browser) window.removeEventListener("popstate", handlePopState);
   });
 
@@ -217,7 +217,7 @@
           pipelineActions.setRunStatus("running");
           startAutoRefresh();
           startElapsedTimer();
-          if (running?.run_id) websocketActions.watchRun(running.run_id);
+          if (running?.run_id) runPollingActions.watchRun(running.run_id);
         } else {
           pipelineActions.setExecutionState(false);
           pipelineActions.setRunStatus("idle");
@@ -245,10 +245,10 @@
           pipelineActions.setRunStatus("running");
           startAutoRefresh();
           startElapsedTimer();
-          if (nowRunning?.run_id) websocketActions.watchRun(nowRunning.run_id);
+          if (nowRunning?.run_id) runPollingActions.watchRun(nowRunning.run_id);
         } else if (nowRunning?.run_id && pipeline.currentRunId !== nowRunning.run_id) {
           pipelineActions.setCurrentRun(nowRunning.run_id, "agent");
-          websocketActions.watchRun(nowRunning.run_id);
+          runPollingActions.watchRun(nowRunning.run_id);
         }
       } else {
         if (pipeline.isExecuting) {
@@ -318,15 +318,15 @@
     });
   }
 
-  // WebSocket message handling
-  function handleWebSocketMessage(data: any) {
+  // Polling event handling
+  function handlePollingMessage(data: any) {
     switch (data.type) {
       case "run_started":
         pipelineActions.setCurrentRun(data.run_id, data.step);
         pipelineActions.setExecutionState(true);
         pipelineActions.setRunStatus("running");
         pipelineActions.updateRunProgress(0, "Initializing...");
-        websocketActions.watchRun(data.run_id);
+        runPollingActions.watchRun(data.run_id);
         startAutoRefresh();
         startElapsedTimer();
         break;
@@ -526,9 +526,9 @@
         <span class="text-sm text-content-subtle">SmarterVote</span>
       </div>
       <div class="flex items-center space-x-2">
-        <div class="w-3 h-3 rounded-full {websocket.connected ? 'bg-green-500' : 'bg-red-500'}" />
+        <div class="w-3 h-3 rounded-full {polling.connected ? 'bg-green-500' : 'bg-red-500'}" />
         <span class="text-sm text-content-muted">
-          {websocket.connected ? "Connected" : "Disconnected"}
+          {polling.connected ? "Connected" : "Disconnected"}
         </span>
         {#if pipeline.isRefreshing}
           <div class="flex items-center space-x-1">
@@ -635,7 +635,7 @@
           <LiveLogs
             {logs}
             logFilter={pipeline.logFilter}
-            connected={websocket.connected}
+            connected={polling.connected}
             on:filter-change={handleLogFilterChange}
             on:clear-logs={handleClearLogs}
           />

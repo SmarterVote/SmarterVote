@@ -432,7 +432,6 @@ export interface RaceRecord {
   published_exists?: boolean;
 
   candidate_count: number;
-  quality_score?: number;
   quality_grade?: "A" | "B" | "C" | "D" | "F";
   freshness?: string;
 

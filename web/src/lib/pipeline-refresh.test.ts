@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// Mock WebSocket and related browser APIs
-const mockWebSocket = vi.fn();
-Object.defineProperty(globalThis, "WebSocket", {
-  value: mockWebSocket,
-});
-
 Object.defineProperty(globalThis, "requestIdleCallback", {
   value: vi.fn((cb: () => void) => setTimeout(cb, 0)),
 });
@@ -79,59 +73,59 @@ describe("Pipeline Auto-refresh Functionality", () => {
     expect(mockLoadArtifacts).toHaveBeenCalledTimes(1);
   });
 
-  it("should queue WebSocket messages to prevent UI blocking", () => {
+  it("should queue polling events to prevent UI blocking", () => {
     const mockHandleMessage = vi.fn();
 
     // Simulate message queue functionality
-    const wsMessageQueue: any[] = [];
-    let wsProcessingTimer: ReturnType<typeof setTimeout> | null = null;
+    const pollingEventQueue: any[] = [];
+    let pollingProcessingTimer: ReturnType<typeof setTimeout> | null = null;
 
     function processMessageQueue() {
-      if (wsMessageQueue.length === 0) return;
+      if (pollingEventQueue.length === 0) return;
 
-      const messagesToProcess = wsMessageQueue.splice(0, 5);
+      const messagesToProcess = pollingEventQueue.splice(0, 5);
 
       for (const message of messagesToProcess) {
         mockHandleMessage(message);
       }
 
-      if (wsMessageQueue.length > 0) {
-        wsProcessingTimer = setTimeout(processMessageQueue, 10);
+      if (pollingEventQueue.length > 0) {
+        pollingProcessingTimer = setTimeout(processMessageQueue, 10);
       } else {
-        wsProcessingTimer = null;
+        pollingProcessingTimer = null;
       }
     }
 
-    function queueWebSocketMessage(message: any) {
-      wsMessageQueue.push(message);
+    function queuePollingEvent(message: any) {
+      pollingEventQueue.push(message);
 
-      if (!wsProcessingTimer) {
-        wsProcessingTimer = setTimeout(processMessageQueue, 10);
+      if (!pollingProcessingTimer) {
+        pollingProcessingTimer = setTimeout(processMessageQueue, 10);
       }
     }
 
     // Queue multiple messages rapidly
     for (let i = 0; i < 12; i++) {
-      queueWebSocketMessage({ type: "log", message: `Test message ${i}` });
+      queuePollingEvent({ type: "log", message: `Test message ${i}` });
     }
 
-    expect(wsMessageQueue).toHaveLength(12);
+    expect(pollingEventQueue).toHaveLength(12);
     expect(mockHandleMessage).not.toHaveBeenCalled();
 
     // Process first batch
     vi.advanceTimersByTime(10);
     expect(mockHandleMessage).toHaveBeenCalledTimes(5);
-    expect(wsMessageQueue).toHaveLength(7);
+    expect(pollingEventQueue).toHaveLength(7);
 
     // Process second batch
     vi.advanceTimersByTime(10);
     expect(mockHandleMessage).toHaveBeenCalledTimes(10);
-    expect(wsMessageQueue).toHaveLength(2);
+    expect(pollingEventQueue).toHaveLength(2);
 
     // Process final batch
     vi.advanceTimersByTime(10);
     expect(mockHandleMessage).toHaveBeenCalledTimes(12);
-    expect(wsMessageQueue).toHaveLength(0);
+    expect(pollingEventQueue).toHaveLength(0);
   });
 
   it("should handle auto-refresh timer lifecycle correctly", () => {

@@ -87,16 +87,16 @@
           <li>• Healthcare</li>
           <li>• Economy</li>
           <li>• Climate/Energy</li>
-          <li>• Reproductive Rights</li>
+          <li>• Abortion & Reproductive Health</li>
           <li>• Immigration</li>
-          <li>• Guns & Safety</li>
+          <li>• Firearms & Second Amendment</li>
         </ul>
         <ul class="space-y-1 sm:space-y-2 text-content-muted text-sm sm:text-base">
           <li>• Foreign Policy</li>
-          <li>• Social Justice</li>
+          <li>• Civil Rights & Equality</li>
           <li>• Education</li>
           <li>• Tech & AI</li>
-          <li>• Election Reform</li>
+          <li>• Election Policy</li>
           <li>• Local Issues</li>
         </ul>
       </div>

@@ -631,7 +631,6 @@
                   {#if rec.quality_grade}
                     <span class="rounded px-1.5 py-0.5 font-semibold {gradeColor(rec.quality_grade)}">
                       Grade {rec.quality_grade}
-                      {#if rec.quality_score != null}&nbsp;({rec.quality_score}){/if}
                     </span>
                   {/if}
                   {#if rec.freshness}

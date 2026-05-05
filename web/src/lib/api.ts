@@ -4,11 +4,12 @@ import { logger } from "./utils/logger";
 import { fetchWithAuth } from "$lib/stores/apiStore";
 
 const API_BASE = import.meta.env.VITE_RACES_API_URL || "http://localhost:8080";
+const USE_SAMPLE_FALLBACK = import.meta.env.DEV;
 
 export async function getRace(
   id: string,
   fetchFn: typeof fetch = fetch,
-  useFallback: boolean = true
+  useFallback: boolean = USE_SAMPLE_FALLBACK
 ): Promise<Race> {
   try {
     const res = await fetchFn(`${API_BASE}/races/${id}`);
@@ -46,7 +47,7 @@ export async function getRace(
 
 export async function getRaceSummaries(
   fetchFn: typeof fetch = fetch,
-  useFallback: boolean = true
+  useFallback: boolean = USE_SAMPLE_FALLBACK
 ): Promise<RaceSummary[]> {
   try {
     const res = await fetchFn(`${API_BASE}/races/summaries`);
@@ -86,7 +87,7 @@ export async function getRaceSummaries(
 // Keep the old function for backward compatibility but deprecated
 export async function getAllRaces(
   fetchFn: typeof fetch = fetch,
-  useFallback: boolean = true
+  useFallback: boolean = USE_SAMPLE_FALLBACK
 ): Promise<Race[]> {
   logger.warn("getAllRaces is deprecated, use getRaceSummaries instead");
   try {
@@ -115,7 +116,7 @@ export async function getAllRaces(
  * Used for admin preview of un-published races via ?draft=true query param.
  */
 export async function getDraftRace(id: string): Promise<Race> {
-  const res = await fetchWithAuth(`${API_BASE}/drafts/${id}`, {}, 15000);
+  const res = await fetchWithAuth(`${API_BASE}/api/races/${encodeURIComponent(id)}/data?draft=true`, {}, 15000);
   if (!res.ok) {
     throw new Error(`Failed to fetch draft race: ${res.status}`);
   }

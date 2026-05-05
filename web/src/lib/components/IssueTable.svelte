@@ -9,8 +9,7 @@
   export let raceId: string = "";
   export let candidateName: string = "";
 
-  // Sponsor / donate link shown inside the rename tooltip
-  const SPONSOR_URL = "https://github.com/sponsors/jacobfholland"; // TODO: replace with real sponsor link
+  const SPONSOR_URL = "https://github.com/sponsors/jacobfholland";
 
   $: issueEntries = Object.entries(issues) as [IssueKey, IssueStance][];
   $: hasIssues = issueEntries.length > 0;

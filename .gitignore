@@ -254,6 +254,7 @@ web/.build
 # Vite
 web/dist
 web/.vite
+web/test-results/
 
 # Mac/Linux
 web/.DS_Store
@@ -293,6 +294,7 @@ data/pipeline_metrics.db-shm
 data/pipeline_metrics.db-wal
 services/races-api/data/analytics.db-wal
 services/races-api/data/analytics.db-shm
+services/races-api/data/published/
 data/analytics.db
 data/analytics.db-shm
 data/analytics.db-wal

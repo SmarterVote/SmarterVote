@@ -33,7 +33,7 @@ async def list_steps() -> Dict[str, Any]:
     return {"steps": _PIPELINE_STEPS, "step_details": _PIPELINE_STEP_DETAILS}
 
 
-@router.get("/queue", dependencies=[Depends(verify_token)])
+@router.get("/api/queue", dependencies=[Depends(verify_token)])
 async def get_queue(active_only: bool = False, limit: int = 200) -> Dict[str, Any]:
     """List queue items from Firestore.
 
@@ -104,13 +104,7 @@ async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
     return {"added": added, "errors": errors}
 
 
-@router.post("/queue", dependencies=[Depends(verify_token)])
-async def add_to_queue(request: RaceQueueRequest) -> Dict[str, Any]:
-    """Alias for /api/races/queue (legacy endpoint)."""
-    return await queue_races(request)
-
-
-@router.delete("/queue/finished", dependencies=[Depends(verify_token)])
+@router.delete("/api/queue/finished", dependencies=[Depends(verify_token)])
 async def clear_finished_queue() -> Dict[str, Any]:
     """Delete completed/failed/cancelled queue items."""
     db = firestore_helpers._get_fs()
@@ -124,7 +118,7 @@ async def clear_finished_queue() -> Dict[str, Any]:
     return {"removed": removed}
 
 
-@router.delete("/queue/pending", dependencies=[Depends(verify_token)])
+@router.delete("/api/queue/pending", dependencies=[Depends(verify_token)])
 async def clear_pending_queue() -> Dict[str, Any]:
     """Cancel all pending (not yet started) queue items."""
     db = firestore_helpers._get_fs()
@@ -140,7 +134,7 @@ async def clear_pending_queue() -> Dict[str, Any]:
     return {"removed": removed}
 
 
-@router.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
+@router.delete("/api/queue/{item_id}", dependencies=[Depends(verify_token)])
 async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
     """Cancel or remove a specific queue item.
 

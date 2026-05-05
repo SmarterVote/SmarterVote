@@ -35,12 +35,22 @@ def _ts_to_str(v: Any) -> Any:
     return v
 
 
+def _strip_quality_score(value: Any) -> Any:
+    """Remove legacy race-level quality_score fields from Firestore payloads."""
+    if isinstance(value, dict):
+        return {k: _strip_quality_score(v) for k, v in value.items() if k != "quality_score"}
+    if isinstance(value, list):
+        return [_strip_quality_score(v) for v in value]
+    return value
+
+
 def _doc_to_plain(doc: Any) -> Optional[Dict[str, Any]]:
     """Convert a Firestore DocumentSnapshot to a JSON-serialisable dict, or None."""
     if not doc.exists:
         return None
     raw = doc.to_dict() or {}
-    return {k: _ts_to_str(v) for k, v in raw.items()}
+    plain = {k: _ts_to_str(v) for k, v in raw.items()}
+    return _strip_quality_score(plain)
 
 
 def _fs_update_race(race_id: str, fields: Dict[str, Any]) -> None:
@@ -48,6 +58,7 @@ def _fs_update_race(race_id: str, fields: Dict[str, Any]) -> None:
     try:
         from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
 
+        fields = _strip_quality_score(dict(fields))
         fields.setdefault("updated_at", SERVER_TIMESTAMP)
         _get_fs().collection("races").document(race_id).set(fields, merge=True)
     except Exception as exc:

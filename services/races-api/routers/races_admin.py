@@ -83,6 +83,18 @@ async def list_all_races() -> Dict[str, Any]:
     return {"races": races}
 
 
+@router.get("/api/races/drafts", dependencies=[Depends(verify_token)])
+async def list_draft_races() -> Dict[str, Any]:
+    """List all draft race summaries from GCS."""
+    ids = gcs_helpers._gcs_list_race_ids("drafts")
+    races = []
+    for race_id in ids or []:
+        data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
+        if isinstance(data, dict):
+            races.append(_race_summary(data, race_id))
+    return {"races": races}
+
+
 @router.get("/api/races/{race_id}", dependencies=[Depends(verify_token)])
 async def get_race_record(race_id: str) -> Dict[str, Any]:
     """Get a single race record from Firestore."""
@@ -201,44 +213,7 @@ async def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> 
 # ---------------------------------------------------------------------------
 
 
-@router.get("/drafts", dependencies=[Depends(verify_token)])
-async def list_draft_races() -> Dict[str, Any]:
-    """List all draft race summaries from GCS."""
-    ids = gcs_helpers._gcs_list_race_ids("drafts")
-    races = []
-    for race_id in ids or []:
-        data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
-        if isinstance(data, dict):
-            races.append(_race_summary(data, race_id))
-    return {"races": races}
-
-
-@router.get("/drafts/{race_id}", dependencies=[Depends(verify_token)])
-async def get_draft_race(race_id: str) -> Dict[str, Any]:
-    """Get full draft race JSON."""
-    validate_race_id(race_id)
-    data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
-    if data is None:
-        raise HTTPException(status_code=404, detail="Draft not found")
-    return data
-
-
-@router.post("/drafts/{race_id}/publish", dependencies=[Depends(verify_token)])
-async def publish_draft(race_id: str) -> Dict[str, Any]:
-    """Promote a draft to published."""
-    validate_race_id(race_id)
-    data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
-    if data is None:
-        raise HTTPException(status_code=404, detail="Draft not found")
-    gcs_helpers._publish_race_gcs(race_id, data)
-    firestore_helpers._fs_update_race(
-        race_id,
-        {"status": "published", "published_at": datetime.now(timezone.utc).isoformat(), "draft_updated_at": None},
-    )
-    return {"message": f"Race {race_id} published", "id": race_id}
-
-
-@router.delete("/drafts/{race_id}", dependencies=[Depends(verify_token)])
+@router.delete("/api/races/{race_id}/draft", dependencies=[Depends(verify_token)])
 async def delete_draft_race(race_id: str) -> Dict[str, Any]:
     """Delete a draft race from GCS and update Firestore record."""
     validate_race_id(race_id)
@@ -248,25 +223,6 @@ async def delete_draft_race(race_id: str) -> Dict[str, Any]:
     has_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
     firestore_helpers._fs_update_race(race_id, {"status": "published" if has_published else "empty", "draft_updated_at": None})
     return {"message": f"Draft {race_id} deleted", "id": race_id}
-
-
-@router.delete("/races/{race_id}/admin", dependencies=[Depends(verify_token)])
-async def delete_published_race_admin(race_id: str) -> Dict[str, Any]:
-    """Delete a published race from GCS (admin — keeps draft)."""
-    validate_race_id(race_id)
-    has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
-    deleted = gcs_helpers._gcs_delete_race_json(race_id, "races")
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Published race not found")
-    firestore_helpers._fs_update_race(
-        race_id,
-        {
-            "status": "draft" if has_draft else "empty",
-            "published_at": None,
-            "draft_updated_at": datetime.now(timezone.utc).isoformat() if has_draft else None,
-        },
-    )
-    return {"message": f"Race {race_id} unpublished", "id": race_id}
 
 
 @router.post("/api/races/{race_id}/publish", dependencies=[Depends(verify_token)])

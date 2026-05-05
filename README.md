@@ -57,8 +57,8 @@ Admin dashboard -> races-api queue endpoint -> Firestore pipeline_queue
 Local development:
 
 ```text
-Admin dashboard -> local pipeline dev API -> in-process agent run
-    -> local drafts/published JSON -> local races API
+Admin dashboard -> local races-api
+Direct runner debugging -> local pipeline dev API -> in-process agent run
 ```
 
 ## Checks
@@ -77,6 +77,7 @@ npm run test:unit
 - [Local Development](docs/local-development.md)
 - [Deployment](docs/deployment-guide.md)
 - [Pipeline Modes](PIPELINE_MODES.md)
+- [Maintenance Audit](docs/maintenance-audit.md)
 
 ## License
 

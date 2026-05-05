@@ -391,7 +391,7 @@ For the "summary" field:
   Do NOT just say "looks good" — be specific.
 - If verdict is "needs_revision" or "flagged": summarize the key concerns concisely.
 
-Also assign an overall quality score from 0-100 based on:
+Also assign the validation grade's numeric score from 0-100 based on:
 - Factual accuracy and source quality (45%)
 - Neutrality and lack of bias (30%)
 - Background accuracy (15%)

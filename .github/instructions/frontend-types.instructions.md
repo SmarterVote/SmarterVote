@@ -18,9 +18,9 @@ When modifying this file, also update `shared/models.py` (and vice versa):
 ## Canonical Issues (current)
 
 ```
-Healthcare | Economy | Climate/Energy | Reproductive Rights | Immigration
-Guns & Safety | Foreign Policy | Social Justice | Education
-Tech & AI | Election Reform | Local Issues
+Healthcare | Economy | Climate/Energy | Abortion & Reproductive Health | Immigration
+Firearms & Second Amendment | Foreign Policy | Civil Rights & Equality | Education
+Tech & AI | Election Policy | Local Issues
 ```
 
 Do not add, rename, or remove canonical issue values without updating both files and `pipeline_client/agent/prompts.py`.

@@ -1,10 +1,10 @@
 """
-Domain-aware alert evaluation engine for the pipeline-client admin dashboard.
+Domain-aware alert evaluation engine for the races-api admin dashboard.
 
 Evaluates four categories of alerts:
 - Data freshness: how recently each race was updated
 - Pipeline failures: consecutive failure counts per race
-- Content quality: issue coverage and confidence scores
+- Content grading: issue coverage and confidence signals
 - Analytics health: API error rate (from proxied analytics data)
 """
 

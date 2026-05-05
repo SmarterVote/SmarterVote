@@ -77,7 +77,8 @@ export async function fetchWithAuth(
 
   // Determine if this is a long-running operation that shouldn't timeout
   const isLongRunningOperation =
-    url.includes("/run/") || // Pipeline execution
+    url.includes("/runs/") || // Pipeline run operations
+    url.includes("/api/races/queue") || // Queueing pipeline work
     url.includes("/continue") || // Pipeline continuation
     (options.method === "POST" && url.includes("/run")); // Any run operation
 

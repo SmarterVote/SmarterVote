@@ -121,12 +121,12 @@ def test_list_steps(client):
 
 
 # ---------------------------------------------------------------------------
-# /queue — GET returns empty list when Firestore is empty
+# /api/queue — GET returns empty list when Firestore is empty
 # ---------------------------------------------------------------------------
 
 
 def test_get_queue_empty(client):
-    resp = client.get("/queue")
+    resp = client.get("/api/queue")
     assert resp.status_code == 200
     body = resp.json()
     assert body["items"] == []
@@ -458,7 +458,7 @@ def test_queue_race_invalid_id():
 
 
 def test_list_drafts_returns_summaries_not_ids():
-    """The web dashboard expects /drafts to return race summary objects."""
+    """The web dashboard expects /api/races/drafts to return race summary objects."""
     os.environ["SKIP_AUTH"] = "true"
     os.environ["ADMIN_API_KEY"] = "test-key"
 
@@ -485,7 +485,7 @@ def test_list_drafts_returns_summaries_not_ids():
         patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
     ):
         tc = TestClient(app_module.app)
-        resp = tc.get("/drafts")
+        resp = tc.get("/api/races/drafts")
 
     assert resp.status_code == 200
     body = resp.json()

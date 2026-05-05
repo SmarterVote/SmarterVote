@@ -1,15 +1,36 @@
+"""Local FastAPI entrypoint for running and inspecting the pipeline agent.
+
+Production/admin race, draft, queue, analytics, and chat endpoints live in
+services/races-api. This app intentionally exposes only local runner endpoints.
+"""
+
 import asyncio
-import json
 import logging
-import os
 import re
-import sys
-import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict
+
+import httpx
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+from pydantic import BaseModel
+
+from .logging_manager import logging_manager
+from .models import RunInfo, RunOptions, RunRequest, RunResponse
+from .pipeline_runner import run_step_async
+from .run_manager import run_manager
+from .settings import settings
+from .step_registry import REGISTRY
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
 _RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
+_gcs_client = None
+http_bearer = HTTPBearer(auto_error=False)
 
 
 def _validate_race_id(race_id: str) -> None:
@@ -17,43 +38,9 @@ def _validate_race_id(race_id: str) -> None:
     if not _RACE_ID_RE.match(race_id):
         raise HTTPException(status_code=400, detail="Invalid race_id format")
 
-from dotenv import load_dotenv
-
-# Load .env from project root so agent can read API keys via os.environ
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
-
-import httpx
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from jose import JWTError, jwt
-from pydantic import BaseModel
-
-from .logging_manager import logging_manager
-from .models import RunInfo, RunOptions, RunRequest, RunResponse
-from .pipeline_runner import run_step_async
-from .queue_manager import queue_manager
-from .race_manager import RaceRecord, race_manager
-from .run_manager import run_manager
-from .settings import settings
-from .step_registry import REGISTRY
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:  # pragma: no cover
-    sys.path.insert(0, str(ROOT))
-
-
-# ---------------------------------------------------------------------------
-# Lazy GCS client singleton — avoids re-creating HTTP sessions per call
-# ---------------------------------------------------------------------------
-
-_gcs_client = None
-
 
 def _get_gcs_client():
-    """Return a lazily-initialised GCS client, or None if the library is missing."""
+    """Return a lazily initialized GCS client, or None if the library is missing."""
     global _gcs_client
     if _gcs_client is not None:
         return _gcs_client
@@ -69,28 +56,23 @@ def _get_gcs_client():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events."""
-    loop = asyncio.get_running_loop()
-    logging_manager.set_main_loop(loop)
-
-    # Hydrate race records from existing files/GCS
-    try:
-        if settings.is_cloud_run and settings.gcs_bucket:
-            race_manager.hydrate_from_gcs()
-        else:
-            race_manager.hydrate_from_files()
-    except Exception:
-        logging.exception("Race hydration failed — continuing with empty race list")
-
-    # Resume queue processing if there are pending items from before restart
-    if queue_manager.get_next_pending():
-        asyncio.create_task(queue_manager.process_next())
+    """Configure loop-bound logging helpers for local background runs."""
+    logging_manager.set_main_loop(asyncio.get_running_loop())
     yield
 
 
-app = FastAPI(title=settings.app_name, description="SmarterVote Pipeline API", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, description="SmarterVote local pipeline runner", lifespan=lifespan)
 
-http_bearer = HTTPBearer(auto_error=False)
+_cors_origins = settings.allowed_origins_list
+_use_credentials = "*" not in _cors_origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins if _use_credentials else ["*"],
+    allow_origin_regex=r"https://(.*\.)?smarter\.vote" if not _use_credentials else None,
+    allow_credentials=_use_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def _decode_token(token: str) -> Dict[str, Any]:
@@ -118,7 +100,7 @@ async def verify_token(
     if not settings.auth0_domain or not settings.auth0_audience:
         raise HTTPException(
             status_code=503,
-            detail="Authentication not configured (AUTH0_DOMAIN/AUTH0_AUDIENCE missing). Set SKIP_AUTH=true for local dev.",
+            detail="Authentication not configured. Set SKIP_AUTH=true for local dev.",
         )
     if credentials is None:
         raise HTTPException(status_code=401, detail="Missing token")
@@ -128,385 +110,23 @@ async def verify_token(
         raise HTTPException(status_code=401, detail="Invalid authentication") from exc
 
 
-async def verify_token_ws(token: str | None) -> Dict[str, Any]:
-    if settings.skip_auth:
-        return {}
-    if not settings.auth0_domain or not settings.auth0_audience:
-        raise HTTPException(
-            status_code=503,
-            detail="Authentication not configured (AUTH0_DOMAIN/AUTH0_AUDIENCE missing). Set SKIP_AUTH=true for local dev.",
-        )
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing token")
-    try:
-        return await _decode_token(token)
-    except (JWTError, httpx.HTTPError) as exc:
-        raise HTTPException(status_code=401, detail="Invalid authentication") from exc
-
-
-# ---------------------------------------------------------------------------
-# Agent endpoint
-# ---------------------------------------------------------------------------
-
-
 class AgentRequest(BaseModel):
-    """Request body for the agent endpoint."""
+    """Request body for running the full agent locally."""
 
     race_id: str
     options: RunOptions | None = None
 
 
-class QueueAddRequest(BaseModel):
-    """Request body for adding races to the queue."""
-
-    race_ids: List[str]
-    options: RunOptions | None = None
-
-
-# ---------------------------------------------------------------------------
-# Helpers for reading race data from GCS or local filesystem
-# ---------------------------------------------------------------------------
-
-
-def _race_summary(data: Dict[str, Any], fallback_id: str) -> Dict[str, Any]:
-    """Build a race summary dict from full race JSON."""
-    am = data.get("agent_metrics") or {}
-    cands = data.get("candidates", [])
-    cands_with_issues = sum(
-        1 for c in cands
-        if any(
-            isinstance(v, dict) and v.get("stance")
-            for v in c.get("issues", {}).values()
-        )
-    )
-    return {
-        "id": data.get("id", fallback_id),
-        "title": data.get("title"),
-        "office": data.get("office"),
-        "jurisdiction": data.get("jurisdiction"),
-        "election_date": data.get("election_date", ""),
-        "updated_utc": data.get("updated_utc", ""),
-        "candidates": [
-            {"name": c.get("name", ""), "party": c.get("party")}
-            for c in cands
-        ],
-        "candidates_with_issues": cands_with_issues,
-        "total_candidates": len(cands),
-        "agent_metrics": (
-            {
-                "estimated_usd": am.get("estimated_usd"),
-                "model": am.get("model"),
-                "total_tokens": am.get("total_tokens"),
-            }
-            if am
-            else None
-        ),
-    }
-
-
-def _list_races_gcs(gcs_prefix: str) -> List[Dict[str, Any]] | None:
-    """List race summaries from a GCS prefix. Returns None on failure."""
-    gcs_bucket = settings.gcs_bucket
-    if not gcs_bucket or not settings.is_cloud_run:
-        return None
-    client = _get_gcs_client()
-    if client is None:
-        return None
+async def _execute_run_async(step: str, request: RunRequest, run_id: str) -> None:
     try:
-        bucket = client.bucket(gcs_bucket)
-        races = []
-        for blob in bucket.list_blobs(prefix=f"{gcs_prefix}/", timeout=30):
-            if not blob.name.endswith(".json"):
-                continue
-            try:
-                data = json.loads(blob.download_as_text())
-                stem = blob.name[len(f"{gcs_prefix}/") : -len(".json")]
-                races.append(_race_summary(data, stem))
-            except Exception:
-                logging.exception("Failed to read blob %s from GCS", blob.name)
-        return sorted(races, key=lambda r: r.get("id", ""))
+        await run_step_async(step, request, run_id)
     except Exception:
-        logging.exception("Failed to list %s from GCS; falling back to local filesystem", gcs_prefix)
-    return None
-
-
-def _list_races_local(local_dir: Path) -> List[Dict[str, Any]]:
-    """List race summaries from a local directory."""
-    races = []
-    if local_dir.exists():
-        for path in sorted(local_dir.glob("*.json")):
-            try:
-                with path.open("r", encoding="utf-8") as f:
-                    data = json.load(f)
-                races.append(_race_summary(data, path.stem))
-            except Exception:
-                logging.exception("Failed to read race file %s", path)
-    return races
-
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# Unified Race Management API (Phase 1-4)
-# ---------------------------------------------------------------------------
-
-
-class RaceQueueRequest(BaseModel):
-    """Request body for queueing races."""
-
-    race_ids: List[str]
-    options: RunOptions | None = None
-
-
-@app.post("/api/races/queue", dependencies=[Depends(verify_token)])
-async def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
-    """Queue races for pipeline processing (unified — replaces POST /queue)."""
-    options = request.options.model_dump(exclude_unset=True) if request.options else {}
-    added = []
-    errors = []
-
-    valid_ids = []
-    for race_id in request.race_ids:
-        race_id = race_id.strip()
-        if not race_id:
-            continue
-        try:
-            _validate_race_id(race_id)
-            valid_ids.append(race_id)
-        except HTTPException:
-            errors.append({"race_id": race_id, "error": "Invalid race_id format"})
-
-    # Update race_manager records
-    records = race_manager.queue_races(valid_ids, options)
-
-    # Also add to queue_manager for processing
-    for record in records:
-        if record.status == "queued":
-            try:
-                queue_manager.add(record.race_id, options)
-                added.append(record.model_dump(mode="json"))
-            except ValueError as e:
-                errors.append({"race_id": record.race_id, "error": str(e)})
-        else:
-            added.append(record.model_dump(mode="json"))
-
-    # Start processing
-    asyncio.create_task(queue_manager.process_next())
-
-    return {"added": added, "errors": errors}
-
-
-@app.post("/api/races/{race_id}/cancel", dependencies=[Depends(verify_token)])
-async def cancel_race_queue(race_id: str) -> Dict[str, Any]:
-    """Cancel a queued or running race."""
-    _validate_race_id(race_id)
-    race = race_manager.get_race(race_id)
-    if not race or race.status not in ("queued", "running"):
-        raise HTTPException(status_code=404, detail="Race is not queued or running")
-
-    # Cancel in queue_manager (handles queued items with active runs)
-    for item in queue_manager.get_all():
-        if item.race_id == race_id and item.status in ("pending", "running"):
-            queue_manager.cancel(item.id)
-            break
-
-    # Cancel the run in run_manager so it no longer shows as "running"
-    if race.current_run_id:
-        run_manager.cancel_run(race.current_run_id)
-        await logging_manager.send_run_status(race.current_run_id, "cancelled")
-
-    record = race_manager.cancel_race(race_id)
-    return {"message": f"Race {race_id} cancelled", "race": record.model_dump(mode="json") if record else None}
-
-
-@app.post("/api/races/{race_id}/recheck", dependencies=[Depends(verify_token)])
-async def recheck_race_status(race_id: str) -> Dict[str, Any]:
-    """Re-derive race status from actual storage state.
-
-    Use when a race is stuck in 'running' after a process crash or
-    serialisation error.  Safe to call at any time — if the run is
-    genuinely still active the status is left unchanged.
-    """
-    _validate_race_id(race_id)
-    record = race_manager.recheck_status(race_id)
-    return {"message": f"Race {race_id} rechecked", "race": record.model_dump(mode="json")}
-
-
-@app.post("/api/races/{race_id}/run", dependencies=[Depends(verify_token)])
-async def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> Dict[str, Any]:
-    """Run the pipeline for a single race (direct, not queued)."""
-    _validate_race_id(race_id)
-
-    run_request = RunRequest(
-        payload={"race_id": race_id},
-        options=options,
-    )
-    run_info = run_manager.create_run(["agent"], run_request)
-
-    # Update race record
-    race_manager.start_run(race_id, run_info.run_id)
-    race_manager.save_run(race_id, run_info)
-
-    asyncio.create_task(_execute_run_async("agent", run_request, run_info.run_id))
-
-    return {"run_id": run_info.run_id, "status": "started", "race_id": race_id}
-
-
-# ---------------------------------------------------------------------------
-# Legacy agent endpoint (kept for backward compatibility, delegates to unified)
-# ---------------------------------------------------------------------------
-
-
-@app.post("/api/run", dependencies=[Depends(verify_token)])
-async def run_agent_endpoint(request: AgentRequest) -> Dict[str, Any]:
-    """Run the agent pipeline for a race.
-
-    The agent uses a multi-phase AI agent with web search to research
-    candidates and produce a complete RaceJSON profile. If a published
-    profile already exists for this race, the agent will update it.
-    """
-    _validate_race_id(request.race_id)
-    run_request = RunRequest(
-        payload={"race_id": request.race_id},
-        options=request.options,
-    )
-    run_info = run_manager.create_run(["agent"], run_request)
-
-    # Update race record
-    race_manager.start_run(request.race_id, run_info.run_id)
-    race_manager.save_run(request.race_id, run_info)
-
-    # Start execution in background
-    asyncio.create_task(_execute_run_async("agent", run_request, run_info.run_id))
-
-    return {"run_id": run_info.run_id, "status": "started", "step": "agent"}
-
-
-# ---------------------------------------------------------------------------
-# Queue endpoints
-# ---------------------------------------------------------------------------
-
-
-@app.get("/queue", dependencies=[Depends(verify_token)])
-async def get_queue(sync: bool = False) -> Dict[str, Any]:
-    """Get all queue items with their status.
-
-    Pass ?sync=true to force a Firestore re-read (only needed for debugging
-    multi-instance drift; normal polling should omit this).
-    """
-    if sync:
-        queue_manager.refresh()
-    items = queue_manager.get_all()
-    return {
-        "items": [item.model_dump(mode="json") for item in items],
-        "running": queue_manager.has_running(),
-        "pending": queue_manager.pending_count(),
-    }
-
-
-@app.post("/queue", dependencies=[Depends(verify_token)])
-async def add_to_queue(request: QueueAddRequest) -> Dict[str, Any]:
-    """Add one or more races to the processing queue."""
-    added = []
-    errors = []
-    options = request.options.model_dump(exclude_unset=True) if request.options else {}
-
-    for race_id in request.race_ids:
-        race_id = race_id.strip()
-        if not race_id:
-            continue
-        _validate_race_id(race_id)
-        try:
-            item = queue_manager.add(race_id, options)
-            added.append(item.model_dump(mode="json"))
-        except ValueError as e:
-            errors.append({"race_id": race_id, "error": str(e)})
-
-    # Start processing if not already running
-    asyncio.create_task(queue_manager.process_next())
-
-    return {"added": added, "errors": errors}
-
-
-@app.delete("/queue/finished", dependencies=[Depends(verify_token)])
-async def clear_finished_queue() -> Dict[str, Any]:
-    """Remove completed/failed/cancelled items from the queue."""
-    removed = queue_manager.clear_finished()
-    return {"removed": removed}
-
-
-@app.delete("/queue/pending", dependencies=[Depends(verify_token)])
-async def clear_pending_queue() -> Dict[str, Any]:
-    """Remove all pending (not yet started) items from the queue."""
-    removed_items = queue_manager.clear_pending()
-    # Dequeue associated races so they don't stay stuck in "queued" status
-    for item in removed_items:
-        try:
-            race_manager.dequeue_race(item.race_id)
-        except Exception:
-            logging.exception("Failed to dequeue race %s after clearing pending queue", item.race_id)
-    return {"removed": len(removed_items)}
-
-
-@app.delete("/queue/{item_id}", dependencies=[Depends(verify_token)])
-async def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
-    """Remove or cancel a queue item. Use force=true for stuck/broken items."""
-    if not force:
-        if queue_manager.remove(item_id):
-            return {"ok": True, "action": "removed"}
-        if queue_manager.cancel(item_id):
-            return {"ok": True, "action": "cancelled"}
-    # Force-remove as fallback for broken/stuck items
-    removed = queue_manager.force_remove(item_id)
-    if removed:
-        # Reconcile race status so it doesn't stay stuck
-        try:
-            race = race_manager.get_race(removed.race_id)
-            if race and race.status in ("queued", "running"):
-                race_manager.cancel_race(removed.race_id)
-        except Exception:
-            logging.exception("Failed to reconcile race %s after force-remove", removed.race_id)
-        return {"ok": True, "action": "force_removed"}
-    raise HTTPException(status_code=404, detail="Queue item not found")
-
-
-# ---------------------------------------------------------------------------
-# Run & artifact inspection endpoints
-# ---------------------------------------------------------------------------
-
-
-@app.get("/run/{run_id}", dependencies=[Depends(verify_token)])
-async def get_run_details(run_id: str) -> Dict[str, Any]:
-    """Get full details of a specific run."""
-    run_info = run_manager.get_run(run_id)
-    if not run_info:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return run_info.model_dump(mode="json")
-
-
-_cors_origins = settings.allowed_origins_list
-# credentials=True is incompatible with wildcard origin — use explicit list or drop credentials
-_use_credentials = "*" not in _cors_origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins if _use_credentials else ["*"],
-    allow_origin_regex=r"https://(.*\.)?smarter\.vote" if not _use_credentials else None,
-    allow_credentials=_use_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Serve static files for frontend
-frontend_path = Path(__file__).parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+        logging.exception("Unexpected error during async run %s", run_id)
 
 
 @app.get("/health")
 async def health() -> Dict[str, Any]:
-    return {"ok": True, "name": settings.app_name}
+    return {"ok": True, "name": settings.app_name, "mode": "local-runner"}
 
 
 @app.get("/steps", dependencies=[Depends(verify_token)])
@@ -516,22 +136,24 @@ async def steps() -> Dict[str, Any]:
 
 @app.post("/run/{step}", response_model=RunResponse, dependencies=[Depends(verify_token)])
 async def run(step: str, request: RunRequest) -> RunResponse:
+    """Run one registered pipeline step and return its response."""
     if step not in REGISTRY:
         raise HTTPException(status_code=404, detail=f"Unknown step '{step}'")
     return await run_step_async(step, request)
 
 
-async def _execute_run_async(step: str, request: RunRequest, run_id: str):
-    """Execute a single run asynchronously."""
-    try:
-        await run_step_async(step, request, run_id)
-    except Exception:
-        logging.exception("Unexpected error during async run %s", run_id)
+@app.post("/api/run", dependencies=[Depends(verify_token)])
+async def run_agent_endpoint(request: AgentRequest) -> Dict[str, Any]:
+    """Start a local full-agent run in the background."""
+    _validate_race_id(request.race_id)
+    run_request = RunRequest(payload={"race_id": request.race_id}, options=request.options)
+    run_info = run_manager.create_run(["agent"], run_request)
+    asyncio.create_task(_execute_run_async("agent", run_request, run_info.run_id))
+    return {"run_id": run_info.run_id, "status": "started", "step": "agent"}
 
 
 @app.get("/runs", dependencies=[Depends(verify_token)])
 async def list_runs(limit: int = 50) -> Dict[str, Any]:
-    """List recent runs."""
     runs = run_manager.list_recent_runs(limit)
     return {
         "runs": [run.model_dump(mode="json") for run in runs],
@@ -542,720 +164,32 @@ async def list_runs(limit: int = 50) -> Dict[str, Any]:
 
 @app.get("/runs/active", dependencies=[Depends(verify_token)])
 async def list_active_runs() -> Dict[str, Any]:
-    """List currently active runs."""
     runs = run_manager.list_active_runs()
     return {"runs": [run.model_dump(mode="json") for run in runs], "count": len(runs)}
 
 
 @app.get("/runs/{run_id}", dependencies=[Depends(verify_token)])
 async def get_run(run_id: str) -> RunInfo:
-    """Get details of a specific run."""
     run_info = run_manager.get_run(run_id)
     if not run_info:
         raise HTTPException(status_code=404, detail="Run not found")
     return run_info
 
 
+@app.get("/runs/{run_id}/logs", dependencies=[Depends(verify_token)])
+async def get_run_logs(run_id: str, since: int = 0) -> Dict[str, Any]:
+    logs = run_manager.get_run_logs(run_id)
+    sliced = logs[since:] if since < len(logs) else []
+    return {"logs": sliced, "total": len(logs)}
+
+
 @app.delete("/runs/{run_id}", dependencies=[Depends(verify_token)])
 async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run and/or delete it from history."""
     run_info = run_manager.get_run(run_id)
     if not run_info:
         raise HTTPException(status_code=404, detail="Run not found")
-
-    # Cancel first if still active
     if run_info.status in ["pending", "running"]:
         run_manager.cancel_run(run_id)
         await logging_manager.send_run_status(run_id, "cancelled")
-        # Update the race record so it no longer shows as "running"
-        race_id_from_payload = run_info.payload.get("race_id")
-        if race_id_from_payload:
-            race = race_manager.get_race(race_id_from_payload)
-            if race and race.status in ("running", "queued"):
-                race_manager.cancel_race(race_id_from_payload)
-
-    # Always delete after cancellation (or if already completed/failed/cancelled)
-    race_id_from_payload = run_info.payload.get("race_id")
-    if race_id_from_payload:
-        race_manager.delete_run(race_id_from_payload, run_id)
     run_manager.delete_run(run_id)
     return {"message": "Run deleted", "run_id": run_id}
-
-
-# ---------------------------------------------------------------------------
-# WebSocket endpoints for live logging
-# ---------------------------------------------------------------------------
-
-
-@app.websocket("/ws/logs")
-async def websocket_logs_all(websocket: WebSocket):
-    """WebSocket endpoint for all logs."""
-    token = websocket.query_params.get("token")
-    try:
-        await verify_token_ws(token)
-    except HTTPException:
-        await websocket.close(code=1008)
-        return
-    connection_id = str(uuid.uuid4())
-
-    async def _ping_loop() -> None:
-        while True:
-            await asyncio.sleep(30)
-            try:
-                await websocket.send_text('{"type": "ping"}')
-            except Exception:
-                break
-
-    ping_task = asyncio.create_task(_ping_loop())
-    try:
-        await logging_manager.connect_websocket(websocket, connection_id)
-        while True:
-            try:
-                await websocket.receive_text()
-            except WebSocketDisconnect:
-                break
-    finally:
-        ping_task.cancel()
-        logging_manager.disconnect_websocket(connection_id)
-
-
-@app.websocket("/ws/logs/{run_id}")
-async def websocket_logs_run(websocket: WebSocket, run_id: str):
-    """WebSocket endpoint for logs of a specific run."""
-    token = websocket.query_params.get("token")
-    try:
-        await verify_token_ws(token)
-    except HTTPException:
-        await websocket.close(code=1008)
-        return
-    connection_id = str(uuid.uuid4())
-
-    async def _ping_loop() -> None:
-        while True:
-            await asyncio.sleep(30)
-            try:
-                await websocket.send_text('{"type": "ping"}')
-            except Exception:
-                break
-
-    ping_task = asyncio.create_task(_ping_loop())
-    try:
-        await logging_manager.connect_websocket(websocket, connection_id, run_id)
-        while True:
-            try:
-                await websocket.receive_text()
-            except WebSocketDisconnect:
-                break
-    finally:
-        ping_task.cancel()
-        logging_manager.disconnect_websocket(connection_id)
-
-
-# ---------------------------------------------------------------------------
-# Root
-# ---------------------------------------------------------------------------
-
-
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    """Serve the basic dashboard."""
-    basic_frontend = Path(__file__).parent.parent / "frontend" / "index.html"
-    if basic_frontend.exists():
-        with open(basic_frontend, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), status_code=200)
-
-    return HTMLResponse(
-        content="""
-        <h1>SmarterVote Pipeline API</h1>
-        <p>Dashboard: <a href="http://localhost:5173/admin/pipeline">/admin/pipeline</a></p>
-        <p><a href="/docs">API docs</a></p>
-    """,
-        status_code=200,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Alerts endpoints
-# ---------------------------------------------------------------------------
-
-from .alerts import acknowledge_alert, acknowledge_alerts, evaluate_all  # noqa: E402
-
-
-@app.get("/alerts", dependencies=[Depends(verify_token)])
-async def get_alerts() -> Dict[str, Any]:
-    """Evaluate all domain-aware alert rules and return the result list."""
-    # Optionally pass analytics overview for API-health alerts
-    overview = None
-    races_api_url = os.getenv("RACES_API_URL", "http://localhost:8080")
-    admin_key = os.getenv("ADMIN_API_KEY", "")
-    if races_api_url and admin_key:
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(f"{races_api_url}/analytics/overview", headers={"X-Admin-Key": admin_key})
-                if resp.status_code == 200:
-                    overview = resp.json()
-        except Exception as e:
-            logging.debug("Analytics unavailable for health alerts: %s", e)  # non-critical
-
-    alerts = evaluate_all(run_manager, overview=overview)
-    unacknowledged = sum(1 for a in alerts if not a.acknowledged)
-    return {
-        "alerts": [a.to_dict() for a in alerts],
-        "total": len(alerts),
-        "unacknowledged": unacknowledged,
-    }
-
-
-@app.post("/alerts/{alert_id}/acknowledge", dependencies=[Depends(verify_token)])
-async def ack_alert(alert_id: str) -> Dict[str, Any]:
-    """Acknowledge an alert by ID."""
-    acknowledge_alert(alert_id)
-    return {"ok": True, "alert_id": alert_id}
-
-
-@app.post("/alerts/acknowledge-all", dependencies=[Depends(verify_token)])
-async def ack_all_alerts() -> Dict[str, Any]:
-    """Acknowledge all currently active (unacknowledged) alerts."""
-    alerts = evaluate_all(run_manager, overview=None)
-    alert_ids = [a.id for a in alerts if not a.acknowledged]
-    if alert_ids:
-        acknowledge_alerts(alert_ids)
-    return {"ok": True, "acknowledged_count": len(alert_ids)}
-
-
-# ---------------------------------------------------------------------------
-# Pipeline metrics (token usage & cost per research run)
-# ---------------------------------------------------------------------------
-
-
-@app.get("/pipeline/metrics", dependencies=[Depends(verify_token)])
-async def get_pipeline_metrics(limit: int = 50) -> Dict[str, Any]:
-    """Return recent pipeline run records with token usage and cost data."""
-    from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
-
-    try:
-        records = await get_pipeline_metrics_store().get_recent(limit=limit)
-        return {"records": records, "count": len(records)}
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Pipeline metrics unavailable: {exc}") from exc
-
-
-@app.get("/pipeline/metrics/summary", dependencies=[Depends(verify_token)])
-async def get_pipeline_metrics_summary() -> Dict[str, Any]:
-    """Return aggregate pipeline cost stats (total_runs, total_usd, avg_usd, recent_30d_usd)."""
-    from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
-
-    try:
-        return await get_pipeline_metrics_store().get_summary()
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Pipeline metrics unavailable: {exc}") from exc
-
-
-# ---------------------------------------------------------------------------
-# Admin chat endpoint
-# ---------------------------------------------------------------------------
-
-_ADMIN_CHAT_SYSTEM = """\
-You are an AI assistant embedded in the SmarterVote admin dashboard. You help administrators:
-
-1. Review and understand existing races (published and draft state, quality, recency).
-2. Decide which races need to be re-run or updated.
-3. Kick off new pipeline runs with the right settings.
-
-## Quality Grades
-- **A** (score ≥ 80): Comprehensive research, strong candidate coverage.
-- **B** (score ≥ 60): Good coverage, minor gaps.
-- **C** (score ≥ 40): Moderate coverage; consider a re-run.
-- **D** (score ≥ 20): Sparse data; likely needs a full re-run.
-- **F** (score < 20): Essentially empty; run required.
-
-## Freshness
-- **fresh**: Updated within the last 7 days.
-- **recent**: Updated within the last 30 days.
-- **aging**: Updated within the last 90 days.
-- **stale**: Not updated in 90+ days; strongly consider a refresh.
-
-## Available Run Options
-- cheap_mode (bool, default true): Use cheaper/faster models. Set false for higher quality output.
-- force_fresh (bool, default false): Ignore existing data, start the pipeline from scratch.
-- enabled_steps (list): Which steps to run: discovery, images, issues, finance, refinement, review, iteration. Null or omit = all steps.
-- research_model (str): Override the OpenAI research model (e.g. "gpt-4o", "gpt-4o-mini").
-- claude_model (str): Claude model for the review phase (e.g. "claude-opus-4-5").
-- max_candidates (int): Limit how many candidates to research in depth.
-- candidate_names (list[str]): Only research specific named candidates.
-- target_no_info (bool, default false): Prioritise candidates with least existing issue data.
-- note (str): A short label attached to the run for easy identification.
-- goal (str, optional): A brief description of why this run is being triggered (e.g. "Update ahead of primary", "Fix missing polling"). Shown as a subtitle in the Runs tab.
-
-## Targeted Completion Runs
-When a race has `⚠ PARTIAL` or `⚠ NO ISSUE DATA` annotations, use targeted runs to fill gaps efficiently
-instead of re-running the full pipeline:
-
-- **Partial race — specific candidates missing**: Use `enabled_steps: ["issues", "refinement"]` +
-  `candidate_names: ["Name 1", "Name 2"]` to only research the missing candidates while skipping those
-  that are already complete.
-- **All candidates missing issues**: Use `enabled_steps: ["issues", "finance", "refinement"]` +
-  `target_no_info: true` to research the full roster without a fresh discovery pass.
-- **Single candidate deep-dive**: Pass `candidate_names: ["Name"]` with no `enabled_steps` restriction
-  for a full update of just that person.
-
-Example for a partial race where "Jordan Koteras" is missing:
-ACTION:{"type":"queue_run","race_ids":["nv-governor-2026"],"options":{"enabled_steps":["issues","refinement"],"candidate_names":["Jordan Koteras"],"note":"Fill missing issues"},"description":"Fill issue stances for Jordan Koteras"}
-
-## When to suggest a run
-- When a user explicitly asks to run, update, refresh, or research a race.
-- When a race is stale or aging and the user asks about quality.
-- When the user asks for a high-quality or comprehensive run (suggest cheap_mode=false).
-
-## Inspecting a race in detail
-If the user asks detailed questions about a specific race (e.g. "what does the race say about issue X?",
-"show me candidate Y's bio", "what is the full content?"), include an INSPECT block **anywhere** in your
-reply so the system can fetch the full race data and you can answer precisely:
-
-INSPECT:{"race_ids":["race-id-1","race-id-2"]}
-
-Rules for INSPECT:
-- Maximum 3 races per INSPECT block.
-- Only use race IDs from the list below.
-- Do not use both ACTION and INSPECT in the same reply — pick the most relevant one.
-- Do not wrap it in markdown code fences.
-- The system will automatically strip the INSPECT block and replace your reply with a full analysis
-  once the race data is loaded — so you do NOT need to write placeholder text like "Once I see the data...".
-  Just write the INSPECT block and the system handles the rest.
-
-## Web research
-When the user asks about competitive/swingy races, recent polling, or other live information not
-already in the race list below, search the web BEFORE producing your reply. Append SEARCH and/or
-FETCH blocks at the VERY END of your message — the system will execute them and call you again
-with the results:
-
-SEARCH:{"query":"2026 competitive Senate races toss-up Cook Political Report"}
-FETCH:{"url":"https://www.cookpolitical.com/ratings/senate-race-ratings"}
-
-Rules for SEARCH/FETCH:
-- Maximum 3 SEARCH blocks and 2 FETCH blocks per turn.
-- Blocks go at the very END of your reply, one per line.
-- Do not use SEARCH/FETCH and INSPECT in the same reply — SEARCH/FETCH is for live web data;
-  INSPECT is for existing race file data. If both seem relevant, pick SEARCH/FETCH.
-- Do not wrap in markdown code fences.
-- Use SEARCH for general queries; use FETCH for specific URLs you know are relevant
-  (e.g. Cook Political Report, FiveThirtyEight, Ballotpedia election pages).
-
-## Clarifying questions
-If you need more information before suggesting a run (e.g. quality level preference, which candidates, force-fresh vs update),
-ask the user first. Append a QUESTION block at the VERY END of your reply:
-
-QUESTION:{"text":"Do you want high-quality mode (cheap_mode: false) or the default fast mode?"}
-
-Rules for QUESTION:
-- Only include a QUESTION block when you genuinely need an answer before producing an ACTION.
-- Do not use QUESTION and ACTION in the same reply.
-- Do not wrap it in markdown code fences.
-
-## Producing actions
-When you want to queue a pipeline run, append ONE action block at the VERY END of your reply (nothing after it):
-
-ACTION:{"type":"queue_run","race_ids":["race-id"],"options":{"cheap_mode":true},"description":"One-line description of what this run will do"}
-
-Rules for ACTION:
-- Only one ACTION block per reply.
-- race_ids must be exact race IDs from the race list below.
-- Always include `cheap_mode` explicitly in options (default: true). Set false only if user asks for high quality.
-- Include `goal` in options when the context implies a clear purpose — derive it from the user's message
-  (e.g. "get me the top 50 swingy races" → goal: "Top 50 competitive races refresh").
-- If you are not triggering a run, omit the ACTION block entirely.
-- Do not wrap the ACTION block in markdown code fences.
-
-## Formatting
-- Use concise markdown: headers (##/###), bullet lists, **bold** for key terms.
-- Keep responses focused; avoid unnecessary padding.
-
-Current races in the system:
-"""
-
-
-class _AdminChatMessage(BaseModel):
-    role: str  # "user" | "assistant"
-    content: str
-
-
-class _AdminChatRequest(BaseModel):
-    messages: List[_AdminChatMessage]
-
-
-def _is_discovery_only(opts: Dict[str, Any] | None) -> bool:
-    """Return True when the run options limit execution to only the discovery step."""
-    if not opts:
-        return False
-    steps = opts.get("enabled_steps")
-    return isinstance(steps, list) and len(steps) == 1 and steps[0] == "discovery"
-
-
-def _build_race_context() -> str:
-    """Build a compact text summary of all known races for LLM context, enriched with race_manager metadata."""
-    published = _list_races_gcs("races")
-    if published is None:
-        published = _list_races_local(ROOT / "data" / "published")
-    drafts = _list_races_gcs("drafts")
-    if drafts is None:
-        drafts = _list_races_local(ROOT / "data" / "drafts")
-
-    # Build race_manager index for enrichment
-    rm_index: Dict[str, RaceRecord] = {}
-    try:
-        for rec in race_manager.list_races():
-            rm_index[rec.race_id] = rec
-    except Exception as e:
-        logging.warning("Failed to index race records from race_manager: %s", e)
-
-    def _race_line(r: Dict[str, Any], source: str) -> str:
-        rid = r["id"]
-        cands = ", ".join(
-            f"{c['name']} ({c.get('party', '?')})" for c in r.get("candidates", [])
-        )
-        updated = (r.get("updated_utc") or "")[:10]
-        rec = rm_index.get(rid)
-        grade = rec.quality_grade if rec else None
-        score = rec.quality_score if rec else None
-        freshness = rec.freshness if rec else None
-        runs = rec.requests_24h if rec else 0
-        last_run = (rec.last_run_at or "")[:10] if rec else ""
-        parts = [f"- [{source}] {rid}: {r.get('title', '?')}"]
-        parts.append(f"  Candidates: {cands or 'none'}")
-        parts.append(f"  Updated: {updated or 'unknown'}")
-        if grade:
-            parts.append(f"  Grade: {grade}" + (f" ({score})" if score is not None else ""))
-        if freshness:
-            parts.append(f"  Freshness: {freshness}")
-        if last_run:
-            parts.append(f"  Last run: {last_run}")
-        if runs:
-            parts.append(f"  Requests/24h: {runs}")
-        # Flag if the most recent (or current) run was discovery-only
-        active_opts = rec.queue_options if rec and rec.status in ("queued", "running") else None
-        last_run_opts = rec.last_run_options if rec else None
-        if _is_discovery_only(active_opts) or _is_discovery_only(last_run_opts):
-            parts.append("  ⚠ DISCOVERY ONLY — candidates found but no research/issues/finance yet")
-        # Flag candidates actually missing issue data (regardless of run options)
-        total_cands = r.get("total_candidates", 0)
-        cands_with_issues = r.get("candidates_with_issues", 0)
-        missing_count = total_cands - cands_with_issues
-        if total_cands > 0 and missing_count > 0 and not (_is_discovery_only(active_opts) or _is_discovery_only(last_run_opts)):
-            if missing_count == total_cands:
-                parts.append(f"  ⚠ NO ISSUE DATA — all {total_cands} candidates need issue research")
-            else:
-                parts.append(f"  ⚠ PARTIAL ISSUES — {missing_count}/{total_cands} candidates need issue research")
-        return " | ".join(parts)
-
-    lines: List[str] = ["### Published Races"]
-    for r in published:
-        lines.append(_race_line(r, "published"))
-    if not published:
-        lines.append("(none)")
-
-    lines.append("")
-    lines.append("### Draft Races")
-    for r in drafts:
-        lines.append(_race_line(r, "draft"))
-    if not drafts:
-        lines.append("(none)")
-
-    # Races known to race_manager but not in files (queued/running/failed)
-    known_ids = {r["id"] for r in published} | {r["id"] for r in drafts}
-    other = [rec for rid, rec in rm_index.items() if rid not in known_ids and rec.status not in ("empty",)]
-    if other:
-        lines.append("")
-        lines.append("### Other Known Races (queued/running/failed)")
-        for rec in other:
-            lines.append(
-                f"- {rec.race_id}: {rec.title or '?'} | Status: {rec.status}"
-                + (f" | Grade: {rec.quality_grade}" if rec.quality_grade else "")
-            )
-
-    return "\n".join(lines)
-
-
-def _load_full_race(race_id: str) -> Dict[str, Any] | None:
-    """Load the full race JSON for inspection. Tries published, then draft, then GCS."""
-    data = _get_race_gcs(race_id, "races")
-    if data:
-        return data
-    data = _get_race_gcs(race_id, "drafts")
-    if data:
-        return data
-    for local_dir in [ROOT / "data" / "published", ROOT / "data" / "drafts"]:
-        candidate = local_dir / f"{race_id}.json"
-        if candidate.exists():
-            try:
-                with open(candidate) as f:
-                    return json.load(f)
-            except Exception as e:
-                logging.warning("Failed to read race file %s: %s", candidate, e)
-    return None
-
-
-def _format_race_for_inspect(data: Dict[str, Any]) -> str:
-    """Format a full race JSON into a readable markdown summary for LLM INSPECT context."""
-    lines: List[str] = []
-    lines.append(f"**{data.get('title', data.get('id', '?'))}**")
-    lines.append(f"Updated: {(data.get('updated_utc') or '')[:10] or 'unknown'}")
-    rec_grade = data.get("quality_grade")
-    rec_score = data.get("quality_score")
-    if rec_grade:
-        lines.append(f"Grade: {rec_grade}" + (f" ({rec_score})" if rec_score is not None else ""))
-    lines.append("")
-
-    for c in data.get("candidates", []):
-        name = c.get("name", "?")
-        party = c.get("party", "?")
-        lines.append(f"### {name} ({party})")
-        bio = c.get("bio") or c.get("biography") or ""
-        if bio:
-            lines.append(f"Bio: {str(bio)[:300]}")
-        issues = c.get("issues") or {}
-        if issues:
-            lines.append("**Issues:**")
-            for topic, val in issues.items():
-                if isinstance(val, dict):
-                    stance = val.get("stance") or ""
-                    conf = val.get("confidence") or ""
-                    conf_tag = f" [{conf}]" if conf else ""
-                    lines.append(f"- {topic}{conf_tag}: {str(stance)[:250]}")
-        else:
-            lines.append("_No issue data_")
-        finance = c.get("finance") or {}
-        if finance:
-            raised = finance.get("total_raised") or finance.get("raised")
-            spent = finance.get("total_spent") or finance.get("spent")
-            parts: List[str] = []
-            if raised:
-                parts.append(f"raised {raised}")
-            if spent:
-                parts.append(f"spent {spent}")
-            if parts:
-                lines.append(f"Finance: {', '.join(parts)}")
-        lines.append("")
-
-    return "\n".join(lines)[:14000]  # cap at ~14KB per race
-
-
-async def _call_admin_llm(
-    system: str,
-    messages: List[Dict[str, str]],
-    max_tokens: int = 4096,
-) -> str:
-    """Call Anthropic (primary) or OpenAI (fallback) and return the reply text."""
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
-
-    reply_text = ""
-    if anthropic_key:
-        try:
-            import anthropic as _anthropic  # type: ignore
-        except ImportError:
-            _anthropic = None  # type: ignore
-
-        if _anthropic is not None:
-            client = _anthropic.Anthropic(api_key=anthropic_key)
-            resp = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=max_tokens,
-                    system=system,
-                    messages=messages,
-                ),
-            )
-            reply_text = resp.content[0].text
-
-    if not reply_text and openai_key:
-        try:
-            import openai as _openai  # type: ignore
-        except ImportError as exc:
-            raise HTTPException(status_code=503, detail="openai package not installed") from exc
-
-        client = _openai.AsyncOpenAI(api_key=openai_key)
-        resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            max_tokens=max_tokens,
-            messages=[{"role": "system", "content": system}] + messages,  # type: ignore[arg-type]
-        )
-        reply_text = resp.choices[0].message.content or ""
-
-    if not reply_text:
-        raise HTTPException(
-            status_code=503,
-            detail="No AI API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY)",
-        )
-    return reply_text
-
-
-@app.post("/api/admin-chat", dependencies=[Depends(verify_token)])
-async def admin_chat(request: _AdminChatRequest) -> Dict[str, Any]:
-    """Chat with an AI assistant about races and pipeline runs."""
-    race_context = _build_race_context()
-    system_prompt = _ADMIN_CHAT_SYSTEM + race_context
-
-    messages = [{"role": m.role, "content": m.content} for m in request.messages]
-
-    try:
-        reply_text = await _call_admin_llm(system_prompt, messages)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logging.exception("Admin chat LLM call failed")
-        raise HTTPException(status_code=503, detail=f"AI service error: {exc}") from exc
-
-    # Handle INSPECT directive — second LLM pass with full race data
-    inspect_match = re.search(r"\nINSPECT:(\{[^\n]+\})", reply_text)
-    if inspect_match:
-        try:
-            inspect_data = json.loads(inspect_match.group(1))
-            inspect_ids: List[str] = (inspect_data.get("race_ids") or [])[:3]
-            # Strip the INSPECT directive and everything after it (LLM often writes
-            # placeholder text like "Once I see the data…" after the block)
-            reply_text = reply_text[: inspect_match.start()].rstrip()
-
-            if inspect_ids:
-                race_details: List[str] = []
-                for rid in inspect_ids:
-                    full = _load_full_race(rid)
-                    if full:
-                        race_details.append(f"=== {rid} ===\n{_format_race_for_inspect(full)}")
-                    else:
-                        race_details.append(f"=== {rid} ===\n(not found)")
-
-                inspect_system = system_prompt + "\n\n## Inspected Race Data\n" + "\n\n".join(race_details)
-                inspect_messages = messages + [{"role": "assistant", "content": reply_text}] if reply_text else messages
-                try:
-                    reply_text = await _call_admin_llm(inspect_system, inspect_messages)
-                except Exception as exc:
-                    logging.warning("INSPECT second-pass LLM call failed, using initial reply: %s", exc)  # fall back to the partial reply already set
-        except (json.JSONDecodeError, ValueError, KeyError):
-            pass
-
-    # Handle SEARCH/FETCH directives — web research pass (only if INSPECT was not used)
-    web_thinking: List[str] = []
-    if not inspect_match:
-        _search_matches = list(re.finditer(r"\nSEARCH:(\{[^\n]+\})", reply_text))[:3]
-        _fetch_matches = list(re.finditer(r"\nFETCH:(\{[^\n]+\})", reply_text))[:2]
-        if _search_matches or _fetch_matches:
-            # Strip all directives from reply text (reverse order to preserve offsets)
-            for _m in sorted(_search_matches + _fetch_matches, key=lambda m: m.start(), reverse=True):
-                reply_text = reply_text[:_m.start()] + reply_text[_m.end():]
-            reply_text = reply_text.rstrip()
-
-            from pipeline_client.agent.web_tools import _fetch_page, _serper_search
-            _tasks: list = []
-            _task_labels: List[tuple] = []
-
-            for _m in _search_matches:
-                try:
-                    _d = json.loads(_m.group(1))
-                    _q = (_d.get("query") or "").strip()
-                    if _q:
-                        _tasks.append(_serper_search(_q, num_results=_d.get("num_results", 6)))
-                        _task_labels.append(("search", _q))
-                except (json.JSONDecodeError, ValueError):
-                    pass
-
-            for _m in _fetch_matches:
-                try:
-                    _d = json.loads(_m.group(1))
-                    _url = (_d.get("url") or "").strip()
-                    if _url:
-                        _tasks.append(_fetch_page(_url))
-                        _task_labels.append(("fetch", _url))
-                except (json.JSONDecodeError, ValueError):
-                    pass
-
-            if _tasks:
-                _results = await asyncio.gather(*_tasks, return_exceptions=True)
-                _parts: List[str] = []
-                for (_kind, _label), _result in zip(_task_labels, _results):
-                    if isinstance(_result, Exception):
-                        logging.warning("Admin web %s failed for '%s': %s", _kind, _label, _result)
-                        continue
-                    if _kind == "search":
-                        web_thinking.append(f"Searched: {_label}")
-                        _hits: Any = _result
-                        if isinstance(_hits, list) and _hits and not (len(_hits) == 1 and _hits[0].get("error")):
-                            _hit_lines = [f"### Search results: {_label}"]
-                            for _h in _hits[:6]:
-                                _hit_lines.append(
-                                    f"- **{_h.get('title', '')}** ({_h.get('url', '')}): {_h.get('snippet', '')}"
-                                )
-                            _parts.append("\n".join(_hit_lines))
-                    else:
-                        web_thinking.append(f"Fetched: {_label}")
-                        if isinstance(_result, str) and len(_result) > 50:
-                            _parts.append(f"### Page content: {_label}\n{_result[:4000]}")
-
-                if _parts:
-                    _web_context = "\n\n## Web Research Results\n\n" + "\n\n".join(_parts)
-                    _web_system = system_prompt + _web_context
-                    _web_msgs = messages + ([{"role": "assistant", "content": reply_text}] if reply_text else [])
-                    try:
-                        reply_text = await _call_admin_llm(_web_system, _web_msgs)
-                    except Exception as _exc:
-                        logging.warning("Web-assisted LLM pass failed: %s", _exc)
-
-    # Parse optional QUESTION block appended by the model
-    question: str | None = None
-    question_match = re.search(r"\nQUESTION:(\{[^\n]+\})\s*$", reply_text)
-    if question_match:
-        try:
-            q_data = json.loads(question_match.group(1))
-            question = q_data.get("text") or None
-            reply_text = reply_text[: question_match.start()].rstrip()
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-    # Parse optional ACTION block appended by the model
-    action: Dict[str, Any] | None = None
-    action_match = re.search(r"\nACTION:(\{[^\n]+\})\s*$", reply_text)
-    if action_match:
-        try:
-            action = json.loads(action_match.group(1))
-            reply_text = reply_text[: action_match.start()].rstrip()
-            # Ensure cheap_mode is always present (never None/missing)
-            if isinstance(action, dict) and action.get("type") == "queue_run" and "options" in action:
-                action["options"].setdefault("cheap_mode", True)
-        except (json.JSONDecodeError, ValueError):
-            pass
-
-    # Build race_records for the action's races so the UI can show enriched cards
-    race_records: List[Dict[str, Any]] = []
-    if action and action.get("type") == "queue_run":
-        for rid in action.get("race_ids") or []:
-            rec = race_manager.get_race(rid)
-            if rec:
-                race_records.append(
-                    {
-                        "race_id": rec.race_id,
-                        "title": rec.title,
-                        "status": rec.status,
-                        "quality_grade": rec.quality_grade,
-                        "quality_score": rec.quality_score,
-                        "freshness": rec.freshness,
-                        "candidate_count": rec.candidate_count,
-                        "last_run_at": rec.last_run_at,
-                        "last_run_status": rec.last_run_status,
-                        "requests_24h": rec.requests_24h,
-                        "published_at": rec.published_at,
-                        "draft_updated_at": rec.draft_updated_at,
-                        "discovery_only": _is_discovery_only(rec.last_run_options) or _is_discovery_only(rec.queue_options),
-                    }
-                )
-
-    # Build thinking_steps list so the UI can show what happened
-    thinking_steps: List[str] = []
-    if inspect_match:
-        thinking_steps.append("Fetched full race data for inspection")
-    thinking_steps.extend(web_thinking)
-    if action:
-        thinking_steps.append(f"Prepared run for {len(action.get('race_ids') or [])} race(s)")
-    if question:
-        thinking_steps.append("Needs clarification before queuing")
-
-    return {"reply": reply_text, "action": action, "race_records": race_records, "question": question, "thinking_steps": thinking_steps}

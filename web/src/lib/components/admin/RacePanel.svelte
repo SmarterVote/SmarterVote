@@ -10,7 +10,6 @@
     RESEARCH_MODELS,
     type ReviewerKey,
   } from "$lib/config/pipelineOptions";
-  import QualityBadge from "./QualityBadge.svelte";
   import type { RaceRecord, RunInfo, RunOptions } from "$lib/types";
   import { PIPELINE_STEPS } from "$lib/types";
   import { downloadAsJson } from "$lib/utils/pipelineUtils";
@@ -474,8 +473,10 @@
             <!-- Status + quality hero row -->
             <div class="flex items-center gap-3">
               <span class="px-2.5 py-1 rounded-full text-xs font-semibold {statusBadge(race.status)} capitalize">{race.status}</span>
-              {#if race.quality_score != null}
-                <QualityBadge score={race.quality_score} />
+              {#if race.quality_grade}
+                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-alt text-content-muted border border-stroke">
+                  Grade {race.quality_grade}
+                </span>
               {/if}
               {#if race.freshness}
                 <span class="text-xs text-content-faint capitalize ml-auto">{race.freshness} freshness</span>

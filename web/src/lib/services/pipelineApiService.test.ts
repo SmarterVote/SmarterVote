@@ -25,7 +25,7 @@ describe("PipelineApiService production admin API contract", () => {
     fetchWithAuth.mockReset();
   });
 
-  it("loads draft race summaries from /drafts", async () => {
+  it("loads draft race summaries from the canonical draft endpoint", async () => {
     fetchWithAuth.mockResolvedValueOnce(
       jsonResponse({
         races: [
@@ -45,7 +45,7 @@ describe("PipelineApiService production admin API contract", () => {
     const api = new PipelineApiService("https://api.example.test");
     const drafts = await api.loadDraftRaces();
 
-    expect(fetchWithAuth).toHaveBeenCalledWith("https://api.example.test/drafts", {}, expect.any(Number));
+    expect(fetchWithAuth).toHaveBeenCalledWith("https://api.example.test/api/races/drafts", {}, expect.any(Number));
     expect(drafts).toHaveLength(1);
     expect(drafts[0].id).toBe("az-senate-2026");
     expect(drafts[0].candidates[0].name).toBe("Alice Example");
@@ -136,6 +136,7 @@ describe("PipelineApiService production admin API contract", () => {
     const api = new PipelineApiService("https://api.example.test");
     const run = await api.getRunDetails("run-1");
 
+    expect(fetchWithAuth).toHaveBeenCalledWith("https://api.example.test/runs/run-1", {}, expect.any(Number));
     expect(run.current_step).toBe("issues");
     expect(run.progress).toBe(20);
     expect(run.steps?.find((s) => s.name === "discovery")?.status).toBe("completed");

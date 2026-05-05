@@ -11,7 +11,6 @@ Best for development and small-scale use.
 - Web search results cached in SQLite (`data/cache/`)
 - Published profiles written to `data/published/` as JSON files
 - Drafts written to `data/drafts/` before publish
-- Queue state managed in-memory (cleared on restart)
 - Races API reads directly from local files
 - Frontend polls the pipeline API every few seconds for progress
 
@@ -39,7 +38,7 @@ cd services/races-api && python main.py
 The primary cloud architecture. Admin triggers runs via `races-api`; the pipeline runs inside a gen2 Cloud Function invoked by Firestore Eventarc.
 
 **How it works**:
-- Admin queues a race via `races-api POST /queue/{race_id}` (X-Admin-Key authenticated)
+- Admin queues a race via `races-api POST /api/races/queue` (Auth0 authenticated)
 - `races-api` creates a document in Firestore `pipeline_queue`
 - Firestore Eventarc trigger invokes the gen2 Cloud Function (`functions/agent/main.py`)
 - CF imports `AgentHandler` from `pipeline_client.backend.handlers.agent`
@@ -60,23 +59,6 @@ Environment variables set automatically by Terraform:
 - `GCS_BUCKET_NAME=smartervote-sv-data-{env}`
 - `FIRESTORE_PROJECT=smartervote`
 - API keys via Secret Manager
-
-## Optional: Pipeline Client Cloud Mode
-
-The `pipeline_client` server can also be deployed to Cloud Run for cases where you want a long-running server instead of a CF. Disabled by default (`enable_pipeline_client = false`).
-
-**How it works** (when enabled):
-- Pipeline runs on Cloud Run (Auth0-protected, port 8001)
-- Agent output saves to GCS `drafts/` prefix first
-- Admin publishes draft → GCS `races/` prefix
-- Races API reads from GCS with 300s TTL cache
-- Run history, race records, and queue persist to Firestore
-
-```bash
-cd infra
-# Edit terraform.tfvars: enable_pipeline_client = true
-terraform apply
-```
 
 ## Mode Detection
 

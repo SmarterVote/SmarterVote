@@ -5,10 +5,10 @@ AI-powered electoral analysis platform. Multi-phase research agent (OpenAI + Ser
 ## Architecture
 
 ```
-pipeline_client/           # FastAPI pipeline backend + AI research agent
+pipeline_client/           # Local runner + AI research agent
   agent/                   # Agent loop, prompts, search cache, review, tools
-  backend/                 # FastAPI app, handlers/, run_manager, queue_manager
-services/races-api/        # Public read-only FastAPI serving published RaceJSON
+  backend/                 # Local FastAPI runner, Cloud Function handler, run managers
+services/races-api/        # Production public/admin FastAPI API
 web/                       # SvelteKit frontend (static adapter → GitHub Pages)
 shared/                    # Pydantic models shared across Python services
 infra/                     # Terraform for GCP (Cloud Run, GCS, Firestore)
@@ -23,9 +23,8 @@ See `docs/architecture.md` for full details, endpoints, and cloud topology.
 ## Build & Test
 
 ```bash
-# Python tests (from repo root — PYTHONPATH required)
-PYTHONPATH=. python -m pytest tests/test_pipeline.py -v
-cd services/races-api && PYTHONPATH=../.. python -m pytest test_races_api.py -v
+# Python tests
+PYTHONPATH=. python -m pytest
 
 # Python formatting
 black --line-length 127 --target-version py310 <file>
@@ -49,7 +48,7 @@ CI (`.github/workflows/ci.yaml`) runs all four on push/PR to `main`/`develop`. C
 - **Logging** — all loggers use `logging.getLogger("pipeline")`, not `__name__`
 - **Async** with `httpx.AsyncClient` for HTTP; FastAPI endpoints are async where applicable
 - **Race ID format** — lowercase only, validated via `^[a-z0-9][a-z0-9_-]{0,99}$` (e.g., `ga-senate-2026`)
-- **Auth0 on endpoints** — protected routes use `dependencies=[Depends(verify_token)]`; auth gracefully disabled if `AUTH0_DOMAIN` env var is missing (safe for local dev)
+- **Auth0 on endpoints** — protected routes use `dependencies=[Depends(verify_token)]`; local dev can set `SKIP_AUTH=true`
 
 ## TypeScript / Svelte Conventions
 
@@ -69,9 +68,9 @@ CI (`.github/workflows/ci.yaml`) runs all four on push/PR to `main`/`develop`. C
 ## Key Rules
 
 1. Agent always saves to **drafts** first — publish is an explicit admin action
-2. Keep canonical issues consistent: Healthcare, Economy, Climate/Energy, Reproductive Rights, Immigration, Guns & Safety, Foreign Policy, Social Justice, Education, Tech & AI, Election Reform, Local Issues (defined in `shared/models.py` `CanonicalIssue` enum)
+2. Keep canonical issues consistent: Healthcare, Economy, Climate/Energy, Abortion & Reproductive Health, Immigration, Firearms & Second Amendment, Foreign Policy, Civil Rights & Equality, Education, Tech & AI, Election Policy, Local Issues (defined in `shared/models.py` `CanonicalIssue` enum)
 3. Preserve confidence scoring and source attribution in data changes
-4. Local dev: run history is in-memory only (lost on restart); queue persists to `pipeline_client/queue.json`
+4. Local dev: `services/races-api` is the production-shaped admin API; `pipeline_client/backend/main.py` is only for direct local runner/debug endpoints
 5. Storage mode (`STORAGE_MODE` env var): `local` uses filesystem, `gcp` uses GCS + Firestore — see `PIPELINE_MODES.md`
 
 ## Detailed Docs (link, don't duplicate)

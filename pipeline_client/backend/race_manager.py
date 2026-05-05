@@ -56,7 +56,6 @@ class RaceRecord(BaseModel):
 
     # Quality
     candidate_count: int = 0
-    quality_score: Optional[int] = None
     quality_grade: Optional[str] = None  # A | B | C | D | F
     freshness: Optional[str] = None  # fresh | recent | aging | stale
 
@@ -98,10 +97,6 @@ def _compute_freshness(updated_utc: Optional[str]) -> str:
     if days <= 30:
         return "aging"
     return "stale"
-
-
-def _compute_quality(candidate_count: int) -> int:
-    return min(50 + candidate_count * 10, 100)
 
 
 class RaceManager:
@@ -438,7 +433,6 @@ class RaceManager:
         """Update race metadata from RaceJSON content (e.g. after agent run or on hydration)."""
         candidates = race_data.get("candidates", [])
         candidate_count = len(candidates)
-        quality = _compute_quality(candidate_count)
         updated_utc = race_data.get("updated_utc")
         freshness = _compute_freshness(updated_utc)
         vg = race_data.get("validation_grade")
@@ -450,7 +444,6 @@ class RaceManager:
             "jurisdiction": race_data.get("jurisdiction"),
             "election_date": race_data.get("election_date"),
             "candidate_count": candidate_count,
-            "quality_score": quality,
             "quality_grade": quality_grade,
             "freshness": freshness,
         }
@@ -471,7 +464,6 @@ class RaceManager:
 
         candidates = race_data.get("candidates", [])
         candidate_count = len(candidates)
-        quality = _compute_quality(candidate_count)
         updated_utc = race_data.get("updated_utc")
         freshness = _compute_freshness(updated_utc)
 
@@ -485,7 +477,6 @@ class RaceManager:
             "jurisdiction": race_data.get("jurisdiction"),
             "election_date": race_data.get("election_date"),
             "candidate_count": candidate_count,
-            "quality_score": quality,
             "quality_grade": quality_grade,
             "freshness": freshness,
         }
@@ -656,7 +647,6 @@ class RaceManager:
                 published_at=info.get("pub_utc") if info["published"] else None,
                 draft_updated_at=updated_utc if info["draft"] else None,
                 candidate_count=len(candidates),
-                quality_score=_compute_quality(len(candidates)),
                 quality_grade=quality_grade,
                 freshness=_compute_freshness(updated_utc),
                 created_at=now,
@@ -735,7 +725,6 @@ class RaceManager:
                     published_at=info.get("pub_utc") if info["published"] else None,
                     draft_updated_at=updated_utc if info.get("draft") else None,
                     candidate_count=len(candidates),
-                    quality_score=_compute_quality(len(candidates)),
                     quality_grade=quality_grade,
                     freshness=_compute_freshness(updated_utc),
                     created_at=now,

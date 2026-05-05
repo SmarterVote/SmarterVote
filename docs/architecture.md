@@ -60,12 +60,12 @@ The admin dashboard should target `services/races-api`.
 | GET | `/runs/{run_id}` | Get run details |
 | GET | `/runs/{run_id}/logs` | Get run logs |
 | DELETE | `/runs/{run_id}` | Cancel or delete a run |
-| GET | `/queue` | List queue items |
-| DELETE | `/queue/{item_id}` | Cancel/remove a queue item |
-| GET | `/drafts` | List draft race summaries |
-| GET | `/drafts/{race_id}` | Get full draft JSON |
-| POST | `/drafts/{race_id}/publish` | Publish draft JSON |
-| DELETE | `/drafts/{race_id}` | Delete draft JSON |
+| GET | `/api/queue` | List queue items |
+| DELETE | `/api/queue/{item_id}` | Cancel/remove a queue item |
+| DELETE | `/api/queue/finished` | Clear completed/failed/cancelled queue items |
+| DELETE | `/api/queue/pending` | Cancel pending queue items |
+| GET | `/api/races/drafts` | List draft race summaries |
+| DELETE | `/api/races/{race_id}/draft` | Delete draft JSON |
 | POST | `/api/races/{race_id}/publish` | Publish a race |
 | POST | `/api/races/{race_id}/unpublish` | Unpublish a race |
 | POST | `/api/races/publish` | Batch publish drafts |
@@ -73,7 +73,7 @@ The admin dashboard should target `services/races-api`.
 | GET | `/api/races/{race_id}/versions` | List retired versions |
 | POST | `/api/admin-chat` | Admin assistant |
 
-Legacy aliases such as `/queue` can remain for compatibility, but new frontend code should prefer the `/api/races/*` production routes.
+Legacy admin aliases were removed; frontend code should use the routes above.
 
 ## Public API Surface
 
@@ -102,12 +102,12 @@ Update/rerun mode adds roster and metadata synchronization before re-researching
 | GCS `retired/` | Archived previous versions |
 | Firestore `pipeline_queue` | Queue items that trigger Cloud Function runs |
 | Firestore `pipeline_runs` | Run status, progress, and logs |
-| Firestore `races` | Race metadata, quality, status, history |
+| Firestore `races` | Race metadata, grading data, status, history |
 | Secret Manager | API keys and admin secrets |
 
 ## Local Development
 
-`pipeline_client/backend/main.py` is local-only. It can keep convenience routes for in-process debugging, but production correctness should be tested against `services/races-api` plus the Cloud Function handler path.
+`pipeline_client/backend/main.py` is local-only and exposes only runner/debug routes such as `/api/run`, `/run/{step}`, and `/runs/*`. Production correctness should be tested against `services/races-api` plus the Cloud Function handler path.
 
 ## Migration Guardrails
 

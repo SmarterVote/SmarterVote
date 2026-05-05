@@ -13,7 +13,6 @@ function makeRace(overrides: Partial<RaceRecord> = {}): RaceRecord {
     published_at: undefined,
     draft_updated_at: undefined,
     candidate_count: 2,
-    quality_score: 78,
     freshness: "recent",
     total_runs: 0,
     requests_24h: 0,

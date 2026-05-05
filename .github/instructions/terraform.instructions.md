@@ -8,7 +8,7 @@ applyTo: "infra/**/*.tf"
 
 - GCP project: `smartervote`, environment: `dev`
 - State stored remotely in GCS; never run `terraform apply` locally without confirming you're not overwriting shared state
-- `enable_pipeline_client` variable controls whether the pipeline-client Cloud Run service is deployed (default: `false`)
+- `enable_pipeline_client` is legacy/debug-only and should stay `false` for normal deployments; the agent Cloud Function processes queue items
 
 ## Naming & Structure
 
@@ -26,7 +26,7 @@ applyTo: "infra/**/*.tf"
 
 ## Deployment
 
-Every push to `main` auto-deploys via CD workflow. For manual deploys see `docs/deployment-guide.md` and `scripts/deploy_pipeline_client.ps1`.
+Every push to `main` auto-deploys via CD workflow. For manual deploys see `docs/deployment-guide.md`.
 
 Validate before committing:
 ```bash

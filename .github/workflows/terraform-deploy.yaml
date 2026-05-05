@@ -46,9 +46,6 @@ jobs:
     strategy:
       matrix:
         container:
-          - name: pipeline-client
-            dockerfile: pipeline_client/Dockerfile
-            context: .
           - name: races-api
             dockerfile: services/races-api/Dockerfile
             context: .

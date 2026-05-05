@@ -26,7 +26,7 @@ async def _run_and_save_post_analysis(
     _log = logging.getLogger("pipeline")
 
     async def _emit(message: str, level: str = "info") -> None:
-        """Log to Python logger (Cloud Run logs) AND broadcast to any connected WebSocket clients."""
+        """Log to Python and record a structured local status event."""
         getattr(_log, level, _log.info)(f"[post-analysis] {message}")
         await logging_manager.broadcast_message({
             "type": "log",
@@ -47,7 +47,7 @@ async def _run_and_save_post_analysis(
         analysis_text: str = result.get("analysis", "").strip()
         model = result.get("model", "?")
 
-        # 1. Save as its own artifact so it's always retrievable regardless of WebSocket state
+        # 1. Save as its own artifact so it is retrievable independently of UI polling.
         try:
             analysis_artifact_id = new_artifact_id("post-analysis")
             save_artifact(analysis_artifact_id, {
@@ -83,8 +83,7 @@ async def _run_and_save_post_analysis(
             except Exception:
                 _log.warning("Failed to write post-run analysis to draft", exc_info=True)
 
-        # 3. Emit each line to Python logger + WebSocket so it appears in Cloud Run logs
-        #    and in the UI log panel for any still-connected clients.
+        # 3. Emit each line to Python logger and the local structured event buffer.
         await _emit(f"━━━ Post-run pipeline analysis ({model}) ━━━")
         for line in analysis_text.splitlines():
             await _emit(line)
@@ -182,7 +181,7 @@ async def run_step_async(step: str, request: RunRequest, run_id: Optional[str] =
         options["run_id"] = run_id
 
         # Run the handler directly in the main event loop context
-        # This allows logging to work properly with WebSocket broadcasting
+        # This allows logging to stay on the main loop for structured event capture.
         output = await handler.handle(request.payload, options)
 
         duration_ms = int((time.perf_counter() - t0) * 1000)
@@ -231,8 +230,8 @@ async def run_step_async(step: str, request: RunRequest, run_id: Optional[str] =
             except Exception:
                 context_logger.warning("Failed to update race record after completion", exc_info=True)
 
-        # Run Gemini post-run analysis BEFORE broadcasting run_completed so the
-        # frontend WebSocket is still subscribed and receives the log lines.
+        # Run Gemini post-run analysis before marking the run completed so the
+        # analysis log lines are captured with the run.
         race_id_for_analysis = request.payload.get("race_id", "unknown")
         await _run_and_save_post_analysis(run_id, race_id_for_analysis, run_logs, output=output)
 

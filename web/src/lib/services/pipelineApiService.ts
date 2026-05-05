@@ -28,7 +28,6 @@ export interface AdminChatRaceRecord {
   title?: string;
   status: string;
   quality_grade?: string;
-  quality_score?: number;
   freshness?: string;
   candidate_count: number;
   last_run_at?: string;
@@ -215,7 +214,7 @@ export class PipelineApiService {
    * Get run details
    */
   async getRunDetails(runId: string): Promise<RunInfo> {
-    const res = await fetchWithAuth(`${this.apiBase}/run/${runId}`, {}, API_TIMEOUT_DEFAULT);
+    const res = await fetchWithAuth(`${this.apiBase}/runs/${encodeURIComponent(runId)}`, {}, API_TIMEOUT_DEFAULT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return this.normalizeRun(await res.json());
   }
@@ -264,8 +263,8 @@ export class PipelineApiService {
    */
   async deletePublishedRace(raceId: string): Promise<void> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/races/${encodeURIComponent(raceId)}/admin`,
-      { method: "DELETE" },
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/unpublish`,
+      { method: "POST" },
       API_TIMEOUT_DEFAULT
     );
     if (!res.ok) {
@@ -280,7 +279,7 @@ export class PipelineApiService {
    * Load draft race summaries
    */
   async loadDraftRaces(): Promise<PublishedRaceSummary[]> {
-    const res = await fetchWithAuth(`${this.apiBase}/drafts`, {}, API_TIMEOUT_SHORT);
+    const res = await fetchWithAuth(`${this.apiBase}/api/races/drafts`, {}, API_TIMEOUT_SHORT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     const data: PublishedRacesResponse = await res.json();
     return data.races || [];
@@ -291,7 +290,7 @@ export class PipelineApiService {
    */
   async getDraftRace(raceId: string): Promise<Record<string, unknown>> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/drafts/${encodeURIComponent(raceId)}`,
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/data?draft=true`,
       {},
       API_TIMEOUT_DEFAULT
     );
@@ -326,7 +325,7 @@ export class PipelineApiService {
    */
   async deleteDraftRace(raceId: string): Promise<void> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/drafts/${encodeURIComponent(raceId)}`,
+      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/draft`,
       { method: "DELETE" },
       API_TIMEOUT_DEFAULT
     );
@@ -346,7 +345,7 @@ export class PipelineApiService {
    * Get current queue state
    */
   async loadQueue(): Promise<QueueResponse> {
-    const res = await fetchWithAuth(`${this.apiBase}/queue`, {}, API_TIMEOUT_SHORT);
+    const res = await fetchWithAuth(`${this.apiBase}/api/queue`, {}, API_TIMEOUT_SHORT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
   }
@@ -358,7 +357,7 @@ export class PipelineApiService {
     raceIds: string[],
     options: RunOptions = {}
   ): Promise<QueueAddResponse> {
-    const res = await fetchWithAuth(`${this.apiBase}/queue`, {
+    const res = await fetchWithAuth(`${this.apiBase}/api/races/queue`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ race_ids: raceIds, options }),
@@ -374,7 +373,7 @@ export class PipelineApiService {
    * Remove or cancel a queue item. If force=true, skip graceful cancel and force-remove.
    */
   async removeQueueItem(itemId: string, force = false): Promise<void> {
-    const url = `${this.apiBase}/queue/${encodeURIComponent(itemId)}${force ? "?force=true" : ""}`;
+    const url = `${this.apiBase}/api/queue/${encodeURIComponent(itemId)}${force ? "?force=true" : ""}`;
     const res = await fetchWithAuth(url, { method: "DELETE" }, API_TIMEOUT_SHORT);
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
@@ -383,7 +382,7 @@ export class PipelineApiService {
    * Clear completed/failed items from queue
    */
   async clearFinishedQueue(): Promise<{ removed: number }> {
-    const res = await fetchWithAuth(`${this.apiBase}/queue/finished`, {
+    const res = await fetchWithAuth(`${this.apiBase}/api/queue/finished`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -394,7 +393,7 @@ export class PipelineApiService {
    * Clear all pending (not yet started) items from queue
    */
   async clearPendingQueue(): Promise<{ removed: number }> {
-    const res = await fetchWithAuth(`${this.apiBase}/queue/pending`, {
+    const res = await fetchWithAuth(`${this.apiBase}/api/queue/pending`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);

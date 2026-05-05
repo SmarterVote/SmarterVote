@@ -16,6 +16,7 @@ from pipeline_client.agent.prompts import (
     UPDATE_META_SYSTEM,
     UPDATE_META_USER,
 )
+from shared.models import LEGACY_ISSUE_NAMES
 
 # ---------------------------------------------------------------------------
 # Canonical issues
@@ -36,6 +37,24 @@ def test_canonical_issues_thematic_order():
     """Canonical issues are in the expected thematic order."""
     assert CANONICAL_ISSUES[0] == "Healthcare"
     assert CANONICAL_ISSUES[-1] == "Local Issues"
+
+
+def test_agent_prompts_do_not_request_legacy_issue_names():
+    """Agent-facing issue lists use canonical names only; legacy migration stays in schemas."""
+    prompt_text = "\n".join(
+        [
+            ", ".join(CANONICAL_ISSUES),
+            DISCOVERY_USER,
+            REFINE_USER,
+            UPDATE_META_USER,
+            ISSUE_SUBAGENT_USER,
+            UPDATE_ISSUE_SUBAGENT_USER,
+            ITERATE_USER,
+        ]
+    )
+    for legacy_issue in LEGACY_ISSUE_NAMES:
+        assert legacy_issue not in CANONICAL_ISSUES
+        assert legacy_issue not in prompt_text
 
 
 # ---------------------------------------------------------------------------

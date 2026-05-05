@@ -84,7 +84,7 @@ npx vite dev --port 5173 --host
 - Races API health: `http://localhost:8080/health`
 - Pipeline dev API health: `http://localhost:8001/health`
 
-The admin UI should target `races-api` for production-shaped admin behavior. The pipeline dev API is retained for local direct runs and debugging while the Cloud Function migration is completed.
+The admin UI should target `races-api` for production-shaped admin behavior. The pipeline dev API is retained only for local direct runs and debugging.
 
 ## Race IDs
 

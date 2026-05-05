@@ -2,13 +2,13 @@
 
 ## Overview
 
-This document describes the Auth0 authentication implementation for the SmarterVote pipeline client and frontend. Auth0 is used to secure the admin interface that allows authorized users to manage the AI pipeline for race data processing.
+This document describes the Auth0 authentication implementation for the SmarterVote admin frontend and protected API endpoints. Auth0 secures the admin interface that allows authorized users to manage race data processing.
 
 ## Architecture
 
 ### Security Model
 - **Frontend Authentication**: Auth0 login required for `/admin/*` routes
-- **API Authentication**: JWT token verification for all sensitive pipeline endpoints
+- **API Authentication**: JWT token verification for all sensitive admin endpoints
 - **Cloud Run Access**: Public at infrastructure level, secured at application level
 - **CORS**: Configured to allow credentials for auth headers
 
@@ -20,14 +20,19 @@ This document describes the Auth0 authentication implementation for the SmarterV
 - **Protected Routes**: `/admin` and `/admin/pipeline`
 - **Token Management**: Automatic token refresh with `getTokenSilently()`
 
-#### 2. Pipeline Client (FastAPI Backend)
-- **Location**: `pipeline_client/backend/main.py`
+#### 2. Races API (FastAPI Backend)
+- **Location**: `services/races-api`
 - **Implementation**: JWT verification using `python-jose`
-- **Protected Endpoints**: 15 endpoints with `dependencies=[Depends(verify_token)]`
-- **WebSocket Support**: Token verification for real-time logging
+- **Protected Endpoints**: Admin race, queue, run, analytics, and chat endpoints use `dependencies=[Depends(verify_token)]`
+- **Live Updates**: Frontend polls `/runs/{run_id}` and `/runs/{run_id}/logs?since=N`
 
-#### 3. Infrastructure (Terraform)
-- **Location**: `infra/pipeline-client.tf`
+#### 3. Pipeline Client (Local Runner)
+- **Location**: `pipeline_client/backend/main.py`
+- **Implementation**: Same Auth0 helper, normally disabled locally with `SKIP_AUTH=true`
+- **Protected Endpoints**: Local runner/debug endpoints only
+
+#### 4. Infrastructure (Terraform)
+- **Location**: `infra/races-api.tf`
 - **Environment Variables**: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `ALLOWED_ORIGINS`
 - **CORS Configuration**: Supports credentials for auth headers
 
@@ -38,7 +43,7 @@ This document describes the Auth0 authentication implementation for the SmarterV
 # Production (.env.production)
 VITE_AUTH0_DOMAIN=dev-t37rz-ur.auth0.com
 VITE_AUTH0_CLIENT_ID=KNkBhmyIGEvjkKDthMzyYe6YFevGoJIy
-VITE_API_BASE=https://pipeline-client-dev-ddsvfazica-uc.a.run.app
+VITE_RACES_API_URL=https://races-api-dev-ddsvfazica-uc.a.run.app
 ```
 
 ### Terraform Variables
@@ -49,8 +54,8 @@ auth0_audience = "your-auth0-audience"
 allowed_origins = ["https://your-frontend-domain.com"]
 ```
 
-### Pipeline Client Settings
-The pipeline client uses environment variables set by Terraform:
+### API Settings
+The protected APIs use environment variables set by Terraform:
 - `AUTH0_DOMAIN`: Auth0 tenant domain
 - `AUTH0_AUDIENCE`: API audience identifier
 - `ALLOWED_ORIGINS`: CORS allowed origins (comma-separated)
@@ -63,7 +68,7 @@ The pipeline client uses environment variables set by Terraform:
 4. **Callback**: Auth0 redirects back to `/admin` with authorization code
 5. **Token Exchange**: Frontend exchanges code for JWT access token
 6. **API Calls**: Frontend includes `Authorization: Bearer <token>` header
-7. **Verification**: Pipeline client validates JWT against Auth0 JWKS
+7. **Verification**: API validates JWT against Auth0 JWKS
 8. **Access Granted**: Valid tokens allow access to protected endpoints
 
 ## Protected Endpoints
@@ -73,7 +78,6 @@ All sensitive pipeline endpoints require authentication:
 ```python
 @app.post("/api/run", dependencies=[Depends(verify_token)])
 @app.get("/runs", dependencies=[Depends(verify_token)])
-@app.get("/artifacts", dependencies=[Depends(verify_token)])
 # ... and more endpoints
 ```
 
@@ -99,7 +103,7 @@ All sensitive pipeline endpoints require authentication:
 1. **JWT Validation**: Full verification against Auth0 JWKS
 2. **Token Expiry**: Automatic token refresh in frontend
 3. **CORS Security**: Credentials allowed only for specified origins
-4. **WebSocket Auth**: Real-time connections also require valid tokens
+4. **Polling Auth**: Run status and log polling use the same bearer token
 5. **Graceful Degradation**: Local development works without auth setup
 
 ## Testing Authentication
