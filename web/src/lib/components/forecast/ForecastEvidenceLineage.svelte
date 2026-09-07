@@ -2,6 +2,7 @@
   import type { ForecastEvidence } from "$lib/types";
   import { isExternalUrl } from "$lib/utils/url";
   import { getHostname } from "$lib/utils/forecastPresentation";
+  import UiIcon from "$lib/components/UiIcon.svelte";
 
   export let entries: ForecastEvidence[] | null | undefined = undefined;
 
@@ -15,7 +16,7 @@
   <div class="pt-2 border-t border-stroke/20" data-testid="evidence-lineage">
     <span
       class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
-      >Evidence Lineage</span
+      >Evidence behind this forecast</span
     >
     <ul class="grid gap-1.5">
       {#each stated as item}
@@ -28,9 +29,10 @@
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-1 inline-flex items-center text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
+              class="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
             >
-              {getHostname(item.source_url)} ->
+              {getHostname(item.source_url)}
+              <UiIcon name="external" size="sm" />
             </a>
           {:else if item.source_url}
             <span

@@ -39,7 +39,7 @@ describe("ForecastElectoralMap", () => {
   it("renders the map header and legend, including holdover swatches for non-house tabs", () => {
     render(ForecastElectoralMap, { activeTab: "senate", ...baseProps() });
 
-    expect(screen.getByText("Electoral Map")).toBeTruthy();
+    expect(screen.getByText("Electoral map")).toBeTruthy();
     expect(screen.getByText("Safe D")).toBeTruthy();
     expect(screen.getByText("Safe R")).toBeTruthy();
     expect(screen.getByText("Dem Holdover")).toBeTruthy();
@@ -47,18 +47,18 @@ describe("ForecastElectoralMap", () => {
     expect(screen.queryByText(/Clear Map Filter/)).toBeNull();
   });
 
-  it("offers a collapsed mobile map control", async () => {
+  it("shows the mobile map by default and offers a hide control", async () => {
     render(ForecastElectoralMap, { activeTab: "house", ...baseProps() });
 
     const toggle = screen.getByRole("button", {
-      name: "Show interactive map",
+      name: "Hide interactive map",
     });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
 
     await fireEvent.click(toggle);
 
     expect(
-      screen.getByRole("button", { name: "Hide interactive map" }),
+      screen.getByRole("button", { name: "Show interactive map" }),
     ).toBeTruthy();
   });
 
@@ -77,7 +77,9 @@ describe("ForecastElectoralMap", () => {
       selectedState: "Texas",
     });
 
-    const button = screen.getByText(/Clear Map Filter: Texas/);
+    const button = screen.getByRole("button", {
+      name: /Clear map filter: Texas/,
+    });
     await fireEvent.click(button);
 
     expect(props.onClearFilter).toHaveBeenCalledTimes(1);

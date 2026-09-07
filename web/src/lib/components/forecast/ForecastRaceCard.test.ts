@@ -75,14 +75,14 @@ describe("ForecastRaceCard", () => {
         "Rivera holds a mid-single-digit lead heading into the fall.",
       ),
     ).toBeTruthy();
-    expect(screen.queryByText("Full Assessment")).toBeNull();
+    expect(screen.queryByText("Full assessment")).toBeNull();
   });
 
   it("calls onToggleExpand when the expand button is clicked", async () => {
     const onToggleExpand = vi.fn();
     render(ForecastRaceCard, { race, isExpanded: false, onToggleExpand });
 
-    await fireEvent.click(screen.getByText("Expand Analysis"));
+    await fireEvent.click(screen.getByText("Show analysis"));
 
     expect(onToggleExpand).toHaveBeenCalledTimes(1);
   });
@@ -94,8 +94,8 @@ describe("ForecastRaceCard", () => {
       onToggleExpand: vi.fn(),
     });
 
-    expect(screen.getByText("Hide Analysis")).toBeTruthy();
-    expect(screen.getByText("Full Assessment")).toBeTruthy();
+    expect(screen.getByText("Hide analysis")).toBeTruthy();
+    expect(screen.getByText("Full assessment")).toBeTruthy();
     expect(screen.getByText("Polling advantage")).toBeTruthy();
     expect(
       screen.getByText("Late undecideds could tighten the race."),
@@ -130,7 +130,7 @@ describe("ForecastRaceCard", () => {
       onToggleExpand: vi.fn(),
     });
     expect(screen.queryByTestId("evidence-lineage")).toBeNull();
-    expect(screen.queryByText("Evidence Lineage")).toBeNull();
+    expect(screen.queryByText("Evidence behind this forecast")).toBeNull();
     cleanup();
 
     render(ForecastRaceCard, {

@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { slide } from "svelte/transition";
   import Card from "$lib/components/Card.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import IssueTable from "$lib/components/IssueTable.svelte";
   import DonorTable from "$lib/components/DonorTable.svelte";
   import VotingRecordTable from "$lib/components/VotingRecordTable.svelte";
@@ -300,7 +301,7 @@
             )}{isDraftPreview ? '&draft=true' : ''}"
             class="text-xs font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
           >
-            Compare Candidates →
+            Compare candidates <UiIcon name="arrow-right" size="sm" />
           </a>
         {/if}
       </div>

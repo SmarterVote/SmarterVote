@@ -1,5 +1,6 @@
 <script lang="ts">
   import ElectionLookup from "$lib/components/home/ElectionLookup.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PageData } from "./$types";
   export let data: PageData;
   let exploring = false;
@@ -49,7 +50,7 @@
         <a
           href="/"
           class="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 transition hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
-          ><span aria-hidden="true">←</span> Back to Smarter.Vote</a
+          ><UiIcon name="arrow-left" size="sm" /> Back to Smarter.Vote</a
         >
         <p
           class="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-blue-600 sm:mt-12 dark:text-blue-400"

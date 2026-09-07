@@ -1,5 +1,6 @@
 <script lang="ts">
   import ConfidenceIndicator from "$lib/components/ConfidenceIndicator.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import ReviewScoreInfo from "$lib/components/compare/ReviewScoreInfo.svelte";
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, CanonicalIssue, Race } from "$lib/types";
@@ -236,7 +237,8 @@
         </div>
         <a
           href="/races/{race.id}/{isDraftPreview ? '?draft=true' : ''}#forecast"
-          class="text-sm font-bold text-blue-600">View forecast →</a
+          class="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600"
+          >View forecast <UiIcon name="arrow-right" size="sm" /></a
         >
       </div>
     </div>

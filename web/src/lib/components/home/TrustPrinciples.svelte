@@ -1,3 +1,7 @@
+<script lang="ts">
+  import UiIcon from "$lib/components/UiIcon.svelte";
+</script>
+
 <section
   class="bg-blue-950 py-20 text-white sm:py-28"
   aria-labelledby="trust-heading"
@@ -20,7 +24,7 @@
         <a
           href="/about/#methodology"
           class="mt-8 inline-flex border-b border-blue-400 pb-1 font-semibold text-blue-200 transition hover:text-white"
-          >Examine our methodology →</a
+          >Examine our methodology <UiIcon name="arrow-right" size="sm" /></a
         >
       </div>
       <div class="divide-y divide-blue-800 border-y border-blue-800">

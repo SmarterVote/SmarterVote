@@ -26,7 +26,7 @@ describe("ForecastEvidenceLineage", () => {
     render(ForecastEvidenceLineage, { entries });
 
     expect(screen.getByTestId("evidence-lineage")).toBeTruthy();
-    expect(screen.getByText("Evidence Lineage")).toBeTruthy();
+    expect(screen.getByText("Evidence behind this forecast")).toBeTruthy();
     expect(
       screen.getByText(
         "Prediction markets imply roughly an 87% Democratic win probability in NV-3",

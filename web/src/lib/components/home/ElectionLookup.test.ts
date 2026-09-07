@@ -102,7 +102,7 @@ describe("ElectionLookup", () => {
     ).toBe("https://www.vote411.org/ballot");
     expect(screen.queryByLabelText("Home address")).toBeNull();
     expect(
-      screen.getByRole("button", { name: "← Search another address" }),
+      screen.getByRole("button", { name: "Search another address" }),
     ).toBeTruthy();
   });
 

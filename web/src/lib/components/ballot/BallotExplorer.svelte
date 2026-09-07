@@ -3,6 +3,7 @@
   import { onMount, tick } from "svelte";
   import { getRace } from "$lib/api";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Candidate, Race, RaceSummary } from "$lib/types";
   import { formatElectionDate } from "$lib/utils/electionDate";
 
@@ -213,7 +214,7 @@
             <a
               href="/races/{selectedRace.id}/"
               class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-white shadow-md shadow-blue-900/10 transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >View full race guide <span aria-hidden="true">→</span></a
+              >View full race guide <UiIcon name="arrow-right" size="sm" /></a
             >
           </div>
         </div>

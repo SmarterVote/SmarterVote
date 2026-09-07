@@ -45,9 +45,7 @@ test.describe("my-ballot address lookup", () => {
     ).toBeVisible();
     await expect(page.getByText("Casey Whitfield").first()).toBeVisible();
 
-    await page
-      .getByRole("button", { name: "← Search another address" })
-      .click();
+    await page.getByRole("button", { name: "Search another address" }).click();
     await expect(
       page.getByRole("heading", { name: "Where are you registered to vote?" }),
     ).toBeVisible();

@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import { getDraftRace, getRace } from "$lib/api";
   import type { Candidate, Race } from "$lib/types";
   import { candidateSlug } from "$lib/utils/format";
@@ -163,7 +164,7 @@
     <a
       href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
       class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-4 py-2 text-sm font-semibold text-content no-underline transition-colors hover:bg-surface-alt"
-      >← Back to Race Overview</a
+      ><UiIcon name="arrow-left" size="sm" /> Back to race overview</a
     >
   </header>
 
