@@ -57,7 +57,7 @@ describe("CandidateComparison", () => {
     expect(
       getByRole("heading", {
         level: 2,
-        name: "Choose candidates to compare:",
+        name: "Choose candidates",
       }),
     ).toBeTruthy();
   });
