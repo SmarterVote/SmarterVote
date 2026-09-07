@@ -415,7 +415,6 @@
             .join(',')}{isDraftPreview ? '&draft=true' : ''}"
           class="header-compare-link"
         >
-          <UiIcon name="compare" />
           Compare all {activeCandidates.length} candidates
         </a>
       {/if}

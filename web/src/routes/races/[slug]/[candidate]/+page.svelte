@@ -290,7 +290,7 @@
           )}{isDraftPreview ? '&draft=true' : ''}"
           class="compare-link"
         >
-          <UiIcon name="compare" /> Compare
+          Compare
           <span class="hidden sm:inline">candidates</span>
         </a>
       {/if}
@@ -702,9 +702,11 @@
   }
 
   .compare-link {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5
-           text-sm font-bold text-white no-underline shadow-sm transition-colors hover:bg-blue-700
-           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:px-4;
+    @apply inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-blue-200
+           bg-surface px-3 py-1.5 text-sm font-bold text-blue-700 no-underline transition-colors
+           hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 focus-visible:outline
+           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
+           dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30 dark:hover:text-blue-200;
   }
 
   /* Other candidates collapsible */
