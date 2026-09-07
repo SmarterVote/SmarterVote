@@ -1,6 +1,7 @@
 <script lang="ts">
   import PolicySection from "$lib/components/support/PolicySection.svelte";
   import TrustPage from "$lib/components/support/TrustPage.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
 </script>
 
 <TrustPage
@@ -22,9 +23,9 @@
       href="https://github.com/SmarterVote/SmarterVote/issues/new/choose"
       target="_blank"
       rel="noopener noreferrer"
-      class="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
     >
-      Report a correction on GitHub →
+      Report a correction on GitHub <UiIcon name="external" size="sm" />
     </a>
   </PolicySection>
   <PolicySection title="What happens next">

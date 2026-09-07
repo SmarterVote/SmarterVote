@@ -1,5 +1,6 @@
 <script lang="ts">
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Race } from "$lib/types";
   import { candidateSlug } from "$lib/utils/format";
 
@@ -56,7 +57,7 @@
       <a
         href="/races/{selectedRace.id}/"
         class="shrink-0 text-sm font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400"
-        >Open race page →</a
+        >Open race page <UiIcon name="arrow-right" size="sm" /></a
       >
     </div>
 
@@ -69,7 +70,8 @@
           type="button"
           on:click={() => moveRace(-1)}
           class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-blue-600"
-          aria-label="Previous featured race">←</button
+          aria-label="Previous featured race"
+          ><UiIcon name="arrow-left" /></button
         >
         <div
           bind:this={pillList}
@@ -96,7 +98,7 @@
           type="button"
           on:click={() => moveRace(1)}
           class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-blue-600"
-          aria-label="Next featured race">→</button
+          aria-label="Next featured race"><UiIcon name="arrow-right" /></button
         >
       </div>
     </div>
@@ -116,7 +118,8 @@
             .join(',')}"
           class="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white no-underline transition hover:bg-blue-700"
         >
-          Compare all {candidates.length} candidates →
+          Compare all {candidates.length} candidates
+          <UiIcon name="arrow-right" size="sm" />
         </a>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import NoDataFallback from "./NoDataFallback.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Source } from "$lib/types";
   import { isExternalUrl } from "$lib/utils/url";
 
@@ -81,7 +82,7 @@
               class="source-link-btn"
             >
               {source.title}
-              <span aria-hidden="true">→</span>
+              <UiIcon name="external" size="sm" />
             </a>
           {/each}
         </div>

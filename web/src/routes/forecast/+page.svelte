@@ -14,6 +14,7 @@
   import ForecastSummaryCard from "$lib/components/forecast/ForecastSummaryCard.svelte";
   import ForecastTabNav from "$lib/components/forecast/ForecastTabNav.svelte";
   import ForecastUnavailable from "$lib/components/forecast/ForecastUnavailable.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { ChamberForecasts, RaceSummary } from "$lib/types";
   import {
     aggregateForecasts,
@@ -225,7 +226,7 @@
           <a
             href="/about/#forecast-methodology"
             class="text-blue-600 hover:underline dark:text-blue-400"
-            >How the forecast works →</a
+            >How the forecast works <UiIcon name="arrow-right" size="sm" /></a
           >
         </div>
       </div>

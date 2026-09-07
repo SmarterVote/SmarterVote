@@ -1,5 +1,6 @@
 <script lang="ts">
   import USMap from "$lib/components/USMap.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { ForecastTab } from "$lib/utils/forecast";
   import type { StateTooltip } from "$lib/utils/forecastPresentation";
 
@@ -12,7 +13,7 @@
   export let onStateClick: (state: string) => void;
   export let onClearFilter: () => void;
 
-  let mobileMapOpen = false;
+  let mobileMapOpen = true;
   $: mapPanelId = `forecast-map-${activeTab}`;
 
   $: stateOptions = [...activeStates].sort((a, b) => a.localeCompare(b));
@@ -39,9 +40,9 @@
     class="flex flex-col items-start justify-between gap-2 border-b border-stroke/40 pb-4 mb-4 sm:flex-row sm:items-center"
   >
     <div>
-      <h2 class="text-lg font-bold text-content">Electoral Map</h2>
+      <h2 class="text-lg font-bold text-content">Electoral map</h2>
       <p class="text-xs text-content-subtle">
-        Shaded by projected rating or holdover representation
+        States are shaded by projected rating or holdover representation.
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
@@ -50,7 +51,8 @@
           on:click={onClearFilter}
           class="flex min-h-11 items-center gap-1 rounded-lg border border-blue-200/50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-500 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:text-blue-300"
         >
-          Clear Map Filter: {selectedState} x
+          Clear map filter: {selectedState}
+          <UiIcon name="close" size="sm" />
         </button>
       {/if}
       <button
@@ -109,7 +111,7 @@
     <!-- Map Colors Legend -->
     <div class="mt-4 space-y-3 border-t border-stroke/40 pt-4">
       <span class="text-xs font-semibold text-content-muted block"
-        >Map Legend</span
+        >Map legend</span
       >
       <div
         class="flex flex-wrap gap-x-4 gap-y-2 justify-center lg:justify-start"

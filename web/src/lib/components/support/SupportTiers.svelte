@@ -1,4 +1,5 @@
 <script lang="ts">
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import {
     createSupportCheckout,
     type SupportMode,
@@ -142,7 +143,7 @@
   <!-- CTA -->
   <button
     type="submit"
-    class="inline-flex w-full items-center justify-center rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
     disabled={!canSubmit}
   >
     {#if loading}
@@ -170,7 +171,8 @@
     {:else if effectiveAmountCents !== null}
       Support with ${(effectiveAmountCents / 100).toFixed(
         effectiveAmountCents % 100 === 0 ? 0 : 2,
-      )}{mode === "subscription" ? " per month" : ""} →
+      )}{mode === "subscription" ? " per month" : ""}
+      <UiIcon name="arrow-right" size="sm" />
     {:else}
       Enter an amount to continue
     {/if}

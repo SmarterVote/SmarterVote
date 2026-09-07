@@ -2,6 +2,7 @@
   import { replaceState } from "$app/navigation";
   import { createEventDispatcher, onMount } from "svelte";
   import BallotExplorer from "$lib/components/ballot/BallotExplorer.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { RaceSummary } from "$lib/types";
   import {
     lookupElectionGeography,
@@ -376,7 +377,7 @@
           on:click={searchAnotherAddress}
           class="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border border-stroke bg-surface px-4 text-sm font-bold text-content transition hover:border-blue-400 hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          ← Search another address
+          <UiIcon name="arrow-left" size="sm" /> Search another address
         </button>
       </div>
       {#if results.length}

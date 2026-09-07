@@ -19,6 +19,7 @@
     ratingClass,
   } from "$lib/utils/forecastPresentation";
   import ForecastEvidenceLineage from "./ForecastEvidenceLineage.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
 
   export let race: ForecastRace;
   export let isExpanded: boolean;
@@ -47,9 +48,9 @@
         </a>
         <a
           href={browser ? raceHref(race.id) : undefined}
-          class="inline-flex min-h-11 items-center text-[10px] text-content-subtle hover:text-blue-600 dark:hover:text-blue-400 font-extrabold bg-surface border border-stroke/60 px-3 py-1 rounded-md transition-all whitespace-nowrap self-start"
+          class="inline-flex min-h-11 items-center gap-1.5 text-[10px] text-content-subtle hover:text-blue-600 dark:hover:text-blue-400 font-extrabold bg-surface border border-stroke/60 px-3 py-1 rounded-md transition-all whitespace-nowrap self-start"
         >
-          Details ->
+          View race <UiIcon name="arrow-right" size="sm" />
         </a>
       </div>
       <div class="flex flex-wrap items-center gap-1.5">
@@ -90,7 +91,7 @@
       <div class="flex flex-col justify-center border-r border-stroke/30">
         <span
           class="text-[9px] font-bold text-content-subtle uppercase tracking-wider"
-          >Win Prob.</span
+          >Win probability</span
         >
         <span class="text-xs font-black mt-0.5 text-content tabular-nums">
           {probability(race.forecast.win_probability)}
@@ -99,7 +100,7 @@
       <div class="flex flex-col justify-center pl-1">
         <span
           class="text-[9px] font-bold text-content-subtle uppercase tracking-wider"
-          >Est. Margin</span
+          >Estimated margin</span
         >
         <span class="text-xs font-black mt-0.5 text-content tabular-nums">
           {race.forecast.margin_estimate === undefined ||
@@ -134,7 +135,7 @@
     <div class="flex flex-col justify-center border-t border-stroke/20 pt-2.5">
       <span
         class="text-[9px] font-bold text-content-subtle uppercase tracking-wider mb-1"
-        >Key Takeaway</span
+        >Key takeaway</span
       >
       <p class="text-xs text-content-muted leading-relaxed font-medium">
         {race.forecast.takeaway ||
@@ -157,10 +158,12 @@
         aria-expanded={isExpanded}
       >
         <span
-          class="inline-block transition-transform duration-200"
-          style={isExpanded ? "transform: rotate(180deg);" : ""}>v</span
+          class="inline-flex transition-transform duration-200"
+          style={isExpanded ? "transform: rotate(180deg);" : ""}
         >
-        {isExpanded ? "Hide Analysis" : "Expand Analysis"}
+          <UiIcon name="chevron-down" size="sm" />
+        </span>
+        {isExpanded ? "Hide analysis" : "Show analysis"}
       </button>
 
       <span class="text-[10px] text-content-subtle font-medium">
@@ -180,7 +183,7 @@
         <div>
           <span
             class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
-            >Full Assessment</span
+            >Full assessment</span
           >
           <p
             class="text-content-muted leading-relaxed font-medium whitespace-pre-wrap"
@@ -194,7 +197,7 @@
           <div class="pt-2 border-t border-stroke/20">
             <span
               class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
-              >Key Drivers</span
+              >Key drivers</span
             >
             <ul
               class="list-disc list-inside space-y-1 text-content-muted font-medium pl-1"
@@ -211,7 +214,7 @@
           <div class="pt-2 border-t border-stroke/20">
             <span
               class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
-              >Risk Factors & Uncertainty</span
+              >Uncertainty</span
             >
             <p class="text-content-muted font-medium leading-relaxed">
               {race.forecast.uncertainty}
@@ -224,7 +227,7 @@
             <div class="flex items-center justify-between gap-2 mb-2">
               <span
                 class="font-bold text-content uppercase tracking-wider text-[9px] block"
-                >Kalshi Market Signals</span
+                >Kalshi market signals</span
               >
               <span class="text-[9px] text-content-subtle font-bold"
                 >{race.forecast.market_signals.length} market{race.forecast
@@ -300,9 +303,10 @@
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex items-center text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
+                  class="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
                 >
-                  {getHostname(url)} ->
+                  {getHostname(url)}
+                  <UiIcon name="external" size="sm" />
                 </a>
               {/each}
             </div>
@@ -314,11 +318,11 @@
           class="pt-2 border-t border-stroke/20 flex flex-wrap items-center justify-between gap-2 text-[9px] text-content-subtle font-bold"
         >
           {#if race.forecast.model}
-            <span>Model: {race.forecast.model}</span>
+            <span>Model {race.forecast.model}</span>
           {/if}
           {#if race.forecast.generated_at}
             <span
-              >Generated: {new Date(
+              >Generated {new Date(
                 race.forecast.generated_at,
               ).toLocaleDateString()}</span
             >

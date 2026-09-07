@@ -2,6 +2,7 @@
   import HowItWorks from "$lib/components/home/HowItWorks.svelte";
   import InteractiveRaceCompare from "$lib/components/home/InteractiveRaceCompare.svelte";
   import TrustPrinciples from "$lib/components/home/TrustPrinciples.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PageData } from "./$types";
   export let data: PageData;
 </script>
@@ -65,7 +66,8 @@
           >
             <span class="flex items-center justify-between font-extrabold"
               >Explore my ballot <span
-                class="transition group-hover:translate-x-1">→</span
+                class="inline-flex transition group-hover:translate-x-1"
+                ><UiIcon name="arrow-right" /></span
               ></span
             >
             <span class="mt-1 block text-sm text-blue-100"
@@ -78,8 +80,8 @@
           >
             <span class="flex items-center justify-between font-extrabold"
               >Browse all elections <span
-                class="text-blue-600 transition group-hover:translate-x-1"
-                >→</span
+                class="inline-flex text-blue-600 transition group-hover:translate-x-1"
+                ><UiIcon name="arrow-right" /></span
               ></span
             >
             <span class="mt-1 block text-sm text-content-muted"
@@ -116,7 +118,9 @@
       <a
         href="/my-ballot/"
         class="mt-9 inline-flex min-h-12 items-center rounded-md bg-white px-8 py-3 font-bold text-blue-700 shadow-xl transition hover:-translate-y-0.5 hover:bg-blue-50"
-        >Find my elections <span class="ml-3">→</span></a
+        >Find my elections <span class="ml-3 inline-flex"
+          ><UiIcon name="arrow-right" /></span
+        ></a
       >
     </div>
   </section>

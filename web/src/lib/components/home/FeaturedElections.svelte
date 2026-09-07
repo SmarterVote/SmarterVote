@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RaceSummary } from "$lib/types";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
   export let races: RaceSummary[] = [];
 </script>
@@ -29,7 +30,7 @@
         <a
           href="/elections/"
           class="hidden text-sm font-semibold text-blue-600 transition hover:text-blue-800 sm:block dark:text-blue-400"
-          >View the full index →</a
+          >View the full index <UiIcon name="arrow-right" size="sm" /></a
         >
       </header>
 
@@ -64,7 +65,8 @@
           </div>
           <p class="mt-10 font-semibold text-blue-600 dark:text-blue-400">
             Open the election guide <span
-              class="inline-block transition group-hover:translate-x-1">→</span
+              class="inline-flex transition group-hover:translate-x-1"
+              ><UiIcon name="arrow-right" size="sm" /></span
             >
           </p>
         </a>
@@ -95,7 +97,7 @@
       <a
         href="/elections/"
         class="mt-8 inline-block text-sm font-semibold text-blue-600 sm:hidden dark:text-blue-400"
-        >View the full index →</a
+        >View the full index <UiIcon name="arrow-right" size="sm" /></a
       >
     </div>
   </section>

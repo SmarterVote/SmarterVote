@@ -2,6 +2,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import CandidateCard from "$lib/components/CandidateCard.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import ReviewPanel from "$lib/components/ReviewPanel.svelte";
   import ValidationGradeBadge from "$lib/components/ValidationGradeBadge.svelte";
   import Card from "$lib/components/Card.svelte";
@@ -415,7 +416,7 @@
           class="header-compare-link"
         >
           Compare all {activeCandidates.length} candidates
-          <span aria-hidden="true">→</span>
+          <UiIcon name="arrow-right" size="sm" />
         </a>
       {/if}
     </Card>
@@ -534,10 +535,14 @@
             </div>
             {#if polls.length > 1}
               <span class="poll-snapshot-more"
-                >{polls.length} polls total — view all ↓</span
+                >{polls.length} polls total — view all
+                <UiIcon name="chevron-down" size="sm" /></span
               >
             {:else}
-              <span class="poll-snapshot-more">View detailed results ↓</span>
+              <span class="poll-snapshot-more"
+                >View detailed results
+                <UiIcon name="chevron-down" size="sm" /></span
+              >
             {/if}
           </a>
         {/if}

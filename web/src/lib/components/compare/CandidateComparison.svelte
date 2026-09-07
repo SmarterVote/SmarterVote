@@ -1,5 +1,6 @@
 <script lang="ts">
   import ConfidenceIndicator from "$lib/components/ConfidenceIndicator.svelte";
+  import UiIcon from "$lib/components/UiIcon.svelte";
   import MobileCandidateComparison from "$lib/components/compare/MobileCandidateComparison.svelte";
   import ReviewScoreInfo from "$lib/components/compare/ReviewScoreInfo.svelte";
   import SourceLink from "$lib/components/SourceLink.svelte";
@@ -294,8 +295,9 @@
                     href={candidate.website.trim()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex min-h-6 items-center py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                    >Visit campaign website ↗</a
+                    class="inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                    >Visit campaign website
+                    <UiIcon name="external" size="sm" /></a
                   >
                 </div>{/if}
             </div>
@@ -516,8 +518,8 @@
                         href={sourceUrl.trim()}
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="inline-flex min-h-6 items-center py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                        >{row.link} ↗</a
+                        class="inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                        >{row.link} <UiIcon name="external" size="sm" /></a
                       >{/if}{:else}<span
                       class="text-xs italic text-content-faint"
                       >No records available.</span
