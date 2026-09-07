@@ -26,6 +26,7 @@
   let othersExpanded = false;
   let isDraftPreview = false;
   let summarySourcesOpen = false;
+  let summaryExpanded = false;
   const SUMMARY_SOURCE_LIMIT = 3;
 
   let slug: string;
@@ -181,9 +182,9 @@
       </h2>
       <a
         href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
-        class="mt-4 inline-block text-blue-600 hover:text-blue-400 font-medium"
+        class="mt-4 inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-400 font-medium"
       >
-        &larr; Back to race overview
+        <UiIcon name="arrow-left" size="sm" /> Back to race overview
       </a>
     </div>
   {:else if candidate && race}
@@ -274,37 +275,25 @@
     {/if}
     <!-- Navigation Bar -->
     <nav class="nav-bar">
-      <div class="flex items-center gap-3">
+      <a
+        href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
+        class="back-link"
+      >
+        <UiIcon name="arrow-left" size="sm" />
+        <span class="sm:hidden">Race overview</span>
+        <span class="hidden sm:inline">Back to {raceDisplayTitle(race)}</span>
+      </a>
+      {#if otherCandidates.length > 0}
         <a
-          href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
-          class="back-link"
+          href="/races/{slug}/compare/?candidates={candidateParam},{candidateSlug(
+            otherCandidates[0].name,
+          )}{isDraftPreview ? '&draft=true' : ''}"
+          class="compare-link"
         >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to {raceDisplayTitle(race)}
+          <UiIcon name="compare" /> Compare
+          <span class="hidden sm:inline">candidates</span>
         </a>
-        {#if otherCandidates.length > 0}
-          <a
-            href="/races/{slug}/compare/?candidates={candidateParam},{candidateSlug(
-              otherCandidates[0].name,
-            )}{isDraftPreview ? '&draft=true' : ''}"
-            class="text-xs font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline inline-flex items-center gap-1"
-          >
-            Compare candidates <UiIcon name="arrow-right" size="sm" />
-          </a>
-        {/if}
-      </div>
+      {/if}
     </nav>
 
     <!-- Other Candidates (Collapsible) -->
@@ -314,22 +303,17 @@
           class="toggle-others"
           on:click={() => (othersExpanded = !othersExpanded)}
           aria-expanded={othersExpanded}
+          aria-label={`Other Candidates (${otherCandidates.length})`}
         >
-          <span>Other Candidates ({otherCandidates.length})</span>
-          <svg
-            class="w-4 h-4 transition-transform duration-200"
+          <span class="flex items-center gap-2">
+            <span>Other candidates</span>
+            <span class="other-count">{otherCandidates.length}</span>
+          </span>
+          <span
+            class="inline-flex transition-transform duration-200"
             class:rotate-180={othersExpanded}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+            ><UiIcon name="chevron-down" /></span
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
         </button>
         {#if othersExpanded}
           <div transition:slide class="others-list">
@@ -403,7 +387,29 @@
         </div>
       </div>
 
-      <p class="candidate-summary">{candidate.summary}</p>
+      {#if candidate.summary}
+        <div class="candidate-about">
+          <p class="candidate-about-label">About</p>
+          <p class="candidate-summary" class:is-expanded={summaryExpanded}>
+            {candidate.summary}
+          </p>
+          {#if candidate.summary.length > 320}
+            <button
+              type="button"
+              class="summary-toggle sm:hidden"
+              aria-expanded={summaryExpanded}
+              on:click={() => (summaryExpanded = !summaryExpanded)}
+            >
+              {summaryExpanded ? "Show less" : "Read full biography"}
+              <span
+                class="inline-flex transition-transform duration-200"
+                class:rotate-180={summaryExpanded}
+                ><UiIcon name="chevron-down" size="sm" /></span
+              >
+            </button>
+          {/if}
+        </div>
+      {/if}
 
       {#if candidate.summary_sources && candidate.summary_sources.length > 0}
         <div class="summary-sources">
@@ -421,7 +427,8 @@
                 d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
               />
             </svg>
-            Sources ({candidate.summary_sources.length})
+            Biography sources
+            <span class="source-count">{candidate.summary_sources.length}</span>
           </div>
           <ul class="summary-sources-list">
             {#each summarySourcesOpen ? candidate.summary_sources : candidate.summary_sources.slice(0, SUMMARY_SOURCE_LIMIT) as src}
@@ -433,20 +440,8 @@
                     rel="noopener noreferrer"
                     class="summary-source-link"
                   >
-                    <svg
-                      class="w-3 h-3 flex-shrink-0"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                    {src.title ?? src.url}
+                    <span>{src.title ?? src.url}</span>
+                    <UiIcon name="external" size="sm" />
                   </a>
                 {:else}
                   <span class="summary-source-link">{src.title ?? src.url}</span
@@ -697,32 +692,45 @@
 
 <style lang="postcss">
   .nav-bar {
-    @apply flex items-center justify-between mb-6 flex-wrap gap-3;
+    @apply mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:mb-6 sm:gap-3;
   }
 
   .back-link {
-    @apply inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800
-           font-medium text-sm no-underline transition-colors duration-200;
+    @apply inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-sm font-semibold
+           text-blue-700 no-underline transition-colors duration-200 hover:bg-blue-50 hover:text-blue-900
+           dark:text-blue-300 dark:hover:bg-blue-950/30 dark:hover:text-blue-200 sm:px-3;
+  }
+
+  .compare-link {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5
+           text-sm font-bold text-white no-underline shadow-sm transition-colors hover:bg-blue-700
+           focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:px-4;
   }
 
   /* Other candidates collapsible */
   .other-candidates-bar {
-    @apply mb-6 bg-surface-alt border border-stroke rounded-lg overflow-hidden;
+    @apply mb-5 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-sm sm:mb-6;
   }
 
   .toggle-others {
-    @apply w-full flex items-center justify-between px-4 py-3 text-sm font-medium
-           text-content hover:bg-stroke/30 transition-colors duration-200;
+    @apply flex min-h-12 w-full items-center justify-between px-4 py-3 text-sm font-bold
+           text-content transition-colors duration-200 hover:bg-surface-alt/70 sm:px-5;
+  }
+
+  .other-count,
+  .source-count {
+    @apply inline-flex min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 py-0.5
+           text-[11px] font-extrabold text-blue-700 dark:bg-blue-900/50 dark:text-blue-200;
   }
 
   .others-list {
-    @apply px-4 pb-4 flex flex-wrap gap-3;
+    @apply grid grid-cols-1 gap-2 border-t border-stroke bg-surface-alt/35 p-3 sm:grid-cols-2 sm:p-4;
   }
 
   .other-chip {
-    @apply flex items-center gap-2.5 px-3 py-2 bg-surface border border-stroke
-           rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors
-           duration-200 no-underline text-content;
+    @apply flex min-h-14 min-w-0 items-center gap-3 rounded-xl border border-stroke bg-surface px-3 py-2.5
+           text-content no-underline shadow-sm transition-colors duration-200 hover:border-blue-400
+           hover:bg-blue-50 dark:hover:bg-blue-950;
   }
 
   .other-avatar {
@@ -743,7 +751,7 @@
 
   /* Candidate header */
   :global(.candidate-header-card) {
-    @apply p-5 sm:p-6 mb-6 shadow-sm;
+    @apply mb-6 overflow-hidden rounded-2xl border border-stroke p-5 shadow-sm sm:p-6;
   }
 
   .candidate-top {
@@ -776,7 +784,27 @@
   }
 
   .candidate-summary {
-    @apply text-content-muted leading-relaxed text-sm sm:text-base mb-4;
+    @apply text-sm leading-7 text-content-muted sm:text-base sm:leading-relaxed;
+  }
+
+  .candidate-summary:not(.is-expanded) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+  }
+
+  .candidate-about {
+    @apply mb-4 border-t border-stroke pt-4;
+  }
+
+  .candidate-about-label {
+    @apply mb-2 text-xs font-extrabold uppercase tracking-wider text-content-subtle;
+  }
+
+  .summary-toggle {
+    @apply mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-600
+           hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300;
   }
 
   .quick-links {
@@ -867,12 +895,11 @@
 
   /* Summary sources */
   .summary-sources {
-    @apply mb-4;
+    @apply mb-4 rounded-xl border border-stroke bg-surface-alt/35 p-3 sm:p-4;
   }
 
   .summary-sources-heading {
-    @apply inline-flex items-center gap-1.5 text-xs text-content-subtle hover:text-blue-600
-           dark:hover:text-blue-400 transition-colors duration-150 font-medium;
+    @apply inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-content-subtle;
   }
 
   .summary-sources-toggle {
@@ -884,8 +911,20 @@
   }
 
   .summary-source-link {
-    @apply inline-flex min-h-8 min-w-0 max-w-full items-center gap-1 truncate py-1 text-xs text-blue-600
-           no-underline hover:underline dark:text-blue-400 sm:max-w-sm;
+    @apply inline-flex min-h-9 min-w-0 max-w-full items-start gap-2 rounded-lg px-2 py-1.5 text-xs
+           leading-5 text-blue-600 no-underline hover:bg-blue-50 hover:text-blue-800
+           dark:text-blue-400 dark:hover:bg-blue-950/30 dark:hover:text-blue-300 sm:text-sm;
+  }
+
+  .summary-source-link span {
+    @apply min-w-0 break-words;
+  }
+
+  @media (min-width: 640px) {
+    .candidate-summary:not(.is-expanded) {
+      display: block;
+      overflow: visible;
+    }
   }
 
   /* Entry source link (career + education) */

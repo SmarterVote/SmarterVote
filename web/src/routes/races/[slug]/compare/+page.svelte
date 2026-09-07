@@ -140,32 +140,24 @@
 </svelte:head>
 
 <div class="container mx-auto max-w-7xl px-4 py-6 sm:py-8">
-  <header
-    class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-  >
-    <div>
-      <nav class="mb-1 text-xs uppercase tracking-wide text-content-subtle">
-        <a href="/" class="hover:text-content">Home</a> &middot;
-        <a
-          href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
-          class="hover:text-content">Race Detail</a
-        >
-        &middot; <span class="text-content-muted">Compare</span>
-      </nav>
+  <header class="compare-header">
+    <a
+      href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
+      class="compare-back-link"
+    >
+      <UiIcon name="arrow-left" size="sm" /> Race overview
+    </a>
+    <div class="mt-3">
+      <p class="compare-eyebrow">Candidate comparison</p>
       <h1
         class="text-2xl font-extrabold tracking-tight text-content sm:text-3xl"
       >
         Compare Candidates
       </h1>
-      {#if race}<p class="mt-1 text-sm text-content-muted">
-          {race.office}{race.district ? ` · ${race.district}` : ""} &bull; {race.jurisdiction}
+      {#if race}<p class="mt-1 text-sm leading-6 text-content-muted">
+          {raceDisplayTitle(race)}
         </p>{/if}
     </div>
-    <a
-      href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
-      class="inline-flex items-center gap-1.5 rounded-lg border border-stroke px-4 py-2 text-sm font-semibold text-content no-underline transition-colors hover:bg-surface-alt"
-      ><UiIcon name="arrow-left" size="sm" /> Back to race overview</a
-    >
   </header>
 
   {#if loading}
@@ -214,3 +206,19 @@
     />
   {/if}
 </div>
+
+<style lang="postcss">
+  .compare-header {
+    @apply mb-5 rounded-2xl border border-stroke bg-surface p-4 shadow-sm sm:mb-6 sm:p-6;
+  }
+
+  .compare-back-link {
+    @apply inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-blue-700
+           no-underline transition-colors hover:bg-blue-50 hover:text-blue-900 dark:text-blue-300
+           dark:hover:bg-blue-950/30 dark:hover:text-blue-200 sm:px-3;
+  }
+
+  .compare-eyebrow {
+    @apply mb-1 text-xs font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400;
+  }
+</style>

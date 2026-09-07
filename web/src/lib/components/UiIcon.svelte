@@ -4,7 +4,8 @@
     | "arrow-left"
     | "chevron-down"
     | "external"
-    | "close";
+    | "close"
+    | "compare";
   export let size: "sm" | "md" = "md";
 </script>
 
@@ -120,5 +121,24 @@
 
   .ui-icon--close::after {
     transform: rotate(-45deg);
+  }
+
+  .ui-icon--compare::before,
+  .ui-icon--compare::after {
+    content: "";
+    position: absolute;
+    top: 8%;
+    bottom: 8%;
+    width: 34%;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .ui-icon--compare::before {
+    left: 4%;
+  }
+
+  .ui-icon--compare::after {
+    right: 4%;
   }
 </style>

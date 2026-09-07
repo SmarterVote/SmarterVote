@@ -68,7 +68,7 @@ test.describe("candidate comparison page", () => {
     await mockRaceJson(page, FIXTURE_RACE_IDS.senate, ohSenateRace);
     await page.goto(`${COMPARE_PATH}/`);
 
-    await page.getByRole("link", { name: "Back to race overview" }).click();
+    await page.getByRole("link", { name: "Race overview" }).click();
 
     await expect(page).toHaveURL(
       new RegExp(`/races/${FIXTURE_RACE_IDS.senate}/?$`),

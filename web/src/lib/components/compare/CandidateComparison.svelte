@@ -116,31 +116,34 @@
 
 {#if onToggle}
   <div
-    class="mb-6 flex flex-col gap-3 rounded-2xl border border-stroke bg-surface p-4 shadow-sm"
+    class="mb-5 flex flex-col gap-3 rounded-2xl border border-stroke bg-surface p-4 shadow-sm sm:mb-6 sm:p-5"
   >
-    <h2
-      class="text-xs font-extrabold uppercase tracking-wider text-content-subtle"
-    >
-      Choose candidates to compare:
-    </h2>
-    <div class="flex flex-wrap gap-2.5">
+    <div>
+      <h2 class="text-sm font-extrabold text-content">Choose candidates</h2>
+      <p class="mt-0.5 text-xs leading-5 text-content-subtle">
+        Select who you want to include in the comparison.
+      </p>
+    </div>
+    <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
       {#each race.candidates.filter((candidate) => !candidate.withdrawn) as candidate}
         {@const checked = candidates.some(
           (selected) => selected.name === candidate.name,
         )}
         <label
-          class="inline-flex min-h-11 cursor-pointer select-none items-center gap-2 rounded-xl border border-stroke bg-surface-alt/40 px-3 py-1.5 text-xs font-semibold text-content transition-colors hover:bg-surface-alt sm:text-sm"
+          class="inline-flex min-h-12 cursor-pointer select-none items-center gap-3 rounded-xl border px-3.5 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-surface-alt {checked
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+            : 'border-stroke bg-surface'}"
         >
           <input
             type="checkbox"
             {checked}
             on:change={() => onToggle?.(candidate.name)}
-            class="h-6 w-6 cursor-pointer rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
+            class="h-5 w-5 cursor-pointer rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
           />
           {candidate.name}
           {#if candidate.party}<span
-              class="text-[10px] font-bold text-content-subtle"
-              >({partyAbbr(candidate.party)})</span
+              class="ml-auto rounded-md bg-surface-alt px-1.5 py-0.5 text-[10px] font-bold text-content-subtle sm:ml-0"
+              >{partyAbbr(candidate.party)}</span
             >{/if}
         </label>
       {/each}
