@@ -22,7 +22,7 @@ from .web_tools import _serper_image_search
 
 logger = logging.getLogger("pipeline")
 
-_IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg"})
+_IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"})
 
 _BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 _WIKIMEDIA_API_UA = "SmarterVoteBot/1.0 (https://smarter.vote; contact: dev@smarter.vote)"
@@ -1212,6 +1212,13 @@ def _is_valid_image_url(url: Any) -> bool:
         parsed = urlparse(url)
         path = parsed.path.lower()
         netloc = parsed.netloc.lower()
+
+        # A headshot is never vector art. SVGs are logos and site icons: one
+        # replaced a working candidate photo with a chatbot widget's turtle
+        # (civoren.com/assistant/turtle.svg). Checked before the host rules,
+        # since upload.wikimedia.org serves party logos as SVG too.
+        if path.rstrip("/").endswith(".svg"):
+            return False
 
         # File extension check (most reliable signal)
         if any(path.rstrip("/").endswith(ext) for ext in _IMAGE_EXTENSIONS):

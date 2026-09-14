@@ -350,3 +350,44 @@ def test_a_close_same_party_race_names_no_winner():
     assert consensus["predicted_winner_name"] is None
     assert consensus["predicted_winner_party"] == "Democratic"
     assert consensus["party_probabilities"] == {"Democratic": 1.0}
+
+
+TIGHT_PANEL = {
+    FORECAST_PANEL_MODELS[0]: {"Democratic": 0.70, "Republican": 0.30},
+    FORECAST_PANEL_MODELS[1]: {"Democratic": 0.68, "Republican": 0.32},
+    FORECAST_PANEL_MODELS[2]: {"Democratic": 0.69, "Republican": 0.31},
+}
+
+
+def _polled_race(matchups):
+    race = _race()
+    race["polling"] = [
+        {"pollster": f"Pollster {index}", "date": "2026-09-01", "sample_size": 500, "matchups": [matchup]}
+        for index, matchup in enumerate(matchups)
+    ]
+    return race
+
+
+@pytest.mark.asyncio
+async def test_three_head_to_head_polls_and_a_tight_panel_earn_high_confidence():
+    head_to_head = {"candidates": ["Stefany Shaheen", "Anthony DiLorenzo"], "percentages": [48, 44]}
+    race = _polled_race([head_to_head, head_to_head, head_to_head])
+    fake, _state = _fake_loop(panel=TIGHT_PANEL)
+    await _run(race, fake)
+    assert race["forecast"]["confidence"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_single_candidate_primary_polls_do_not_count_toward_confidence():
+    # Arizona's 1st: three primary polls, each reporting one candidate's share,
+    # and no general-election poll.
+    race = _polled_race(
+        [
+            {"candidates": ["Anthony DiLorenzo"], "percentages": [25]},
+            {"candidates": ["Anthony DiLorenzo"], "percentages": [15]},
+            {"candidates": ["Stefany Shaheen"], "percentages": [33]},
+        ]
+    )
+    fake, _state = _fake_loop(panel=TIGHT_PANEL)
+    await _run(race, fake)
+    assert race["forecast"]["confidence"] == "medium"

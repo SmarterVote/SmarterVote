@@ -176,6 +176,26 @@ def _to_candidate_probabilities(raw: Dict[str, Any], race_json: Dict[str, Any]) 
     return {name: round(value / total, 4) for name, value in merged.items()} if total > 0 else {}
 
 
+def _head_to_head_poll_count(race_json: Dict[str, Any]) -> int:
+    """Polls with at least one matchup between two or more current candidates.
+
+    A primary poll that reports one candidate's share ("Jay Feely 25%") says
+    nothing about the general election. Arizona's 1st had three and no
+    general-election poll, and counting them rated its forecast "high"
+    confidence, which an unpolled race never gets.
+    """
+    roster = {_name_key(candidate["name"]) for candidate in _active_candidates(race_json)}
+    count = 0
+    for poll in race_json.get("polling") or []:
+        matchups = poll.get("matchups") if isinstance(poll, dict) else None
+        if any(
+            isinstance(matchup, dict) and len({_name_key(name) for name in matchup.get("candidates") or []} & roster) >= 2
+            for matchup in matchups or []
+        ):
+            count += 1
+    return count
+
+
 async def _panel_member(
     ctx: PhaseContext, agent_loop: Callable, model: str, prompt: str, same_party: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
@@ -549,7 +569,7 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             log("info", f"  Forecast: every candidate is {same_party}; the panel estimates candidates, not parties")
             panel_prompt += "\n\n" + FORECAST_PANEL_SAME_PARTY_NOTE.format(party=same_party)
         members = await run_forecast_panel(ctx, _agent_loop, panel_prompt, same_party=same_party)
-        poll_count = len(race_json.get("polling") or [])
+        poll_count = _head_to_head_poll_count(race_json)
         consensus = build_consensus(members, poll_count, same_party=same_party) if members else None
         if consensus:
             log(
