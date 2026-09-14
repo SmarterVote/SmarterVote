@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from google.api_core.exceptions import NotFound, PreconditionFailed
 
 from shared.config import NON_RACE_CATALOG_IDS
+from shared.race_catalog import build_forecast_summary
 
 # Resolved once at startup; can be overridden in tests.
 _GCS_BUCKET = os.getenv("GCS_BUCKET", "")
@@ -182,7 +183,6 @@ def _gcs_list_versions(race_id: str) -> List[Dict[str, Any]]:
 
 def _summary_from_race_data(race_id: str, race_data: Dict[str, Any]) -> Dict[str, Any]:
     agent_metrics = race_data.get("agent_metrics") or None
-    forecast = race_data.get("forecast") or None
     return {
         "id": race_data.get("id", race_id),
         "title": race_data.get("title"),
@@ -214,25 +214,10 @@ def _summary_from_race_data(race_id: str, race_data: Dict[str, Any]) -> Dict[str
             if isinstance(agent_metrics, dict)
             else None
         ),
-        "forecast": (
-            {
-                "predicted_winner_name": forecast.get("predicted_winner_name"),
-                "predicted_winner_party": forecast.get("predicted_winner_party"),
-                "win_probability": forecast.get("win_probability"),
-                "party_probabilities": forecast.get("party_probabilities") or {},
-                "margin_estimate": forecast.get("margin_estimate"),
-                "rating": forecast.get("rating"),
-                "confidence": forecast.get("confidence"),
-                "rationale": forecast.get("rationale"),
-                "based_on_poll_count": forecast.get("based_on_poll_count", 0),
-                "generated_at": forecast.get("generated_at"),
-                "model": forecast.get("model"),
-                "source_urls": forecast.get("source_urls") or [],
-                "market_signals": forecast.get("market_signals") or [],
-            }
-            if isinstance(forecast, dict)
-            else None
-        ),
+        # One shape for every summary writer: this used to be a third hand-copied
+        # field list that silently dropped takeaway, key_reasons, uncertainty and
+        # the forecast panel from summaries.json, which the forecast page reads.
+        "forecast": build_forecast_summary(race_data),
     }
 
 
