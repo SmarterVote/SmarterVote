@@ -40,6 +40,7 @@ def test_run_failure_reason_covers_required_categories():
         "placeholder_content",
         "roster_verification_failed",
         "roster_completeness_unproven",
+        "forecast_text_unverified",
         "budget_exhausted",
         "stale_worker_version",
         "cancelled",

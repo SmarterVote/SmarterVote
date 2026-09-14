@@ -469,9 +469,12 @@ panel of forecasters already estimated this race, and their median IS the
 forecast. Copy its party_probabilities, rating, confidence and margin_estimate
 into set_forecast exactly, and write the rationale, takeaway, key_reasons and
 uncertainty to explain that consensus. The panel's key considerations are there
-to help you explain it; where members disagreed, say what the disagreement was
-about in the uncertainty field. If the consensus is null, set the numbers
-yourself using these rating bands:
+to help you explain it. Write for voters, not about the method: never mention
+the panel, its members, models, AI, or how the forecast was produced. If the
+considerations pull in different directions, say what the race turns on (for
+example, "whether Ramaswamy's spending edge outweighs Acton's polling lead") in
+the uncertainty field. If the consensus is null, set the numbers yourself using
+these rating bands:
 - safe_d / safe_r: overwhelming advantage, roughly 95%+ party win probability.
 - likely_d / likely_r: clear advantage, roughly 80-94%.
 - lean_d / lean_r: meaningful advantage, roughly 65-79%.
@@ -564,7 +567,9 @@ Flag only real problems:
 - primary-election polling presented as the current general-election picture;
 - a number in the prose (probability, poll result, margin, money raised) that
   contradicts the forecast's own fields or the data provided;
-- prose that favors a different party or candidate than the forecast's numbers.
+- prose that favors a different party or candidate than the forecast's numbers;
+- any mention of how the forecast was produced (a panel, its members, models,
+  AI), which belongs on the methodology page, not in a race forecast.
 Do not flag style, tone, or omissions.
 Return ONLY a JSON object of the form {"issues": ["..."]}, with an empty list
 when the text is sound."""

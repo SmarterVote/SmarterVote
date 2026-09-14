@@ -32,6 +32,7 @@ from shared.forecast_math import (
     rating_for,
 )
 from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
+from shared.run_health import RunFailureReason
 
 from ..handlers import _make_editing_handlers
 from ..prompts import (
@@ -407,7 +408,7 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             revised_by = await _write_forecast(ctx, _agent_loop, revision_prompt, handlers, consensus, [writer_model])
             remaining = await _check_forecast_text(ctx, _agent_loop) if revised_by else issues
             if remaining:
-                _record_step_failure(race_json, "forecast", "forecast_text_check", "; ".join(remaining))
+                _record_step_failure(race_json, "forecast", RunFailureReason.FORECAST_TEXT_UNVERIFIED, "; ".join(remaining))
 
         forecast = race_json["forecast"]
         forecast["model"] = writer_model

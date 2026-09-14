@@ -49,6 +49,11 @@ class RunFailureReason(str, Enum):
     #: qualified-candidate list has been published — so it degrades a run
     #: rather than failing it, and the rest of the pipeline still runs.
     ROSTER_COMPLETENESS_UNPROVEN = "roster_completeness_unproven"
+    #: The forecast was written, but its fact-check still found a problem in the
+    #: prose after one revision (often a quibble like a poll's field dates versus
+    #: its release date). The numbers come from the panel and are sound, so this
+    #: degrades a run for a human to read rather than failing it.
+    FORECAST_TEXT_UNVERIFIED = "forecast_text_unverified"
     BUDGET_EXHAUSTED = "budget_exhausted"
     STALE_WORKER_VERSION = "stale_worker_version"
     CANCELLED = "cancelled"

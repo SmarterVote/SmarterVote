@@ -203,7 +203,16 @@ async def test_text_still_flagged_after_revision_is_recorded():
         return {"issues": ["Names a candidate who lost the primary."]}
 
     await _run(race, always_flagging)
-    assert race["pipeline_state"]["step_failures"][0]["reason"] == "forecast_text_check"
+    assert race["pipeline_state"]["step_failures"][0]["reason"] == "forecast_text_unverified"
+
+
+def test_unverified_forecast_text_degrades_a_run_rather_than_failing_it():
+    """The reason must be a real RunFailureReason (an unknown string only warned and
+    left the run "healthy"), and a prose quibble must not block publishing."""
+    from shared.run_health import _HARD_FAILURE_REASONS, RunFailureReason
+
+    assert RunFailureReason("forecast_text_unverified") is RunFailureReason.FORECAST_TEXT_UNVERIFIED
+    assert RunFailureReason.FORECAST_TEXT_UNVERIFIED not in _HARD_FAILURE_REASONS
 
 
 @pytest.mark.asyncio
