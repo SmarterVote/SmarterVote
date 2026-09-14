@@ -81,38 +81,81 @@ def _is_useful_link(url: str) -> bool:
     return False
 
 
-async def lookup_candidate_image(candidate_name: str) -> Optional[str]:
+def state_name_for_race(race_id: Optional[str]) -> Optional[str]:
+    """Full state name for a race id such as ``nh-senate-2026``, or None."""
+    if not race_id:
+        return None
+    return _STATE_NAMES.get(str(race_id).split("-", 1)[0].upper())
+
+
+def state_name_in_text(text: Optional[str]) -> Optional[str]:
+    """The state named in a jurisdiction such as "New Hampshire's 1st Congressional District".
+
+    Longer names are tried first so "West Virginia" is not read as "Virginia".
+    """
+    lowered = (text or "").casefold()
+    if not lowered:
+        return None
+    for name in sorted(_STATE_NAMES.values(), key=len, reverse=True):
+        if name.casefold() in lowered:
+            return name
+    return None
+
+
+async def lookup_candidate_image(candidate_name: str, state: Optional[str] = None) -> Optional[str]:
     """Return a Ballotpedia thumbnail URL for *candidate_name*, or None.
 
-    Uses ``opensearch`` to find the Ballotpedia page then ``pageimages`` to get
-    the thumbnail.  This is a focused helper used by the image-resolution
-    pipeline (images.py) — for full candidate data use ``lookup_candidate_data``.
+    A focused helper used by the image-resolution pipeline (images.py) — for
+    full candidate data use ``lookup_candidate_data``. Pass *state* whenever the
+    race is known; see ``lookup_candidate_data`` for why.
     """
-    result = await lookup_candidate_data(candidate_name)
+    result = await lookup_candidate_data(candidate_name, state=state)
     return result.get("image_url") if result else None
 
 
-async def lookup_candidate_data(candidate_name: str) -> Dict[str, Any]:
+async def lookup_candidate_data(candidate_name: str, state: Optional[str] = None) -> Dict[str, Any]:
     """Scrape a Ballotpedia candidate page for structured data.
 
     Tries the direct URL first (``/First_Last``), then falls back to
     ``Special:Search`` which redirects on a unique match.
 
+    With *state*, Ballotpedia's disambiguated page (``/Tim_Harris_(New_Hampshire)``)
+    is tried first, and a bare-name page that never mentions the state is treated
+    as a namesake rather than the candidate. The bare ``/Tim_Harris`` page is a
+    different man from New Hampshire's 2026 Senate candidate, and returning its
+    photo put the wrong face on a published race through three repair runs.
+
     Returns a dict with keys:
         found (bool), page_url (str|None), extract (str|None),
         external_links (list[str]), image_url (str|None)
 
-    Returns ``{"found": False}`` if the candidate is not found or an error occurs.
+    Returns ``{"found": False}`` if the candidate is not found or an error occurs,
+    and ``{"found": False, "possible_namesake": True, ...}`` for a namesake page.
     """
     empty: Dict[str, Any] = {"found": False}
     try:
         async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
-            # Step 1: try the canonical URL derived from the name
             url_name = candidate_name.strip().replace(" ", "_")
-            resp = await client.get(
-                f"https://ballotpedia.org/{url_name}",
-                headers={"User-Agent": _BROWSER_UA},
-            )
+            state_url = (state or "").strip().replace(" ", "_")
+            resp = None
+            disambiguated = False
+            # Step 0: Ballotpedia's own disambiguation for namesakes.
+            if state_url:
+                state_resp = await client.get(
+                    f"https://ballotpedia.org/{url_name}_({state_url})",
+                    headers={"User-Agent": _BROWSER_UA},
+                )
+                if state_resp.status_code == 200 and "Special:Search" not in str(state_resp.url):
+                    resp = state_resp
+                    url_name = f"{url_name}_({state_url})"
+                    disambiguated = True
+
+            # Step 1: try the canonical URL derived from the name
+            if resp is None:
+                resp = await client.get(
+                    f"https://ballotpedia.org/{url_name}",
+                    headers={"User-Agent": _BROWSER_UA},
+                )
 
             # Step 2: fall back to Special:Search (redirects when there is a unique match)
             if resp.status_code != 200:
@@ -168,6 +211,17 @@ async def lookup_candidate_data(candidate_name: str) -> Dict[str, Any]:
                             "image_url": fallback_image,
                         }
                     return empty
+
+            if state and not disambiguated and state.casefold() not in unescape(html).casefold():
+                return {
+                    "found": False,
+                    "possible_namesake": True,
+                    "page_url": page_url,
+                    "note": (
+                        f"Ballotpedia's page for {candidate_name} never mentions {state}; it is probably a "
+                        "different person with the same name. Do not use its photo or biography."
+                    ),
+                }
 
             # --- Image: first widget-img inside the infobox -----------------
             image_url: Optional[str] = None

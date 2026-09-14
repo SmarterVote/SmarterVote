@@ -500,7 +500,8 @@ async def test_agent_loop_handles_ballotpedia_lookup_tool_call():
         result = await _agent_loop("system", "user", model="gpt-5.4-mini", phase_name="test")
 
     assert result == {"done": True}
-    mock_lookup.assert_called_once_with("Jane Doe")
+    # No race id here, so no state to disambiguate namesakes with.
+    mock_lookup.assert_called_once_with("Jane Doe", state=None)
 
 
 @pytest.mark.asyncio

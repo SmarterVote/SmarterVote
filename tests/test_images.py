@@ -57,7 +57,7 @@ def test_ballotpedia_submit_photo_placeholder_is_rejected():
 
 @pytest.mark.asyncio
 async def test_ballotpedia_lookup_drops_submit_photo_placeholder(monkeypatch):
-    async def fake_lookup(candidate_name: str):
+    async def fake_lookup(candidate_name: str, state=None):
         return "https://ballotpedia.s3.us-east-1.amazonaws.com/images/thumb/6/68/SubmitPhoto-150px.png"
 
     monkeypatch.setattr("pipeline_client.agent.images._ballotpedia_lookup", fake_lookup)
@@ -172,7 +172,7 @@ async def test_resolve_single_image_replaces_existing_non_photo_url(monkeypatch)
 
     monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
 
-    async def fake_ballotpedia(name: str):
+    async def fake_ballotpedia(name: str, state=None):
         return None
 
     monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)
@@ -201,7 +201,7 @@ async def test_resolve_single_image_replaces_govtrack_reference_headshot(monkeyp
 
     monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
 
-    async def fake_ballotpedia(name: str):
+    async def fake_ballotpedia(name: str, state=None):
         return None
 
     monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)
@@ -235,7 +235,7 @@ async def test_resolve_single_image_falls_back_to_serper_image(monkeypatch):
 
     monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
 
-    async def fake_ballotpedia(name: str):
+    async def fake_ballotpedia(name: str, state=None):
         return None
 
     monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)
@@ -386,7 +386,7 @@ async def test_resolve_single_image_discards_stale_mismatched_wikimedia_url(monk
 
     monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fail_check)
 
-    async def fake_ballotpedia(name: str):
+    async def fake_ballotpedia(name: str, state=None):
         return None
 
     monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)

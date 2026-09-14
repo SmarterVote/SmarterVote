@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup
 from .ballotpedia import lookup_election_page as _ballotpedia_election_lookup
+from .ballotpedia import state_name_for_race
 from .context import AgentContext, AgentContextBudget
 from .cost import (
     accumulate,
@@ -862,7 +863,7 @@ async def _agent_loop(
                     candidate_name = args.get("candidate_name", "")
                     log("info", f"    📋 Ballotpedia lookup: {candidate_name}")
                     bp_data = await _await_with_run_budget(
-                        _ballotpedia_lookup(candidate_name),
+                        _ballotpedia_lookup(candidate_name, state=state_name_for_race(race_id)),
                         run_budget=run_budget,
                         requested_timeout=20.0,
                         operation="Ballotpedia candidate lookup",
