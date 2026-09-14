@@ -20,6 +20,28 @@
     </p>
   </PolicySection>
 
+  <PolicySection title="Why this exists">
+    <p>
+      I think having systems to choose our rules and leaders is one of the
+      better ideas humanity has had. For as dysfunctional as our government can
+      be, I've always felt lucky to live in a democracy.
+    </p>
+    <p>
+      Most of what's wrong with it is firmly outside the scope of what one 27
+      year old software engineer can fix. But in 2024 I went to vote and
+      couldn't find hardly any issue stances or positions for many of the
+      candidates on my ballot.
+    </p>
+    <p>
+      So I built this. Smarter.Vote runs an AI pipeline that researches issue
+      stances for every candidate in every federal race in America and publishes
+      the sources next to the answers, so you can check the work instead of
+      taking my word for it. Ballot initiatives and local races are hopefully
+      next.
+    </p>
+    <p class="text-sm">Jacob Loukota, Smarter.Vote LLC</p>
+  </PolicySection>
+
   <div id="ai-generated-content" class="scroll-mt-24">
     <PolicySection title="This site uses AI-generated content">
       <p class="font-semibold text-content">
