@@ -14,6 +14,7 @@ import httpx
 from shared.model_catalog import DEFAULT_IMAGE_VISION_MODEL
 
 from .ballotpedia import lookup_candidate_image as _ballotpedia_lookup
+from .ballotpedia import state_name_in_text
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
@@ -1425,13 +1426,13 @@ async def _lookup_wikipedia_image(candidate_name: str, context: str = "") -> Opt
     return None
 
 
-async def _lookup_ballotpedia_image(candidate_name: str) -> Optional[str]:
+async def _lookup_ballotpedia_image(candidate_name: str, state: Optional[str] = None) -> Optional[str]:
     """Return a Ballotpedia thumbnail URL for *candidate_name*, or None.
 
     Delegates to the shared :mod:`.ballotpedia` module so all Ballotpedia API
-    logic lives in one place.
+    logic lives in one place. *state* lets it tell the candidate from a namesake.
     """
-    image_url = await _ballotpedia_lookup(candidate_name)
+    image_url = await _ballotpedia_lookup(candidate_name, state=state)
     if image_url and _looks_like_non_photo(image_url):
         return None
     return image_url
@@ -1720,9 +1721,10 @@ async def _resolve_single_image(
     context_parts = [p for p in (jurisdiction, office) if p]
     search_context = " ".join(context_parts)
 
-    # Fast path 1: Ballotpedia API (politics-specific, no name-collision risk)
+    # Fast path 1: Ballotpedia. Politics-specific, but not collision-proof: a
+    # bare name can resolve to a namesake's page, so pass the race's state.
     log("info", f"  [{name}] Trying Ballotpedia API lookup...")
-    bp_url = await _lookup_ballotpedia_image(name)
+    bp_url = await _lookup_ballotpedia_image(name, state=state_name_in_text(jurisdiction))
     if bp_url:
         log("info", f"  [{name}] Ballotpedia API returned: {bp_url[:80]}")
         accessible, final_url = await _check_url_accessible(bp_url)

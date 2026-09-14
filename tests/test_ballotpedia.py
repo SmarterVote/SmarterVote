@@ -12,6 +12,7 @@ from pipeline_client.agent.ballotpedia import (
     default_ballotpedia_race_url,
     lookup_candidate_data,
     lookup_election_page,
+    state_name_for_race,
 )
 
 
@@ -368,6 +369,101 @@ async def test_ballotpedia_lookup_uses_proxy_for_blocked_candidate_page(monkeypa
     assert result["found"] is True
     assert result["page_url"] == "https://ballotpedia.org/Roy_Cooper"
     assert result["image_url"] == "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Roy_Cooper.jpg"
+
+
+_NH_HARRIS_PAGE = """
+<div class="mw-parser-output"><table class="infobox person"><tr><td>
+<img src="https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Harris_NH.jpg" />
+</td></tr></table>
+<p>Tim Harris is an independent candidate for U.S. Senate in New Hampshire in the 2026 election.</p></div>
+"""
+
+_OTHER_HARRIS_PAGE = """
+<div class="mw-parser-output"><table class="infobox person"><tr><td>
+<img src="https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Tim_Harris.jpg" />
+</td></tr></table>
+<p>Tim Harris was a candidate for the Texas House of Representatives, District 12.</p></div>
+"""
+
+
+class _FakeNamesakeClient:
+    """Serves Ballotpedia pages by exact URL; anything else is a 404."""
+
+    def __init__(self, pages):
+        self.pages = pages
+        self.calls = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def get(self, url, **kwargs):
+        self.calls.append(url)
+        if url in self.pages:
+            return _FakeResponse(url=url, text=self.pages[url])
+        return _FakeResponse(url=url, text="", status_code=404)
+
+    async def head(self, url, **kwargs):
+        return _FakeResponse(url=url, text="", status_code=404)
+
+
+@pytest.mark.asyncio
+async def test_lookup_prefers_the_state_disambiguated_page(monkeypatch):
+    client = _FakeNamesakeClient(
+        {
+            "https://ballotpedia.org/Tim_Harris_(New_Hampshire)": _NH_HARRIS_PAGE,
+            "https://ballotpedia.org/Tim_Harris": _OTHER_HARRIS_PAGE,
+        }
+    )
+    monkeypatch.setattr("pipeline_client.agent.ballotpedia.httpx.AsyncClient", lambda *a, **kw: client)
+
+    result = await lookup_candidate_data("Tim Harris", state="New Hampshire")
+
+    assert result["found"] is True
+    assert result["page_url"] == "https://ballotpedia.org/Tim_Harris_(New_Hampshire)"
+    assert result["image_url"].endswith("/Harris_NH.jpg")
+
+
+@pytest.mark.asyncio
+async def test_lookup_refuses_a_namesake_page_that_never_mentions_the_state(monkeypatch):
+    """The bare-name page belonged to someone else, so its photo must not come back."""
+    client = _FakeNamesakeClient({"https://ballotpedia.org/Tim_Harris": _OTHER_HARRIS_PAGE})
+    monkeypatch.setattr("pipeline_client.agent.ballotpedia.httpx.AsyncClient", lambda *a, **kw: client)
+
+    result = await lookup_candidate_data("Tim Harris", state="New Hampshire")
+
+    assert result["found"] is False
+    assert result["possible_namesake"] is True
+    assert "image_url" not in result
+
+
+@pytest.mark.asyncio
+async def test_lookup_accepts_a_bare_name_page_that_names_the_state(monkeypatch):
+    client = _FakeNamesakeClient({"https://ballotpedia.org/Tim_Harris": _NH_HARRIS_PAGE})
+    monkeypatch.setattr("pipeline_client.agent.ballotpedia.httpx.AsyncClient", lambda *a, **kw: client)
+
+    result = await lookup_candidate_data("Tim Harris", state="New Hampshire")
+
+    assert result["found"] is True
+    assert result["image_url"].endswith("/Harris_NH.jpg")
+
+
+def test_state_name_for_race():
+    assert state_name_for_race("nh-senate-2026") == "New Hampshire"
+    assert state_name_for_race("oh-senate-2026-special") == "Ohio"
+    assert state_name_for_race("zz-house-01-2026") is None
+    assert state_name_for_race(None) is None
+
+
+def test_state_name_in_text_prefers_the_longer_state_name():
+    from pipeline_client.agent.ballotpedia import state_name_in_text
+
+    assert state_name_in_text("New Hampshire's 1st Congressional District") == "New Hampshire"
+    assert state_name_in_text("West Virginia") == "West Virginia"
+    assert state_name_in_text("Virginia's 2nd Congressional District") == "Virginia"
+    assert state_name_in_text("") is None
 
 
 class _FakeElectionFallbackClient:
