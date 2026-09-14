@@ -170,6 +170,8 @@ export interface ForecastEvidence {
 export interface ForecastPanelEstimate {
   model: string;
   party_probabilities: Record<string, number>;
+  /** Only in races where every candidate shares one party. */
+  candidate_probabilities?: Record<string, number>;
   margin_estimate?: number;
   confidence: ConfidenceLevel;
 }

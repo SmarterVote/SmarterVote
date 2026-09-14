@@ -1188,9 +1188,17 @@ SUBMIT_FORECAST_ESTIMATE_TOOL: Dict = {
                     "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1},
                     "description": "Each party's probability of winning, keyed by party name. Should sum to about 1.",
                 },
+                "candidate_probabilities": {
+                    "type": "object",
+                    "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1},
+                    "description": (
+                        "Only when every candidate shares one party: each candidate's probability of winning, "
+                        "keyed by the exact roster name. Should sum to about 1."
+                    ),
+                },
                 "margin_estimate": {
                     "type": "number",
-                    "description": "Expected winning margin, in percentage points, for the party you think most likely to win.",
+                    "description": "Expected winning margin, in percentage points, for the party or candidate you think most likely to win.",
                 },
                 "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
                 "key_considerations": {
@@ -1200,7 +1208,7 @@ SUBMIT_FORECAST_ESTIMATE_TOOL: Dict = {
                     "description": "The two or three considerations that most drove your estimate, one short sentence each.",
                 },
             },
-            "required": ["party_probabilities", "confidence"],
+            "required": ["confidence"],
         },
     },
 }

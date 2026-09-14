@@ -296,6 +296,8 @@ class ForecastPanelEstimate(BaseModel):
 
     model: str
     party_probabilities: Dict[str, float] = Field(default_factory=dict)
+    # Only in races where every candidate shares one party.
+    candidate_probabilities: Optional[Dict[str, float]] = None
     margin_estimate: Optional[float] = None
     confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
 

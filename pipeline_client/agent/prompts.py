@@ -557,6 +557,16 @@ Also give the expected margin in percentage points for the party you think most
 likely to win, your confidence in your own estimate, and the two or three
 considerations that drove it."""
 
+FORECAST_PANEL_SAME_PARTY_NOTE = """Every candidate in this race is a {party} candidate, so the party outcome is
+already settled. Estimate which candidate wins instead: put each candidate's
+probability of winning in candidate_probabilities, keyed by the exact names in
+the roster above, and give the margin for the candidate you think most likely
+to win."""
+
+FORECAST_WRITER_SAME_PARTY_NOTE = """Every candidate in this race is a {party} candidate. The panel consensus
+estimates which candidate wins, so write the takeaway, reasons, and uncertainty
+about the candidates, not about party control."""
+
 FORECAST_CHECK_SYSTEM = """\
 You are a fact-checking editor for an election forecast. Compare the forecast
 text with the race facts and list every statement in it that is wrong or stale.
