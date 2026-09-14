@@ -447,6 +447,13 @@ def test_brightspot_image_cdn_url_without_extension_is_a_valid_image():
     assert _is_valid_image_url(url)
 
 
+def test_svg_is_never_a_candidate_photo():
+    """Arizona's 6th: a working photo was replaced by a site widget's icon."""
+    assert not _is_valid_image_url("https://www.civoren.com/assistant/turtle.svg?dpl=dpl_D1oSKcJqetbRu1xNsjZm47EPLwRx")
+    assert not _is_valid_image_url("https://upload.wikimedia.org/wikipedia/commons/9/93/Libertarian_Party_logo.svg")
+    assert _is_valid_image_url("https://www.azvoterguide.com/wp-content/uploads/2026/06/Photo_202603061638133813.png")
+
+
 def test_candidate_questionnaire_page_maps_each_photo_to_its_own_candidate():
     """A multi-candidate voter guide must not give everyone the article hero."""
     html = """
