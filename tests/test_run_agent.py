@@ -728,6 +728,33 @@ async def test_discovery_only_update_uses_update_discovery_phases():
     assert "Use the certified special-election roster." in mock_loop.call_args_list[0].args[1]
 
 
+def _emulate_forecast_tools(kwargs):
+    """Answer the forecast panel and writer the way a model would.
+
+    A forecast nobody writes is now a recorded step failure, so a test about
+    some other phase would otherwise fail on an empty forecast it never meant
+    to exercise.
+    """
+    handlers = kwargs.get("extra_tool_handlers") or {}
+    required = kwargs.get("required_final_tool_name")
+    if required == "submit_forecast_estimate":
+        handlers["submit_forecast_estimate"](
+            {"party_probabilities": {"Democratic": 0.6, "Republican": 0.4}, "confidence": "low"}
+        )
+    elif required == "set_forecast":
+        handlers["set_forecast"](
+            {
+                "rating": "tilt_d",
+                "confidence": "low",
+                "rationale": "Democrats hold a narrow edge.",
+                "based_on_poll_count": 0,
+                "party_probabilities": {},
+                "source_urls": [],
+                "evidence_lineage": [],
+            }
+        )
+
+
 @pytest.mark.asyncio
 async def test_unproven_roster_completeness_keeps_going_and_says_so():
     existing = {
@@ -745,6 +772,7 @@ async def test_unproven_roster_completeness_keeps_going_and_says_so():
             kwargs["extra_tool_handlers"]["remove_candidate"](
                 {"name": "Wrong Contest", "reason": "Officially withdrew from the race."}
             )
+        _emulate_forecast_tools(kwargs)
         return {"_tool_trace": {"required_final_tool_succeeded": False}}
 
     with (
@@ -2256,14 +2284,25 @@ async def test_discovery_polling_forecast_refresh_does_not_require_review():
         patch("pipeline_client.agent.phases.fetch_kalshi_market_signals", new_callable=AsyncMock, return_value=[]),
         patch("pipeline_client.agent.agent._load_existing", return_value=existing),
     ):
-        mock_loop.side_effect = [{"_tool_trace": {"required_final_tool_succeeded": True}}] + [{}] * 4
+        responses = iter([{"_tool_trace": {"required_final_tool_succeeded": True}}])
+
+        async def fake_loop(*_args, **kwargs):
+            _emulate_forecast_tools(kwargs)
+            return next(responses, {})
+
+        mock_loop.side_effect = fake_loop
         result = await run_agent(
             "market-refresh-2026",
             existing_data=existing,
             enabled_steps=["discovery", "polling", "forecast"],
         )
 
-    assert mock_loop.await_count == 5
+    from shared.model_catalog import FORECAST_PANEL_MODELS
+
+    # Four discovery/metadata/polling calls, then the forecast: one call per panel
+    # member, the writer, and the fact-check.
+    assert mock_loop.await_count == 4 + len(FORECAST_PANEL_MODELS) + 2
+    assert result["forecast"]["method"] == "panel_median_v1"
     assert result["pipeline_state"]["complete"] is True
     assert result["pipeline_state"]["remaining_steps"] == []
 

@@ -12,9 +12,11 @@ from shared.forecast_summary import (
     election_cycle_year,
     get_chamber_forecast_system_prompt,
     get_chamber_narrative_review_prompt,
+    get_chamber_panel_synthesis_prompt,
     is_chamber_control_race,
     summarize_chamber,
 )
+from shared.model_catalog import CHAMBER_FORECAST_PANEL_MODELS, CHAMBER_FORECAST_SYNTHESIS_MODEL
 
 Chamber = Literal["house", "senate", "governors"]
 
@@ -176,24 +178,117 @@ async def review_chamber_analysis(
     return {key: str(parsed[key]).strip() for key in REQUIRED_ANALYSIS_KEYS}, corrections
 
 
+async def synthesize_chamber_analysis(
+    chamber_name: str,
+    context_text: str,
+    drafts: list[dict[str, str]],
+    *,
+    model: str,
+    cycle_year: str | None = None,
+) -> tuple[dict[str, str], list[str]]:
+    """Merge independent drafts into one note, holding every claim to the data.
+
+    Drafts are shown unlabelled so the editor weighs what each says, not which
+    model said it.
+    """
+    drafts_text = "\n\n".join(
+        f"Draft {chr(ord('A') + index)}:\n{json.dumps(draft, indent=2)}" for index, draft in enumerate(drafts)
+    )
+    messages = [
+        {"role": "system", "content": get_chamber_panel_synthesis_prompt(chamber_name, cycle_year)},
+        {
+            "role": "user",
+            "content": (
+                f"Authoritative forecast data for the {chamber_name}:\n\n{context_text}\n\n"
+                f"Independent drafts:\n\n{drafts_text}"
+            ),
+        },
+    ]
+    data = await _call_openrouter(messages, model=model)
+    parsed = json.loads(_strip_markdown_code_fence(_extract_choice_content(data)))
+    if not isinstance(parsed, dict):
+        raise ValueError("chamber panel synthesis response must be a JSON object")
+    missing = [key for key in REQUIRED_ANALYSIS_KEYS if not parsed.get(key)]
+    if missing:
+        raise ValueError(f"chamber panel synthesis missing required keys: {missing}")
+    notes = [str(item).strip() for item in (parsed.get("panel_notes") or []) if str(item).strip()]
+    return {key: str(parsed[key]).strip() for key in REQUIRED_ANALYSIS_KEYS}, notes
+
+
+async def generate_chamber_analysis_panel(
+    chamber_name: str,
+    context_text: str,
+    *,
+    panel_models: tuple[str, ...] = CHAMBER_FORECAST_PANEL_MODELS,
+    synthesis_model: str = CHAMBER_FORECAST_SYNTHESIS_MODEL,
+    cycle_year: str | None = None,
+) -> dict[str, Any]:
+    """Draft the chamber note with several strong models, then merge the drafts.
+
+    One failed drafter costs one voice, not the chamber. If the editor itself
+    fails, the first surviving draft (in panel order) is published as-is rather
+    than losing the regeneration.
+    """
+    results = await asyncio.gather(
+        *(generate_chamber_analysis(chamber_name, context_text, model=model, cycle_year=cycle_year) for model in panel_models),
+        return_exceptions=True,
+    )
+    drafts = {model: result for model, result in zip(panel_models, results) if isinstance(result, dict)}
+    failed = {model: str(result) for model, result in zip(panel_models, results) if isinstance(result, BaseException)}
+    if not drafts:
+        raise RuntimeError(f"every chamber panel model failed: {failed}")
+
+    synthesized_by: str | None = synthesis_model
+    try:
+        analysis, notes = await synthesize_chamber_analysis(
+            chamber_name, context_text, list(drafts.values()), model=synthesis_model, cycle_year=cycle_year
+        )
+    except Exception as exc:  # noqa: BLE001 — a failed editor must not cost the drafts already paid for
+        analysis, notes, synthesized_by = next(iter(drafts.values())), [f"synthesis failed: {exc}"], None
+    return {
+        **analysis,
+        "panel": {"drafted_by": list(drafts), "failed": failed, "synthesized_by": synthesized_by, "notes": notes},
+    }
+
+
 async def generate_chamber_analyses(
     summaries: list[dict[str, Any]],
     *,
     model: str,
     review: bool = False,
     goal: str | None = None,
-) -> Dict[Chamber, dict[str, str]]:
+    panel: bool = False,
+    panel_models: tuple[str, ...] = CHAMBER_FORECAST_PANEL_MODELS,
+    synthesis_model: str = CHAMBER_FORECAST_SYNTHESIS_MODEL,
+) -> Dict[Chamber, dict[str, Any]]:
+    """Write the analysis for every chamber. The three chambers run concurrently.
+
+    With ``panel`` the note is drafted by ``panel_models`` and merged by
+    ``synthesis_model``; otherwise ``model`` writes it alone. ``model`` also runs
+    the optional review pass either way.
+    """
     chamber_names: Dict[Chamber, str] = {"senate": "US Senate", "house": "US House", "governors": "Governors"}
     cycle_year = election_cycle_year(summaries)
-    analyses: Dict[Chamber, dict[str, str]] = {}
-    for chamber, name in chamber_names.items():
+
+    async def one(chamber: Chamber, name: str) -> tuple[Chamber, dict[str, Any]]:
         races = races_for_chamber(summaries, chamber)
         summary = summarize_chamber(summaries, chamber)
         context = build_chamber_context(races, name, summary)
-        analysis = await generate_chamber_analysis(name, context, model=model, cycle_year=cycle_year)
+        analysis: dict[str, Any]
+        if panel:
+            analysis = await generate_chamber_analysis_panel(
+                name, context, panel_models=panel_models, synthesis_model=synthesis_model, cycle_year=cycle_year
+            )
+        else:
+            analysis = await generate_chamber_analysis(name, context, model=model, cycle_year=cycle_year)
         if review:
-            analysis, corrections = await review_chamber_analysis(name, context, analysis, model=model, goal=goal)
+            reviewed, corrections = await review_chamber_analysis(
+                name, context, {key: analysis[key] for key in REQUIRED_ANALYSIS_KEYS}, model=model, goal=goal
+            )
+            analysis = {**analysis, **reviewed}
             if corrections:
-                analysis = {**analysis, "review_corrections": corrections}
-        analyses[chamber] = analysis
-    return analyses
+                analysis["review_corrections"] = corrections
+        return chamber, analysis
+
+    results = await asyncio.gather(*(one(chamber, name) for chamber, name in chamber_names.items()))
+    return dict(results)

@@ -317,7 +317,12 @@
         <div
           class="pt-2 border-t border-stroke/20 flex flex-wrap items-center justify-between gap-2 text-[9px] text-content-subtle font-bold"
         >
-          {#if race.forecast.model}
+          {#if race.forecast.panel && race.forecast.panel.length > 1}
+            <span
+              >Consensus of {race.forecast.panel.length} models{#if race.forecast.panel_spread !== undefined && race.forecast.panel_spread !== null}
+                · {Math.round(race.forecast.panel_spread * 100)}-pt spread{/if}</span
+            >
+          {:else if race.forecast.model}
             <span>Model {race.forecast.model}</span>
           {/if}
           {#if race.forecast.generated_at}

@@ -109,6 +109,7 @@ CHECKED_MODELS: Dict[str, Type[BaseModel]] = {
     "ValidationGrade": shared_models.ValidationGrade,
     "ForecastMarketSignal": shared_models.ForecastMarketSignal,
     "ForecastEvidence": shared_models.ForecastEvidence,
+    "ForecastPanelEstimate": shared_models.ForecastPanelEstimate,
     "RaceForecast": shared_models.RaceForecast,
     "Candidate": shared_models.Candidate,
     "PollMatchup": shared_models.PollMatchup,

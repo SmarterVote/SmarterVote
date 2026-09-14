@@ -352,6 +352,9 @@ def build_forecast_summary(race_data: Dict[str, Any]) -> Dict[str, Any] | None:
         "model": forecast.get("model"),
         "source_urls": forecast.get("source_urls") or [],
         "market_signals": forecast.get("market_signals") or [],
+        "method": forecast.get("method"),
+        "panel": forecast.get("panel"),
+        "panel_spread": forecast.get("panel_spread"),
     }
 
 

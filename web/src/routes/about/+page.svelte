@@ -145,21 +145,43 @@
     <div id="forecast-methodology" class="scroll-mt-24">
       <PolicySection title="How forecasts work">
         <p>
-          Race forecasts start with the published race record. They prefer
-          candidate-level polling when it is available and otherwise weigh
-          incumbency, party context, candidate strength, the documented race
-          environment, and other evidence already gathered for the contest.
-          Prediction-market signals may provide additional context, but they are
-          never treated as ground truth.
+          Every race forecast starts from the published race record: the
+          verified candidate list, candidate-level polling, fundraising,
+          incumbency, the district or state's partisan lean, and the documented
+          race environment. Prediction-market prices can add context, but they
+          are discounted when trading is thin or stale and are never treated as
+          ground truth.
         </p>
         <p>
-          Each race forecast includes a rating, modeled win probability, key
-          drivers, uncertainty, and supporting sources where the analysis relies
-          on a specific external claim. Chamber forecasts combine those race
-          probabilities with known holdover seats to calculate projected seats,
-          seat-outcome distributions, and the chance of party control. For the
-          2026 Senate forecast, a 50–50 result is counted as Republican control
-          under the vice president tie-break assumption.
+          Three AI models from different developers each estimate the race
+          independently. None of them sees the others' answers or the previous
+          forecast, so no single model's lean—and no stale number—decides the
+          result. The published win probability is the median of their
+          estimates, and the rating follows directly from it: toss-up below 55%,
+          tilt from 55%, lean from 65%, likely from 80%, and safe from 95%.
+          Confidence reflects how closely the models agreed and how much polling
+          exists; a race without public polling is never labeled high
+          confidence.
+        </p>
+        <p>
+          A separate writing step explains that consensus without changing its
+          numbers, and a fact-check sends back any text that contradicts the
+          race—for example, describing a primary as unresolved after it has been
+          decided. Each forecast lists its key drivers, its main uncertainty,
+          and the sources behind specific claims.
+        </p>
+        <p>
+          Chamber forecasts combine race probabilities with known holdover
+          seats. Polling errors tend to run in the same direction across the
+          country, so the model lets every race shift together with a shared
+          national swing instead of treating each contest as an independent coin
+          flip. Each race keeps its own probability, but the range of seat
+          outcomes and the chance of party control reflect how a real polling
+          miss plays out. The chamber analysis is drafted independently by
+          several leading AI models and merged by an editor model that checks
+          every figure against the forecast. For the 2026 Senate forecast, a
+          50–50 result is counted as Republican control under the vice president
+          tie-break assumption.
         </p>
       </PolicySection>
     </div>

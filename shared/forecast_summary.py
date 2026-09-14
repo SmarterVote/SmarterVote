@@ -4,6 +4,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Literal
 
+from shared.forecast_math import NATIONAL_SWING_LOGIT_SD, correlated_seat_distribution
+
 Party = Literal["Democratic", "Republican", "Other"]
 Chamber = Literal["house", "senate", "governors"]
 
@@ -438,14 +440,11 @@ def summarize_chamber(
             fallback_party = fallback_party_for_race(race)
             rep_probs.append(1.0 if fallback_party == "Republican" else 0.0)
 
-    # Exact Poisson binomial distribution using dynamic programming
-    dp = [1.0]
-    for p in rep_probs:
-        next_dp = [0.0] * (len(dp) + 1)
-        for j, val in enumerate(dp):
-            next_dp[j] += val * (1.0 - p)
-            next_dp[j + 1] += val * p
-        dp = next_dp
+    # Races share one national swing, so they move together the way real
+    # polling misses do. An independent Poisson binomial here made the tails
+    # far too thin (House control read 96.6%). Each race still keeps its own
+    # published probability — see shared.forecast_math.
+    dp = correlated_seat_distribution(rep_probs)
 
     # Exact control and tie probabilities from DP
     if chamber == "senate":
@@ -569,7 +568,11 @@ def summarize_chamber(
         "tossup_count": tossups,
         "competitive_race_count": len(competitive),
         "competitive_races": competitive[:12],
-        "method": "Aggregates published race forecast probabilities and known holdover seats. Senate 50-50 outcomes count as Republican control via VP tie-break.",
+        "method": (
+            "Aggregates published race forecast probabilities and known holdover seats, with a shared national swing "
+            f"(log-odds SD {NATIONAL_SWING_LOGIT_SD}) so polling errors move races together. "
+            "Senate 50-50 outcomes count as Republican control via VP tie-break."
+        ),
         "bottom_line": (analysis or {}).get("bottom_line") or default_bottom_line,
         "why_party_favored": (analysis or {}).get("why_party_favored") or default_why_favored,
         "opposing_party_path": (analysis or {}).get("opposing_party_path") or default_opposing_path,
@@ -750,6 +753,39 @@ def get_chamber_narrative_review_prompt(chamber_name: str, goal: str | None = No
         "Output ONLY the JSON object, with no markdown code blocks, no backticks, and no extra text."
     )
     return instructions
+
+
+def get_chamber_panel_synthesis_prompt(chamber_name: str, cycle_year: str | int | None = None) -> str:
+    """Prompt for the editor that merges the chamber panel's drafts into one note.
+
+    Several strong models draft independently from the same authoritative
+    context. The editor keeps the sharpest supported points, lets the numbers
+    settle any disagreement, and holds every claim to the review pass's rules.
+    """
+    cycle_phrase = f"in the {cycle_year} election cycle" if cycle_year else "in the current election cycle"
+    return (
+        "You are the lead editor of a nonpartisan election forecast desk. Several analysts independently drafted notes "
+        f"on the {chamber_name} {cycle_phrase} from the same authoritative forecast data. Produce the single note that "
+        "will be published.\n\n"
+        "How to merge:\n"
+        "1. Keep the sharpest, most specific points from any draft; drop filler and repetition.\n"
+        "2. Where drafts disagree, the authoritative data decides. Never average, round differently, or invent numbers.\n"
+        "3. Seat totals, probabilities and percentages must match the data exactly. Never state a number the data does "
+        "not contain.\n"
+        "4. A party can only be described as defending or holding a seat it currently holds. The data gives the current "
+        "holder of every competitive race; a race the favored party does not hold is a pickup for them.\n"
+        "5. Do not conflate the projected seat split with the party most likely to control the chamber. Where they "
+        "differ, state both.\n"
+        "6. Named races must appear in the data, with the rating and direction the data gives them.\n"
+        "7. It must read as a sharp analyst note, free of AI boilerplate and generic caveats.\n\n"
+        "Return ONLY a JSON object with these keys:\n"
+        "- 'narrative': 2-4 sentences on the battle for control.\n"
+        "- 'bottom_line': one sentence.\n"
+        "- 'why_party_favored', 'opposing_party_path', 'key_uncertainty': as in the drafts.\n"
+        "- 'panel_notes': an array of short strings, one per substantive disagreement between drafts and how the data "
+        "resolved it. Empty if the drafts agreed.\n\n"
+        "Output ONLY the JSON object, with no markdown code blocks, no backticks, and no extra text."
+    )
 
 
 def get_chamber_forecast_system_prompt(chamber_name: str, cycle_year: str | int | None = None) -> str:

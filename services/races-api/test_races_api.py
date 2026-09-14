@@ -585,7 +585,7 @@ def test_generate_chamber_forecasts_defaults_to_catalog_model(client, monkeypatc
 
     monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_generate_chamber_analysis)
 
-    resp = client.post("/api/races/chamber_forecasts/generate", json={})
+    resp = client.post("/api/races/chamber_forecasts/generate", json={"panel": False})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -644,7 +644,7 @@ def test_generate_chamber_forecasts_skips_review_by_default(client, monkeypatch)
     monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_generate)
     monkeypatch.setattr(chamber_narratives, "review_chamber_analysis", fake_review)
 
-    resp = client.post("/api/races/chamber_forecasts/generate", json={})
+    resp = client.post("/api/races/chamber_forecasts/generate", json={"panel": False})
 
     assert resp.status_code == 200
     assert reviewed == []
@@ -670,7 +670,7 @@ def test_generate_chamber_forecasts_review_applies_corrections_and_forwards_goal
 
     resp = client.post(
         "/api/races/chamber_forecasts/generate",
-        json={"review": True, "goal": "lead with the tipping-point races"},
+        json={"review": True, "goal": "lead with the tipping-point races", "panel": False},
     )
 
     assert resp.status_code == 200
@@ -681,6 +681,69 @@ def test_generate_chamber_forecasts_review_applies_corrections_and_forwards_goal
     assert "Republican-held seat" in body["review_corrections"]["senate"][0]
     # Operator-facing only: the published payload must not carry it.
     assert "review_corrections" not in body["forecast"]["chambers"]["senate"]
+
+
+def test_generate_chamber_forecasts_uses_the_model_panel_by_default(client, monkeypatch):
+    """Every panel model drafts each chamber, and the synthesis model merges the drafts once per chamber."""
+    from shared.model_catalog import CHAMBER_FORECAST_PANEL_MODELS, CHAMBER_FORECAST_SYNTHESIS_MODEL
+
+    drafted = []
+    synthesized = []
+
+    async def fake_generate(chamber_name, context_text, *, model, cycle_year=None):
+        drafted.append((chamber_name, model))
+        return _stub_analysis(chamber_name)
+
+    async def fake_synthesize(chamber_name, context_text, drafts, *, model, cycle_year=None):
+        synthesized.append((chamber_name, model, len(drafts)))
+        return {**_stub_analysis(chamber_name), "narrative": f"{chamber_name} merged"}, ["drafts split on Maine"]
+
+    import chamber_narratives
+
+    monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_generate)
+    monkeypatch.setattr(chamber_narratives, "synthesize_chamber_analysis", fake_synthesize)
+
+    resp = client.post("/api/races/chamber_forecasts/generate", json={})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    chambers = ("US Senate", "US House", "Governors")
+    assert sorted(drafted) == sorted((name, model) for name in chambers for model in CHAMBER_FORECAST_PANEL_MODELS)
+    assert sorted(synthesized) == sorted(
+        (name, CHAMBER_FORECAST_SYNTHESIS_MODEL, len(CHAMBER_FORECAST_PANEL_MODELS)) for name in chambers
+    )
+    assert body["forecast"]["senate"] == "US Senate merged"
+    assert body["panel"]["senate"]["notes"] == ["drafts split on Maine"]
+    assert body["forecast"]["chambers"]["senate"]["narrative_panel"] == {
+        "drafted_by": list(CHAMBER_FORECAST_PANEL_MODELS),
+        "synthesized_by": CHAMBER_FORECAST_SYNTHESIS_MODEL,
+    }
+
+
+@pytest.mark.asyncio
+async def test_chamber_panel_survives_a_failed_drafter_and_a_failed_editor(monkeypatch):
+    """One failed drafter costs one voice; a failed editor publishes the first surviving draft."""
+    import chamber_narratives
+
+    async def flaky_generate(chamber_name, context_text, *, model, cycle_year=None):
+        if model == "panel/b":
+            raise RuntimeError("provider unavailable")
+        return {**_stub_analysis(chamber_name), "narrative": f"draft by {model}"}
+
+    async def failing_synthesize(*_args, **_kwargs):
+        raise RuntimeError("editor unavailable")
+
+    monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", flaky_generate)
+    monkeypatch.setattr(chamber_narratives, "synthesize_chamber_analysis", failing_synthesize)
+
+    result = await chamber_narratives.generate_chamber_analysis_panel(
+        "US Senate", "context", panel_models=("panel/a", "panel/b", "panel/c"), synthesis_model="editor/x"
+    )
+
+    assert result["narrative"] == "draft by panel/a"
+    assert result["panel"]["drafted_by"] == ["panel/a", "panel/c"]
+    assert "panel/b" in result["panel"]["failed"]
+    assert result["panel"]["synthesized_by"] is None
 
 
 @pytest.mark.asyncio
