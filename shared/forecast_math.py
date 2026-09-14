@@ -55,7 +55,8 @@ def normalize_party_label(label: object) -> str:
     """Map "Democrat", "GOP", "Libertarian Party" and friends onto one label."""
     raw = str(label or "").strip()
     key = raw.casefold()
-    if key.endswith(" party"):
+    # "No Political Party" is a label, not "No Political" plus a suffix.
+    if key.endswith(" party") and not key.startswith("no "):
         key = key[: -len(" party")].strip()
         raw = raw[: -len(" party")].strip()
     return _PARTY_ALIASES.get(key, raw or "Other")

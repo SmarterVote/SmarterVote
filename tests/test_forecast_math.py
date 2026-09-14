@@ -31,6 +31,15 @@ def test_normalize_drops_values_that_are_not_probabilities():
     assert normalize_probabilities({"Democratic": "high", "Republican": True}) == {}
 
 
+def test_normalize_keeps_no_party_labels_whole():
+    """A Nevada panel member's "No Political Party" came back as "No Political"."""
+    from shared.forecast_math import normalize_party_label
+
+    assert normalize_party_label("No Political Party") == "No Political Party"
+    assert normalize_party_label("Constitution Party") == "Constitution"
+    assert normalize_party_label("No Party Affiliation") == "No Party Affiliation"
+
+
 def test_aggregate_panel_takes_the_median_so_one_outlier_cannot_move_it():
     consensus = aggregate_panel(
         [
