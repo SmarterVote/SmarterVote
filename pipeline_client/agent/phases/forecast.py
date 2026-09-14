@@ -17,11 +17,13 @@ success and left the stale forecast in place while the run reported healthy.
 
 import asyncio
 import json
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from shared.forecast_math import (
+    RATING_BANDS,
     aggregate_panel,
     confidence_for,
     consensus_margin,
@@ -38,11 +40,13 @@ from ..handlers import _make_editing_handlers
 from ..prompts import (
     FORECAST_CHECK_SYSTEM,
     FORECAST_CHECK_USER,
+    FORECAST_PANEL_SAME_PARTY_NOTE,
     FORECAST_PANEL_SYSTEM,
     FORECAST_PANEL_USER,
     FORECAST_REVISION_USER,
     FORECAST_SYSTEM,
     FORECAST_USER,
+    FORECAST_WRITER_SAME_PARTY_NOTE,
 )
 from ..run_budget import RunBudgetExceeded
 from ..tools import FORECAST_PANEL_TOOLS, FORECAST_TOOLS, READ_PROFILE_TOOL
@@ -101,17 +105,103 @@ def _phase_name(ctx: PhaseContext, suffix: str = "") -> str:
     return f"{'update-' if ctx.is_update else ''}forecast{suffix}"
 
 
-async def _panel_member(ctx: PhaseContext, agent_loop: Callable, model: str, prompt: str) -> Optional[Dict[str, Any]]:
+def _active_candidates(race_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [
+        candidate
+        for candidate in race_json.get("candidates", [])
+        if isinstance(candidate, dict) and not candidate.get("withdrawn") and str(candidate.get("name") or "").strip()
+    ]
+
+
+def same_party_contest(race_json: Dict[str, Any]) -> Optional[str]:
+    """The one party every active candidate shares, or None.
+
+    A top-two or jungle general between co-partisans (California's 11th: two
+    Democrats) has a certain party outcome, so a party-level estimate is
+    meaningless there; the panel has to estimate candidates instead.
+    """
+    active = _active_candidates(race_json)
+    # A candidate with no recorded party is unknown, not a match for another one.
+    if len(active) < 2 or any(not str(candidate.get("party") or "").strip() for candidate in active):
+        return None
+    parties = {normalize_party_label(candidate.get("party")) for candidate in active}
+    if len(parties) == 1:
+        return next(iter(parties))
+    return None
+
+
+_TRAILING_PARENTHETICAL = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _name_key(value: Any) -> str:
+    """The comparison key for a candidate name: case-folded, without a trailing "(Democratic)"."""
+    return _TRAILING_PARENTHETICAL.sub("", str(value or "")).strip().casefold()
+
+
+def _numeric(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        return None
+    return float(value)
+
+
+def _to_party_probabilities(raw: Dict[str, Any], race_json: Dict[str, Any]) -> Dict[str, float]:
+    """A member's party probabilities, with any candidate-name keys mapped to that candidate's party.
+
+    Members sometimes answer by candidate ("Stefany Shaheen": 0.7) even when
+    asked by party; left alone, those keys become parties of their own and
+    split the consensus.
+    """
+    party_of = {_name_key(c["name"]): normalize_party_label(c.get("party")) for c in _active_candidates(race_json)}
+    merged: Dict[str, float] = {}
+    for key, value in (raw or {}).items():
+        amount = _numeric(value)
+        if amount is None:
+            continue
+        label = party_of.get(_name_key(key), key)
+        merged[label] = merged.get(label, 0.0) + amount
+    return normalize_probabilities(merged)
+
+
+def _to_candidate_probabilities(raw: Dict[str, Any], race_json: Dict[str, Any]) -> Dict[str, float]:
+    """A member's per-candidate probabilities, keyed by exact roster name. Unknown keys are dropped."""
+    roster = {_name_key(c["name"]): c["name"] for c in _active_candidates(race_json)}
+    merged: Dict[str, float] = {}
+    for key, value in (raw or {}).items():
+        name = roster.get(_name_key(key))
+        amount = _numeric(value)
+        if name is None or amount is None:
+            continue
+        merged[name] = merged.get(name, 0.0) + amount
+    total = sum(merged.values())
+    return {name: round(value / total, 4) for name, value in merged.items()} if total > 0 else {}
+
+
+async def _panel_member(
+    ctx: PhaseContext, agent_loop: Callable, model: str, prompt: str, same_party: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     captured: Dict[str, Any] = {}
 
     def submit_forecast_estimate(args: Dict[str, Any]) -> str:
-        probabilities = normalize_probabilities(args.get("party_probabilities") or {})
-        if not probabilities:
-            return "ERROR: party_probabilities must map at least one party to a probability between 0 and 1."
+        candidate_probabilities: Optional[Dict[str, float]] = None
+        if same_party:
+            candidate_probabilities = _to_candidate_probabilities(
+                args.get("candidate_probabilities") or {}, ctx.race_json
+            ) or _to_candidate_probabilities(args.get("party_probabilities") or {}, ctx.race_json)
+            if not candidate_probabilities:
+                return (
+                    f"ERROR: Every candidate in this race is a {same_party} candidate. Put each candidate's chance of "
+                    "winning in candidate_probabilities, keyed by the exact names in the roster."
+                )
+            probabilities = {same_party: 1.0}
+        else:
+            probabilities = _to_party_probabilities(args.get("party_probabilities") or {}, ctx.race_json)
+            if not probabilities:
+                return "ERROR: party_probabilities must map at least one party to a probability between 0 and 1."
         margin = args.get("margin_estimate")
         confidence = args.get("confidence")
         captured.update(
             model=model,
+            candidate_probabilities=candidate_probabilities,
             party_probabilities={party: round(value, 4) for party, value in probabilities.items()},
             margin_estimate=float(margin) if isinstance(margin, (int, float)) and not isinstance(margin, bool) else None,
             confidence=confidence if confidence in {"high", "medium", "low"} else "unknown",
@@ -148,11 +238,15 @@ async def _panel_member(ctx: PhaseContext, agent_loop: Callable, model: str, pro
 
 
 async def run_forecast_panel(
-    ctx: PhaseContext, agent_loop: Callable, prompt: str, models: Sequence[str] = FORECAST_PANEL_MODELS
+    ctx: PhaseContext,
+    agent_loop: Callable,
+    prompt: str,
+    models: Sequence[str] = FORECAST_PANEL_MODELS,
+    same_party: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Ask every panel member for an independent estimate, concurrently. A failed member is dropped."""
     results = await asyncio.gather(
-        *(_panel_member(ctx, agent_loop, model, prompt) for model in models),
+        *(_panel_member(ctx, agent_loop, model, prompt, same_party) for model in models),
         return_exceptions=True,
     )
     for result in results:
@@ -161,8 +255,53 @@ async def run_forecast_panel(
     return [result for result in results if isinstance(result, dict)]
 
 
-def build_consensus(members: Sequence[Dict[str, Any]], poll_count: int) -> Optional[Dict[str, Any]]:
+def _candidate_rating(party: str, probability: float) -> str:
+    """Rating for the leading candidate of a same-party race, in the same bands as a party race."""
+    suffix = {"Democratic": "d", "Republican": "r"}.get(party)
+    if suffix is None:
+        return "other"
+    for threshold, band in RATING_BANDS:
+        if probability >= threshold:
+            return f"{band}_{suffix}"
+    return "tossup"
+
+
+def _build_candidate_consensus(members: Sequence[Dict[str, Any]], poll_count: int, party: str) -> Optional[Dict[str, Any]]:
+    """Consensus for a same-party race: the party is certain, so the numbers describe which candidate wins."""
+    usable = [member for member in members if member.get("candidate_probabilities")]
+    estimates = [member["candidate_probabilities"] for member in usable]
+    probabilities = aggregate_panel(estimates)
+    if not probabilities:
+        return None
+    leader = max(probabilities, key=lambda name: probabilities[name])
+    probability = probabilities[leader]
+    rating = _candidate_rating(party, probability)
+    spread = panel_spread(estimates, leader)
+    margins = [
+        (max(estimate, key=lambda name: estimate[name]), member.get("margin_estimate"))
+        for member, estimate in zip(usable, estimates)
+    ]
+    return {
+        "party_probabilities": {party: 1.0},
+        "candidate_probabilities": probabilities,
+        "rating": rating,
+        "leading_party": party,
+        "predicted_winner_party": party,
+        "predicted_winner_name": None if rating == "tossup" else leader,
+        "win_probability": probability,
+        "confidence": confidence_for(spread, poll_count, len(usable)),
+        "margin_estimate": consensus_margin(margins, leader),
+        "panel_spread": spread,
+        "members": list(usable),
+    }
+
+
+def build_consensus(
+    members: Sequence[Dict[str, Any]], poll_count: int, same_party: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """Turn panel estimates into the forecast's numbers."""
+    if same_party:
+        return _build_candidate_consensus(members, poll_count, same_party)
     estimates = [member["party_probabilities"] for member in members]
     probabilities = aggregate_panel(estimates)
     if not probabilities:
@@ -188,7 +327,14 @@ def build_consensus(members: Sequence[Dict[str, Any]], poll_count: int) -> Optio
 
 
 def _consensus_for_prompt(consensus: Dict[str, Any]) -> Dict[str, Any]:
+    extra = {}
+    if consensus.get("candidate_probabilities"):
+        extra = {
+            "candidate_probabilities": consensus["candidate_probabilities"],
+            "predicted_winner_name": consensus.get("predicted_winner_name"),
+        }
     return {
+        **extra,
         "party_probabilities": consensus["party_probabilities"],
         "rating": consensus["rating"],
         "predicted_winner_party": consensus["predicted_winner_party"],
@@ -235,7 +381,12 @@ def _pinned_set_forecast(
             call_args["win_probability"] = consensus["win_probability"]
             call_args["confidence"] = consensus["confidence"]
             call_args["predicted_winner_party"] = consensus["predicted_winner_party"]
-            call_args["predicted_winner_name"] = _winner_name_for(call_args.get("predicted_winner_name"), consensus, race_json)
+            if "predicted_winner_name" in consensus:
+                call_args["predicted_winner_name"] = consensus["predicted_winner_name"]
+            else:
+                call_args["predicted_winner_name"] = _winner_name_for(
+                    call_args.get("predicted_winner_name"), consensus, race_json
+                )
             if consensus["margin_estimate"] is not None:
                 call_args["margin_estimate"] = consensus["margin_estimate"]
         result = original(call_args)
@@ -289,6 +440,19 @@ async def _write_forecast(
     return None
 
 
+def _checked_forecast(forecast: Dict[str, Any], fields: Sequence[str], race_json: Dict[str, Any]) -> Dict[str, Any]:
+    checked = {field: forecast.get(field) for field in fields}
+    party = same_party_contest(race_json)
+    if party:
+        # Without this, a 70% win_probability beside a 100% party probability
+        # reads as a contradiction.
+        checked["note"] = (
+            f"Every candidate is {party}, so party_probabilities is certain; win_probability is the predicted "
+            "winner's chance of beating the other candidates."
+        )
+    return checked
+
+
 async def _check_forecast_text(ctx: PhaseContext, agent_loop: Callable) -> List[str]:
     """Ask an independent model whether the forecast text contradicts the race. [] when it cannot run."""
     race_json = ctx.race_json
@@ -316,7 +480,7 @@ async def _check_forecast_text(ctx: PhaseContext, agent_loop: Callable) -> List[
         description=(race_json.get("description") or "")[:_MAX_CHECK_DESCRIPTION_CHARS],
         roster_json=json.dumps(roster, indent=2),
         polling_json=json.dumps((race_json.get("polling") or [])[:_MAX_CHECK_POLLS], indent=2, default=str),
-        forecast_json=json.dumps({field: forecast.get(field) for field in checked_fields}, indent=2, default=str),
+        forecast_json=json.dumps(_checked_forecast(forecast, checked_fields, race_json), indent=2, default=str),
     )
     try:
         result = await agent_loop(
@@ -379,8 +543,14 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             log("warning", f"  Forecast: Kalshi market signals unavailable: {exc}")
 
         fields = _race_prompt_fields(race_json, race_id, market_signals)
-        members = await run_forecast_panel(ctx, _agent_loop, FORECAST_PANEL_USER.format(**fields))
-        consensus = build_consensus(members, len(race_json.get("polling") or [])) if members else None
+        same_party = same_party_contest(race_json)
+        panel_prompt = FORECAST_PANEL_USER.format(**fields)
+        if same_party:
+            log("info", f"  Forecast: every candidate is {same_party}; the panel estimates candidates, not parties")
+            panel_prompt += "\n\n" + FORECAST_PANEL_SAME_PARTY_NOTE.format(party=same_party)
+        members = await run_forecast_panel(ctx, _agent_loop, panel_prompt, same_party=same_party)
+        poll_count = len(race_json.get("polling") or [])
+        consensus = build_consensus(members, poll_count, same_party=same_party) if members else None
         if consensus:
             log(
                 "info",
@@ -394,6 +564,8 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             **fields,
             consensus_json=json.dumps(_consensus_for_prompt(consensus), indent=2) if consensus else "null",
         )
+        if same_party:
+            writer_prompt += "\n\n" + FORECAST_WRITER_SAME_PARTY_NOTE.format(party=same_party)
         writer_models = list(dict.fromkeys([model, SMALL_MODEL]))
         writer_model = await _write_forecast(ctx, _agent_loop, writer_prompt, handlers, consensus, writer_models)
         if writer_model is None:
@@ -419,10 +591,15 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
                 {
                     "model": member["model"],
                     "party_probabilities": member["party_probabilities"],
+                    **(
+                        {"candidate_probabilities": member["candidate_probabilities"]}
+                        if member.get("candidate_probabilities")
+                        else {}
+                    ),
                     "margin_estimate": member.get("margin_estimate"),
                     "confidence": member.get("confidence", "unknown"),
                 }
-                for member in members
+                for member in consensus["members"]
             ]
             forecast["panel_spread"] = consensus["panel_spread"]
         else:

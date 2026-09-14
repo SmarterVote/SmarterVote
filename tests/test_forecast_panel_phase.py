@@ -7,7 +7,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from pipeline_client.agent.phases.context import PhaseContext
-from pipeline_client.agent.phases.forecast import PANEL_METHOD, SINGLE_MODEL_METHOD, build_consensus, run_forecast_phase
+from pipeline_client.agent.phases.forecast import (
+    PANEL_METHOD,
+    SINGLE_MODEL_METHOD,
+    build_consensus,
+    run_forecast_phase,
+    same_party_contest,
+)
 from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
 
 WRITER = "test/writer"
@@ -84,20 +90,29 @@ def _writer_args(rating="lean_d"):
 
 
 def _fake_loop(panel=PANEL_ESTIMATES, writer_rating="lean_d", silent_writers=(), check_issues=()):
-    state = {"writers": [], "checks": 0, "prompts": []}
+    state = {"writers": [], "checks": 0, "prompts": [], "replies": []}
 
     async def fake(system, user, *, model, extra_tool_handlers=None, required_final_tool_name=None, **_kwargs):
         state["prompts"].append(user)
         if required_final_tool_name == "submit_forecast_estimate":
             estimate = panel.get(model)
             if estimate is not None:
-                extra_tool_handlers["submit_forecast_estimate"](
-                    {
-                        "party_probabilities": estimate,
-                        "margin_estimate": 8.0,
-                        "confidence": "low",
-                        "key_considerations": ["D+2 district"],
-                    }
+                # A bare mapping is party probabilities; a mapping with either
+                # probability field is the member's whole answer.
+                answer = (
+                    estimate
+                    if {"party_probabilities", "candidate_probabilities"} & set(estimate)
+                    else {"party_probabilities": estimate}
+                )
+                state["replies"].append(
+                    extra_tool_handlers["submit_forecast_estimate"](
+                        {
+                            **answer,
+                            "margin_estimate": 8.0,
+                            "confidence": "low",
+                            "key_considerations": ["D+2 district"],
+                        }
+                    )
                 )
             return {}
         if required_final_tool_name == "set_forecast":
@@ -236,3 +251,102 @@ def test_a_tossup_consensus_names_no_winner_party():
     assert consensus["rating"] == "tossup"
     assert consensus["predicted_winner_party"] == "Toss-up"
     assert consensus["confidence"] == "high"
+
+
+def _same_party_race():
+    race = _race()
+    race.update(id="ca-house-11-2026", state="California", description="Top-two general between two Democrats.")
+    race["candidates"] = [
+        {"name": "Scott Wiener", "party": "Democratic"},
+        {"name": "Connie Chan", "party": "Democrat"},
+        {"name": "Bruce Lou", "party": "Republican", "withdrawn": True},
+    ]
+    return race
+
+
+def test_same_party_contest_ignores_withdrawn_candidates():
+    assert same_party_contest(_same_party_race()) == "Democratic"
+    assert same_party_contest(_race()) is None
+    solo = _same_party_race()
+    solo["candidates"] = solo["candidates"][:1]
+    assert same_party_contest(solo) is None
+    # Two unknown parties are not the same party.
+    unknown = _same_party_race()
+    unknown["candidates"] = [{"name": "Alice Smith"}, {"name": "Bob Jones", "party": ""}]
+    assert same_party_contest(unknown) is None
+
+
+@pytest.mark.asyncio
+async def test_a_same_party_race_forecasts_candidates_not_parties():
+    # The three shapes members answered California's 11th in; before this fix
+    # they became three different "parties" and a 20% "Democratic" consensus.
+    answers = {
+        FORECAST_PANEL_MODELS[0]: {"party_probabilities": {"Scott Wiener": 0.70, "Connie Chan": 0.30}},
+        FORECAST_PANEL_MODELS[1]: {
+            "candidate_probabilities": {"Scott Wiener (Democratic)": 0.66, "Connie Chan (Democratic)": 0.34}
+        },
+        FORECAST_PANEL_MODELS[2]: {
+            "party_probabilities": {"Democratic": 1.0},
+            "candidate_probabilities": {"Scott Wiener": 0.74, "Connie Chan": 0.26},
+        },
+    }
+    race = _same_party_race()
+    fake, state = _fake_loop(panel=answers)
+    await _run(race, fake)
+
+    forecast = race["forecast"]
+    assert forecast["party_probabilities"] == {"Democratic": 1.0}
+    assert forecast["win_probability"] == pytest.approx(0.70, abs=0.005)
+    assert forecast["rating"] == "lean_d"
+    assert forecast["predicted_winner_name"] == "Scott Wiener"
+    assert forecast["predicted_winner_party"] == "Democratic"
+    assert forecast["panel_spread"] == pytest.approx(0.08)
+    assert [member["candidate_probabilities"]["Scott Wiener"] for member in forecast["panel"]] == [0.70, 0.66, 0.74]
+    assert "every candidate in this race is a democratic candidate" in state["prompts"][0].lower()
+    assert not race.get("pipeline_state", {}).get("step_failures")
+
+
+@pytest.mark.asyncio
+async def test_a_party_only_answer_to_a_same_party_race_is_refused():
+    answers = {
+        FORECAST_PANEL_MODELS[0]: {"candidate_probabilities": {"Scott Wiener": 0.70, "Connie Chan": 0.30}},
+        FORECAST_PANEL_MODELS[1]: {"candidate_probabilities": {"Scott Wiener": 0.60, "Connie Chan": 0.40}},
+        FORECAST_PANEL_MODELS[2]: {"party_probabilities": {"Democratic": 1.0}},
+    }
+    race = _same_party_race()
+    fake, state = _fake_loop(panel=answers)
+    await _run(race, fake)
+
+    assert sum(reply.startswith("ERROR") for reply in state["replies"]) == 1
+    assert [member["model"] for member in race["forecast"]["panel"]] == list(FORECAST_PANEL_MODELS[:2])
+
+
+@pytest.mark.asyncio
+async def test_candidate_name_keys_in_a_party_race_count_for_the_candidates_party():
+    answers = dict(PANEL_ESTIMATES)
+    answers[FORECAST_PANEL_MODELS[2]] = {"Stefany Shaheen": 0.68, "Anthony DiLorenzo (R)": 0.32}
+    race = _race()
+    fake, _state = _fake_loop(panel=answers)
+    await _run(race, fake)
+
+    forecast = race["forecast"]
+    assert set(forecast["party_probabilities"]) == {"Democratic", "Republican"}
+    assert forecast["party_probabilities"]["Democratic"] == pytest.approx(0.68, abs=0.005)
+    assert forecast["panel"][2]["party_probabilities"] == {"Democratic": 0.68, "Republican": 0.32}
+
+
+def test_a_close_same_party_race_names_no_winner():
+    members = [
+        {
+            "model": name,
+            "party_probabilities": {"Democratic": 1.0},
+            "candidate_probabilities": {"Scott Wiener": wiener, "Connie Chan": round(1 - wiener, 2)},
+            "margin_estimate": 1.0,
+        }
+        for name, wiener in (("a", 0.52), ("b", 0.50), ("c", 0.48))
+    ]
+    consensus = build_consensus(members, poll_count=0, same_party="Democratic")
+    assert consensus["rating"] == "tossup"
+    assert consensus["predicted_winner_name"] is None
+    assert consensus["predicted_winner_party"] == "Democratic"
+    assert consensus["party_probabilities"] == {"Democratic": 1.0}
