@@ -167,6 +167,13 @@ export interface ForecastEvidence {
   inferred: boolean;
 }
 
+export interface ForecastPanelEstimate {
+  model: string;
+  party_probabilities: Record<string, number>;
+  margin_estimate?: number;
+  confidence: ConfidenceLevel;
+}
+
 export interface RaceForecast {
   predicted_winner_name?: string;
   predicted_winner_party?: string;
@@ -185,6 +192,9 @@ export interface RaceForecast {
   source_urls: string[];
   evidence_lineage?: ForecastEvidence[];
   market_signals: ForecastMarketSignal[];
+  method?: string;
+  panel?: ForecastPanelEstimate[];
+  panel_spread?: number;
 }
 
 export interface ForecastMarketSignal {

@@ -1728,8 +1728,13 @@ async def generate_chamber_forecasts(
     model: str = DEFAULT_CHAMBER_FORECAST_MODEL,
     review: bool = False,
     goal: str | None = None,
+    panel: bool = True,
 ) -> Dict[str, Any]:
     """Automatically generate chamber-level forecast narratives using an LLM on the remote races-api backend.
+
+    By default (``panel=True``) each chamber note is drafted independently by the chamber panel of flagship models
+    and merged by the synthesis model, which holds every claim to the computed numbers; the response lists who
+    drafted and merged each chamber under ``panel``. Pass ``panel=False`` to have ``model`` write each note alone.
 
     Set ``review=True`` to run a second pass that re-reads each drafted narrative against the same forecast data
     and rewrites claims that contradict it — for instance describing a seat as defended by the party that does not
@@ -1739,7 +1744,7 @@ async def generate_chamber_forecasts(
     corrections always take precedence over it. It requires ``review=True``.
     """
     client = _client()
-    payload: Dict[str, Any] = {"model": model, "review": review}
+    payload: Dict[str, Any] = {"model": model, "review": review, "panel": panel}
     if goal:
         payload["goal"] = goal
     res = await client.post("/api/races/chamber_forecasts/generate", json=payload)

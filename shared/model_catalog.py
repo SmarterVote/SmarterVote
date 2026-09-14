@@ -349,6 +349,31 @@ ROSTER_COMPLETENESS_REVIEW_MODEL = "anthropic/claude-opus-5"
 #: one. Imported by the races-api endpoint and the MCP tool — never re-typed.
 DEFAULT_CHAMBER_FORECAST_MODEL = PREMIUM_REVIEW_GEMINI
 
+#: The race-forecast panel. Each member estimates every race independently —
+#: numbers only, without seeing the others or the previous forecast — and the
+#: published probability is their median (`shared.forecast_math`).
+#:
+#: Three developers rather than three sizes of one: models trained by the same
+#: lab share blind spots, so their disagreement tells you less. Measured
+#: 2026-09-14 on the production forecast prompt, three draws each: repeat draws
+#: of one model moved only +/-0.02-0.03, but models differed from one another
+#: by up to five points on a 14-poll Senate race — enough, alone, to push the
+#: rating across a band edge. Gemini 3.7 Flash is not a member: it returned no
+#: usable forced tool call in 6 of 6 attempts on the same prompt.
+#:
+#: All three are cheap (~$0.005 a call), so the panel adds ~$0.02 per race.
+FORECAST_PANEL_MODELS: tuple[str, ...] = (DEFAULT_RESEARCH_MODEL, SMALL_MODEL, DEFAULT_REVIEW_GROK)
+
+#: Chamber narratives are a few calls per regeneration over the whole map, not
+#: per race, so their panel takes each house's flagship. Each drafts the note
+#: independently from the same computed numbers.
+CHAMBER_FORECAST_PANEL_MODELS: tuple[str, ...] = (PREMIUM_REVIEW_CLAUDE, PREMIUM_RESEARCH_MODEL, PREMIUM_REVIEW_GROK)
+
+#: Merges the chamber panel's drafts into the published note and holds every
+#: claim to the computed numbers. The strongest catalogued model; it runs once
+#: per chamber, three times per regeneration.
+CHAMBER_FORECAST_SYNTHESIS_MODEL = FRONTIER_MODEL
+
 #: Looks at a candidate photo before it is stored and answers structural
 #: questions about it — how many faces, is it a photograph at all, is the face
 #: obscured, does it look archival.

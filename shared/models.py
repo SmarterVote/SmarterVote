@@ -291,6 +291,15 @@ class ForecastEvidence(BaseModel):
     inferred: bool = False
 
 
+class ForecastPanelEstimate(BaseModel):
+    """One panel member's independent estimate, before the consensus is taken."""
+
+    model: str
+    party_probabilities: Dict[str, float] = Field(default_factory=dict)
+    margin_estimate: Optional[float] = None
+    confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+
+
 class RaceForecast(BaseModel):
     """Informational AI forecast for a race."""
 
@@ -311,6 +320,12 @@ class RaceForecast(BaseModel):
     source_urls: List[str] = Field(default_factory=list)
     evidence_lineage: Optional[List[ForecastEvidence]] = None
     market_signals: List[ForecastMarketSignal] = Field(default_factory=list)
+    #: "panel_median_v1" when the numbers are the median of an independent
+    #: model panel; "single_model" when one model set them.
+    method: Optional[str] = None
+    panel: Optional[List[ForecastPanelEstimate]] = None
+    #: Largest gap between members on the consensus leader's probability.
+    panel_spread: Optional[float] = Field(None, ge=0, le=1)
 
     @field_validator("party_probabilities")
     @classmethod

@@ -386,14 +386,32 @@ def test_forecast_prompt_formats_and_disallows_search():
         polling_note="No public polling found.",
         polling_json="[]",
         market_signals_json="[]",
-        forecast_json="null",
+        consensus_json="null",
     )
 
     assert "ga-senate-2026" in result
-    assert "set a forecast" in result.lower()
+    assert "Panel consensus" in result
     assert "Prediction market signals" in result
     assert "Do not search the web" in FORECAST_SYSTEM
     assert "Use set_forecast exactly once" in FORECAST_SYSTEM
+
+
+def test_forecast_prompts_never_show_the_previous_forecast():
+    """Feeding the old forecast back in anchored every update to it — NH-01 kept a
+    pre-primary "tilt D, primaries unresolved" call for a week after its primary."""
+    from pipeline_client.agent.prompts import FORECAST_PANEL_USER
+
+    assert "{forecast_json}" not in FORECAST_USER
+    assert "{forecast_json}" not in FORECAST_PANEL_USER
+    assert "Existing forecast" not in FORECAST_USER
+
+
+def test_forecast_prompts_treat_decided_primaries_as_decided():
+    from pipeline_client.agent.prompts import FORECAST_CHECK_SYSTEM, FORECAST_PANEL_SYSTEM
+
+    assert "unresolved" in FORECAST_SYSTEM
+    assert "Treat completed primaries as" in FORECAST_PANEL_SYSTEM
+    assert "unresolved" in FORECAST_CHECK_SYSTEM
 
 
 def test_roster_prompt_requires_current_contest_stage():

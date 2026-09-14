@@ -68,6 +68,9 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from shared.model_catalog import (  # noqa: E402
     ADJUDICATOR_MODEL,
+    CHAMBER_FORECAST_PANEL_MODELS,
+    CHAMBER_FORECAST_SYNTHESIS_MODEL,
+    FORECAST_PANEL_MODELS,
     MODEL_CATALOG,
     MODEL_ESCALATION,
     MODEL_ROLES,
@@ -276,6 +279,35 @@ def _check_adjudicator(live: Dict[str, Dict[str, Any]]) -> List[str]:
     return errors
 
 
+def _check_forecast_panels(live: Dict[str, Dict[str, Any]]) -> List[str]:
+    """Forecast panels must be real, served, and independent.
+
+    A panel's whole value is independent opinions: two members from one
+    developer share training data and blind spots, and fewer than three
+    members means the median cannot outvote one model that misreads a race.
+    """
+    errors: List[str] = []
+    for name, panel in (
+        ("race forecast panel", FORECAST_PANEL_MODELS),
+        ("chamber forecast panel", CHAMBER_FORECAST_PANEL_MODELS),
+    ):
+        for model_id in panel:
+            if model_id not in MODEL_CATALOG:
+                errors.append(f"{name}: {model_id} is not in MODEL_CATALOG")
+            if model_id not in live:
+                errors.append(f"{name}: {model_id} is not served by OpenRouter")
+        providers = [_provider(model_id) for model_id in panel]
+        if len(set(providers)) != len(providers):
+            errors.append(f"{name}: members share a developer ({', '.join(panel)})")
+        if len(panel) < 3:
+            errors.append(f"{name}: has {len(panel)} member(s); a median needs at least three to resist one outlier")
+    if CHAMBER_FORECAST_SYNTHESIS_MODEL not in MODEL_CATALOG:
+        errors.append(f"chamber synthesis model {CHAMBER_FORECAST_SYNTHESIS_MODEL} is not in MODEL_CATALOG")
+    if CHAMBER_FORECAST_SYNTHESIS_MODEL not in live:
+        errors.append(f"chamber synthesis model {CHAMBER_FORECAST_SYNTHESIS_MODEL} is not served by OpenRouter")
+    return errors
+
+
 def _check_no_hardcoded_models() -> List[str]:
     """No model ID may be written down outside the catalog.
 
@@ -374,6 +406,7 @@ def main(argv: List[str]) -> int:
         ("escalation climbs", _check_escalation()),
         ("premium not worse than default", _check_premium_not_worse(live)),
         ("adjudicator independence", _check_adjudicator(live)),
+        ("forecast panels", _check_forecast_panels(live)),
         ("no hardcoded model IDs", _check_no_hardcoded_models()),
     )
 

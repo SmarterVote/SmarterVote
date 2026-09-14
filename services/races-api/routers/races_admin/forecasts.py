@@ -36,6 +36,13 @@ class GenerateForecastsRequest(BaseModel):
             "'keep it under three sentences'. Factual corrections always take precedence. Requires review=true."
         ),
     )
+    panel: bool = Field(
+        default=True,
+        description=(
+            "Draft each chamber note with the chamber panel (CHAMBER_FORECAST_PANEL_MODELS) and merge the drafts with "
+            "CHAMBER_FORECAST_SYNTHESIS_MODEL. When false, `model` writes the note alone."
+        ),
+    )
 
 
 @router.get("/api/races/chamber_forecasts/draft", dependencies=[Depends(verify_token)])
@@ -63,7 +70,9 @@ async def generate_chamber_forecasts_endpoint(
         raise HTTPException(status_code=500, detail=f"Invalid summaries from publish service: {type(summaries)}")
 
     try:
-        analyses = await generate_chamber_analyses(summaries, model=payload.model, review=payload.review, goal=payload.goal)
+        analyses = await generate_chamber_analyses(
+            summaries, model=payload.model, review=payload.review, goal=payload.goal, panel=payload.panel
+        )
     except Exception as exc:
         logging.error("Error generating chamber forecast analyses using model %s: %s", payload.model, exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"LLM chamber forecast generation failed: {exc}") from exc
@@ -73,6 +82,13 @@ async def generate_chamber_forecasts_endpoint(
         {chamber: analysis["narrative"] for chamber, analysis in analyses.items()},
         analyses,
     )
+    for chamber, analysis in analyses.items():
+        panel = analysis.get("panel")
+        if panel and chamber in forecast_data["chambers"]:
+            forecast_data["chambers"][chamber]["narrative_panel"] = {
+                "drafted_by": panel.get("drafted_by", []),
+                "synthesized_by": panel.get("synthesized_by"),
+            }
 
     try:
         gcs_helpers.save_chamber_forecasts(forecast_data, draft=True)
@@ -83,6 +99,7 @@ async def generate_chamber_forecasts_endpoint(
         "message": "Draft chamber forecasts generated successfully",
         "updated_at": forecast_data["updated_at"],
         "model": payload.model,
+        "panel": {chamber: analysis.get("panel") for chamber, analysis in analyses.items() if analysis.get("panel")},
         "reviewed": payload.review,
         "review_corrections": {
             chamber: analysis["review_corrections"]

@@ -1174,6 +1174,38 @@ SET_FORECAST_TOOL: Dict = {
 }
 
 FORECAST_TOOLS: List[Dict] = [SET_FORECAST_TOOL]
+
+SUBMIT_FORECAST_ESTIMATE_TOOL: Dict = {
+    "type": "function",
+    "function": {
+        "name": "submit_forecast_estimate",
+        "description": "Submit your own independent estimate of who wins this race. Numbers only; no prose.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "party_probabilities": {
+                    "type": "object",
+                    "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1},
+                    "description": "Each party's probability of winning, keyed by party name. Should sum to about 1.",
+                },
+                "margin_estimate": {
+                    "type": "number",
+                    "description": "Expected winning margin, in percentage points, for the party you think most likely to win.",
+                },
+                "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                "key_considerations": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 3,
+                    "description": "The two or three considerations that most drove your estimate, one short sentence each.",
+                },
+            },
+            "required": ["party_probabilities", "confidence"],
+        },
+    },
+}
+
+FORECAST_PANEL_TOOLS: List[Dict] = [SUBMIT_FORECAST_ESTIMATE_TOOL]
 VOTER_RESOURCE_TOOLS: List[Dict] = [
     _restricted_race_field_tool(
         ["ballotpedia_url", "register_to_vote_url", "how_to_vote_url"],

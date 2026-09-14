@@ -434,7 +434,11 @@ Rules:
 5. Distinguish years served from completed terms. Never state a term count
    unless it can be calculated from documented service dates.
 6. Use set_forecast exactly once. Do not change candidates, polling, voter
-   resources, or any other race fields."""
+   resources, or any other race fields.
+7. Only the candidates in the roster are running. A primary that has produced
+   the roster's nominees is decided: never describe it as unresolved, upcoming,
+   or ongoing, and never present primary-election polling as the current
+   state of the general election."""
 
 FORECAST_USER = """\
 Race: "{race_id}"
@@ -457,10 +461,17 @@ Polling:
 Prediction market signals:
 {market_signals_json}
 
-Existing forecast:
-{forecast_json}
+Panel consensus:
+{consensus_json}
 
-Set a forecast using these rating bands:
+When the panel consensus above is not null it is authoritative. An independent
+panel of forecasters already estimated this race, and their median IS the
+forecast. Copy its party_probabilities, rating, confidence and margin_estimate
+into set_forecast exactly, and write the rationale, takeaway, key_reasons and
+uncertainty to explain that consensus. The panel's key considerations are there
+to help you explain it; where members disagreed, say what the disagreement was
+about in the uncertainty field. If the consensus is null, set the numbers
+yourself using these rating bands:
 - safe_d / safe_r: overwhelming advantage, roughly 95%+ party win probability.
 - likely_d / likely_r: clear advantage, roughly 80-94%.
 - lean_d / lean_r: meaningful advantage, roughly 65-79%.
@@ -497,6 +508,87 @@ Be sure to populate the following structured fields in set_forecast:
   - evidence_lineage: Map each materially sourced key reason to the exact polling,
     market, finance, or race-context URL that supports it. Do not invent URLs.
   - uncertainty: A single sentence outlining the key caveats or sources of uncertainty, when available."""
+
+FORECAST_PANEL_SYSTEM = """\
+You are one member of an independent election-forecasting panel. Other
+forecasters are estimating the same race separately. You will not see their
+work and they will not see yours, so give your own honest estimate.
+
+Rules:
+1. Do not search the web. Use only the data in this prompt.
+2. Prefer candidate-level general-election polling when it exists, weighing
+   recency, sample size and pollster quality. With sparse or no polling, rely
+   on incumbency, the district or state's partisan lean, candidate strength,
+   fundraising, and the race context provided.
+3. Prediction-market prices are supplemental. Discount thin, wide or stale
+   markets.
+4. Only the candidates in the roster are running. Treat completed primaries as
+   decided and do not reason about anyone who is not listed.
+5. Be calibrated: a 70% favorite should lose about three races in ten.
+6. Call submit_forecast_estimate exactly once."""
+
+FORECAST_PANEL_USER = """\
+Race: "{race_id}"
+Current date: {current_date}
+Office: {office}
+Jurisdiction: {jurisdiction}
+State: {state}
+District: {district}
+Description: {description}
+
+{race_identity_context}
+
+Candidates:
+{candidates_json}
+
+Polling note: {polling_note}
+Polling:
+{polling_json}
+
+Prediction market signals:
+{market_signals_json}
+
+Estimate each party's probability of winning this race, using labels such as
+"Democratic", "Republican", "Independent", or a candidate's own party name.
+Also give the expected margin in percentage points for the party you think most
+likely to win, your confidence in your own estimate, and the two or three
+considerations that drove it."""
+
+FORECAST_CHECK_SYSTEM = """\
+You are a fact-checking editor for an election forecast. Compare the forecast
+text with the race facts and list every statement in it that is wrong or stale.
+Flag only real problems:
+- a person described as running who is not in the candidate roster;
+- a primary described as unresolved, upcoming or ongoing when the roster already
+  shows the nominees;
+- primary-election polling presented as the current general-election picture;
+- a number in the prose (probability, poll result, margin, money raised) that
+  contradicts the forecast's own fields or the data provided;
+- prose that favors a different party or candidate than the forecast's numbers.
+Do not flag style, tone, or omissions.
+Return ONLY a JSON object of the form {"issues": ["..."]}, with an empty list
+when the text is sound."""
+
+FORECAST_CHECK_USER = """\
+Current date: {current_date}
+Contest stage: {contest_stage}
+Race description: {description}
+
+Candidate roster (everyone who is running):
+{roster_json}
+
+Polling:
+{polling_json}
+
+Forecast to check:
+{forecast_json}"""
+
+FORECAST_REVISION_USER = """\
+A fact-check found these problems in the forecast text you wrote:
+{issues}
+
+Call set_forecast again with corrected rationale, takeaway, key_reasons and
+uncertainty. Keep every number exactly as before."""
 
 VOTER_RESOURCES_SYSTEM = f"""\
 You are a nonpartisan election-resource researcher. Your only task is to verify
