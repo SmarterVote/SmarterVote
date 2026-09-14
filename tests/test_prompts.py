@@ -414,6 +414,17 @@ def test_forecast_prompts_treat_decided_primaries_as_decided():
     assert "unresolved" in FORECAST_CHECK_SYSTEM
 
 
+def test_forecast_prose_is_about_the_race_not_the_method():
+    """The first panel forecasts wrote "panel members disagreed mainly on..." into
+    reader-facing uncertainty text. The method belongs on the methodology page."""
+    from pipeline_client.agent.prompts import FORECAST_CHECK_SYSTEM
+
+    assert "where members disagreed" not in FORECAST_USER
+    assert "never mention" in FORECAST_USER
+    assert "how the forecast was produced" in FORECAST_USER
+    assert "how the forecast was produced" in FORECAST_CHECK_SYSTEM
+
+
 def test_roster_prompt_requires_current_contest_stage():
     """A stale pre_primary keeps defeated primary candidates on general-election rosters."""
     assert "STEP 2.6 — Record the CURRENT contest stage" in ROSTER_SYNC_USER
