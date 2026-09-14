@@ -2,6 +2,12 @@ FROM python:3.14-slim@sha256:656d12e70054d5fda18a045e2494c96701e9792dd1445f95b3d
 
 WORKDIR /app
 
+# The digest pin freezes Debian packages at the base image's build date; take
+# security updates so a newly published OS CVE doesn't fail the Trivy gate.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements-constraints.txt .
 COPY services/races-api/requirements.txt .
 RUN pip install --no-cache-dir -c requirements-constraints.txt -r requirements.txt
