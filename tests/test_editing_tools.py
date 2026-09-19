@@ -1468,6 +1468,65 @@ def test_finalize_roster_allows_middle_initial_in_extracted_source_name():
     assert result == "Roster finalized with 1 evidence-backed active candidate(s)."
 
 
+def test_canonical_roster_name_ignores_nicknames_but_keeps_apostrophes():
+    from pipeline_client.agent.handlers import _canonical_roster_name
+
+    # Official lists publish a quoted nickname the roster name omits.
+    assert _canonical_roster_name('Michael "Dr. Mike" Katz') == _canonical_roster_name("Michael Katz")
+    assert _canonical_roster_name("Joseph “Dr. Joe” Arminio") == _canonical_roster_name("Joseph Arminio")
+    assert _canonical_roster_name("Michael (Mike) Katz") == _canonical_roster_name("Michael Katz")
+    # An apostrophe is part of the surname, not a nickname delimiter.
+    assert _canonical_roster_name("Marty O'Donnell") == _canonical_roster_name("Marty O'Donnell")
+    assert "donnell" in _canonical_roster_name("Marty O'Donnell")
+
+
+def test_finalize_roster_allows_quoted_nickname_in_extracted_source_name():
+    """Delaware publishes `Michael "Dr. Mike" Katz`; the roster carries `Michael Katz`.
+
+    The nickname tokens used to survive normalization, so the extracted-name set
+    never equalled the proposed roster and finalize_roster was blocked on every
+    retry — de-senate-2026 escalated to an expensive model and aborted twice.
+    """
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    source_url = "https://elections.delaware.gov/candidates/candidatelist/genl_fcddt_2026.html"
+    source = {
+        "url": source_url,
+        "title": "General Election 11/3/2026 - Filed Candidates by Office",
+        "evidence": (
+            "Qualified candidates for U.S. Senator, Statewide, in the November 3, 2026 general election: "
+            'Chris Coons, Democratic, Qualified; Michael "Dr. Mike" Katz, Republican, Qualified'
+        ),
+    }
+    race_json = {
+        "id": "de-senate-2026",
+        "pipeline_state": {
+            "race_identity": {
+                "office": "U.S. Senate",
+                "contest_stage": "post_primary_general",
+                "election_date": "2026-11-03",
+            }
+        },
+        "candidates": [],
+    }
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["finalize_roster"](
+        {
+            "summary": "Official qualified candidate list.",
+            "candidates": [
+                {"name": "Chris Coons", "party": "Democratic", "incumbent": True},
+                {"name": "Michael Katz", "party": "Republican", "incumbent": False},
+            ],
+            "source_candidate_names": ["Chris Coons", 'Michael "Dr. Mike" Katz'],
+            "completeness_sources": [source],
+            "_research_trace": {"researched_urls": [source_url], "fetched_urls": [source_url]},
+        }
+    )
+
+    assert result == "Roster finalized with 2 evidence-backed active candidate(s)."
+
+
 def test_finalize_roster_reuses_persisted_content_evidence_by_url():
     from pipeline_client.agent.agent import _make_editing_handlers
 

@@ -274,9 +274,18 @@ def _record_verdict_on_source(source: Dict[str, Any], args: Dict[str, Any], clai
 
 
 def _canonical_roster_name(name: str) -> str:
-    """Normalize harmless middle initials and suffixes for roster-set comparison."""
+    """Normalize harmless middle initials, suffixes, and nicknames for roster-set comparison."""
     suffixes = {"jr", "sr", "ii", "iii", "iv"}
-    tokens = re.findall(r"[a-z0-9]+", str(name).casefold())
+    # Official candidate lists routinely carry a quoted or parenthesized nickname
+    # that the roster name omits: Delaware publishes `Michael "Dr. Mike" Katz` and
+    # `Joseph "Dr. Joe" Arminio`. Those extra tokens survived tokenization, so the
+    # completeness set never equalled the proposed roster and finalize_roster was
+    # blocked on every retry — the model cannot satisfy both lists at once, and it
+    # escalated to an expensive model and aborted instead (de-senate-2026, ~$1/run).
+    # Only double quotes and parentheses are stripped; apostrophes are left alone
+    # so O'Donnell-style surnames keep their tokens.
+    without_nickname = re.sub(r"\"[^\"]*\"|“[^”]*”|\([^)]*\)", " ", str(name))
+    tokens = re.findall(r"[a-z0-9]+", without_nickname.casefold())
     return " ".join(token for token in tokens if len(token) > 1 and token not in suffixes)
 
 
