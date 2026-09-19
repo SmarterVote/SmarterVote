@@ -13,6 +13,27 @@ if sys.platform == "win32":
 
 
 @pytest.fixture(autouse=True)
+def isolate_search_provider_env(monkeypatch):
+    """Keep a developer's .env out of the tests that choose a search provider.
+
+    `_serper_search` falls back to Searlo when SEARLO_API_KEY is set. Tests that
+    exercise the Serper path patch os.environ with `patch.dict(..., {...})`, which
+    *adds to* the ambient environment rather than replacing it, so a real
+    SEARLO_API_KEY from .env survived and diverted them to the Searlo branch. That
+    branch calls `.get` on a mock whose only async method is `.post`, producing
+    "object MagicMock can't be used in 'await' expression" — five failures that
+    appear only in a full local run, never in CI, and never when the file is run
+    alone.
+
+    CI has no .env and passes, so scrubbing these makes local match CI exactly.
+    Tests needing a provider key still set it explicitly inside their own
+    patch.dict, which runs after this fixture.
+    """
+    for name in ("SERPER_API_KEY", "SEARLO_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
 def mock_wikipedia_image_lookup():
     """Prevent every candidate-image fast path from making real HTTP calls."""
     with (
