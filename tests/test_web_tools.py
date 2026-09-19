@@ -39,6 +39,16 @@ async def test_search_raises_when_no_provider_is_configured():
         await _serper_search("test query")
 
 
+def test_search_provider_env_is_isolated_from_dotenv():
+    """Guards the conftest fixture that keeps a developer's .env out of these tests.
+
+    Without it, an ambient SEARLO_API_KEY sends the Serper-path tests down the
+    Searlo fallback and they fail only in a full local run.
+    """
+    assert os.environ.get("SERPER_API_KEY") is None
+    assert os.environ.get("SEARLO_API_KEY") is None
+
+
 @pytest.mark.asyncio
 async def test_serper_search_uses_cache():
     """_serper_search returns cached results when available."""
