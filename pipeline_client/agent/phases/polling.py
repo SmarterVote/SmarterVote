@@ -16,7 +16,16 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
     """Refresh available polling data for the race."""
     race_json = ctx.race_json
     race_id = ctx.race_id
-    candidate_names = ctx.candidate_names
+    # Polling is race-level: a general-election poll pits every nominee against the
+    # others. ctx.candidate_names is the run's *research* scope, which a run targeted
+    # at one candidate narrows to that person. Passing that subset to this prompt told
+    # the model the other nominees were not in the race, so it rejected every real
+    # poll and dropped the ones already stored (oh-house-10-2026, issue #392).
+    candidate_names = [
+        name
+        for candidate in race_json.get("candidates", [])
+        if isinstance(candidate, dict) and (name := str(candidate.get("name") or "").strip())
+    ]
     small_model = ctx.small_model
     on_log = ctx.on_log
     max_iterations = ctx.max_iterations
