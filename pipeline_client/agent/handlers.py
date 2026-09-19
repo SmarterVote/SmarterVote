@@ -1142,6 +1142,23 @@ def _make_editing_handlers(
             value = args.get(key)
             if value not in (None, ""):
                 identity[key] = value
+        # The date this contest's primary was held (or is scheduled for). Stored so a
+        # catalogue sweep can ask "which races have had their primary since the roster
+        # was last built" directly, instead of that being calendar knowledge carried in
+        # someone's head — which is how post-primary staleness has been found so far.
+        #
+        # Deliberately optional and non-blocking: some contests have no party primary
+        # at all (Louisiana's jungle primary *is* the general election), and a run that
+        # cannot source the date should still be able to lock an identity.
+        primary_date = args.get("primary_date")
+        if primary_date not in (None, ""):
+            try:
+                identity["primary_date"] = datetime.fromisoformat(str(primary_date).strip()).date().isoformat()
+            except ValueError:
+                log(
+                    "warning",
+                    f"    Ignoring unparseable primary_date {str(primary_date)!r}; expected YYYY-MM-DD",
+                )
         if isinstance(args.get("known_ineligible_or_not_running"), list):
             identity["known_ineligible_or_not_running"] = [
                 str(item) for item in args["known_ineligible_or_not_running"] if str(item).strip()
