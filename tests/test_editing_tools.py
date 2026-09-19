@@ -1527,6 +1527,50 @@ def test_finalize_roster_allows_quoted_nickname_in_extracted_source_name():
     assert result == "Roster finalized with 2 evidence-backed active candidate(s)."
 
 
+def _identity_args(**overrides):
+    args = {"office": "Governor", "contest_stage": "post_primary_general", "state": "New Hampshire"}
+    args.update(overrides)
+    return args
+
+
+def test_set_race_identity_records_primary_date():
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"id": "nh-governor-2026", "candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["set_race_identity"](_identity_args(primary_date="2026-09-08"))
+
+    assert result == "Recorded race identity brief."
+    assert race_json["pipeline_state"]["race_identity"]["primary_date"] == "2026-09-08"
+
+
+def test_set_race_identity_ignores_unparseable_primary_date():
+    """A bad date must not block identity locking — it is optional metadata."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"id": "nh-governor-2026", "candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["set_race_identity"](_identity_args(primary_date="second Tuesday in September"))
+
+    assert result == "Recorded race identity brief."
+    assert "primary_date" not in race_json["pipeline_state"]["race_identity"]
+
+
+def test_set_race_identity_without_primary_date_is_valid():
+    """Louisiana has no party primary, so the field must stay genuinely optional."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"id": "la-house-01-2026", "candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["set_race_identity"](_identity_args(office="U.S. House", contest_stage="pre_primary"))
+
+    assert result == "Recorded race identity brief."
+    assert "primary_date" not in race_json["pipeline_state"]["race_identity"]
+
+
 def _nh_governor_style_finalize_args(source_url, **overrides):
     """finalize_roster args for a general-election roster under a stale pre_primary identity."""
     source = {
