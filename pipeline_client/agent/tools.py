@@ -356,6 +356,15 @@ SET_RACE_IDENTITY_TOOL: Dict = {
                 "contest_stage": {"type": "string", "enum": CONTEST_STAGE_VALUES},
                 "election_date": {"type": "string"},
                 "primary_status": {"type": "string"},
+                "primary_date": {
+                    "type": "string",
+                    "description": (
+                        "The date this contest's primary was held, or is scheduled for, as YYYY-MM-DD. Give it "
+                        "whenever the evidence states it, for a primary already held as well as an upcoming one. "
+                        "Omit it when the contest has no party primary at all, as in Louisiana, where the jungle "
+                        "primary is the general election itself."
+                    ),
+                },
                 "official_roster_source_url": {"type": "string"},
                 "known_incumbent": {"type": "string"},
                 "known_ineligible_or_not_running": {"type": "array", "items": {"type": "string"}},
