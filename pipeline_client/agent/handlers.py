@@ -1166,6 +1166,27 @@ def _make_editing_handlers(
         if not isinstance(identity, dict) or not identity.get("office") or not identity.get("contest_stage"):
             return "ERROR: roster finalization blocked. Lock the exact office and contest stage with set_race_identity."
 
+        # The roster and the stage it belongs to are one fact: a pre-primary field
+        # and a general-election field are different sets of people. The identity
+        # above is only required to *exist* — it is inherited from the baseline, and
+        # nothing re-checks it against what this run just proved. That is how
+        # nh-governor-2026 finalized a correct general-election roster and rewrote
+        # its description to "Ayotte won the September 8 primary" while the stored
+        # contest_stage stayed pre_primary, contradicting both.
+        #
+        # Validated here, before the expensive source work, so a bad value costs one
+        # cheap retry. Absent, we keep the inherited stage rather than blocking:
+        # repeated blocked edits escalate roster-sync to a frontier model, and a new
+        # blocking condition would hand that path another trigger for no gain.
+        submitted_stage = args.get("contest_stage")
+        if submitted_stage is not None:
+            submitted_stage = str(submitted_stage).strip().lower()
+            if submitted_stage not in _CONTEST_STAGES:
+                return (
+                    "ERROR: roster finalization blocked. contest_stage must be one of: "
+                    f"{', '.join(sorted(_CONTEST_STAGES))}."
+                )
+
         completeness_sources = _normalize_observed_roster_sources(
             args.get("completeness_sources"),
             race_id=race_id,
@@ -1374,11 +1395,24 @@ def _make_editing_handlers(
         if proposed_specs is not None:
             race_json["candidates"] = active_candidates
 
+        # Commit the declared stage alongside the roster it describes, so the stored
+        # stage can never be older than the field it is supposed to label.
+        if submitted_stage:
+            identity["contest_stage"] = submitted_stage
+            race_json["contest_stage"] = submitted_stage
+        else:
+            log(
+                "warning",
+                "    finalize_roster declared no contest_stage; inheriting "
+                f"{str(identity.get('contest_stage'))!r} from the locked identity",
+            )
+        effective_stage = str(identity.get("contest_stage") or race_json.get("contest_stage") or "unknown")
+
         summary = str(args.get("summary") or "").strip()
         pipeline_state = race_json.setdefault("pipeline_state", {})
         pipeline_state["roster_research"] = {
             "finalized_at": datetime.now(timezone.utc).isoformat(),
-            "contest_stage": str(identity.get("contest_stage") or race_json.get("contest_stage") or "unknown"),
+            "contest_stage": effective_stage,
             "summary": summary,
             "active_candidate_count": len(active_candidates),
             "candidate_names": [str(candidate.get("name") or "").strip() for candidate in active_candidates],

@@ -372,7 +372,9 @@ FINALIZE_ROSTER_TOOL: Dict = {
         "description": (
             "Atomically submit and finish the complete active roster after research. Every proposed candidate must "
             "have current-cycle exact-contest evidence, and retrieved authoritative evidence must prove the roster "
-            "itself is complete. Existing profiles are preserved by name while wrong or omitted entries are removed."
+            "itself is complete. Existing profiles are preserved by name while wrong or omitted entries are removed. "
+            "Declare the contest_stage this roster belongs to: a pre-primary field and a general-election field are "
+            "different sets of people, so the stage is part of the roster you are submitting."
         ),
         "parameters": {
             "type": "object",
@@ -380,6 +382,16 @@ FINALIZE_ROSTER_TOOL: Dict = {
                 "summary": {
                     "type": "string",
                     "description": "Brief description of the authoritative roster and contest stage used.",
+                },
+                "contest_stage": {
+                    "type": "string",
+                    "enum": CONTEST_STAGE_VALUES,
+                    "description": (
+                        "The contest stage this roster is the field for, as of now. If the primary has been held and "
+                        "these are the general-election candidates, this is post_primary_general even when the stored "
+                        "value still says pre_primary. This overwrites the stored stage, so state it from current "
+                        "evidence rather than repeating the stale value."
+                    ),
                 },
                 "candidates": {
                     "type": "array",
@@ -466,7 +478,7 @@ FINALIZE_ROSTER_TOOL: Dict = {
                     },
                 },
             },
-            "required": ["summary", "candidates", "source_candidate_names", "completeness_sources"],
+            "required": ["summary", "contest_stage", "candidates", "source_candidate_names", "completeness_sources"],
         },
     },
 }

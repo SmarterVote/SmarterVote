@@ -1527,6 +1527,102 @@ def test_finalize_roster_allows_quoted_nickname_in_extracted_source_name():
     assert result == "Roster finalized with 2 evidence-backed active candidate(s)."
 
 
+def _nh_governor_style_finalize_args(source_url, **overrides):
+    """finalize_roster args for a general-election roster under a stale pre_primary identity."""
+    source = {
+        "url": source_url,
+        "title": "2026 General Election Candidates",
+        "evidence": (
+            "Candidates for Governor of New Hampshire in the November 3, 2026 general election: "
+            "Kelly Ayotte and Cinde Warmington"
+        ),
+    }
+    args = {
+        "summary": "Official general-election candidate list.",
+        "contest_stage": "post_primary_general",
+        "candidates": [
+            {"name": "Kelly Ayotte", "party": "Republican", "incumbent": True},
+            {"name": "Cinde Warmington", "party": "Democratic", "incumbent": False},
+        ],
+        "source_candidate_names": ["Kelly Ayotte", "Cinde Warmington"],
+        "completeness_sources": [source],
+        "_research_trace": {"researched_urls": [source_url], "fetched_urls": [source_url]},
+    }
+    args.update(overrides)
+    return args
+
+
+def _stale_pre_primary_race_json():
+    return {
+        "id": "nh-governor-2026",
+        "contest_stage": "pre_primary",
+        "pipeline_state": {
+            "race_identity": {
+                "office": "Governor",
+                "contest_stage": "pre_primary",
+                "election_date": "2026-11-03",
+            }
+        },
+        "candidates": [],
+    }
+
+
+def test_finalize_roster_declared_stage_overwrites_stale_identity():
+    """A general-election roster must not be recorded under an inherited pre_primary stage.
+
+    nh-governor-2026 finalized the correct post-primary roster and rewrote its
+    description to say the September 8 primary was over, yet stayed flagged
+    pre_primary because the run never re-locked the inherited identity.
+    """
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    source_url = "https://www.sos.nh.gov/2026-general-election-candidates"
+    race_json = _stale_pre_primary_race_json()
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["finalize_roster"](_nh_governor_style_finalize_args(source_url))
+
+    assert result == "Roster finalized with 2 evidence-backed active candidate(s)."
+    assert race_json["contest_stage"] == "post_primary_general"
+    assert race_json["pipeline_state"]["race_identity"]["contest_stage"] == "post_primary_general"
+    assert race_json["pipeline_state"]["roster_research"]["contest_stage"] == "post_primary_general"
+
+
+def test_finalize_roster_rejects_unknown_contest_stage():
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    source_url = "https://www.sos.nh.gov/2026-general-election-candidates"
+    race_json = _stale_pre_primary_race_json()
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["finalize_roster"](_nh_governor_style_finalize_args(source_url, contest_stage="after_the_primary"))
+
+    assert "contest_stage must be one of" in result
+    # A rejected stage must not partially apply.
+    assert race_json["contest_stage"] == "pre_primary"
+    assert race_json["candidates"] == []
+
+
+def test_finalize_roster_without_contest_stage_inherits_locked_identity():
+    """Omitting the field keeps prior behaviour instead of blocking.
+
+    A new blocking condition would give roster-sync's escalate-on-repeated-block
+    path another trigger, which costs ~$1 per affected race.
+    """
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    source_url = "https://www.sos.nh.gov/2026-general-election-candidates"
+    race_json = _stale_pre_primary_race_json()
+    args = _nh_governor_style_finalize_args(source_url)
+    args.pop("contest_stage")
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["finalize_roster"](args)
+
+    assert result == "Roster finalized with 2 evidence-backed active candidate(s)."
+    assert race_json["pipeline_state"]["roster_research"]["contest_stage"] == "pre_primary"
+
+
 def test_finalize_roster_reuses_persisted_content_evidence_by_url():
     from pipeline_client.agent.agent import _make_editing_handlers
 
