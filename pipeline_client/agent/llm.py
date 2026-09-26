@@ -21,7 +21,7 @@ from .cost import (
     total_token_budget_reached,
 )
 from .errors import PermanentProviderError, RetryableProviderError
-from .model_registry import MODEL_CATALOG, escalation_for, normalize_model_id
+from .model_registry import MODEL_CATALOG, escalation_for, normalize_model_id, provider_routing_for
 from .roster_adjudicator import collect_roster_adjudications
 from .run_budget import RunBudget
 from .source_types import normalize_source_type
@@ -244,6 +244,9 @@ async def _call_openrouter(
     if tools:
         kwargs["tools"] = tools
         kwargs["tool_choice"] = tool_choice or "auto"
+    provider_routing = provider_routing_for(model)
+    if provider_routing:
+        kwargs["extra_body"] = {"provider": provider_routing}
 
     rate_limit_wait = 0.0
     transient_wait = 0.0

@@ -73,6 +73,7 @@ from shared.model_catalog import (  # noqa: E402
     FORECAST_PANEL_MODELS,
     MODEL_CATALOG,
     MODEL_ESCALATION,
+    MODEL_PROVIDER_PREFERENCES,
     MODEL_ROLES,
     PROFILE_DEFAULTS,
 )
@@ -392,6 +393,35 @@ def _advise_newer(live: Dict[str, Dict[str, Any]]) -> List[str]:
     return notes
 
 
+def _fetch_endpoint_slugs(model_id: str) -> Optional[set]:
+    """Return the provider slugs currently serving *model_id*, or None if unreachable."""
+    req = urllib.request.Request(f"https://openrouter.ai/api/v1/models/{model_id}/endpoints")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            payload = json.load(resp)
+    except Exception:  # noqa: BLE001 - reported as a check failure by the caller
+        return None
+    endpoints = (payload.get("data") or {}).get("endpoints") or []
+    return {str(e.get("tag") or "").split("/")[0] for e in endpoints if e.get("tag")}
+
+
+def _check_provider_preferences() -> List[str]:
+    """Every preferred provider must still serve its model, or the preference silently does nothing."""
+    errors: List[str] = []
+    for model_id, order in MODEL_PROVIDER_PREFERENCES.items():
+        if model_id not in MODEL_CATALOG:
+            errors.append(f"{model_id}: has a provider preference but is not in the catalog")
+            continue
+        slugs = _fetch_endpoint_slugs(model_id)
+        if slugs is None:
+            errors.append(f"{model_id}: could not read its OpenRouter endpoints")
+            continue
+        for slug in order:
+            if slug not in slugs:
+                errors.append(f"{model_id}: preferred provider {slug!r} no longer serves it (live: {sorted(slugs)})")
+    return errors
+
+
 def main(argv: List[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--quiet", action="store_true", help="suppress the advisory section")
@@ -408,6 +438,7 @@ def main(argv: List[str]) -> int:
         ("adjudicator independence", _check_adjudicator(live)),
         ("forecast panels", _check_forecast_panels(live)),
         ("no hardcoded model IDs", _check_no_hardcoded_models()),
+        ("provider preferences", _check_provider_preferences()),
     )
 
     total = 0
