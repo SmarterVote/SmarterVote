@@ -695,7 +695,7 @@ def build_chamber_forecasts(
     }
 
 
-def _seat_control_note(race: Dict[str, Any]) -> str:
+def seat_control_note(race: Dict[str, Any]) -> str:
     """Describe who holds the seat now, so a hold can be told apart from a flip.
 
     Without this the context carried only a rating and a probability, which
@@ -765,10 +765,10 @@ def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[
         title = race.get("title") or race.get("id")
         if "toss-up" in rating or "tossup" in rating:
             toss_ups += 1
-            competitive_list.append(f"- {title}: Toss-up (Win Prob: {prob * 100:.1f}%, {_seat_control_note(race)})")
+            competitive_list.append(f"- {title}: Toss-up (Win Prob: {prob * 100:.1f}%, {seat_control_note(race)})")
         elif "tilt" in rating:
             competitive_list.append(
-                f"- {title}: Tilt {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {_seat_control_note(race)})"
+                f"- {title}: Tilt {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {seat_control_note(race)})"
             )
             if "democrat" in winner_party:
                 dem_wins += 1
@@ -776,7 +776,7 @@ def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[
                 gop_wins += 1
         elif "lean" in rating:
             competitive_list.append(
-                f"- {title}: Lean {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {_seat_control_note(race)})"
+                f"- {title}: Lean {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {seat_control_note(race)})"
             )
             if "democrat" in winner_party:
                 dem_wins += 1
@@ -784,7 +784,7 @@ def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[
                 gop_wins += 1
         elif "likely" in rating:
             competitive_list.append(
-                f"- {title}: Likely {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {_seat_control_note(race)})"
+                f"- {title}: Likely {winner_party.upper()} (Win Prob: {prob * 100:.1f}%, {seat_control_note(race)})"
             )
             if "democrat" in winner_party:
                 dem_wins += 1
