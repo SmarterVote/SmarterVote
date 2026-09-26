@@ -28,3 +28,15 @@ packages = ["shared", "shared.data"]
 [tool.setuptools.package-dir]
 shared = "."
 "shared.data" = "data"
+
+# Black and isort take the nearest pyproject.toml as the project root, so any
+# run given only files under shared/ (a single-file run, or a pre-commit hook
+# passing staged files) stops here, not at the repo root. Without these it
+# silently reformats to black's 88-column default. Keep in step with the root.
+[tool.black]
+line-length = 127
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 127
