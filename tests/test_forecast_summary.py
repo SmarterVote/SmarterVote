@@ -549,8 +549,84 @@ def test_context_states_who_currently_holds_each_competitive_seat():
 
     # A Democratic-favored race on a Republican-held seat is a pickup, not a defense.
     assert "Maine U.S. Senate Election, 2026: Tilt DEMOCRATIC (Win Prob: 64.0%, currently Republican-held)" in context
-    # No incumbent running reads as an open seat rather than being left ambiguous.
-    assert "Ohio Senate Special: Toss-up (Win Prob: 55.0%, open seat, no incumbent running)" in context
+    # With no incumbent on the ballot the seat is open, but it still has a holder.
+    assert (
+        "Ohio Senate Special: Toss-up (Win Prob: 55.0%, open seat, currently Republican-held (incumbent not running))"
+        in context
+    )
+
+
+def test_chamber_context_names_the_holder_of_open_seats_and_lists_them_by_party():
+    """Regression: the published Senate note called Georgia 'the one Democratic-held
+    competitive seat' because open Minnesota reached the models with no holder."""
+    from shared.forecast_summary import build_chamber_context
+
+    context = build_chamber_context(
+        [
+            {
+                "id": "ga-senate-2026",
+                "title": "2026 Georgia U.S. Senate Election",
+                "office": "U.S. Senate",
+                "forecast": {"rating": "likely_d", "predicted_winner_party": "Democratic", "win_probability": 0.9},
+                "candidates": [{"name": "Jon Ossoff", "party": "Democratic", "incumbent": True}],
+            },
+            {
+                "id": "mn-senate-2026",
+                "title": "2026 Minnesota U.S. Senate Election",
+                "office": "U.S. Senate",
+                "forecast": {"rating": "lean_d", "predicted_winner_party": "Democratic", "win_probability": 0.7},
+                "candidates": [{"name": "Peggy Flanagan", "party": "Democratic"}],
+            },
+            {
+                "id": "me-senate-2026",
+                "title": "2026 Maine U.S. Senate Election",
+                "office": "U.S. Senate",
+                "forecast": {"rating": "tilt_d", "predicted_winner_party": "Democratic", "win_probability": 0.63},
+                "candidates": [{"name": "Susan Collins", "party": "Republican", "incumbent": True}],
+            },
+            {
+                "id": "ca-house-11-2026",
+                "title": "2026 California's 11th Congressional District Election",
+                "office": "U.S. House",
+                "forecast": {"rating": "tilt_d", "predicted_winner_party": "Democratic", "win_probability": 0.63},
+                "candidates": [{"name": "A", "party": "Democratic"}],
+            },
+        ],
+        "US Senate",
+        {"projected_seats": {}, "expected_seats": {}, "outcome_probabilities": {}},
+    )
+
+    assert "open seat, currently Democratic-held (incumbent not running)" in context
+    assert "- Democratic-held (2): 2026 Georgia U.S. Senate Election; 2026 Minnesota U.S. Senate Election" in context
+    assert "- Republican-held (1): 2026 Maine U.S. Senate Election" in context
+    # An open House seat has no holder table; say so rather than leave room to guess.
+    assert "current holding party not in the data" in context
+    assert "- Holder not in the data (1): 2026 California's 11th Congressional District Election" in context
+
+
+def test_race_state_expands_a_postal_code():
+    from shared.forecast_summary import race_state
+
+    assert race_state({"state": "CA", "id": "ca-governor-2026"}) == "California"
+    assert race_state({"state": "Virginia"}) == "Virginia"
+
+
+def test_seat_holder_tables_cover_every_seat_exactly_once():
+    """Rolling the tables forward a cycle must leave each state with two senators and one governor."""
+    from shared.forecast_summary import ABBR_TO_STATE, GOVERNOR_HOLDOVERS, SEAT_HOLDERS_UP, SENATE_HOLDOVERS
+
+    states = set(ABBR_TO_STATE.values())
+    senate_up = SEAT_HOLDERS_UP["senate"]
+    assert set(senate_up) <= states
+    for state in states:
+        holdovers = SENATE_HOLDOVERS.get(state, [])
+        # summarize_chamber keeps only the first holdover when the state also has a race up.
+        counted = holdovers[:1] if state in senate_up else holdovers
+        assert len(counted) + (state in senate_up) == 2, state
+
+    governors_up = SEAT_HOLDERS_UP["governors"]
+    assert not set(governors_up) & set(GOVERNOR_HOLDOVERS)
+    assert set(governors_up) | set(GOVERNOR_HOLDOVERS) == states
 
 
 def test_forecast_prompt_forbids_defending_a_seat_the_party_does_not_hold():
