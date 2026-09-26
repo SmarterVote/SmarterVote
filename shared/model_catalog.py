@@ -504,6 +504,24 @@ MODEL_ESCALATION: Dict[str, str] = {
 }
 
 
+#: Preferred OpenRouter providers for a model, tried in order before OpenRouter's
+#: own routing takes over (fallbacks stay on, so a slow or down provider costs
+#: money, never a run).
+#:
+#: OpenRouter's default routing weighs uptime and latency, not only price, and for
+#: some models that sends every request to a provider charging several times the
+#: list price. Measured 2026-09-26 on DeepSeek V4.1 Flash: default routing and
+#: ``sort=price`` both chose Together ($0.30/M uncached) over InferenceNet
+#: ($0.035/M), and a 5-race refresh trial paid ~7x list as a result. Pinning
+#: InferenceNet returned list price with working tool calls, at ~5s latency.
+#:
+#: Keys are catalog model IDs; values are OpenRouter provider slugs (the
+#: endpoint ``tag`` without its ``/variant`` suffix). The catalog guard checks
+#: that each slug still serves its model.
+MODEL_PROVIDER_PREFERENCES: Dict[str, tuple[str, ...]] = {
+    "deepseek/deepseek-v4.1-flash": ("inference-net",),
+}
+
 #: Old model strings that still appear in stored run options and race records.
 #: Every value must be a live catalog key, so replaying an old run resolves to
 #: something real rather than falling back to a default price.
@@ -663,6 +681,15 @@ def escalation_for(model: Optional[str]) -> Optional[str]:
     """Return the model to climb to when *model* stalls, if there is one."""
     normalized = normalize_model_id(model)
     return MODEL_ESCALATION.get(normalized) if normalized else None
+
+
+def provider_routing_for(model: Optional[str]) -> Optional[Dict[str, object]]:
+    """Return the OpenRouter ``provider`` request object for *model*, if it has a preference."""
+    normalized = normalize_model_id(model)
+    order = MODEL_PROVIDER_PREFERENCES.get(normalized) if normalized else None
+    if not order:
+        return None
+    return {"order": list(order), "allow_fallbacks": True}
 
 
 def resolve_profile_models(

@@ -40,6 +40,7 @@ from shared.model_catalog import (
     intelligence_of,
     normalize_model_id,
     normalize_profile_name,
+    provider_routing_for,
     resolve_profile_models,
     spec_for,
 )
@@ -70,6 +71,7 @@ __all__ = [
     "normalize_model_id",
     "normalize_profile_name",
     "profile_from_options",
+    "provider_routing_for",
     "resolve_profile_models",
     "resolve_run_models",
     "spec_for",
