@@ -21,15 +21,17 @@ make that sound rather than circular:
    returned verbatim to the calling agent, so a rejection is inspectable after
    the fact instead of being a flaky gate nobody can debug.
 
-Determinism: pinned model, temperature 0, and an in-process cache keyed by
-``(claim, url, evidence)``. Provider-side drift is still possible, which is why
+Determinism: pinned model and an in-process cache keyed by
+``(claim, url, evidence)``. Temperature 0 is requested, but no OpenRouter
+endpoint for the GPT-5.6 or GPT-6 Luna models accepts ``temperature``, so it is
+dropped in transit. Provider-side drift is still possible, which is why
 :data:`ADJUDICATOR_MODEL` is pinned to an explicit version rather than a floating
 alias — a silent upgrade would move a publish gate with no commit to point at.
 
 The tier choice is deliberate and is explained at
 :data:`shared.model_catalog.ADJUDICATOR_MODEL`. Two requirements rule out the
-bargain tiers regardless of price: the model must accept ``temperature=0``, or
-the gate cannot be pinned; and it must still answer under a 400-token ceiling,
+bargain tiers regardless of price: it must return well-formed JSON; and it must
+still answer under a 400-token ceiling,
 because a model that spends its whole budget on reasoning and returns empty
 content reads, on a fail-closed gate, as a rejection of valid evidence.
 

@@ -17,11 +17,17 @@ Three kinds of fact live here, and they are maintained differently:
   are verified against OpenRouter's live model list by
   ``scripts/check_model_catalog.py``. Never edit them from memory.
 * **Intelligence index** is our capability yardstick — Artificial Analysis
-  Intelligence Index v4.1, captured 2026-08-07. Nothing can verify it
+  Intelligence Index v4.3.2, captured 2026-09-26 from each model's page on
+  artificialanalysis.ai (highest reasoning effort shown). Nothing can verify it
   automatically, so it is written down explicitly and cited. It exists because
   price is *not* a proxy for capability: nemotron-3-ultra cost 6.7x more per
   input token than deepseek-v4-flash-0731 while scoring 12 points *lower*, and
   the guard's price-based escalation check waved that through for months.
+
+  **Never mix index versions.** v4.3.2 re-baselined every score to roughly
+  0.7x its v4.1 value (Sonnet 5: 53.4 -> 38), so a new model's current score
+  written next to an old model's v4.1 score reads as a downgrade that is not
+  one. Third-party mirrors (benchlm.ai) mix the two; read AA's own model page.
 * **Role assignments** are our judgment, argued in comments at each choice.
 
 Adding a model? Add it to :data:`MODEL_CATALOG` with a real intelligence score
@@ -45,7 +51,7 @@ MODEL_ROLES = frozenset({"primary", "small", "roster", "image_vision", "review_c
 #:
 #: There used to be three. ``balanced`` sat between ``economy`` and ``quality``
 #: and was strictly dominated by both: its only difference from ``economy`` was a
-#: primary model scoring 25.0 against economy's 49.9 while costing 2.8x more per
+#: primary model scoring 25.0 against economy's 49.9 (index v4.1) while costing 2.8x more per
 #: input token. Nobody could have wanted it. Two tiers — the one you run, and
 #: the one you pay for — is the whole useful range.
 MODEL_PROFILES = frozenset({"default", "premium", "custom"})
@@ -121,18 +127,37 @@ class ModelSpec:
 # The catalog
 # ---------------------------------------------------------------------------
 #
-# Curated, not exhaustive: OpenRouter serves 339 models and we keep the ones
+# Curated, not exhaustive: OpenRouter serves 458 models and we keep the ones
 # that are the best answer to some question we actually ask. Every entry is
-# reachable through a profile role or an explicit `model_overrides` request.
+# reachable through a profile role, an explicit `model_overrides` request, or a
+# stored run record that still has to price correctly.
 #
 # Prices, context windows, and completion limits verified against OpenRouter
-# live 2026-08-13.
+# live 2026-09-26. Intelligence is AA Intelligence Index v4.3.2, same date.
 
 MODEL_CATALOG: Dict[str, ModelSpec] = {
+    # --- OpenAI: GPT-6 family (2026-09-22) ---------------------------------
+    # Level with GPT-5.6 on the index (Luna 37.26 vs 37.32, Sol 47.5 vs 47) at
+    # half the Luna price, and AA measured both using roughly half the tokens
+    # per task. The regressions AA found are in long-form deliverable
+    # presentation (GDPval-AA -75 Elo), which is not a job we give them;
+    # hallucination abstention *improved* (Luna 93% -> 77%). Luna was
+    # live-probed on the roster adjudicator before the swap: 12/12 correct on
+    # labelled membership cases, no empty verdicts under the 400-token ceiling.
+    "openai/gpt-6-luna": ModelSpec(
+        "openai/gpt-6-luna",
+        "GPT-6 Luna",
+        0.10,
+        0.50,
+        0.01,
+        1_050_000,
+        37.3,
+        128_000,
+    ),
+    "openai/gpt-6-sol": ModelSpec("openai/gpt-6-sol", "GPT-6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.5, 128_000),
     # --- OpenAI: GPT-5.6 family (2026-07-09) -------------------------------
-    # One generation, three sizes, identical 1.05M context. Luna is the
-    # cheapest model in the catalog that still scores above 50, which makes it
-    # the workhorse for bounded judgment calls.
+    # Superseded by GPT-6 at the same or twice the price. Kept so stored runs
+    # and explicit overrides still price correctly.
     "openai/gpt-5.6-luna": ModelSpec(
         "openai/gpt-5.6-luna",
         "GPT-5.6 Luna",
@@ -140,7 +165,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         1.20,
         0.02,
         1_050_000,
-        51.2,
+        37.3,
         128_000,
     ),
     "openai/gpt-5.6-terra": ModelSpec(
@@ -150,40 +175,42 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         12.00,
         0.20,
         1_050_000,
-        55.0,
+        42.0,
         128_000,
     ),
-    "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 58.9, 128_000),
+    "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.0, 128_000),
     # --- DeepSeek ----------------------------------------------------------
-    # The 0731 build is the reason the default profile is cheap. It scores
-    # within 1.3 points of Luna at 9/100ths the output price, and its gains
-    # over the original V4 Flash were concentrated exactly where we use it:
-    # agentic tool loops (GDPval-AA 1189 -> 1559 Elo, Terminal-Bench +17pts).
-    # Pinned to the dated snapshot. The floating `deepseek-v4-flash` alias is a
-    # different, older model — and actually *cheaper* ($0.06/$0.12), so the pin
-    # costs us a little. It is worth it: the 0731 gains were concentrated in the
-    # agentic tool loops this model spends its life in, and a floating alias
-    # would move a research model with no commit to point at.
+    # The 0731 build is the reason the default profile is cheap: the lowest
+    # input price of anything we run, on a 22:1 input:output workload (latest
+    # 500 production records, 2026-09-26). Its gains over the original V4
+    # Flash were concentrated exactly where we use it: agentic tool loops
+    # (GDPval-AA 1189 -> 1559 Elo).
+    # Pinned to the dated snapshot so a provider upgrade cannot move the
+    # research model with no commit to point at.
     "deepseek/deepseek-v4-flash-0731": ModelSpec(
         "deepseek/deepseek-v4-flash-0731",
         "DeepSeek V4 Flash (07-31)",
-        0.08,
-        0.18,
+        0.021,
+        0.32,
         0.016,
         1_310_720,
-        49.9,
-        384_000,
+        34.0,
+        943_718,
     ),
-    # Confusingly, "Pro" scores *below* the newer Flash (44.3 against 49.9).
-    # Kept only so an explicit override resolves to a real price.
-    "deepseek/deepseek-v4-pro": ModelSpec(
-        "deepseek/deepseek-v4-pro",
-        "DeepSeek V4 Pro",
-        0.413772,
-        0.827544,
-        0.034481,
+    # Five index points above 0731 and a 16x cheaper cache read, but 67% dearer
+    # on uncached input, and on 2026-09-26 only one OpenRouter provider served
+    # it at that list price (the next is $0.05/$0.40). Whether it is cheaper
+    # per *race* depends on the cache hit rate, which our metrics do not
+    # record, so it is catalogued for a model_overrides trial rather than
+    # assigned a role.
+    "deepseek/deepseek-v4.1-flash": ModelSpec(
+        "deepseek/deepseek-v4.1-flash",
+        "DeepSeek V4.1 Flash",
+        0.035,
+        0.29,
+        0.001,
         1_048_576,
-        44.3,
+        39.0,
         384_000,
     ),
     # --- Google ------------------------------------------------------------
@@ -194,7 +221,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         1.50,
         0.025,
         1_048_576,
-        25.0,
+        16.0,
         65_536,
     ),
     "google/gemini-3.5-flash-lite": ModelSpec(
@@ -204,9 +231,12 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         2.50,
         0.03,
         1_048_576,
-        36.5,
+        22.0,
         65_536,
     ),
+    # 3.6, 3.7 and 3.8 Flash now all cost the same $0.75/$3.75 (3.7 launched at
+    # half that and was repriced), so the newest is a strict win: 34 -> 39 -> 41.
+    # 3.8 also returns forced tool calls, which 3.7 failed 6 of 6 times.
     "google/gemini-3.6-flash": ModelSpec(
         "google/gemini-3.6-flash",
         "Gemini 3.6 Flash",
@@ -214,19 +244,27 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         3.75,
         0.075,
         1_048_576,
-        50.1,
+        34.0,
         65_536,
     ),
-    # Half of 3.6 Flash on input, output *and* cache read, newer, and 4 points
-    # stronger. A strict win with no trade-off to weigh.
     "google/gemini-3.7-flash": ModelSpec(
         "google/gemini-3.7-flash",
         "Gemini 3.7 Flash",
-        0.375,
-        1.875,
-        0.0375,
+        0.75,
+        3.75,
+        0.075,
         1_048_576,
-        54.1,
+        39.0,
+        65_536,
+    ),
+    "google/gemini-3.8-flash": ModelSpec(
+        "google/gemini-3.8-flash",
+        "Gemini 3.8 Flash",
+        0.75,
+        3.75,
+        0.075,
+        1_048_576,
+        41.0,
         65_536,
     ),
     # --- Anthropic ---------------------------------------------------------
@@ -241,7 +279,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         5.00,
         0.10,
         200_000,
-        24.0,
+        17.0,
         64_000,
     ),
     "anthropic/claude-sonnet-5": ModelSpec(
@@ -251,9 +289,14 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         10.00,
         0.20,
         1_000_000,
-        53.4,
+        38.0,
         128_000,
     ),
+    # Opus 5.5 (2026-09-22, 58 index, $4/$20) is stronger *and* cheaper, and is
+    # deliberately absent: every provider rejects a forced or "required"
+    # tool_choice for it (probed 2026-09-26), and the research loop forces its
+    # final tool call on whatever model it has escalated to. As the frontier
+    # escalation target it would turn an escalation into a permanent 400.
     "anthropic/claude-opus-5": ModelSpec(
         "anthropic/claude-opus-5",
         "Claude Opus 5",
@@ -261,7 +304,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         25.00,
         0.50,
         1_000_000,
-        60.7,
+        51.0,
         128_000,
     ),
     # --- xAI ---------------------------------------------------------------
@@ -269,20 +312,13 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     # *older* than 4.3 (2026-04-30), which is older than 4.5 (2026-07-08).
     # Reading them the other way once put the premium reviewer on an older
     # model than the default one. Release dates decide, never string order.
-    "x-ai/grok-4.3": ModelSpec("x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 37.6),
-    "x-ai/grok-4.5": ModelSpec("x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 53.8),
-    # Same $2/$6 as 4.5, newer, +5.0 index. Cached input rises $0.30 -> $0.50,
-    # which is near-free here: review calls are cache-cold by design because the
-    # race packet changes on every call.
-    "x-ai/grok-4.6": ModelSpec(
-        "x-ai/grok-4.6",
-        "Grok 4.6",
-        2.00,
-        6.00,
-        0.50,
-        500_000,
-        58.8,
-    ),
+    "x-ai/grok-4.3": ModelSpec("x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 25.0),
+    "x-ai/grok-4.5": ModelSpec("x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 39.0),
+    "x-ai/grok-4.6": ModelSpec("x-ai/grok-4.6", "Grok 4.6", 2.00, 6.00, 0.50, 500_000, 44.0),
+    # Newer, +2 index, and 20% cheaper than 4.6 on every price. It answered a
+    # probability tool field as a percentage (64.0) in 2 of 3 probe draws, so it
+    # is a reviewer, not a forecast-panel member, until that is normalized.
+    "x-ai/grok-4.7": ModelSpec("x-ai/grok-4.7", "Grok 4.7", 1.60, 4.80, 0.40, 500_000, 46.0),
 }
 
 
@@ -291,30 +327,37 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
 # ---------------------------------------------------------------------------
 
 #: Research and roster work for the default profile. Huge prompts, small
-#: completions — measured at 31.4:1 input:output across the latest 250
-#: production metric records — so the input price is what matters and
-#: DeepSeek's is the lowest above 45 index.
+#: completions — measured at 22:1 input:output across the latest 500
+#: production metric records (2026-09-26) — so the input price is what matters,
+#: and DeepSeek 0731's $0.021 is the lowest in the catalog. See the V4.1 Flash
+#: entry for the trial that could replace it.
 DEFAULT_RESEARCH_MODEL = "deepseek/deepseek-v4-flash-0731"
 
 #: Same jobs under ``premium``. This was Terra, chosen as "the cheapest model
 #: that genuinely beats the default research model" against a catalogued
 #: $1.00/$6.00 that OpenRouter never charged — Terra is really $2.00/$12.00.
 #: At true prices Sol *strictly dominates* it: identical input and cache price,
-#: identical 1.05M context, cheaper output ($10 vs $12), and 58.9 against 55.0.
+#: identical 1.05M context, cheaper output ($10 vs $12), and 47 against 42.
 #: There is no axis on which Terra is the better buy, so nothing selects it.
-PREMIUM_RESEARCH_MODEL = "openai/gpt-5.6-sol"
+#: GPT-6 Sol then replaced GPT-5.6 Sol at an identical price: +0.5 index and
+#: roughly half the output tokens per task by AA's measurement.
+PREMIUM_RESEARCH_MODEL = "openai/gpt-6-sol"
 
 #: Bounded sub-agent work and the roster adjudication gate, in *both* profiles.
 #: Deliberately not the research model — see :data:`ADJUDICATOR_MODEL`.
-SMALL_MODEL = "openai/gpt-5.6-luna"
+#:
+#: The second-largest line in the bill (301M prompt tokens across the latest
+#: 500 runs), so GPT-6 Luna — same index as GPT-5.6 Luna at half the price on
+#: every axis — roughly halves it.
+SMALL_MODEL = "openai/gpt-6-luna"
 
 #: Ceiling for escalation. Nothing routes here by default.
 #:
 #: Sol became the premium research model, so it can no longer also be the place
 #: research escalates *to* — a self-edge would fail the escalation guard and, more
-#: to the point, would not be an escalation. Opus-5 (60.7) is the only catalogued
-#: model above Sol. This is the one edge that leaves its provider family; nothing
-#: in OpenAI's live list is both stronger than Sol and scored.
+#: to the point, would not be an escalation. Opus 5 (51) is above Sol (47.5).
+#: This is the one edge that leaves its provider family: GPT-6 Astra (53) is
+#: $10/$50, and Opus 5.5 cannot take a forced tool call (see its catalog note).
 FRONTIER_MODEL = "anthropic/claude-opus-5"
 
 DEFAULT_REVIEW_CLAUDE = "anthropic/claude-haiku-4.5"
@@ -322,8 +365,8 @@ DEFAULT_REVIEW_GEMINI = "google/gemini-3.5-flash-lite"
 DEFAULT_REVIEW_GROK = "x-ai/grok-4.3"
 
 PREMIUM_REVIEW_CLAUDE = "anthropic/claude-sonnet-5"
-PREMIUM_REVIEW_GEMINI = "google/gemini-3.7-flash"
-PREMIUM_REVIEW_GROK = "x-ai/grok-4.6"
+PREMIUM_REVIEW_GEMINI = "google/gemini-3.8-flash"
+PREMIUM_REVIEW_GROK = "x-ai/grok-4.7"
 
 #: The fail-closed reading-comprehension gate in front of every roster edit.
 #:
@@ -334,9 +377,14 @@ PREMIUM_REVIEW_GROK = "x-ai/grok-4.6"
 #: The gate's whole claim to independence is that the model producing the
 #: evidence is not the model judging it, and roster edits are made from both
 #: roster-phase loops (roster model) and metadata/refinement loops (primary
-#: model). Luna satisfies that against both DeepSeek and Terra, accepts
-#: ``temperature=0``, and returns well-formed JSON — all three verified against
-#: the live API. ``scripts/check_model_catalog.py`` enforces the separation.
+#: model). Luna satisfies that against both DeepSeek and Sol and returns
+#: well-formed JSON under the 400-token ceiling, verified against the live API.
+#: ``scripts/check_model_catalog.py`` enforces the separation.
+#:
+#: It does **not** get ``temperature=0``, and neither did GPT-5.6 Luna: no
+#: OpenRouter endpoint for either lists ``temperature`` as a supported
+#: parameter, so it is dropped in transit. Determinism rests on the pinned
+#: model and the verdict cache, not on sampling.
 ADJUDICATOR_MODEL = SMALL_MODEL
 
 #: Strong, independent second look used only when every ordinary completeness
@@ -359,7 +407,8 @@ DEFAULT_CHAMBER_FORECAST_MODEL = PREMIUM_REVIEW_GEMINI
 #: of one model moved only +/-0.02-0.03, but models differed from one another
 #: by up to five points on a 14-poll Senate race — enough, alone, to push the
 #: rating across a band edge. Gemini 3.7 Flash is not a member: it returned no
-#: usable forced tool call in 6 of 6 attempts on the same prompt.
+#: usable forced tool call in 6 of 6 attempts on the same prompt. (3.8 Flash
+#: does return one; it is a candidate if the panel ever wants a Google seat.)
 #:
 #: All three are cheap (~$0.005 a call), so the panel adds ~$0.02 per race.
 FORECAST_PANEL_MODELS: tuple[str, ...] = (DEFAULT_RESEARCH_MODEL, SMALL_MODEL, DEFAULT_REVIEW_GROK)
@@ -378,8 +427,10 @@ CHAMBER_FORECAST_SYNTHESIS_MODEL = FRONTIER_MODEL
 #: questions about it — how many faces, is it a photograph at all, is the face
 #: obscured, does it look archival.
 #:
-#: It is the cheapest vision-capable model in the catalog on purpose. The
-#: questions are perceptual rather than analytical, and a dry run over 57
+#: It was the cheapest vision-capable model in the catalog when it was chosen.
+#: GPT-6 Luna and DeepSeek V4.1 Flash now also take images for less, but this
+#: one is the model the labelled dry run below validated; re-run that dry run
+#: before moving the role. The questions are perceptual rather than analytical, and a dry run over 57
 #: hand-labelled images from live races showed the flash-lite tier answering
 #: them as reliably as anything dearer would: 17 of 24 unusable images caught,
 #: and the only rejection of a "good" image was an archival portrait that was
@@ -396,7 +447,7 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
         # Roster verification decides who is on the ballot, so it used to get a
         # different, supposedly stronger model than research. That reasoning
         # inverted when DeepSeek shipped 0731: the "stronger" roster model
-        # (gemini-3.5-flash-lite) scores 36.5 against research's 49.9, while
+        # (gemini-3.5-flash-lite) scores 36.5 against research's 49.9 (index v4.1), while
         # costing 3.3x more per input token. It was the single largest line in
         # the bill — 36% of LLM spend on 21% of the tokens — and being weak in a
         # long tool loop, it tripped the tool-error escalation that accounted
@@ -432,7 +483,7 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
 #: quality failure and must not trigger an upgrade on the largest prompt.
 #:
 #: Every edge must climb the intelligence index. That sounds obvious and was not
-#: true: the previous map sent deepseek-v4-flash-0731 (49.9) to
+#: true: the previous map sent deepseek-v4-flash-0731 (49.9, v4.1) to
 #: nemotron-3-ultra (37.8) at 6.7x the input price, and because
 #: ``check_model_catalog.py`` compared *output price* rather than capability, it
 #: reported the downgrade as a healthy escalation. The guard now compares
@@ -441,12 +492,15 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
 #: Edges stay inside one provider family wherever possible so prompt behaviour
 #: does not shift mid-loop.
 MODEL_ESCALATION: Dict[str, str] = {
-    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 49.9 -> 58.9
-    SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 51.2 -> 58.9
-    PREMIUM_RESEARCH_MODEL: FRONTIER_MODEL,  # 58.9 -> 60.7
-    DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 24.0 -> 53.4
-    DEFAULT_REVIEW_GEMINI: PREMIUM_REVIEW_GEMINI,  # 36.5 -> 54.1
-    DEFAULT_REVIEW_GROK: PREMIUM_REVIEW_GROK,  # 37.6 -> 58.8
+    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 34.0 -> 47.5
+    # Not yet a role, but a research-model trial must escalate exactly as the
+    # incumbent does or its cost comparison is meaningless.
+    "deepseek/deepseek-v4.1-flash": PREMIUM_RESEARCH_MODEL,  # 39.0 -> 47.5
+    SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 47.5
+    PREMIUM_RESEARCH_MODEL: FRONTIER_MODEL,  # 47.5 -> 51.0
+    DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
+    DEFAULT_REVIEW_GEMINI: PREMIUM_REVIEW_GEMINI,  # 22.0 -> 41.0
+    DEFAULT_REVIEW_GROK: PREMIUM_REVIEW_GROK,  # 25.0 -> 46.0
 }
 
 
@@ -459,7 +513,9 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "gpt-5.6-terra": "openai/gpt-5.6-terra",
     "gpt-5.6-sol": "openai/gpt-5.6-sol",
     "deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
-    "deepseek-v4-pro": "deepseek/deepseek-v4-pro",
+    "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+    "gpt-6-luna": "openai/gpt-6-luna",
+    "gpt-6-sol": "openai/gpt-6-sol",
     "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
     "claude-sonnet-5": "anthropic/claude-sonnet-5",
     "claude-opus-5": "anthropic/claude-opus-5",
@@ -467,18 +523,23 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
     "gemini-3.6-flash": "google/gemini-3.6-flash",
     "gemini-3.7-flash": "google/gemini-3.7-flash",
+    "gemini-3.8-flash": "google/gemini-3.8-flash",
     "grok-4.3": "x-ai/grok-4.3",
     "grok-4.5": "x-ai/grok-4.5",
     "grok-4.6": "x-ai/grok-4.6",
+    "grok-4.7": "x-ai/grok-4.7",
     # Retired models, mapped to their nearest current equivalent so historical
     # runs still price and re-run sensibly.
-    "openai/gpt-5.4": "openai/gpt-5.6-sol",
-    "openai/gpt-5.4-mini": "openai/gpt-5.6-luna",
-    "openai/gpt-5-nano": "openai/gpt-5.6-luna",
-    "gpt-5.4": "openai/gpt-5.6-sol",
-    "gpt-5.4-mini": "openai/gpt-5.6-luna",
-    "gpt-5-nano": "openai/gpt-5.6-luna",
+    "openai/gpt-5.4": "openai/gpt-6-sol",
+    "openai/gpt-5.4-mini": "openai/gpt-6-luna",
+    "openai/gpt-5-nano": "openai/gpt-6-luna",
+    "gpt-5.4": "openai/gpt-6-sol",
+    "gpt-5.4-mini": "openai/gpt-6-luna",
+    "gpt-5-nano": "openai/gpt-6-luna",
     "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
+    # V4 Pro was only ever an override, and V4.1 Flash beats it on index and price.
+    "deepseek/deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
+    "deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
     "deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
     "deepseek/deepseek-chat-v3-0324": "deepseek/deepseek-v4-flash-0731",
     "deepseek-v3-0324": "deepseek/deepseek-v4-flash-0731",
@@ -525,6 +586,7 @@ RETIRED_MODEL_LABELS: Dict[str, str] = {
     "google/gemini-2.5-flash": "Gemini 2.5 Flash",
     "x-ai/grok-4.20": "Grok 4.20",
     "deepseek/deepseek-v4-flash": "DeepSeek V4 Flash",
+    "deepseek/deepseek-v4-pro": "DeepSeek V4 Pro",
     "deepseek/deepseek-chat-v3-0324": "DeepSeek V3 0324",
     "nvidia/nemotron-3-super-120b-a12b": "Nemotron 3 Super",
     "nvidia/nemotron-3-ultra-550b-a55b": "Nemotron 3 Ultra",
