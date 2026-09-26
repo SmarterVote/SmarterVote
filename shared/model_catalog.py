@@ -45,7 +45,17 @@ from typing import Dict, Mapping, Optional
 
 #: Every distinct job a model is chosen for. ``model_overrides`` is validated
 #: against this set.
-MODEL_ROLES = frozenset({"primary", "small", "roster", "image_vision", "review_claude", "review_gemini", "review_grok"})
+MODEL_ROLES = frozenset(
+    {
+        "primary",
+        "small",
+        "roster",
+        "image_vision",
+        "review_claude",
+        "review_gemini",
+        "review_grok",
+    }
+)
 
 #: Two real profiles, plus ``custom`` for a run that overrides roles by hand.
 #:
@@ -154,7 +164,9 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         37.3,
         128_000,
     ),
-    "openai/gpt-6-sol": ModelSpec("openai/gpt-6-sol", "GPT-6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.5, 128_000),
+    "openai/gpt-6-sol": ModelSpec(
+        "openai/gpt-6-sol", "GPT-6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.5, 128_000
+    ),
     # --- OpenAI: GPT-5.6 family (2026-07-09) -------------------------------
     # Superseded by GPT-6 at the same or twice the price. Kept so stored runs
     # and explicit overrides still price correctly.
@@ -178,7 +190,9 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         42.0,
         128_000,
     ),
-    "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.0, 128_000),
+    "openai/gpt-5.6-sol": ModelSpec(
+        "openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.0, 128_000
+    ),
     # --- DeepSeek ----------------------------------------------------------
     # The 0731 build is the reason the default profile is cheap: the lowest
     # input price of anything we run, on a 22:1 input:output workload (latest
@@ -312,13 +326,21 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     # *older* than 4.3 (2026-04-30), which is older than 4.5 (2026-07-08).
     # Reading them the other way once put the premium reviewer on an older
     # model than the default one. Release dates decide, never string order.
-    "x-ai/grok-4.3": ModelSpec("x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 25.0),
-    "x-ai/grok-4.5": ModelSpec("x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 39.0),
-    "x-ai/grok-4.6": ModelSpec("x-ai/grok-4.6", "Grok 4.6", 2.00, 6.00, 0.50, 500_000, 44.0),
+    "x-ai/grok-4.3": ModelSpec(
+        "x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 25.0
+    ),
+    "x-ai/grok-4.5": ModelSpec(
+        "x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 39.0
+    ),
+    "x-ai/grok-4.6": ModelSpec(
+        "x-ai/grok-4.6", "Grok 4.6", 2.00, 6.00, 0.50, 500_000, 44.0
+    ),
     # Newer, +2 index, and 20% cheaper than 4.6 on every price. It answered a
     # probability tool field as a percentage (64.0) in 2 of 3 probe draws, so it
     # is a reviewer, not a forecast-panel member, until that is normalized.
-    "x-ai/grok-4.7": ModelSpec("x-ai/grok-4.7", "Grok 4.7", 1.60, 4.80, 0.40, 500_000, 46.0),
+    "x-ai/grok-4.7": ModelSpec(
+        "x-ai/grok-4.7", "Grok 4.7", 1.60, 4.80, 0.40, 500_000, 46.0
+    ),
 }
 
 
@@ -411,12 +433,20 @@ DEFAULT_CHAMBER_FORECAST_MODEL = PREMIUM_REVIEW_GEMINI
 #: does return one; it is a candidate if the panel ever wants a Google seat.)
 #:
 #: All three are cheap (~$0.005 a call), so the panel adds ~$0.02 per race.
-FORECAST_PANEL_MODELS: tuple[str, ...] = (DEFAULT_RESEARCH_MODEL, SMALL_MODEL, DEFAULT_REVIEW_GROK)
+FORECAST_PANEL_MODELS: tuple[str, ...] = (
+    DEFAULT_RESEARCH_MODEL,
+    SMALL_MODEL,
+    DEFAULT_REVIEW_GROK,
+)
 
 #: Chamber narratives are a few calls per regeneration over the whole map, not
 #: per race, so their panel takes each house's flagship. Each drafts the note
 #: independently from the same computed numbers.
-CHAMBER_FORECAST_PANEL_MODELS: tuple[str, ...] = (PREMIUM_REVIEW_CLAUDE, PREMIUM_RESEARCH_MODEL, PREMIUM_REVIEW_GROK)
+CHAMBER_FORECAST_PANEL_MODELS: tuple[str, ...] = (
+    PREMIUM_REVIEW_CLAUDE,
+    PREMIUM_RESEARCH_MODEL,
+    PREMIUM_REVIEW_GROK,
+)
 
 #: Merges the chamber panel's drafts into the published note and holds every
 #: claim to the computed numbers. The strongest catalogued model; it runs once
@@ -493,6 +523,9 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
 #: does not shift mid-loop.
 MODEL_ESCALATION: Dict[str, str] = {
     DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 34.0 -> 47.5
+    # Not yet a role, but a research-model trial must escalate exactly as the
+    # incumbent does or its cost comparison is meaningless.
+    "deepseek/deepseek-v4.1-flash": PREMIUM_RESEARCH_MODEL,  # 39.0 -> 47.5
     SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 47.5
     PREMIUM_RESEARCH_MODEL: FRONTIER_MODEL,  # 47.5 -> 51.0
     DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
