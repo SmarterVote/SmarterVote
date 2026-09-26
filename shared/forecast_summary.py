@@ -79,6 +79,92 @@ GOVERNOR_HOLDOVERS: Dict[str, Party] = {
     "West Virginia": "Republican",
 }
 
+# Party that holds each seat on this cycle's ballot going into the election,
+# keyed by state (every state has at most one Senate seat up, counting the Ohio
+# and Florida specials). Race data only records a holder when the incumbent is
+# on the ballot, so an open seat reached the narrative models with no party at
+# all: the published Senate note called Georgia "the one Democratic-held
+# competitive seat" because Minnesota, Michigan and New Hampshire, all open, were
+# never marked Democratic. Roll this forward with the holdover tables each cycle.
+SEAT_HOLDERS_UP: Dict[Chamber, Dict[str, Party]] = {
+    "senate": {
+        "Alabama": "Republican",
+        "Alaska": "Republican",
+        "Arkansas": "Republican",
+        "Colorado": "Democratic",
+        "Delaware": "Democratic",
+        "Florida": "Republican",
+        "Georgia": "Democratic",
+        "Idaho": "Republican",
+        "Illinois": "Democratic",
+        "Iowa": "Republican",
+        "Kansas": "Republican",
+        "Kentucky": "Republican",
+        "Louisiana": "Republican",
+        "Maine": "Republican",
+        "Massachusetts": "Democratic",
+        "Michigan": "Democratic",
+        "Minnesota": "Democratic",
+        "Mississippi": "Republican",
+        "Montana": "Republican",
+        "Nebraska": "Republican",
+        "New Hampshire": "Democratic",
+        "New Jersey": "Democratic",
+        "New Mexico": "Democratic",
+        "North Carolina": "Republican",
+        "Ohio": "Republican",
+        "Oklahoma": "Republican",
+        "Oregon": "Democratic",
+        "Rhode Island": "Democratic",
+        "South Carolina": "Republican",
+        "South Dakota": "Republican",
+        "Tennessee": "Republican",
+        "Texas": "Republican",
+        "Virginia": "Democratic",
+        "West Virginia": "Republican",
+        "Wyoming": "Republican",
+    },
+    "governors": {
+        "Alabama": "Republican",
+        "Alaska": "Republican",
+        "Arizona": "Democratic",
+        "Arkansas": "Republican",
+        "California": "Democratic",
+        "Colorado": "Democratic",
+        "Connecticut": "Democratic",
+        "Florida": "Republican",
+        "Georgia": "Republican",
+        "Hawaii": "Democratic",
+        "Idaho": "Republican",
+        "Illinois": "Democratic",
+        "Iowa": "Republican",
+        "Kansas": "Democratic",
+        "Maine": "Democratic",
+        "Maryland": "Democratic",
+        "Massachusetts": "Democratic",
+        "Michigan": "Democratic",
+        "Minnesota": "Democratic",
+        "Nebraska": "Republican",
+        "Nevada": "Republican",
+        "New Hampshire": "Republican",
+        "New Mexico": "Democratic",
+        "New York": "Democratic",
+        "Ohio": "Republican",
+        "Oklahoma": "Republican",
+        "Oregon": "Democratic",
+        "Pennsylvania": "Democratic",
+        "Rhode Island": "Democratic",
+        "South Carolina": "Republican",
+        "South Dakota": "Republican",
+        "Tennessee": "Republican",
+        "Texas": "Republican",
+        "Vermont": "Republican",
+        "Wisconsin": "Democratic",
+        "Wyoming": "Republican",
+    },
+    "house": {},
+}
+
 INCUMBENT_FALLBACKS: Dict[Chamber, Dict[str, Party]] = {
     "governors": {
         "Illinois": "Democratic",
@@ -193,7 +279,9 @@ def office_group(race: Dict[str, Any]) -> Chamber | None:
 def race_state(race: Dict[str, Any]) -> str | None:
     state = race.get("state") or race.get("jurisdiction")
     if state:
-        return str(state)
+        # Some races store the postal code ("CA"), which silently missed every
+        # state-keyed table: holders, holdovers and the holdover trim alike.
+        return ABBR_TO_STATE.get(str(state).strip().lower(), str(state))
     race_id = str(race.get("id") or race.get("race_id") or "")
     return ABBR_TO_STATE.get(race_id.split("-")[0].lower())
 
@@ -615,12 +703,50 @@ def _seat_control_note(race: Dict[str, Any]) -> str:
     the seats Democrats had to "defend" at 64%, when the seat is Susan Collins's
     and a Democratic win there would be a pickup.
     """
+    holder, incumbent_running = _seat_holder(race)
+    if holder is None:
+        # Saying only "open seat" invites the model to guess a holder. Say
+        # outright that it is unknown so the prose cannot assert one.
+        return "open seat, no incumbent running; current holding party not in the data"
+    held = f"currently {holder}-held" if holder != "Other" else "currently held by an independent"
+    return held if incumbent_running else f"open seat, {held} (incumbent not running)"
+
+
+def _seat_holder(race: Dict[str, Any]) -> tuple[Party | None, bool]:
+    """The party holding the seat now, and whether its incumbent is on the ballot.
+
+    A running incumbent is the best evidence; an open seat falls back to
+    `SEAT_HOLDERS_UP`. House open seats have no table and return None.
+    """
     for candidate in race.get("candidates") or []:
-        if not isinstance(candidate, dict) or not candidate.get("incumbent"):
+        if isinstance(candidate, dict) and candidate.get("incumbent"):
+            return normalize_party(candidate.get("party")), True
+    chamber = office_group(race)
+    state = race_state(race)
+    if chamber and state:
+        holder = SEAT_HOLDERS_UP.get(chamber, {}).get(state)
+        if holder:
+            return holder, False
+    return None, False
+
+
+def _holder_summary_lines(races: list[dict[str, Any]]) -> list[str]:
+    """One line per holding party listing its competitive seats.
+
+    Given only per-race notes, a model has to count holders itself before it can
+    say which seats a party is defending, and it miscounted. Listing them removes
+    the counting and any basis for an "only" or "the one" claim the data refutes.
+    """
+    held: Dict[str, list[str]] = {}
+    for race in races:
+        rating = str((race.get("forecast") or {}).get("rating") or "").lower()
+        if not any(key in rating for key in ("toss", "tilt", "lean", "likely")):
             continue
-        party = normalize_party(candidate.get("party"))
-        return f"currently {party}-held" if party != "Other" else "currently held by an independent"
-    return "open seat, no incumbent running"
+        holder, _ = _seat_holder(race)
+        label = f"{holder}-held" if holder in ("Democratic", "Republican") else "Independent-held" if holder else None
+        held.setdefault(label or "Holder not in the data", []).append(str(race.get("title") or race.get("id")))
+    order = ["Democratic-held", "Republican-held", "Independent-held", "Holder not in the data"]
+    return [f"- {label} ({len(held[label])}): {'; '.join(held[label])}" for label in order if held.get(label)]
 
 
 def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[str, Any]) -> str:
@@ -712,6 +838,14 @@ def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[
             "If they do, state both facts explicitly rather than treating them as interchangeable."
         )
 
+    holder_lines = _holder_summary_lines(races)
+    if holder_lines:
+        lines.append(
+            "\nCurrent holders of the competitive seats (toss-up through Likely). This list is complete: a party "
+            "defends exactly the seats listed under it, and a seat it wins from the other list is a pickup."
+        )
+        lines.extend(holder_lines)
+
     lines.append("\nCompetitive/Notable Races Detail:")
     lines.extend(competitive_list[:30])
     return "\n".join(lines)
@@ -733,7 +867,10 @@ def get_chamber_narrative_review_prompt(chamber_name: str, goal: str | None = No
         "1. Seat totals, probabilities and percentages must match the context exactly. Never state a number the "
         "context does not contain.\n"
         "2. A party can only be described as defending or holding a seat it currently holds. The context gives the "
-        "current holder of every competitive race. A race the favored party does not hold is a pickup for them.\n"
+        "current holder of every competitive race and lists each party's held seats in full. A race the favored party "
+        "does not hold is a pickup for them. An open seat still belongs to the party listed as holding it. Where the "
+        "context says the holder is not in the data, the prose must not name one. Any claim that a seat is the only "
+        "or the one seat of its kind must be true of the context's full lists.\n"
         "3. Do not conflate the projected seat split with the party most likely to control the chamber. Where they "
         "differ, state both.\n"
         "4. Named races must appear in the context, with the rating and direction the context gives them.\n"
@@ -773,7 +910,9 @@ def get_chamber_panel_synthesis_prompt(chamber_name: str, cycle_year: str | int 
         "3. Seat totals, probabilities and percentages must match the data exactly. Never state a number the data does "
         "not contain.\n"
         "4. A party can only be described as defending or holding a seat it currently holds. The data gives the current "
-        "holder of every competitive race; a race the favored party does not hold is a pickup for them.\n"
+        "holder of every competitive race and lists each party's held seats in full; a race the favored party does not "
+        "hold is a pickup for them. An open seat still belongs to the party listed as holding it. Where the data says "
+        "the holder is not in the data, name none. Any 'only' or 'the one' claim must be true of the full lists.\n"
         "5. Do not conflate the projected seat split with the party most likely to control the chamber. Where they "
         "differ, state both.\n"
         "6. Named races must appear in the data, with the rating and direction the data gives them.\n"
@@ -818,6 +957,9 @@ def get_chamber_forecast_system_prompt(chamber_name: str, cycle_year: str | int 
         "Every competitive race states who currently holds the seat. Use it: a race the favored party does not already "
         "hold is a pickup opportunity for them and a seat the other party is defending. Never describe a party as "
         "defending or holding a seat it does not currently hold, and never call a race a flip when the favored party is "
-        "the incumbent one.\n\n"
+        "the incumbent one. An open seat still belongs to the party listed as holding it, so winning it is a hold, not "
+        "a flip. Where the data says a seat's holder is not in the data, do not name one. The data lists every "
+        "competitive seat each party holds; any claim that a seat is the only or the one seat of its kind must be "
+        "true of those lists.\n\n"
         "Output ONLY the JSON object, with no markdown code blocks, no backticks, and no extra text. Do not mention that you are an AI."
     )
