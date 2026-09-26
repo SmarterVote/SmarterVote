@@ -29,14 +29,12 @@ packages = ["shared", "shared.data"]
 shared = "."
 "shared.data" = "data"
 
-# Black and isort take the nearest pyproject.toml as the project root, so any
-# run given only files under shared/ (a single-file run, or a pre-commit hook
-# passing staged files) stops here, not at the repo root. Without these it
-# silently reformats to black's 88-column default. Keep in step with the root.
+# Black takes the nearest pyproject.toml as the project root, so any run given
+# only files under shared/ (a single-file run, or a commit hook passing staged
+# files) stops here, not at the repo root, and without this silently rewraps to
+# its 88-column default. Keep in step with the root. Do not add [tool.isort]
+# here: isort applies the config nearest its *first* path to the whole run, so
+# CI's `isort shared ...` would lint the entire repo with it.
 [tool.black]
 line-length = 127
 target-version = ['py311']
-
-[tool.isort]
-profile = "black"
-line_length = 127
