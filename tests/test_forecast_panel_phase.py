@@ -166,6 +166,26 @@ async def test_no_prompt_sees_the_previous_forecast():
 
 
 @pytest.mark.asyncio
+async def test_every_prompt_names_the_holder_of_an_open_seat():
+    """Regression: the open, Democratic-held Kansas governorship was forecast as a
+    Republican "hold" because no prompt said who holds the seat."""
+    race = {
+        **_race(),
+        "id": "ks-governor-2026",
+        "office": "Governor",
+        "state": "Kansas",
+        "candidates": [
+            {"name": "Cindy Holscher", "party": "Democratic"},
+            {"name": "Ty Masterson", "party": "Republican"},
+        ],
+    }
+    fake, state = _fake_loop(check_issues=["x"])
+    await _run(race, fake)
+    holder = "Seat control: open seat, currently Democratic-held (incumbent not running)"
+    assert state["prompts"] and all(holder in prompt for prompt in state["prompts"])
+
+
+@pytest.mark.asyncio
 async def test_a_writer_that_never_sets_the_forecast_falls_back_to_the_small_model():
     race = _race()
     fake, state = _fake_loop(silent_writers=(WRITER,))

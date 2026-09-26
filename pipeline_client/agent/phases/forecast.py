@@ -33,6 +33,7 @@ from shared.forecast_math import (
     panel_spread,
     rating_for,
 )
+from shared.forecast_summary import seat_control_note
 from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
 from shared.run_health import RunFailureReason
 
@@ -83,6 +84,17 @@ def _compact_candidates(race_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     ]
 
 
+def _seat_control_line(race_json: Dict[str, Any]) -> str:
+    """Who holds the seat now, so the prose can tell a hold from a flip.
+
+    Candidates carry only their own incumbent flag, so an open seat reached the
+    writer with no holder at all. The Kansas governor forecast, an open
+    Democratic-held seat, said Republicans were "favored to hold" it, and a goal
+    stating the holder did not correct it.
+    """
+    return f"\nSeat control: {seat_control_note(race_json)}."
+
+
 def _race_prompt_fields(race_json: Dict[str, Any], race_id: str, market_signals: List[Dict[str, Any]]) -> Dict[str, str]:
     """The race facts every forecast prompt shares. Deliberately excludes the previous forecast."""
     return {
@@ -93,7 +105,7 @@ def _race_prompt_fields(race_json: Dict[str, Any], race_id: str, market_signals:
         "state": race_json.get("state") or "",
         "district": race_json.get("district") or "",
         "description": race_json.get("description") or "",
-        "race_identity_context": _race_identity_context(race_json),
+        "race_identity_context": _race_identity_context(race_json) + _seat_control_line(race_json),
         "candidates_json": json.dumps(_compact_candidates(race_json), indent=2, default=str),
         "polling_note": race_json.get("polling_note") or "",
         "polling_json": json.dumps(race_json.get("polling", []), indent=2, default=str),
@@ -497,6 +509,7 @@ async def _check_forecast_text(ctx: PhaseContext, agent_loop: Callable) -> List[
     prompt = FORECAST_CHECK_USER.format(
         current_date=datetime.now(timezone.utc).date().isoformat(),
         contest_stage=race_json.get("contest_stage") or "unknown",
+        seat_control=seat_control_note(race_json),
         description=(race_json.get("description") or "")[:_MAX_CHECK_DESCRIPTION_CHARS],
         roster_json=json.dumps(roster, indent=2),
         polling_json=json.dumps((race_json.get("polling") or [])[:_MAX_CHECK_POLLS], indent=2, default=str),

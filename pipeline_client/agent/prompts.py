@@ -578,6 +578,9 @@ Flag only real problems:
 - a number in the prose (probability, poll result, margin, money raised) that
   contradicts the forecast's own fields or the data provided;
 - prose that favors a different party or candidate than the forecast's numbers;
+- a party described as holding, keeping, retaining or defending a seat that the
+  seat-control line says it does not hold (winning it would be a flip), or a
+  flip claimed for the party that already holds it;
 - any mention of how the forecast was produced (a panel, its members, models,
   AI), which belongs on the methodology page, not in a race forecast.
 Do not flag style, tone, or omissions.
@@ -587,6 +590,7 @@ when the text is sound."""
 FORECAST_CHECK_USER = """\
 Current date: {current_date}
 Contest stage: {contest_stage}
+Seat control: {seat_control}
 Race description: {description}
 
 Candidate roster (everyone who is running):
