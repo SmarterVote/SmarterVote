@@ -56,21 +56,35 @@ function matchesTerm(
   return false;
 }
 
+/**
+ * Searchable fields normalized once up front. Normalization dominates the cost
+ * of matching, so callers that search the same records on every keystroke
+ * should build these when the records load, not per query.
+ */
+export interface SearchDoc {
+  text: string;
+  tokens: string[];
+}
+
+export function prepareSearchDoc(
+  ...values: Array<string | null | undefined>
+): SearchDoc {
+  const text = (values.filter(Boolean) as string[])
+    .map(normalizeSearchText)
+    .join(" ");
+  return { text, tokens: getSearchTokens(text) };
+}
+
+/** Match pre-tokenized query terms (from `getSearchTokens`) against a doc. */
+export function matchesSearchDoc(terms: string[], doc: SearchDoc): boolean {
+  if (terms.length === 0 || doc.tokens.length === 0) return false;
+  return terms.every((term) => matchesTerm(term, doc.tokens, doc.text));
+}
+
 /** Match every query term anywhere across the supplied searchable fields. */
 export function matchesSearchQuery(
   query: string,
   ...values: Array<string | null | undefined>
 ): boolean {
-  const terms = getSearchTokens(query);
-  if (terms.length === 0) return false;
-
-  const validValues = values.filter(Boolean) as string[];
-  if (validValues.length === 0) return false;
-
-  const searchableText = validValues.map(normalizeSearchText).join(" ");
-  const searchableTokens = getSearchTokens(searchableText);
-
-  return terms.every((term) =>
-    matchesTerm(term, searchableTokens, searchableText),
-  );
+  return matchesSearchDoc(getSearchTokens(query), prepareSearchDoc(...values));
 }

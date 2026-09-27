@@ -3,9 +3,14 @@
   import USMap from "$lib/components/USMap.svelte";
   import RaceCard from "$lib/components/RaceCard.svelte";
   import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
+  import { afterNavigate, replaceState } from "$app/navigation";
   import { canonicalRaceState } from "$lib/utils/states";
+  import {
+    getSearchTokens,
+    matchesSearchDoc,
+    prepareSearchDoc,
+    type SearchDoc,
+  } from "$lib/utils/search";
   export let races: RaceSummary[] = [];
   import { debounce } from "$lib/utils/debounce";
 
@@ -17,142 +22,113 @@
   // Filter state
   let selectedState: string | null = null;
   let selectedOffice: string | null = null;
+  // `searchQuery` tracks the box keystroke by keystroke; the grid and map
+  // filter on `debouncedSearchQuery` so re-rendering never blocks typing.
   let searchQuery = "";
   let debouncedSearchQuery = "";
   let mapExpanded = false;
 
-  // Sync searchQuery with URL query parameter q reactively.
-  // Use lastPageQ to avoid a reactive loop: typing updates searchQuery which
-  // would re-trigger this block and reset the value before goto() completes.
-  let lastPageQ = "";
-  $: {
-    if (browser) {
-      const q = $page.url.searchParams.get("q") || "";
-      if (q !== lastPageQ) {
-        lastPageQ = q;
-        searchQuery = q;
-        debouncedSearchQuery = q;
-      }
-    }
+  // Adopt `?q=` only on real navigations (load, back/forward, header search).
+  // Typing writes the URL shallowly, so it can never echo back into the box
+  // and overwrite characters typed while an older write was in flight.
+  afterNavigate(({ to }) => {
+    const q = to?.url.searchParams.get("q") || "";
+    if (q === debouncedSearchQuery) return;
+    applySearch.cancel();
+    searchQuery = q;
+    debouncedSearchQuery = q;
+  });
+
+  function writeQueryToUrl(q: string) {
+    const url = new URL(window.location.href);
+    q ? url.searchParams.set("q", q) : url.searchParams.delete("q");
+    replaceState(url, $page.state);
   }
 
-  const debouncedGoto = debounce((q: string) => {
+  const applySearch = debounce((q: string) => {
     debouncedSearchQuery = q;
-    const params = new URLSearchParams($page.url.searchParams);
-    if (q) {
-      params.set("q", q);
-    } else {
-      params.delete("q");
-    }
-    goto(`/elections/?${params.toString()}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
-    });
+    writeQueryToUrl(q);
   }, 150);
 
   function handleHeroSearchInput() {
-    const q = searchQuery.trim();
-    lastPageQ = q;
-    debouncedGoto(q);
+    applySearch(searchQuery.trim());
   }
 
   function clearHeroSearch() {
+    applySearch.cancel();
     searchQuery = "";
     debouncedSearchQuery = "";
-    lastPageQ = "";
-    const params = new URLSearchParams($page.url.searchParams);
-    params.delete("q");
-    goto(`/elections/?${params.toString()}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
-    });
+    writeQueryToUrl("");
   }
+
+  // Normalize each race's searchable text once per catalog, not per query.
+  $: searchIndex = new Map<
+    RaceSummary,
+    { doc: SearchDoc; candidates: Array<{ name: string; doc: SearchDoc }> }
+  >(
+    races.map((race) => [
+      race,
+      {
+        doc: prepareSearchDoc(
+          race.title,
+          race.office,
+          race.jurisdiction,
+          canonicalRaceState(race),
+          ...race.candidates.flatMap((c) => [c.name, c.party]),
+        ),
+        candidates: race.candidates.map((c) => ({
+          name: c.name,
+          doc: prepareSearchDoc(c.name),
+        })),
+      },
+    ]),
+  );
+  $: searchTerms = getSearchTokens(debouncedSearchQuery);
+
+  // Races passing the office and text filters; the state filter is applied on
+  // top for the grid, while the map shows every state that still has matches.
+  $: officeAndQueryRaces = races.filter((race) => {
+    if (selectedOffice && officeShort(race.office) !== selectedOffice)
+      return false;
+    return (
+      !searchTerms.length ||
+      matchesSearchDoc(searchTerms, searchIndex.get(race)!.doc)
+    );
+  });
 
   // States that have races — prefer explicit `state` field, fall back to `jurisdiction` for
   // older records where jurisdiction is already a plain state name.
   // Dynamically filtered by search query and office filters so the map highlights update.
   $: activeStates = new Set(
-    races
-      .filter((race) => {
-        if (selectedOffice && officeShort(race.office) !== selectedOffice)
-          return false;
-        if (debouncedSearchQuery.trim()) {
-          const q = debouncedSearchQuery.toLowerCase();
-          return (
-            race.title?.toLowerCase().includes(q) ||
-            race.office?.toLowerCase().includes(q) ||
-            race.jurisdiction?.toLowerCase().includes(q) ||
-            canonicalRaceState(race)?.toLowerCase().includes(q) ||
-            race.candidates.some(
-              (c) =>
-                c.name.toLowerCase().includes(q) ||
-                c.party?.toLowerCase().includes(q),
-            )
-          );
-        }
-        return true;
-      })
-      .map(canonicalRaceState)
-      .filter(Boolean) as string[],
+    officeAndQueryRaces.map(canonicalRaceState).filter(Boolean) as string[],
   );
 
   // Compute matching candidates per state to show in map tooltips
   $: matchingCandidatesByState = (() => {
     const map: Record<string, string[]> = {};
-    if (!debouncedSearchQuery.trim()) return map;
-    const q = debouncedSearchQuery.toLowerCase();
+    if (!searchTerms.length) return map;
 
     races.forEach((race) => {
       const stateKey = canonicalRaceState(race);
       if (!stateKey) return;
-
-      const matchedNames: string[] = [];
-      race.candidates.forEach((c) => {
-        if (c.name.toLowerCase().includes(q)) {
-          matchedNames.push(c.name);
-        }
-      });
-
-      if (matchedNames.length > 0) {
-        if (!map[stateKey]) map[stateKey] = [];
-        matchedNames.forEach((name) => {
-          if (!map[stateKey].includes(name)) {
-            map[stateKey].push(name);
-          }
-        });
+      for (const { name, doc } of searchIndex.get(race)!.candidates) {
+        if (!matchesSearchDoc(searchTerms, doc)) continue;
+        map[stateKey] ??= [];
+        if (!map[stateKey].includes(name)) map[stateKey].push(name);
       }
     });
     return map;
   })();
 
   // Compute filtered race counts for active states to show in tooltips
-  $: filteredRaceCounts = races
-    .filter((race) => {
-      if (selectedOffice && officeShort(race.office) !== selectedOffice)
-        return false;
-      if (debouncedSearchQuery.trim()) {
-        const q = debouncedSearchQuery.toLowerCase();
-        return (
-          race.title?.toLowerCase().includes(q) ||
-          race.office?.toLowerCase().includes(q) ||
-          race.jurisdiction?.toLowerCase().includes(q) ||
-          canonicalRaceState(race)?.toLowerCase().includes(q) ||
-          race.candidates.some(
-            (c) =>
-              c.name.toLowerCase().includes(q) ||
-              c.party?.toLowerCase().includes(q),
-          )
-        );
-      }
-      return true;
-    })
-    .reduce<Record<string, number>>((acc, r) => {
+  $: filteredRaceCounts = officeAndQueryRaces.reduce<Record<string, number>>(
+    (acc, r) => {
       const stateKey = canonicalRaceState(r);
       if (stateKey) acc[stateKey] = (acc[stateKey] ?? 0) + 1;
       return acc;
-    }, {});
+    },
+    {},
+  );
 
   // unique short office names for filter chips - raising the bar
   function officeShort(office: string | undefined): string {
@@ -177,28 +153,10 @@
   })();
 
   // filtering chain: state > office > text
-  $: filteredRaces = races
-    .filter((race) => {
-      const raceState = canonicalRaceState(race);
-      if (selectedState && raceState !== selectedState) return false;
-      if (selectedOffice && officeShort(race.office) !== selectedOffice)
-        return false;
-      if (debouncedSearchQuery.trim()) {
-        const q = debouncedSearchQuery.toLowerCase();
-        return (
-          race.title?.toLowerCase().includes(q) ||
-          race.office?.toLowerCase().includes(q) ||
-          race.jurisdiction?.toLowerCase().includes(q) ||
-          canonicalRaceState(race)?.toLowerCase().includes(q) ||
-          race.candidates.some(
-            (c) =>
-              c.name.toLowerCase().includes(q) ||
-              c.party?.toLowerCase().includes(q),
-          )
-        );
-      }
-      return true;
-    })
+  $: filteredRaces = officeAndQueryRaces
+    .filter(
+      (race) => !selectedState || canonicalRaceState(race) === selectedState,
+    )
     .sort((a, b) => {
       const stateOrder = (canonicalRaceState(a) ?? "").localeCompare(
         canonicalRaceState(b) ?? "",
@@ -229,16 +187,7 @@
   function clearFilters() {
     selectedState = null;
     selectedOffice = null;
-    searchQuery = "";
-    debouncedSearchQuery = "";
-
-    const params = new URLSearchParams($page.url.searchParams);
-    params.delete("q");
-    goto(`/elections/?${params.toString()}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
-    });
+    clearHeroSearch();
   }
 </script>
 

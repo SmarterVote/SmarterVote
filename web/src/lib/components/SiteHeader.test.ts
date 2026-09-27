@@ -3,15 +3,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RaceSummary } from "$lib/types";
 import SiteHeader from "./SiteHeader.svelte";
 
-const { goto, getRaceSummaries, pageControl } = vi.hoisted(() => ({
+const {
+  goto,
+  replaceState,
+  afterNavigateCallbacks,
+  getRaceSummaries,
+  pageControl,
+} = vi.hoisted(() => ({
   goto: vi.fn(),
+  replaceState: vi.fn(),
+  afterNavigateCallbacks: [] as Array<(nav: { to: { url: URL } }) => void>,
   getRaceSummaries: vi.fn(),
   // Filled in by the $app/stores factory below so tests can drive the route.
   pageControl: { setUrl: (_: string) => {} },
 }));
 
 vi.mock("$app/environment", () => ({ browser: true }));
-vi.mock("$app/navigation", () => ({ goto }));
+vi.mock("$app/navigation", () => ({
+  goto,
+  replaceState,
+  afterNavigate: (cb: (nav: { to: { url: URL } }) => void) =>
+    afterNavigateCallbacks.push(cb),
+}));
 vi.mock("$app/stores", async () => {
   const { writable } = await import("svelte/store");
   const store = writable({ url: new URL("https://smarter.vote/elections/") });
@@ -21,18 +34,17 @@ vi.mock("$app/stores", async () => {
 vi.mock("$lib/api", () => ({ getRaceSummaries }));
 
 /**
- * On "/" the header treats the URL's `?q=` as the source of truth for the
- * search box: a reactive block copies it into `query` whenever it differs from
- * the last value the header itself wrote. In the real app `goto` updates
- * `$page.url`, closing that loop. Under test `goto` is a spy, so the URL never
- * changes and typing on "/" is immediately reset to "".
- *
- * Search behaviour is therefore exercised from a non-home route, and the
- * homepage URL-sync path gets its own describe block that drives the store by
- * hand. Getting this wrong makes every search assertion fail for a reason that
- * has nothing to do with search.
+ * On "/" the header adopts the URL's `?q=` only on real navigations
+ * (`afterNavigate`); its own writes go through shallow `replaceState` so they
+ * never echo back into the box. `navigateTo` stands in for a real navigation:
+ * it moves the page store and fires the afterNavigate callbacks.
  */
 const NON_HOME_ROUTE = "https://smarter.vote/elections/";
+
+function navigateTo(href: string) {
+  pageControl.setUrl(href);
+  for (const cb of afterNavigateCallbacks) cb({ to: { url: new URL(href) } });
+}
 
 // jsdom has no ResizeObserver, and onMount observes the header for height.
 class FakeResizeObserver {
@@ -76,7 +88,9 @@ async function type(input: HTMLInputElement, value: string) {
 beforeEach(() => {
   vi.stubGlobal("ResizeObserver", FakeResizeObserver);
   pageControl.setUrl(NON_HOME_ROUTE);
+  afterNavigateCallbacks.length = 0;
   goto.mockReset();
+  replaceState.mockReset();
   getRaceSummaries.mockReset();
   getRaceSummaries.mockResolvedValue([race()]);
 });
@@ -328,55 +342,70 @@ describe("SiteHeader lazy race loading", () => {
 describe("SiteHeader homepage query sync", () => {
   const HOME = "https://smarter.vote/";
 
+  function renderAt(href: string, props: Record<string, unknown> = {}) {
+    pageControl.setUrl(href);
+    const result = renderHeader(props);
+    navigateTo(href);
+    return result;
+  }
+
   it("seeds the search box from ?q= on the homepage", async () => {
-    pageControl.setUrl(`${HOME}?q=Missouri`);
-    const { container } = renderHeader();
+    const { container } = renderAt(`${HOME}?q=Missouri`);
 
     await waitFor(() => expect(searchBox(container).value).toBe("Missouri"));
   });
 
   it("loads summaries when arriving with a query already in the url", async () => {
-    pageControl.setUrl(`${HOME}?q=Missouri`);
-    renderHeader({ races: [] });
+    renderAt(`${HOME}?q=Missouri`, { races: [] });
 
     await waitFor(() => expect(getRaceSummaries).toHaveBeenCalled());
   });
 
   it("does not seed the box from ?q= away from the homepage", async () => {
-    pageControl.setUrl("https://smarter.vote/elections/?q=Missouri");
-    const { container } = renderHeader();
+    const { container } = renderAt(
+      "https://smarter.vote/elections/?q=Missouri",
+    );
 
     expect(searchBox(container).value).toBe("");
   });
 
-  it("pushes the typed query into the homepage url without adding history", async () => {
+  it("writes the typed query into the homepage url shallowly", async () => {
     vi.useFakeTimers();
-    pageControl.setUrl(HOME);
-    const { container } = renderHeader();
+    const { container } = renderAt(HOME);
 
     await fireEvent.input(searchBox(container), {
       target: { value: "Missouri" },
     });
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(400);
 
-    expect(goto).toHaveBeenCalledWith(
-      "/?q=Missouri",
-      expect.objectContaining({
-        replaceState: true,
-        keepFocus: true,
-        noScroll: true,
-      }),
-    );
+    expect(goto).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalledTimes(1);
+    const url = replaceState.mock.calls[0][0] as URL;
+    expect(url.searchParams.get("q")).toBe("Missouri");
+  });
+
+  // Regression: a URL write that landed after further typing used to copy the
+  // stale query back into the box, swallowing the newer keystrokes.
+  it("never overwrites characters typed after a url write", async () => {
+    vi.useFakeTimers();
+    const { container } = renderAt(HOME);
+    const input = searchBox(container);
+
+    await fireEvent.input(input, { target: { value: "Miss" } });
+    await vi.advanceTimersByTimeAsync(400);
+    await fireEvent.input(input, { target: { value: "Missouri" } });
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(input.value).toBe("Missouri");
   });
 
   it("offers a clear button only while there is a query", async () => {
-    pageControl.setUrl(HOME);
-    const { container } = renderHeader();
+    const { container } = renderAt(HOME);
     expect(container.querySelector('[aria-label="Clear search"]')).toBeNull();
     cleanup();
+    afterNavigateCallbacks.length = 0;
 
-    pageControl.setUrl(`${HOME}?q=Missouri`);
-    const seeded = renderHeader();
+    const seeded = renderAt(`${HOME}?q=Missouri`);
 
     await waitFor(() =>
       expect(
@@ -386,13 +415,7 @@ describe("SiteHeader homepage query sync", () => {
   });
 
   it("drops the q parameter when the search is cleared", async () => {
-    // Close the navigation feedback loop: the header only stays cleared once
-    // $page.url loses its `q`, which real SvelteKit navigation does for it.
-    goto.mockImplementation((href: string) => {
-      pageControl.setUrl(new URL(href, HOME).href);
-    });
-    pageControl.setUrl(`${HOME}?q=Missouri`);
-    const { container } = renderHeader();
+    const { container } = renderAt(`${HOME}?q=Missouri`);
 
     const clear = await waitFor(() => {
       const el = container.querySelector('[aria-label="Clear search"]');
@@ -402,10 +425,10 @@ describe("SiteHeader homepage query sync", () => {
 
     await fireEvent.click(clear);
 
-    await waitFor(() =>
-      expect(goto).toHaveBeenCalledWith("/?", expect.anything()),
-    );
     await waitFor(() => expect(searchBox(container).value).toBe(""));
+    await waitFor(() => expect(replaceState).toHaveBeenCalled());
+    const url = replaceState.mock.lastCall![0] as URL;
+    expect(url.searchParams.has("q")).toBe(false);
   });
 });
 

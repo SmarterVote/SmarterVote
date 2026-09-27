@@ -1,13 +1,17 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import type { RaceSummary } from "$lib/types";
   import { getRaceSummaries } from "$lib/api";
   import { candidateSlug } from "$lib/utils/format";
   import { debounce } from "$lib/utils/debounce";
-  import { matchesSearchQuery } from "$lib/utils/search";
+  import {
+    getSearchTokens,
+    matchesSearchDoc,
+    prepareSearchDoc,
+  } from "$lib/utils/search";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
 
   export let races: RaceSummary[] = [];
@@ -65,65 +69,75 @@
     return searchLoadPromise;
   }
 
-  $: raceMatches = query.trim()
-    ? searchRaces
-        .filter((race) => {
-          return matchesSearchQuery(
-            query,
-            race.title,
-            race.office,
-            race.state,
-            race.jurisdiction,
-          );
-        })
-        .slice(0, 5)
-    : [];
-  $: candidateMatches = query.trim()
-    ? searchRaces
-        .flatMap((race) =>
-          race.candidates
-            .filter((candidate) => {
-              return matchesSearchQuery(
-                query,
-                candidate.name,
-                candidate.party,
-                race.title,
-                race.office,
-                race.state,
-                race.jurisdiction,
-              );
-            })
-            .map((candidate) => ({
-              ...candidate,
-              raceId: race.id,
-              raceTitle: raceDisplayTitle(race),
-            })),
-        )
-        .slice(0, 5)
-    : [];
+  const MAX_MATCHES = 5;
+
+  // Normalize every searchable field once per catalog load; doing it per
+  // keystroke across hundreds of races is what made typing stutter.
+  $: raceIndex = searchRaces.map((race) => {
+    const raceFields = [race.title, race.office, race.state, race.jurisdiction];
+    return {
+      race,
+      doc: prepareSearchDoc(...raceFields),
+      candidates: race.candidates.map((candidate) => ({
+        candidate,
+        doc: prepareSearchDoc(candidate.name, candidate.party, ...raceFields),
+      })),
+    };
+  });
+
+  $: terms = getSearchTokens(query);
+  $: raceMatches = findRaceMatches(raceIndex, terms);
+  $: candidateMatches = findCandidateMatches(raceIndex, terms);
   $: totalMatches = raceMatches.length + candidateMatches.length;
 
-  $: if (browser && $page.url.pathname === "/") {
-    const urlQuery = $page.url.searchParams.get("q") || "";
-    if (urlQuery !== lastQuery) {
-      lastQuery = urlQuery;
-      query = urlQuery;
-      if (urlQuery) void ensureSearchRaces();
+  function findRaceMatches(index: typeof raceIndex, terms: string[]) {
+    const matches: RaceSummary[] = [];
+    for (const entry of index) {
+      if (matches.length >= MAX_MATCHES) break;
+      if (matchesSearchDoc(terms, entry.doc)) matches.push(entry.race);
     }
-  } else {
-    lastQuery = "";
+    return matches;
   }
+
+  function findCandidateMatches(index: typeof raceIndex, terms: string[]) {
+    const matches: Array<
+      RaceSummary["candidates"][number] & { raceId: string; raceTitle: string }
+    > = [];
+    for (const entry of index) {
+      for (const { candidate, doc } of entry.candidates) {
+        if (matches.length >= MAX_MATCHES) return matches;
+        if (matchesSearchDoc(terms, doc))
+          matches.push({
+            ...candidate,
+            raceId: entry.race.id,
+            raceTitle: raceDisplayTitle(entry.race),
+          });
+      }
+    }
+    return matches;
+  }
+
+  // Adopt the homepage `?q=` only on real navigations (load, back/forward,
+  // links). Our own URL writes are shallow, so they never echo back into the
+  // box and overwrite characters typed since.
+  afterNavigate(({ to }) => {
+    if (!to || to.url.pathname !== "/") {
+      lastQuery = "";
+      return;
+    }
+    const urlQuery = to.url.searchParams.get("q") || "";
+    if (urlQuery === lastQuery) return;
+    lastQuery = urlQuery;
+    query = urlQuery;
+    if (urlQuery) void ensureSearchRaces();
+  });
 
   const updateHomepageQuery = debounce((value: string) => {
     if ($page.url.pathname !== "/") return;
-    const params = new URLSearchParams($page.url.searchParams);
-    value ? params.set("q", value) : params.delete("q");
-    goto(`/?${params}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
-    });
-  }, 150);
+    const url = new URL(window.location.href);
+    value ? url.searchParams.set("q", value) : url.searchParams.delete("q");
+    replaceState(url, $page.state);
+  }, 300);
 
   function handleInput() {
     activeIndex = -1;
