@@ -638,6 +638,24 @@ def test_forecast_prompt_forbids_defending_a_seat_the_party_does_not_hold():
     assert "does not currently hold" in prompt
 
 
+def test_chamber_prompts_keep_data_gaps_out_of_the_prose():
+    """House open seats have no holder table. Told only 'name none', the published
+    House note said 'a structural limit on flip accounting: 33 competitive races
+    have no current holder in the data' — debug output on a public page."""
+    from shared.forecast_summary import (
+        get_chamber_forecast_system_prompt,
+        get_chamber_narrative_review_prompt,
+        get_chamber_panel_synthesis_prompt,
+    )
+
+    for prompt in (
+        get_chamber_forecast_system_prompt("US House"),
+        get_chamber_narrative_review_prompt("US House"),
+        get_chamber_panel_synthesis_prompt("US House"),
+    ):
+        assert "simply an open seat" in prompt
+
+
 def test_narrative_review_prompt_carries_an_optional_goal():
     from shared.forecast_summary import get_chamber_narrative_review_prompt
 
