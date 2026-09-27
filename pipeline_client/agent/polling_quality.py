@@ -21,6 +21,11 @@ _ELECTION_RESULT_URL_MARKERS = (
     "/results-",
     "/returns/",
 )
+# A straw poll is a self-selected tally, not a sample. The Iowa State Fair's
+# corn-kernel poll was stored for IA-02 and IA-03 as "Iowa Secretary of State"
+# at 70-30, dragging both forecasts, and a run goal forbidding straw polls did
+# not keep it out.
+_STRAW_POLL_MARKERS = ("straw poll", "straw-poll", "straw_poll", "strawpoll")
 
 
 def polling_semantic_problem(poll: Any, polling_note: Any = None) -> Optional[str]:
@@ -42,6 +47,8 @@ def polling_semantic_problem(poll: Any, polling_note: Any = None) -> Optional[st
     note = str(polling_note or "").casefold()
     if any(marker in source_url for marker in _ELECTION_RESULT_URL_MARKERS):
         return "Election returns or candidate vote totals cannot be stored as opinion polling."
+    if any(marker in f"{pollster.casefold()} {source_url}" for marker in _STRAW_POLL_MARKERS):
+        return "A straw poll is a self-selected tally, not an opinion poll of a sample."
     if "primary result" in note or "election result" in note:
         return "The polling note identifies this numeric entry as election results rather than an opinion poll."
     return None

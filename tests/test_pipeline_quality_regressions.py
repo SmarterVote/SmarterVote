@@ -156,6 +156,22 @@ def test_polling_semantics_reject_placeholder_and_election_results():
     )
 
 
+def test_polling_semantics_reject_straw_polls():
+    matchup = [{"candidates": ["Joe Mitchell", "Lindsay James"], "percentages": [69.72, 23.92]}]
+    # As stored for IA-02: an ordinary pollster name, the straw poll only in the URL.
+    assert polling_semantic_problem(
+        {
+            "pollster": "Iowa Secretary of State",
+            "source_url": "https://sos.iowa.gov/news-resources/secretary-pates-2026-state-fair-straw-poll-results",
+            "matchups": matchup,
+        }
+    )
+    # As stored for IA-03: the straw poll named in the pollster.
+    assert polling_semantic_problem(
+        {"pollster": "Iowa Secretary of State 2026 State Fair Straw Poll", "source_url": "", "matchups": matchup}
+    )
+
+
 def test_automated_warnings_deduct_without_becoming_a_veto():
     """Warnings can lower the grade but cannot reverse a passing average.
 
