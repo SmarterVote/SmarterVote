@@ -275,12 +275,12 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "gpt-5.4": "openai/gpt-6-sol",
   "gpt-5.4-mini": "openai/gpt-6-luna",
   "gpt-5-nano": "openai/gpt-6-luna",
-  "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
+  "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
   "deepseek/deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
   "deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
-  "deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
-  "deepseek/deepseek-chat-v3-0324": "deepseek/deepseek-v4-flash-0731",
-  "deepseek-v3-0324": "deepseek/deepseek-v4-flash-0731",
+  "deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
+  "deepseek/deepseek-chat-v3-0324": "deepseek/deepseek-v4.1-flash",
+  "deepseek-v3-0324": "deepseek/deepseek-v4.1-flash",
   "anthropic/claude-sonnet-4.6": "anthropic/claude-sonnet-5",
   "claude-sonnet-4-6": "anthropic/claude-sonnet-5",
   "claude-3-5-sonnet-20241022": "anthropic/claude-sonnet-5",
@@ -299,9 +299,9 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "grok-4.20-0309-reasoning": "x-ai/grok-4.3",
   "grok-4-1-fast-non-reasoning": "x-ai/grok-4.3",
   "grok-3-mini": "x-ai/grok-4.3",
-  "nvidia/nemotron-3-super-120b-a12b": "deepseek/deepseek-v4-flash-0731",
+  "nvidia/nemotron-3-super-120b-a12b": "deepseek/deepseek-v4.1-flash",
   "nvidia/nemotron-3-ultra-550b-a55b": "openai/gpt-5.6-terra",
-  "nemotron-3-super": "deepseek/deepseek-v4-flash-0731",
+  "nemotron-3-super": "deepseek/deepseek-v4.1-flash",
   "nemotron-3-ultra": "openai/gpt-5.6-terra"
 };
 
@@ -313,9 +313,9 @@ export const MODEL_PROFILES: string[] = [
 
 export const PROFILE_DEFAULTS: Record<string, Record<string, string>> = {
   "default": {
-    "primary": "deepseek/deepseek-v4-flash-0731",
+    "primary": "deepseek/deepseek-v4.1-flash",
     "small": "openai/gpt-6-luna",
-    "roster": "deepseek/deepseek-v4-flash-0731",
+    "roster": "deepseek/deepseek-v4.1-flash",
     "image_vision": "google/gemini-3.1-flash-lite",
     "review_claude": "anthropic/claude-haiku-4.5",
     "review_gemini": "google/gemini-3.5-flash-lite",
@@ -391,8 +391,8 @@ export const RESEARCH_MODELS: { value: string; label: string }[] = [
     "label": "Auto (profile selects)"
   },
   {
-    "value": "deepseek/deepseek-v4-flash-0731",
-    "label": "DeepSeek V4 Flash (07-31) (default)"
+    "value": "deepseek/deepseek-v4.1-flash",
+    "label": "DeepSeek V4.1 Flash (default)"
   },
   {
     "value": "openai/gpt-6-sol",

@@ -180,13 +180,11 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     ),
     "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.0, 128_000),
     # --- DeepSeek ----------------------------------------------------------
-    # The 0731 build is the reason the default profile is cheap: the lowest
-    # input price of anything we run, on a 22:1 input:output workload (latest
-    # 500 production records, 2026-09-26). Its gains over the original V4
-    # Flash were concentrated exactly where we use it: agentic tool loops
-    # (GDPval-AA 1189 -> 1559 Elo).
-    # Pinned to the dated snapshot so a provider upgrade cannot move the
-    # research model with no commit to point at.
+    # The default research model until 2026-09-26, replaced by V4.1 Flash below.
+    # It has the lowest list input price in the catalog, but it escalated to Sol
+    # far more often: in the trial it cited URLs it never fetched, tripped the
+    # roster-source guards, and 2 of 5 runs climbed to Sol for 80% of the
+    # arm's cost. Kept for overrides and for pricing stored runs.
     "deepseek/deepseek-v4-flash-0731": ModelSpec(
         "deepseek/deepseek-v4-flash-0731",
         "DeepSeek V4 Flash (07-31)",
@@ -197,12 +195,11 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         34.0,
         943_718,
     ),
-    # Five index points above 0731 and a 16x cheaper cache read, but 67% dearer
-    # on uncached input, and on 2026-09-26 only one OpenRouter provider served
-    # it at that list price (the next is $0.05/$0.40). Whether it is cheaper
-    # per *race* depends on the cache hit rate, which our metrics do not
-    # record, so it is catalogued for a model_overrides trial rather than
-    # assigned a role.
+    # The default research and roster model. Five index points above 0731.
+    # Only InferenceNet serves it at list price, and OpenRouter will not route
+    # there on its own; see MODEL_PROVIDER_PREFERENCES. Pinned to the 4.1 slug
+    # so a provider upgrade cannot move the research model with no commit to
+    # point at.
     "deepseek/deepseek-v4.1-flash": ModelSpec(
         "deepseek/deepseek-v4.1-flash",
         "DeepSeek V4.1 Flash",
@@ -327,11 +324,20 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
 # ---------------------------------------------------------------------------
 
 #: Research and roster work for the default profile. Huge prompts, small
-#: completions — measured at 22:1 input:output across the latest 500
-#: production metric records (2026-09-26) — so the input price is what matters,
-#: and DeepSeek 0731's $0.021 is the lowest in the catalog. See the V4.1 Flash
-#: entry for the trial that could replace it.
-DEFAULT_RESEARCH_MODEL = "deepseek/deepseek-v4-flash-0731"
+#: completions (22:1 input:output across the latest 500 production records,
+#: 2026-09-26).
+#:
+#: Chosen over DeepSeek 0731 by a paired trial on 2026-09-26: the same 5 House
+#: races, the same discovery+polling+forecast steps, a published baseline.
+#:
+#:   0731 (the incumbent)                    $0.80   2 of 5 escalated to Sol
+#:   V4.1 Flash, OpenRouter default routing  $0.86   0 escalated
+#:   V4.1 Flash, routed to InferenceNet      $0.20   0 escalated
+#:
+#: All three arms produced identical rosters. Per-token list price is the wrong
+#: lens here: 0731 is cheaper per token but spends more tokens and escalates.
+#: What decides the bill is escalation to Sol, and routing (arm 2 paid ~7x list).
+DEFAULT_RESEARCH_MODEL = "deepseek/deepseek-v4.1-flash"
 
 #: Same jobs under ``premium``. This was Terra, chosen as "the cheapest model
 #: that genuinely beats the default research model" against a catalogued
@@ -492,10 +498,9 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
 #: Edges stay inside one provider family wherever possible so prompt behaviour
 #: does not shift mid-loop.
 MODEL_ESCALATION: Dict[str, str] = {
-    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 34.0 -> 47.5
-    # Not yet a role, but a research-model trial must escalate exactly as the
-    # incumbent does or its cost comparison is meaningless.
-    "deepseek/deepseek-v4.1-flash": PREMIUM_RESEARCH_MODEL,  # 39.0 -> 47.5
+    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 39.0 -> 47.5
+    # The previous research model, still reachable through model_overrides.
+    "deepseek/deepseek-v4-flash-0731": PREMIUM_RESEARCH_MODEL,  # 34.0 -> 47.5
     SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 47.5
     PREMIUM_RESEARCH_MODEL: FRONTIER_MODEL,  # 47.5 -> 51.0
     DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
@@ -554,13 +559,13 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "gpt-5.4": "openai/gpt-6-sol",
     "gpt-5.4-mini": "openai/gpt-6-luna",
     "gpt-5-nano": "openai/gpt-6-luna",
-    "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
+    "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
     # V4 Pro was only ever an override, and V4.1 Flash beats it on index and price.
     "deepseek/deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
     "deepseek-v4-pro": "deepseek/deepseek-v4.1-flash",
-    "deepseek-v4-flash": "deepseek/deepseek-v4-flash-0731",
-    "deepseek/deepseek-chat-v3-0324": "deepseek/deepseek-v4-flash-0731",
-    "deepseek-v3-0324": "deepseek/deepseek-v4-flash-0731",
+    "deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
+    "deepseek/deepseek-chat-v3-0324": "deepseek/deepseek-v4.1-flash",
+    "deepseek-v3-0324": "deepseek/deepseek-v4.1-flash",
     "anthropic/claude-sonnet-4.6": "anthropic/claude-sonnet-5",
     "claude-sonnet-4-6": "anthropic/claude-sonnet-5",
     "claude-3-5-sonnet-20241022": "anthropic/claude-sonnet-5",
@@ -580,9 +585,9 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "grok-4-1-fast-non-reasoning": "x-ai/grok-4.3",
     "grok-3-mini": "x-ai/grok-4.3",
     # Nemotron was only ever an escalation target, and a downgrade at that.
-    "nvidia/nemotron-3-super-120b-a12b": "deepseek/deepseek-v4-flash-0731",
+    "nvidia/nemotron-3-super-120b-a12b": "deepseek/deepseek-v4.1-flash",
     "nvidia/nemotron-3-ultra-550b-a55b": "openai/gpt-5.6-terra",
-    "nemotron-3-super": "deepseek/deepseek-v4-flash-0731",
+    "nemotron-3-super": "deepseek/deepseek-v4.1-flash",
     "nemotron-3-ultra": "openai/gpt-5.6-terra",
 }
 
