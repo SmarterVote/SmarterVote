@@ -3,13 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RaceSummary } from "$lib/types";
 import ElectionDirectory from "./ElectionDirectory.svelte";
 
-const { goto, pageControl } = vi.hoisted(() => ({
-  goto: vi.fn(),
-  pageControl: { setUrl: (_: string) => {} },
-}));
+const { replaceState, afterNavigateCallbacks, pageControl } = vi.hoisted(
+  () => ({
+    replaceState: vi.fn(),
+    afterNavigateCallbacks: [] as Array<(nav: { to: { url: URL } }) => void>,
+    pageControl: { setUrl: (_: string) => {} },
+  }),
+);
 
 vi.mock("$app/environment", () => ({ browser: true }));
-vi.mock("$app/navigation", () => ({ goto }));
+vi.mock("$app/navigation", () => ({
+  replaceState,
+  afterNavigate: (cb: (nav: { to: { url: URL } }) => void) =>
+    afterNavigateCallbacks.push(cb),
+}));
 vi.mock("$app/stores", async () => {
   const { writable } = await import("svelte/store");
   const store = writable({ url: new URL("https://smarter.vote/elections/") });
@@ -18,6 +25,12 @@ vi.mock("$app/stores", async () => {
 });
 
 const ROUTE = "https://smarter.vote/elections/";
+
+/** Stand-in for a real navigation: move the page store, fire afterNavigate. */
+function navigateTo(href: string) {
+  pageControl.setUrl(href);
+  for (const cb of afterNavigateCallbacks) cb({ to: { url: new URL(href) } });
+}
 
 /**
  * The embedded USMap fetches /states-10m.json in onMount with no try/catch, so
@@ -69,7 +82,8 @@ function officeChip(container: HTMLElement, label: string) {
 
 beforeEach(() => {
   pageControl.setUrl(ROUTE);
-  goto.mockReset();
+  afterNavigateCallbacks.length = 0;
+  replaceState.mockReset();
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
@@ -211,15 +225,7 @@ describe("ElectionDirectory search", () => {
     }),
   ];
 
-  /** Search is debounced through goto → $page.url, so drive that loop. */
-  function wireNavigation() {
-    goto.mockImplementation((href: string) => {
-      pageControl.setUrl(new URL(href, ROUTE).href);
-    });
-  }
-
   it("filters by candidate name", async () => {
-    wireNavigation();
     const { container } = renderDirectory(searchable);
 
     await fireEvent.input(searchBox(container), { target: { value: "Jane" } });
@@ -231,7 +237,6 @@ describe("ElectionDirectory search", () => {
   });
 
   it("filters by party", async () => {
-    wireNavigation();
     const { container } = renderDirectory(searchable);
 
     await fireEvent.input(searchBox(container), {
@@ -245,7 +250,6 @@ describe("ElectionDirectory search", () => {
   });
 
   it("filters by title", async () => {
-    wireNavigation();
     const { container } = renderDirectory(searchable);
 
     await fireEvent.input(searchBox(container), {
@@ -258,36 +262,59 @@ describe("ElectionDirectory search", () => {
   });
 
   it("seeds the box from ?q= in the url", async () => {
-    pageControl.setUrl(`${ROUTE}?q=Kansas`);
     const { container } = renderDirectory(searchable);
+    navigateTo(`${ROUTE}?q=Kansas`);
 
     await waitFor(() => expect(searchBox(container).value).toBe("Kansas"));
     await waitFor(() => expect(cards(container)).toHaveLength(1));
   });
 
-  it("writes the query into the url without stacking history entries", async () => {
+  it("writes the query into the url shallowly, without a navigation", async () => {
     const { container } = renderDirectory(searchable);
 
     await fireEvent.input(searchBox(container), { target: { value: "Jane" } });
 
-    await waitFor(
-      () =>
-        expect(goto).toHaveBeenCalledWith(
-          "/elections/?q=Jane",
-          expect.objectContaining({
-            replaceState: true,
-            keepFocus: true,
-            noScroll: true,
-          }),
-        ),
-      { timeout: 2000 },
-    );
+    await waitFor(() => expect(replaceState).toHaveBeenCalled(), {
+      timeout: 2000,
+    });
+    const url = replaceState.mock.lastCall![0] as URL;
+    expect(url.searchParams.get("q")).toBe("Jane");
+  });
+
+  // Regression: a URL write that landed after further typing used to copy the
+  // stale query back into the box, swallowing the newer keystrokes.
+  it("never overwrites characters typed after a url write", async () => {
+    const { container } = renderDirectory(searchable);
+    const input = searchBox(container);
+
+    await fireEvent.input(input, { target: { value: "Ja" } });
+    await waitFor(() => expect(replaceState).toHaveBeenCalledTimes(1), {
+      timeout: 2000,
+    });
+    await fireEvent.input(input, { target: { value: "Jane" } });
+    await waitFor(() => expect(replaceState).toHaveBeenCalledTimes(2), {
+      timeout: 2000,
+    });
+
+    expect(input.value).toBe("Jane");
+  });
+
+  it("matches state abbreviations and out-of-order terms", async () => {
+    const { container } = renderDirectory(searchable);
+
+    await fireEvent.input(searchBox(container), {
+      target: { value: "doe mo" },
+    });
+
+    await waitFor(() => expect(cards(container)).toHaveLength(1), {
+      timeout: 2000,
+    });
+    expect(cards(container)[0].getAttribute("href")).toBe("/races/mo/");
   });
 
   it("clears the query and drops it from the url", async () => {
-    wireNavigation();
-    pageControl.setUrl(`${ROUTE}?q=Kansas`);
     const { container } = renderDirectory(searchable);
+    navigateTo(`${ROUTE}?q=Kansas`);
 
     const clear = await waitFor(() => {
       const el = container.querySelector('[aria-label="Clear search query"]');
@@ -302,7 +329,6 @@ describe("ElectionDirectory search", () => {
   });
 
   it("matches case-insensitively", async () => {
-    wireNavigation();
     const { container } = renderDirectory(searchable);
 
     await fireEvent.input(searchBox(container), { target: { value: "jane" } });
