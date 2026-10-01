@@ -7,9 +7,3 @@
 <svelte:element this={tag} class={`card ${className}`.trim()} {...$$restProps}>
   <slot />
 </svelte:element>
-
-<style lang="postcss">
-  .card {
-    @apply bg-surface rounded-lg shadow;
-  }
-</style>
