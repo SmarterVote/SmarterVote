@@ -1,16 +1,21 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import { getDraftRace, getRace } from "$lib/api";
-  import type { Race } from "$lib/types";
+  import type { CanonicalIssue, Race } from "$lib/types";
+  import { CANONICAL_ISSUES } from "$lib/types";
   import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { candidateSlug, matchesCandidateSlug } from "$lib/utils/format";
-  import { onMount } from "svelte";
-  import { raceDisplayTitle } from "$lib/utils/raceTitle";
+  import { onMount, tick } from "svelte";
+  import {
+    compareMetaDescription,
+    comparePageTitle,
+    raceDisplayTitle,
+  } from "$lib/utils/raceTitle";
   import {
     isNotFoundError,
     selectComparedCandidates,
@@ -45,21 +50,110 @@
   $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
     loadRace(slug, draftParam);
 
-  $: description = `Compare candidates side-by-side on key election issues for ${
-    race ? raceDisplayTitle(race) : "this election"
-  }.`;
-  $: pageTitle = `Compare Candidates | ${
-    race ? raceDisplayTitle(race) : "Smarter.Vote"
-  }`;
+  $: description = compareMetaDescription(race);
+  $: pageTitle = comparePageTitle(race);
   $: draftQuery = isDraftPreview ? "?draft=true" : "";
 
+  // Client-side navigation within the same race (another candidate, say)
+  // brings new embedded data; follow it unless a draft is being previewed.
+  $: if (
+    mounted &&
+    !draftParam &&
+    data.prerenderedRace &&
+    data.prerenderedRace.id === slug &&
+    race !== data.prerenderedRace
+  )
+    race = data.prerenderedRace;
+
+  // The compared issue lives in `?issue=<slug>` so a shared link opens on it.
+  let selectedIssue: CanonicalIssue = "Healthcare";
+  let syncedIssue: CanonicalIssue | null = null;
+
+  function issueFromParam(value: string | null): CanonicalIssue | null {
+    if (!value) return null;
+    const wanted = value.trim().toLowerCase();
+    return (
+      CANONICAL_ISSUES.find(
+        (issue) =>
+          candidateSlug(issue) === wanted || issue.toLowerCase() === wanted,
+      ) ?? null
+    );
+  }
+
+  /** Current address-bar query (a shallow replaceState leaves `$page.url` behind). */
+  function currentParams(): URLSearchParams {
+    return new URLSearchParams(
+      browser ? window.location.search : $page.url.search,
+    );
+  }
+
+  $: if (mounted && syncedIssue !== null && selectedIssue !== syncedIssue) {
+    syncedIssue = selectedIssue;
+    const params = currentParams();
+    params.set("issue", candidateSlug(selectedIssue));
+    try {
+      replaceState(
+        `${window.location.pathname}?${params.toString()}${window.location.hash}`,
+        $page.state,
+      );
+    } catch {
+      // The router is not ready yet; the next change will sync it.
+    }
+  }
+
   onMount(() => {
+    const fromUrl = issueFromParam(
+      new URLSearchParams(window.location.search).get("issue"),
+    );
+    if (fromUrl) selectedIssue = fromUrl;
+    syncedIssue = selectedIssue;
     mounted = true;
+    // The desktop table shows every issue; bring the linked one into view.
+    if (fromUrl && window.matchMedia?.("(min-width: 1024px)").matches) {
+      tick().then(() =>
+        document
+          .getElementById(`compare-issue-${candidateSlug(fromUrl)}`)
+          ?.scrollIntoView(),
+      );
+    }
   });
 
-  // Same policy as the race page: show prerendered data immediately, always
-  // refetch the fresh copy after mount, and keep the prerendered copy if that
-  // refetch fails.
+  let copyStatus = "";
+  let copyTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Copy the comparison's address (candidates + issue) for sharing. */
+  async function copyLink() {
+    const url = window.location.href;
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(url);
+      copied = true;
+    } catch {
+      // Older browsers and non-secure contexts: a hidden textarea + execCommand.
+      const field = document.createElement("textarea");
+      field.value = url;
+      field.setAttribute("readonly", "");
+      field.style.position = "fixed";
+      field.style.opacity = "0";
+      document.body.appendChild(field);
+      field.select();
+      try {
+        copied = document.execCommand("copy");
+      } catch {
+        copied = false;
+      }
+      field.remove();
+    }
+    copyStatus = copied
+      ? "Link copied to clipboard"
+      : "Couldn't copy the link. Copy it from the address bar instead.";
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => (copyStatus = ""), 4000);
+  }
+
+  // Same policy as the race page: the build-embedded race renders as is; a
+  // draft, or a page built without data, fetches after mount, keeping any
+  // embedded copy if that fetch fails.
   async function loadRace(target: string, draft: boolean) {
     const previousSlug = loadedKey?.split("|")[0];
     loadedKey = `${target}|${draft}`;
@@ -72,6 +166,12 @@
     isDraftPreview = draft;
     error = null;
     notFound = false;
+    // The build embedded this race: nothing to refetch (drafts always fetch).
+    if (!draft && prerendered) {
+      race = prerendered;
+      loading = false;
+      return;
+    }
     loading = !race;
 
     try {
@@ -127,7 +227,7 @@
   function toggleSelection(candidateName: string) {
     if (!race) return;
     const selectedSlug = candidateSlug(candidateName);
-    const params = new URLSearchParams($page.url.searchParams);
+    const params = currentParams();
     const active = neutralCandidateOrder(
       race.candidates.filter((candidate) => !candidate.withdrawn),
     );
@@ -196,10 +296,22 @@
         <UiIcon name="arrow-left" size="sm" /> Race overview
       </a>
       <p class="eyebrow mt-3">Candidate comparison</p>
-      <h1 class="h-page mt-1">Compare Candidates</h1>
+      <div class="compare-title-row">
+        <h1 class="h-page mt-1">Compare Candidates</h1>
+        {#if race}
+          <button
+            type="button"
+            class="btn-secondary shrink-0"
+            on:click={copyLink}
+          >
+            {copyStatus === "Link copied to clipboard" ? "Copied" : "Copy link"}
+          </button>
+        {/if}
+      </div>
       {#if race}<p class="mt-2 text-sm text-content-muted sm:text-base">
           {raceDisplayTitle(race)}
         </p>{/if}
+      <p class="sr-only" role="status" aria-live="polite">{copyStatus}</p>
     </header>
 
     {#if loading}
@@ -236,6 +348,7 @@
         {race}
         {candidates}
         {isDraftPreview}
+        bind:selectedIssue
         onToggle={toggleSelection}
       />
     {/if}
@@ -245,6 +358,10 @@
 <style lang="postcss">
   .compare-header {
     @apply mb-5 sm:mb-6;
+  }
+
+  .compare-title-row {
+    @apply flex flex-wrap items-center justify-between gap-3;
   }
 
   .compare-back-link {

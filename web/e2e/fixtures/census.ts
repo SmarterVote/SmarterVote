@@ -1,20 +1,13 @@
 /**
- * Canned Census geocoder response for the `my-ballot` address lookup flow.
- * Matches the shape `parseCensusGeography` (src/lib/services/electionLookup.ts)
- * expects, resolving to Ohio's 5th Congressional District so it lines up with
- * the `e2e-oh-house-05-2026` and `e2e-oh-senate-2026` fixture races.
+ * Canned races-api Census proxy responses (`POST /geocode/census`) for the
+ * `my-ballot` address lookup flow. Matches the shape
+ * `parseCensusProxyResponse` (src/lib/services/electionLookup.ts) expects,
+ * resolving to Ohio's 5th Congressional District so it lines up with the
+ * `e2e-oh-house-05-2026` and `e2e-oh-senate-2026` fixture races.
  */
 export const OHIO_DISTRICT_05_CENSUS_RESPONSE = {
-  result: {
-    addressMatches: [
-      {
-        geographies: {
-          States: [{ NAME: "Ohio" }],
-          "119th Congressional Districts": [{ CD119: "05" }],
-        },
-      },
-    ],
-  },
+  state: "Ohio",
+  congressional_district: { CD120: "05", GEOID: "3905", BASENAME: "5" },
 };
 
 /**
@@ -23,14 +16,6 @@ export const OHIO_DISTRICT_05_CENSUS_RESPONSE = {
  * exercised deterministically.
  */
 export const NO_RACES_CENSUS_RESPONSE = {
-  result: {
-    addressMatches: [
-      {
-        geographies: {
-          States: [{ NAME: "California" }],
-          "119th Congressional Districts": [{ CD119: "12" }],
-        },
-      },
-    ],
-  },
+  state: "California",
+  congressional_district: { CD120: "12", GEOID: "0612", BASENAME: "12" },
 };

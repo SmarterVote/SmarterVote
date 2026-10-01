@@ -7,21 +7,14 @@
 
   let isAuthenticated = false;
   let darkMode = false;
-  const cloudflareAnalyticsToken = import.meta.env
-    .VITE_CLOUDFLARE_WEB_ANALYTICS_TOKEN;
+
+  // Cloudflare Web Analytics is injected at the edge by Cloudflare Pages
+  // (verified 2026-10-01: production HTML served to browsers carries the
+  // versioned beacon.min.js/v… script with this site's token). Adding the
+  // beacon here as well loaded it twice and double-counted page views, so the
+  // app does not inject it itself.
 
   onMount(() => {
-    if (cloudflareAnalyticsToken && !$page.url.pathname.startsWith("/admin")) {
-      const script = document.createElement("script");
-      script.defer = true;
-      script.src = "https://static.cloudflareinsights.com/beacon.min.js";
-      script.dataset.cfBeacon = JSON.stringify({
-        token: cloudflareAnalyticsToken,
-        spa: true,
-      });
-      document.head.appendChild(script);
-    }
-
     let saved: string | null = null;
     try {
       saved = localStorage.getItem("darkMode");

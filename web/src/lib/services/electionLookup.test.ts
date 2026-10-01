@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   districtFromRace,
+  lookupElectionGeography,
   matchingNationalRaces,
   normalizeDistrictCode,
-  parseCensusGeography,
+  parseCensusProxyResponse,
 } from "./electionLookup";
 import type { RaceSummary } from "$lib/types";
 
@@ -19,28 +20,18 @@ const race = (overrides: Partial<RaceSummary>): RaceSummary => ({
   ...overrides,
 });
 
-// Live Census shape (Oct 2026): the district field is CD120, and at-large
-// states carry the text "Congressional District (at Large)" in BASENAME.
-function censusResponse(state: string, entry: Record<string, unknown>) {
-  return {
-    result: {
-      addressMatches: [
-        {
-          geographies: {
-            States: [{ NAME: state }],
-            "120th Congressional Districts": [entry],
-          },
-        },
-      ],
-    },
-  };
+// Live Census shape (Oct 2026), as the races-api proxy passes it through: the
+// district field is CD120, and at-large states carry the text
+// "Congressional District (at Large)" in BASENAME.
+function proxyResponse(state: string, entry: Record<string, unknown>) {
+  return { state, congressional_district: entry };
 }
 
-describe("parseCensusGeography with newer Congress vintages", () => {
+describe("parseCensusProxyResponse with newer Congress vintages", () => {
   it("reads CD120 for an at-large state instead of the BASENAME text", () => {
     expect(
-      parseCensusGeography(
-        censusResponse("Alaska", {
+      parseCensusProxyResponse(
+        proxyResponse("Alaska", {
           BASENAME: "Congressional District (at Large)",
           GEOID: "0200",
           CD120: "00",
@@ -51,19 +42,25 @@ describe("parseCensusGeography with newer Congress vintages", () => {
 
   it("reads CD120 for numbered districts", () => {
     expect(
-      parseCensusGeography(
-        censusResponse("Texas", { BASENAME: "10", GEOID: "4810", CD120: "10" }),
+      parseCensusProxyResponse(
+        proxyResponse("Texas", { BASENAME: "10", GEOID: "4810", CD120: "10" }),
       ),
     ).toEqual({ state: "Texas", congressionalDistrict: "10" });
   });
 
+  it("still reads CD119", () => {
+    expect(
+      parseCensusProxyResponse(proxyResponse("Maryland", { CD119: "04" })),
+    ).toEqual({ state: "Maryland", congressionalDistrict: "04" });
+  });
+
   it("falls back to GEOID, then to the at-large text", () => {
     expect(
-      parseCensusGeography(censusResponse("Ohio", { GEOID: "3907" })),
+      parseCensusProxyResponse(proxyResponse("Ohio", { GEOID: "3907" })),
     ).toEqual({ state: "Ohio", congressionalDistrict: "07" });
     expect(
-      parseCensusGeography(
-        censusResponse("Wyoming", {
+      parseCensusProxyResponse(
+        proxyResponse("Wyoming", {
           BASENAME: "Congressional District (at Large)",
         }),
       ),
@@ -72,10 +69,84 @@ describe("parseCensusGeography with newer Congress vintages", () => {
 
   it("maps the D.C. delegate code 98 to the at-large seat", () => {
     expect(
-      parseCensusGeography(
-        censusResponse("District of Columbia", { GEOID: "1198", CD120: "98" }),
+      parseCensusProxyResponse(
+        proxyResponse("District of Columbia", { GEOID: "1198", CD120: "98" }),
       )?.congressionalDistrict,
     ).toBe("00");
+  });
+
+  it("returns null without a state or a usable district", () => {
+    expect(parseCensusProxyResponse({})).toBeNull();
+    expect(
+      parseCensusProxyResponse(proxyResponse("Ohio", { NAME: "Nowhere" })),
+    ).toBeNull();
+  });
+});
+
+describe("lookupElectionGeography", () => {
+  function jsonResponse(status: number, body: unknown): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: () => Promise.resolve(body),
+    } as Response;
+  }
+
+  it("posts the address to the races-api Census proxy", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, proxyResponse("Texas", { CD120: "10" })),
+      );
+
+    await expect(
+      lookupElectionGeography("301 W 2nd St, Austin, TX 78701", 1000, fetchFn),
+    ).resolves.toEqual({ state: "Texas", congressionalDistrict: "10" });
+
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toMatch(/\/geocode\/census$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      address: "301 W 2nd St, Austin, TX 78701",
+    });
+  });
+
+  it.each([404, 422])("reports %i as an unmatched address", async (status) => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(status, {}));
+    await expect(
+      lookupElectionGeography("nowhere", 1000, fetchFn),
+    ).rejects.toThrow("We could not match that address.");
+  });
+
+  it.each([429, 502, 504])(
+    "reports %i as the service being unavailable",
+    async (status) => {
+      const fetchFn = vi.fn().mockResolvedValue(jsonResponse(status, {}));
+      await expect(
+        lookupElectionGeography("somewhere", 1000, fetchFn),
+      ).rejects.toThrow("The address service is unavailable right now.");
+    },
+  );
+
+  it("reports a network failure as the service being unavailable", async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError("offline"));
+    await expect(
+      lookupElectionGeography("somewhere", 1000, fetchFn),
+    ).rejects.toThrow("The address service is unavailable right now.");
+  });
+
+  it("gives up after the timeout", async () => {
+    const fetchFn = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+    await expect(
+      lookupElectionGeography("somewhere", 5, fetchFn),
+    ).rejects.toThrow("The address service took too long to respond.");
   });
 });
 
@@ -91,49 +162,6 @@ describe("normalizeDistrictCode", () => {
     ["2026", null],
   ])("%s -> %s", (input, expected) => {
     expect(normalizeDistrictCode(input)).toBe(expected);
-  });
-});
-
-describe("parseCensusGeography", () => {
-  it("extracts the state and current congressional district", () => {
-    expect(
-      parseCensusGeography({
-        result: {
-          addressMatches: [
-            {
-              geographies: {
-                States: [{ NAME: "Maryland" }],
-                "119th Congressional Districts": [{ CD119: "04" }],
-              },
-            },
-          ],
-        },
-      }),
-    ).toEqual({ state: "Maryland", congressionalDistrict: "04" });
-  });
-
-  it("returns null for an unmatched address", () => {
-    expect(parseCensusGeography({ result: { addressMatches: [] } })).toBeNull();
-  });
-
-  it("normalizes Census delegate district 98 to at-large", () => {
-    expect(
-      parseCensusGeography({
-        result: {
-          addressMatches: [
-            {
-              geographies: {
-                States: [{ NAME: "District of Columbia" }],
-                "119th Congressional Districts": [{ CD119: "98" }],
-              },
-            },
-          ],
-        },
-      }),
-    ).toEqual({
-      state: "District of Columbia",
-      congressionalDistrict: "00",
-    });
   });
 });
 

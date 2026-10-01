@@ -154,7 +154,7 @@ describe("ElectionLookup", () => {
     ).toBeTruthy();
   });
 
-  it("renders Census delegate districts as at-large", async () => {
+  it("explains D.C.'s non-voting delegate seat", async () => {
     window.history.replaceState(
       {},
       "",
@@ -164,9 +164,22 @@ describe("ElectionLookup", () => {
     render(ElectionLookup, { races: [] });
 
     await waitFor(() =>
-      expect(screen.getByText(/At-large congressional district/i)).toBeTruthy(),
+      expect(screen.getByText(/Non-voting delegate district/i)).toBeTruthy(),
     );
     expect(screen.queryByText(/House District 0/i)).toBeNull();
+    expect(
+      screen.getByText(
+        /D\.C\. elects a non-voting delegate to the U\.S\. House; Smarter\.Vote doesn.t cover that race yet\./,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("suggests a covered example address and has no stray space after VOTE411", async () => {
+    const { container } = render(ElectionLookup, { races: [] });
+    expect(
+      screen.getByLabelText("Home address").getAttribute("placeholder"),
+    ).toBe("301 W 2nd St, Austin, TX 78701");
+    expect(container.textContent).not.toMatch(/VOTE411\s+\./);
   });
 
   it("supports keyboard navigation and selection in the address combobox", async () => {

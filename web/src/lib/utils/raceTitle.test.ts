@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   candidateMetaDescription,
+  candidatePageTitle,
+  compareMetaDescription,
+  comparePageTitle,
   raceDisplayTitle,
   raceMetaDescription,
   racePageTitle,
 } from "./raceTitle";
+import { STATE_NAMES_BY_CODE } from "./states";
 
 describe("raceDisplayTitle", () => {
   it("normalizes Senate titles and special elections", () => {
@@ -89,7 +93,54 @@ describe("raceDisplayTitle", () => {
     ).toBe("Arkansas Supreme Court associate justice election, 2026");
   });
 
-  it("builds voter-focused page metadata", () => {
+  it("builds short voter-focused page titles", () => {
+    expect(
+      racePageTitle({
+        id: "tx-senate-2026",
+        office: "U.S. Senate",
+        state: "Texas",
+      }),
+    ).toBe("Texas Senate race 2026 | Smarter.Vote");
+    expect(
+      racePageTitle({
+        id: "tx-house-12-2026",
+        office: "U.S. House",
+        state: "Texas",
+        district: "12th Congressional District",
+      }),
+    ).toBe("TX-12 House race 2026 | Smarter.Vote");
+    expect(
+      racePageTitle({
+        id: "ak-house-2026",
+        office: "U.S. House",
+        state: "Alaska",
+        district: "At-Large",
+      }),
+    ).toBe("AK-AL House race 2026 | Smarter.Vote");
+    expect(
+      racePageTitle({
+        id: "oh-senate-2026-special",
+        office: "U.S. Senate",
+        state: "Ohio",
+      }),
+    ).toBe("Ohio Senate special election 2026 | Smarter.Vote");
+    expect(
+      racePageTitle({
+        id: "ga-governor-2026",
+        office: "Governor of Georgia",
+        state: "Georgia",
+      }),
+    ).toBe("Georgia Governor race 2026 | Smarter.Vote");
+    expect(
+      comparePageTitle({
+        id: "tx-senate-2026",
+        office: "U.S. Senate",
+        state: "Texas",
+      }),
+    ).toBe("Compare Texas Senate candidates 2026 | Smarter.Vote");
+  });
+
+  it("names the field in neutral display order in the race description", () => {
     const race = {
       id: "ga-senate-2026",
       title: "old",
@@ -97,23 +148,25 @@ describe("raceDisplayTitle", () => {
       state: "Georgia",
       election_date: "2026-11-03",
       // The independent is first in the roster, but the description names
-      // candidates in display order: major-party candidates first, then the
-      // roster's own order.
+      // candidates in display order: major-party candidates first, then
+      // alphabetical by last name.
       candidates: [
         { name: "Alex Taylor", party: "Independent" },
-        { name: "Jane Doe", party: "Democratic" },
         { name: "John Smith", party: "Republican" },
+        { name: "Jane Doe", party: "Democratic" },
       ],
     };
-    expect(racePageTitle(race)).toBe(
-      "2026 Georgia U.S. Senate Election | Smarter.Vote",
-    );
     expect(raceMetaDescription(race)).toBe(
-      "Compare Jane Doe, John Smith, and others in the 2026 Georgia U.S. Senate Election on November 3, 2026, with sourced issue positions, polling, and race updates.",
+      "Compare Jane Doe (D), John Smith (R), and Alex Taylor (I) in the 2026 Georgia Senate race: sourced issue positions, polls and forecast.",
+    );
+    expect(
+      raceMetaDescription({ ...race, candidates: [race.candidates[1]] }),
+    ).toBe(
+      "John Smith (R) is the only candidate in the 2026 Georgia Senate race. Sourced profile, positions and voter resources. Election Day: Nov 3, 2026.",
     );
   });
 
-  it("describes only candidate content that is present", () => {
+  it("describes researched candidates by the issues covered", () => {
     const race = {
       id: "ga-senate-2026",
       office: "U.S. Senate",
@@ -123,16 +176,8 @@ describe("raceDisplayTitle", () => {
       candidateMetaDescription(
         {
           name: "Jane Doe",
+          party: "Democratic",
           summary: "Candidate biography",
-          summary_sources: [
-            {
-              url: "https://example.com",
-              type: "website",
-              title: "Bio",
-              last_accessed: "2026-08-18T00:00:00Z",
-              is_fresh: true,
-            },
-          ],
           issues: {
             Healthcare: {
               stance: "Supports a policy.",
@@ -144,33 +189,150 @@ describe("raceDisplayTitle", () => {
               sources: [],
               confidence: "medium",
             },
+            Immigration: {
+              stance: "Supports a third policy.",
+              sources: [],
+              confidence: "medium",
+            },
           },
           donor_summary: "Donor summary",
         },
         race,
       ),
     ).toBe(
-      "Explore Jane Doe's positions on Healthcare and Economy, biography, donor information, and cited sources for the 2026 Georgia U.S. Senate Election.",
+      "Jane Doe (D) in the 2026 Georgia Senate race: sourced positions on Healthcare, Economy and 1 more issue, plus top donors.",
     );
+    expect(
+      candidatePageTitle({ name: "Jane Doe", party: "Democratic" }, race),
+    ).toBe("Jane Doe (D) – Georgia Senate 2026 | Smarter.Vote");
+  });
 
-    expect(candidateMetaDescription({ name: "Jane Doe" }, race)).toBe(
-      "Learn about Jane Doe in the 2026 Georgia U.S. Senate Election.",
-    );
-
+  it("describes discovery-only candidates by party, incumbency and office", () => {
+    const race = {
+      id: "tx-house-12-2026",
+      office: "U.S. House",
+      state: "Texas",
+      district: "12",
+    };
+    const markerOnly = {
+      Healthcare: {
+        stance: "No public position found",
+        sources: [],
+        confidence: "low" as const,
+      },
+      Economy: {
+        stance: "No specific public position was identified on tax policy.",
+        sources: [],
+        confidence: "low" as const,
+      },
+    };
     expect(
       candidateMetaDescription(
         {
           name: "Jane Doe",
-          issues: {
-            Healthcare: {
-              stance: "No public position found",
-              sources: [],
-              confidence: "low",
-            },
-          },
+          party: "Republican",
+          incumbent: true,
+          issues: markerOnly,
         },
         race,
       ),
-    ).toBe("Learn about Jane Doe in the 2026 Georgia U.S. Senate Election.");
+    ).toBe(
+      "Jane Doe is the Republican incumbent in the 2026 House race in TX-12 (Texas 12th District).",
+    );
+    expect(
+      candidateMetaDescription(
+        { name: "Sam Roe", party: "Independent", summary: "Bio" },
+        race,
+      ),
+    ).toBe(
+      "Sam Roe is an independent candidate in the 2026 House race in TX-12 (Texas 12th District). See background and campaign links.",
+    );
+    expect(candidateMetaDescription({ name: "Jane Doe" }, race)).not.toMatch(
+      /biography|cited sources/,
+    );
+  });
+
+  it("keeps every title within 60 and every description within 155 characters", () => {
+    const names = [
+      "Jo Li",
+      "Maxwell Alejandro Frost",
+      "Alexandria Ocasio-Cortez",
+      'Robert Francis "Beto" O\'Rourke-Villanueva III',
+      "Christopher Jonathan Montgomery-Fitzgerald Jr.",
+    ];
+    const parties = [
+      "Democratic",
+      "Republican",
+      "Working Class Party",
+      "Independent",
+      undefined,
+    ];
+    const issues = Object.fromEntries(
+      [
+        "Healthcare",
+        "Economy",
+        "Climate/Energy",
+        "Abortion & Reproductive Health",
+        "Firearms & Second Amendment",
+      ].map((key) => [
+        key,
+        {
+          stance: "Supports a policy.",
+          sources: [],
+          confidence: "high" as const,
+        },
+      ]),
+    );
+    const races = Object.entries(STATE_NAMES_BY_CODE).flatMap(
+      ([code, state]) => [
+        { id: `${code}-senate-2026`, office: "U.S. Senate", state },
+        { id: `${code}-senate-2026-special`, office: "U.S. Senate", state },
+        { id: `${code}-house-14-2026`, office: "U.S. House", state },
+        {
+          id: `${code}-governor-2026`,
+          office: "Governor and Lieutenant Governor",
+          state,
+        },
+        {
+          id: `${code}-supreme-court-2026`,
+          office: "Supreme Court associate justice",
+          title: `${state} Supreme Court associate justice position 3 nonpartisan election, 2026`,
+          state,
+        },
+      ],
+    );
+    for (const base of races) {
+      const race = {
+        ...base,
+        election_date: "2026-11-03",
+        candidates: names.map((name, index) => ({
+          name,
+          party: parties[index],
+        })),
+      };
+      expect(racePageTitle(race).length).toBeLessThanOrEqual(60);
+      expect(comparePageTitle(race).length).toBeLessThanOrEqual(60);
+      expect(raceMetaDescription(race).length).toBeLessThanOrEqual(155);
+      expect(compareMetaDescription(race).length).toBeLessThanOrEqual(155);
+      names.forEach((name, index) => {
+        const candidate = {
+          name,
+          party: parties[index],
+          incumbent: index === 1,
+        };
+        expect(candidatePageTitle(candidate, race).length).toBeLessThanOrEqual(
+          60,
+        );
+        expect(
+          candidateMetaDescription(candidate, race).length,
+        ).toBeLessThanOrEqual(155);
+        expect(
+          candidateMetaDescription(
+            { ...candidate, issues, donor_summary: "x", voting_summary: "y" },
+            race,
+          ).length,
+        ).toBeLessThanOrEqual(155);
+      });
+    }
   });
 });

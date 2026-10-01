@@ -44,7 +44,7 @@ describe("ForecastKeyRaces", () => {
     expect(screen.getByText("Arizona")).toBeTruthy();
     expect(screen.getByText("Tilt R")).toBeTruthy();
     expect(screen.getByText(/58% win/)).toBeTruthy();
-    expect(screen.getByText(/\+2\.4% margin/)).toBeTruthy();
+    expect(screen.getByText(/\+2\.4 pts margin/)).toBeTruthy();
   });
 
   it("falls back to the first sentence of the rationale when no takeaway is set", () => {

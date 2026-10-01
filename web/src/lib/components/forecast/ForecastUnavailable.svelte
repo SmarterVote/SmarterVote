@@ -16,6 +16,7 @@
     aria-hidden="true"
   >
     <svg
+      aria-hidden="true"
       class="w-6 h-6"
       fill="none"
       stroke="currentColor"

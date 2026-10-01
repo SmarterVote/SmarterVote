@@ -12,6 +12,8 @@
   export let stateTooltips: Record<string, StateTooltip>;
   export let onStateClick: (state: string) => void;
   export let onClearFilter: () => void;
+  /** Scroll to and focus the race list (filtered to the selected state). */
+  export let onViewResults: (() => void) | undefined = undefined;
 
   let mobileMapOpen = true;
   $: mapPanelId = `forecast-map-${activeTab}`;
@@ -116,6 +118,32 @@
         </select>
       </div>
     {/if}
+
+    <!-- A tap on the map changes the race list far below it, so say what
+         happened right here and offer a jump to the results. -->
+    <div aria-live="polite" class="mb-3 empty:hidden">
+      {#if selectedState}
+        {@const count = stateRaceCounts[selectedState] ?? 0}
+        <div
+          class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-content dark:border-primary-800 dark:bg-primary-950/40"
+          data-testid="map-selection-summary"
+        >
+          <span
+            ><strong>{count} {count === 1 ? "race" : "races"}</strong> in {selectedState}</span
+          >
+          {#if onViewResults && count > 0}
+            <button
+              type="button"
+              class="inline-flex min-h-11 items-center gap-1.5 font-semibold text-primary-700 hover:underline dark:text-primary-300"
+              on:click={onViewResults}
+            >
+              View {count === 1 ? "race" : "races"}
+              <UiIcon name="chevron-down" size="sm" />
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </div>
 
     <div class="relative w-full">
       <USMap

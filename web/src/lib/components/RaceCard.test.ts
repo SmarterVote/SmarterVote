@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import RaceCard from "./RaceCard.svelte";
 import type { RaceSummary } from "$lib/types";
@@ -180,6 +180,38 @@ describe("RaceCard candidate avatars", () => {
     );
   });
 
+  it("serves Wikimedia originals as thumbnails", () => {
+    const { container } = render(RaceCard, {
+      race: makeRace({
+        candidates: [
+          {
+            name: "Jane Doe",
+            party: "Democratic",
+            incumbent: false,
+            image_url:
+              "https://upload.wikimedia.org/wikipedia/commons/a/ab/Jane_Doe.jpg",
+          },
+        ],
+      } as Partial<RaceSummary>),
+    });
+
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Jane_Doe.jpg/250px-Jane_Doe.jpg",
+    );
+  });
+
+  it("uses first and last initials in the placeholder", () => {
+    const { container } = render(RaceCard, {
+      race: makeRace({
+        candidates: [
+          { name: "Jane Q. Doe Jr.", party: "Democratic", incumbent: false },
+        ],
+      } as Partial<RaceSummary>),
+    });
+
+    expect(container.textContent).toContain("JD");
+  });
+
   it("shows an initial placeholder when there is no headshot", () => {
     const { container } = render(RaceCard, {
       race: makeRace({
@@ -235,7 +267,10 @@ describe("RaceCard candidate avatars", () => {
       } as Partial<RaceSummary>),
     });
 
-    await fireEvent.error(container.querySelectorAll("img")[0]);
+    const broken = Array.from(container.querySelectorAll("img")).find(
+      (img) => img.getAttribute("src") === "https://example.test/broken.jpg",
+    )!;
+    await fireEvent.error(broken);
 
     const remaining = container.querySelectorAll("img");
     expect(remaining).toHaveLength(1);
@@ -269,8 +304,7 @@ describe("RaceCard candidate avatars", () => {
           ],
         } as Partial<RaceSummary>),
       });
-      await Promise.resolve();
-      expect(container.querySelector("img")).toBeNull();
+      await waitFor(() => expect(container.querySelector("img")).toBeNull());
     } finally {
       if (complete) Object.defineProperty(proto, "complete", complete);
       else delete (proto as unknown as Record<string, unknown>).complete;

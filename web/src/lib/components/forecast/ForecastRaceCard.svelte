@@ -1,10 +1,13 @@
 <script lang="ts">
   import { browser } from "$app/environment";
+  import { fetchPublishedRace } from "$lib/prerenderData";
+  import type { RaceForecast } from "$lib/types";
   import { isExternalUrl } from "$lib/utils/url";
   import type { ForecastRace } from "$lib/utils/forecast";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
   import {
     formatRating,
+    isUncontestedForecastRace,
     normalizeForecastParty,
     raceHref,
   } from "$lib/utils/forecast";
@@ -40,6 +43,72 @@
     return text;
   })();
   $: winnerName = race.forecast.predicted_winner_name || "";
+  // One candidate on the ballot: no rating or odds to show.
+  $: uncontested = isUncontestedForecastRace(race);
+
+  /*
+   * The forecast page embeds only the fields the collapsed card, map and
+   * aggregates need (see toForecastRaceSummaries). The analysis drawer's
+   * longer fields are loaded from the published race file the first time the
+   * card is expanded; fetchPublishedRace caches that request per race.
+   */
+  type DetailFields = Pick<
+    RaceForecast,
+    | "rationale"
+    | "key_reasons"
+    | "uncertainty"
+    | "market_signals"
+    | "evidence_lineage"
+    | "source_urls"
+    | "panel"
+    | "panel_spread"
+    | "model"
+    | "generated_at"
+  >;
+  let details: Partial<DetailFields> | null = null;
+  let detailsState: "idle" | "loading" | "error" | "ready" = "idle";
+  let detailsFor = race.id;
+
+  $: if (race.id !== detailsFor) {
+    detailsFor = race.id;
+    details = null;
+    detailsState = "idle";
+  }
+  // Full forecasts (tests, dev fallbacks) already carry the drawer fields.
+  $: embeddedDetails = Boolean(
+    race.forecast.rationale || race.forecast.key_reasons?.length,
+  );
+  $: if (isExpanded && !embeddedDetails && detailsState === "idle")
+    void loadDetails();
+
+  async function loadDetails() {
+    const id = race.id;
+    detailsState = "loading";
+    try {
+      const full = (await fetchPublishedRace(id)).forecast;
+      if (id !== race.id) return;
+      details = full
+        ? {
+            rationale: full.rationale,
+            key_reasons: full.key_reasons,
+            uncertainty: full.uncertainty,
+            market_signals: full.market_signals,
+            evidence_lineage: full.evidence_lineage,
+            source_urls: full.source_urls,
+            panel: full.panel,
+            panel_spread: full.panel_spread,
+            model: full.model,
+            generated_at: full.generated_at,
+          }
+        : {};
+      detailsState = "ready";
+    } catch {
+      if (id === race.id) detailsState = "error";
+    }
+  }
+
+  $: forecast = { ...race.forecast, ...(details ?? {}) } as RaceForecast;
+  $: drawerReady = embeddedDetails || detailsState === "ready";
 </script>
 
 <article
@@ -69,10 +138,10 @@
         {/if}
         <span
           class={`inline-flex border rounded-full px-2 py-0.5 text-xs font-semibold leading-none ${ratingClass(
-            rating,
+            uncontested ? "other" : rating,
           )}`}
         >
-          {formatRating(rating)}
+          {uncontested ? "Uncontested" : formatRating(rating)}
         </span>
       </div>
     </div>
@@ -82,7 +151,9 @@
       class="grid grid-cols-2 gap-3 rounded-xl border border-stroke bg-surface-alt/40 p-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]"
     >
       <div class="col-span-2 min-w-0 xl:col-span-1">
-        <dt class="text-xs text-content-subtle">Projected</dt>
+        <dt class="text-xs text-content-subtle">
+          {uncontested ? "Unopposed" : "Projected"}
+        </dt>
         <dd class="mt-1 flex min-w-0 items-start gap-1.5">
           <span
             class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold leading-none {partyBadgeClass(
@@ -108,24 +179,25 @@
       <div>
         <dt class="text-xs text-content-subtle">Win probability</dt>
         <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
-          {probability(race.forecast.win_probability)}
+          {uncontested ? "n/a" : probability(race.forecast.win_probability)}
         </dd>
       </div>
       <div>
         <dt class="text-xs text-content-subtle">Est. margin</dt>
         <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
-          {race.forecast.margin_estimate === undefined ||
+          {uncontested ||
+          race.forecast.margin_estimate === undefined ||
           race.forecast.margin_estimate === null
             ? "n/a"
             : `${
                 race.forecast.margin_estimate > 0 ? "+" : ""
-              }${race.forecast.margin_estimate.toFixed(1)}%`}
+              }${race.forecast.margin_estimate.toFixed(1)} pts`}
         </dd>
       </div>
     </dl>
 
     <!-- D vs R Split details -->
-    {#if race.forecast.party_probabilities}
+    {#if race.forecast.party_probabilities && !uncontested}
       <div class="flex justify-between px-1 text-xs font-semibold tabular-nums">
         <span class="text-blue-700 dark:text-blue-300"
           >Democratic {probability(
@@ -181,25 +253,45 @@
     </div>
 
     <!-- Expandable Drawer Content -->
-    {#if isExpanded}
+    {#if isExpanded && !drawerReady}
+      <div
+        class="mt-3 pt-3 border-t border-stroke text-xs text-content-muted rounded-xl p-4"
+        aria-live="polite"
+      >
+        {#if detailsState === "error"}
+          <p class="font-semibold text-content">
+            The full analysis couldn’t be loaded.
+          </p>
+          <button
+            type="button"
+            class="btn-secondary mt-2 px-3 text-xs"
+            on:click={loadDetails}
+          >
+            Try again
+          </button>
+        {:else}
+          <p>Loading analysis…</p>
+        {/if}
+      </div>
+    {:else if isExpanded}
       <div
         class="mt-3 pt-3 border-t border-stroke flex flex-col gap-3 text-xs bg-surface-alt/10 rounded-xl p-4 shadow-inner"
       >
         <!-- Full Rationale -->
-        <div>
-          <span
-            class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
-            >Full assessment</span
-          >
-          <p
-            class="text-content-muted leading-relaxed font-medium whitespace-pre-wrap"
-          >
-            {race.forecast.rationale}
-          </p>
-        </div>
+        {#if forecast.rationale}<div>
+            <span
+              class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
+              >Full assessment</span
+            >
+            <p
+              class="text-content-muted leading-relaxed font-medium whitespace-pre-wrap"
+            >
+              {forecast.rationale}
+            </p>
+          </div>{/if}
 
         <!-- Key Drivers -->
-        {#if race.forecast.key_reasons && race.forecast.key_reasons.length > 0}
+        {#if forecast.key_reasons && forecast.key_reasons.length > 0}
           <div class="pt-2 border-t border-stroke">
             <span
               class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
@@ -208,7 +300,7 @@
             <ul
               class="list-disc list-inside space-y-1 text-content-muted font-medium pl-1"
             >
-              {#each race.forecast.key_reasons as reason}
+              {#each forecast.key_reasons as reason}
                 <li>{reason}</li>
               {/each}
             </ul>
@@ -216,19 +308,19 @@
         {/if}
 
         <!-- Uncertainty -->
-        {#if race.forecast.uncertainty}
+        {#if forecast.uncertainty}
           <div class="pt-2 border-t border-stroke">
             <span
               class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
               >Uncertainty</span
             >
             <p class="text-content-muted font-medium leading-relaxed">
-              {race.forecast.uncertainty}
+              {forecast.uncertainty}
             </p>
           </div>
         {/if}
 
-        {#if race.forecast.market_signals && race.forecast.market_signals.length > 0}
+        {#if forecast.market_signals && forecast.market_signals.length > 0}
           <div class="pt-2 border-t border-stroke">
             <div class="flex items-center justify-between gap-2 mb-2">
               <span
@@ -236,14 +328,14 @@
                 >Kalshi market signals</span
               >
               <span class="text-xs text-content-subtle font-bold"
-                >{race.forecast.market_signals.length} market{race.forecast
-                  .market_signals.length === 1
+                >{forecast.market_signals.length} market{forecast.market_signals
+                  .length === 1
                   ? ""
                   : "s"}</span
               >
             </div>
             <div class="grid gap-2">
-              {#each race.forecast.market_signals as signal}
+              {#each forecast.market_signals as signal}
                 <div
                   class="rounded-lg border border-stroke/60 bg-surface px-3 py-2"
                 >
@@ -294,17 +386,17 @@
         {/if}
 
         <!-- Per-claim Evidence Attribution -->
-        <ForecastEvidenceLineage entries={race.forecast.evidence_lineage} />
+        <ForecastEvidenceLineage entries={forecast.evidence_lineage} />
 
         <!-- Source Links -->
-        {#if race.forecast.source_urls && race.forecast.source_urls.length > 0}
+        {#if forecast.source_urls && forecast.source_urls.length > 0}
           <div class="pt-2 border-t border-stroke">
             <span
               class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
               >Forecast sources</span
             >
             <div class="flex flex-wrap gap-1.5">
-              {#each race.forecast.source_urls as url}
+              {#each forecast.source_urls as url}
                 <a
                   href={url}
                   target="_blank"
@@ -323,18 +415,18 @@
         <div
           class="pt-2 border-t border-stroke flex flex-wrap items-center justify-between gap-2 text-xs text-content-subtle font-bold"
         >
-          {#if race.forecast.panel && race.forecast.panel.length > 1}
+          {#if forecast.panel && forecast.panel.length > 1}
             <span
-              >Consensus of {race.forecast.panel.length} models{#if race.forecast.panel_spread !== undefined && race.forecast.panel_spread !== null}
-                · {Math.round(race.forecast.panel_spread * 100)}-pt spread{/if}</span
+              >Consensus of {forecast.panel.length} models{#if forecast.panel_spread !== undefined && forecast.panel_spread !== null}
+                · {Math.round(forecast.panel_spread * 100)}-pt spread{/if}</span
             >
-          {:else if race.forecast.model}
-            <span>Model {race.forecast.model}</span>
+          {:else if forecast.model}
+            <span>Model {forecast.model}</span>
           {/if}
-          {#if race.forecast.generated_at}
+          {#if forecast.generated_at}
             <span
               >Generated {new Date(
-                race.forecast.generated_at,
+                forecast.generated_at,
               ).toLocaleDateString()}</span
             >
           {/if}

@@ -40,7 +40,12 @@
     <div
       class="lg:col-span-6 flex flex-col space-y-6 lg:rounded-xl lg:border lg:border-stroke lg:bg-surface-alt/25 lg:p-6"
     >
-      <ForecastControlBar {activeTab} {outcomeProbabilities} {projectedSeats} />
+      <ForecastControlBar
+        {activeTab}
+        {outcomeProbabilities}
+        {projectedSeats}
+        {vpTiebreakParty}
+      />
       <ForecastSeatsBar {activeTab} {projectedSeats} {totalSeats} {threshold} />
     </div>
 

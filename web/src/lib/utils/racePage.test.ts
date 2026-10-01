@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { Candidate, Race, RaceForecast } from "$lib/types";
 import {
   candidateForecastProbability,
+  candidateJsonLd,
+  candidateShareImage,
+  contestStageNotice,
+  isPreviousCyclePoll,
+  isUncontestedRace,
+  pollAgeLabel,
+  politicalPartyName,
+  senateSeatLabel,
   cleanDisplayText,
   comparePreview,
   forecastHeadline,
@@ -252,19 +260,33 @@ describe("raceJsonLd", () => {
     ],
   } as unknown as Race;
 
-  it("describes the election and its active candidates without ratings", () => {
+  it("describes the page with an Elections › Race breadcrumb and no ratings", () => {
     const data = raceJsonLd(race);
-    expect(data["@type"]).toBe("Event");
-    expect(data.startDate).toBe("2026-11-03");
-    expect(data.performer).toEqual([
-      {
-        "@type": "Person",
-        name: "Jane Doe",
-        url: "https://smarter.vote/races/ga-senate-2026/jane-doe/",
-        affiliation: { "@type": "Organization", name: "Democratic" },
-      },
-    ]);
-    expect(JSON.stringify(data)).not.toContain("lean_d");
+    const graph = data["@graph"] as Record<string, unknown>[];
+    expect(graph[0]["@type"]).toBe("WebPage");
+    expect(graph[0].url).toBe("https://smarter.vote/races/ga-senate-2026/");
+    expect(graph[1]).toEqual({
+      "@type": "BreadcrumbList",
+      "@id": "https://smarter.vote/races/ga-senate-2026/#breadcrumb",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "Elections",
+          item: "https://smarter.vote/elections/",
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: "2026 Georgia U.S. Senate Election",
+          item: "https://smarter.vote/races/ga-senate-2026/",
+        },
+      ],
+    });
+    const json = JSON.stringify(data);
+    expect(json).not.toContain("Event");
+    expect(json).not.toContain("performer");
+    expect(json).not.toContain("lean_d");
   });
 
   it("escapes markup so the script tag cannot be closed early", () => {
@@ -395,6 +417,31 @@ describe("isNoPositionStance", () => {
     expect(isNoPositionStance("No public position found.")).toBe(true);
     expect(isNoPositionStance("Supports expanding coverage.")).toBe(false);
   });
+
+  // Wordings seen in published data (audit 4, data/findings.json).
+  it.each([
+    "No specific public position was identified on election administration, voting access, ballot rules, election security, or campaign-finance regulation.",
+    "No public stance found on immigration publicly stated by Eric Michael Foreman as of latest credible sources; Libertarian platforms generally advocate fewer restrictions.",
+    "No publicly stated stance found in campaign materials as of latest available sources.",
+    "No public position could be found.",
+    "No public stance published on Tech & AI by Eric Foreman's campaign.",
+    "No public foreign policy position is stated on Stefany Shaheen's official campaign materials.",
+    "No specific public position published after August 24, 2026 was found on district-specific local issues.",
+    "No public position on technology or artificial intelligence was located in Meline's campaign materials.",
+    "no publicly stated position on technology and artificial intelligence policy found.",
+    "No explicit public position on healthcare policy is published on the candidate's official channels.",
+  ])("recognises the variant %j", (stance) => {
+    expect(isNoPositionStance(stance)).toBe(true);
+  });
+
+  it.each([
+    "Supports a public option. No public position found on drug pricing.",
+    "No newer healthcare position was found after August 26, 2026. In a 2018 questionnaire, she backed a public option.",
+    "No explicit Tech & AI policy is listed on the campaign issues page. In Congress, she serves on the Cyber subcommittee.",
+    "No to new taxes: opposes any public position that raises rates.",
+  ])("does not swallow the substantive stance %j", (stance) => {
+    expect(isNoPositionStance(stance)).toBe(false);
+  });
 });
 
 describe("cleanDisplayText regex safety", () => {
@@ -470,7 +517,7 @@ describe("formatWinProbability", () => {
   });
 });
 
-describe("raceJsonLd status and description", () => {
+describe("raceJsonLd description", () => {
   const race = {
     id: "oh-senate-2026",
     title: "Ohio Senate",
@@ -480,28 +527,216 @@ describe("raceJsonLd status and description", () => {
     candidates: [candidate("Jane Doe")],
   } as unknown as Race;
 
-  it("is scheduled until Election Day has passed", () => {
-    expect(raceJsonLd(race, new Date(2026, 9, 1)).eventStatus).toBe(
-      "https://schema.org/EventScheduled",
-    );
-    expect(raceJsonLd(race, new Date(2026, 10, 3)).eventStatus).toBe(
-      "https://schema.org/EventScheduled",
-    );
-    expect(raceJsonLd(race, new Date(2026, 10, 4))).not.toHaveProperty(
-      "eventStatus",
-    );
-  });
-
   it("uses the cleaned description without inline URLs", () => {
-    expect(raceJsonLd(race).description).toBe("Open seat. Next.");
+    const page = (raceJsonLd(race)["@graph"] as Record<string, unknown>[])[0];
+    expect(page.description).toBe("Open seat. Next.");
+  });
+});
+
+describe("candidateJsonLd", () => {
+  const race = {
+    id: "tx-house-12-2026",
+    office: "U.S. House",
+    state: "Texas",
+    district: "12",
+    updated_utc: "2026-09-30T00:00:00Z",
+    candidates: [],
+  } as unknown as Race;
+
+  it("is a ProfilePage about the candidate with a three-level breadcrumb", () => {
+    const data = candidateJsonLd(
+      race,
+      candidate("José Peña", {
+        party: "Republican",
+        image_url:
+          "https://upload.wikimedia.org/wikipedia/commons/a/ab/Jose.jpg",
+        website: "https://pena.example.com",
+        social_media: { x: "https://x.com/pena", bad: "javascript:alert(1)" },
+      }),
+    );
+    const [page, crumbs] = data["@graph"] as Record<string, unknown>[];
+    expect(page["@type"]).toBe("ProfilePage");
+    expect(page.mainEntity).toEqual({
+      "@type": "Person",
+      name: "José Peña",
+      url: "https://smarter.vote/races/tx-house-12-2026/jose-pena/",
+      image:
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Jose.jpg/250px-Jose.jpg",
+      affiliation: { "@type": "PoliticalParty", name: "Republican Party" },
+      sameAs: ["https://pena.example.com", "https://x.com/pena"],
+    });
+    expect(
+      (crumbs.itemListElement as { name: string }[]).map((item) => item.name),
+    ).toEqual([
+      "Elections",
+      "2026 Texas's 12th Congressional District Election",
+      "José Peña",
+    ]);
   });
 
-  it("lists a duplicated roster entry once", () => {
-    const dup = {
-      ...race,
-      candidates: [candidate("Jane Doe"), candidate("Jane Doe")],
-    } as unknown as Race;
-    expect(raceJsonLd(dup).performer).toHaveLength(1);
+  it("leaves independents without a party and escapes markup", () => {
+    const data = candidateJsonLd(
+      race,
+      candidate("</script><b>", { party: "Independent" }),
+    );
+    const page = (data["@graph"] as Record<string, unknown>[])[0];
+    expect(page.mainEntity).not.toHaveProperty("affiliation");
+    expect(jsonLdScript(data)).not.toContain("</script><b>");
+  });
+
+  it.each([
+    ["Democratic", "Democratic Party"],
+    ["Green Party", "Green Party"],
+    ["Working Families", "Working Families Party"],
+    ["Unaffiliated", null],
+    ["", null],
+  ])("party %j -> %j", (party, expected) => {
+    expect(politicalPartyName(party)).toBe(expected);
+  });
+});
+
+describe("candidateShareImage", () => {
+  it("uses a known-good headshot as a summary card", () => {
+    expect(
+      candidateShareImage({
+        image_url:
+          "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jane.jpg",
+      }),
+    ).toEqual({
+      image:
+        "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Jane.jpg",
+      card: "summary",
+    });
+  });
+
+  it.each([
+    undefined,
+    "https://campaign.example.com/photo.jpg",
+    "http://upload.wikimedia.org/x.jpg",
+  ])("falls back to the site image for %j", (image_url) => {
+    expect(candidateShareImage({ image_url })).toEqual({
+      image: "https://smarter.vote/og-image.png",
+      card: "summary_large_image",
+    });
+  });
+});
+
+describe("poll age and cycle", () => {
+  const now = new Date(2026, 9, 1);
+  it("labels polls older than 60 days", () => {
+    expect(pollAgeLabel("2026-09-01", now)).toBe("");
+    expect(pollAgeLabel("2026-07-01", now)).toBe("3 months old");
+    expect(pollAgeLabel("2025-09-01", now)).toBe("over a year old");
+    expect(pollAgeLabel("2024-07-21", now)).toBe("over 2 years old");
+    expect(pollAgeLabel(undefined, now)).toBe("");
+  });
+
+  it("treats polls 18+ months before Election Day as a previous cycle", () => {
+    expect(isPreviousCyclePoll("2024-07-21", "2026-11-03")).toBe(true);
+    expect(isPreviousCyclePoll("2025-05-02", "2026-11-03")).toBe(true);
+    expect(isPreviousCyclePoll("2025-12-19", "2026-11-03")).toBe(false);
+    expect(isPreviousCyclePoll("2024-07-21", undefined)).toBe(false);
+  });
+});
+
+describe("contest stage", () => {
+  const base = {
+    id: "fl-house-10-2026",
+    office: "U.S. House",
+    state: "Florida",
+    contest_stage: "post_primary_general",
+  } as Race;
+  const one = [{ name: "Maxwell Frost" }];
+  const two = [{ name: "A B" }, { name: "C D" }];
+
+  it("treats a canceled race or a one-candidate general as uncontested", () => {
+    expect(isUncontestedRace({ contest_stage: "uncontested" }, 1)).toBe(true);
+    expect(isUncontestedRace(base, 1)).toBe(true);
+    expect(isUncontestedRace(base, 2)).toBe(false);
+    expect(isUncontestedRace({ contest_stage: "pre_primary" }, 1)).toBe(false);
+    expect(contestStageNotice(base, one)).toMatchObject({
+      kind: "uncontested",
+      title: "Uncontested race",
+    });
+    expect(contestStageNotice(base, one)?.body).toContain(
+      "Maxwell Frost is the only candidate",
+    );
+    expect(contestStageNotice(base, two)).toBeNull();
+  });
+
+  it("explains Louisiana's open primary and other pre-primary races", () => {
+    expect(
+      contestStageNotice(
+        {
+          ...base,
+          id: "la-house-05-2026",
+          state: "Louisiana",
+          contest_stage: "pre_primary",
+        },
+        two,
+      )?.title,
+    ).toBe("Nov 3 is an open primary for this seat");
+    expect(
+      contestStageNotice({ ...base, contest_stage: "pre_primary" }, two)?.title,
+    ).toBe("The primary hasn't happened yet");
+  });
+
+  it("explains ranked-choice general elections in Alaska and Maine federal races", () => {
+    expect(
+      contestStageNotice(
+        {
+          ...base,
+          id: "ak-house-2026",
+          state: "Alaska",
+          contest_stage: "top_four_rcv",
+        },
+        two,
+      )?.kind,
+    ).toBe("ranked_choice");
+    expect(
+      contestStageNotice(
+        {
+          ...base,
+          id: "me-senate-2026",
+          office: "U.S. Senate",
+          state: "Maine",
+        },
+        two,
+      )?.kind,
+    ).toBe("ranked_choice");
+    expect(
+      contestStageNotice(
+        { ...base, id: "me-governor-2026", office: "Governor", state: "Maine" },
+        two,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("senateSeatLabel", () => {
+  it.each([
+    ["tx-senate-2026", "Texas", "Class II seat"],
+    ["ga-senate-2026", "Georgia", "Class II seat"],
+    ["oh-senate-2026-special", "Ohio", "Class III seat (special election)"],
+    ["fl-senate-2026-special", "Florida", "Class III seat (special election)"],
+    ["ca-senate-2026", "California", null],
+    ["tx-senate-2028", "Texas", null],
+  ])("%s -> %j", (id, state, expected) => {
+    expect(senateSeatLabel({ id, state, office: "U.S. Senate" })).toBe(
+      expected,
+    );
+  });
+
+  it("replaces the research text's seat class in the location label", () => {
+    expect(
+      raceLocationLabel({
+        id: "tx-senate-2026",
+        office: "United States Senate",
+        district: "Statewide (Class 1 seat)",
+        jurisdiction: "Texas",
+        state: "Texas",
+      }),
+    ).toBe("United States Senate · Class II seat · Texas");
   });
 });
 

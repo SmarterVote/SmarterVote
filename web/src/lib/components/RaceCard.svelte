@@ -4,7 +4,12 @@
   import { raceShortLabel } from "$lib/utils/forecastPresentation";
   import { formatElectionDate } from "$lib/utils/electionDate";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
-  import { neutralCandidateOrder } from "$lib/utils/candidates";
+  import {
+    candidateInitials,
+    neutralCandidateOrder,
+  } from "$lib/utils/candidates";
+  import { avatarSrc } from "$lib/utils/avatar";
+  import { headshotFallback } from "$lib/utils/racePageImage";
 
   export let race: RaceSummary;
 
@@ -38,16 +43,6 @@
   let imageErrors: Set<string> = new Set();
   function handleImageError(name: string) {
     imageErrors = new Set([...imageErrors, name]);
-  }
-
-  /**
-   * Prerendered images can fail before hydration attaches `on:error`; catch
-   * that case on mount so a broken headshot still falls back to initials.
-   */
-  function detectBrokenImage(img: HTMLImageElement, name: string) {
-    if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) {
-      handleImageError(name);
-    }
   }
 </script>
 
@@ -90,27 +85,30 @@
           <!-- Avatar -->
           <div class="relative flex-shrink-0">
             {#if candidate.image_url && !imageErrors.has(candidate.name)}
+              <!-- headshotFallback also catches images that failed before
+                   hydration, so a broken headshot still shows initials. -->
               <img
-                src={candidate.image_url}
+                src={avatarSrc(candidate.image_url)}
                 alt=""
                 class="h-9 w-9 rounded-full object-cover ring-2 {partyRing(
                   candidate.party,
                 )}"
                 loading="lazy"
                 decoding="async"
+                referrerpolicy="no-referrer"
                 width="36"
                 height="36"
-                use:detectBrokenImage={candidate.name}
-                on:error={() => handleImageError(candidate.name)}
+                use:headshotFallback={() => handleImageError(candidate.name)}
               />
             {:else}
+              <!-- Same initials placeholder as the compare and candidate pages. -->
               <div
-                class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-alt text-sm font-semibold text-content-muted ring-2 {partyRing(
+                class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-alt text-xs font-bold text-content-muted ring-2 {partyRing(
                   candidate.party,
                 )}"
                 aria-hidden="true"
               >
-                {candidate.name ? candidate.name[0].toUpperCase() : "?"}
+                {candidateInitials(candidate.name ?? "") || "?"}
               </div>
             {/if}
           </div>

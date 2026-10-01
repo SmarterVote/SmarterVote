@@ -7,6 +7,7 @@
   <div class="rounded-xl border border-stroke bg-surface-alt/30 p-4 sm:p-5">
     <div class="eyebrow mb-2.5 flex items-center gap-1.5">
       <svg
+        aria-hidden="true"
         class="w-3.5 h-3.5"
         fill="none"
         stroke="currentColor"

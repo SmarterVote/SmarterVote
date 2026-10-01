@@ -90,13 +90,15 @@ describe("CandidateComparison", () => {
 
     expect(desktop.getByText(desktopPreview)).toBeTruthy();
     const button = desktop.getByRole("button", {
-      name: "Show more for Casey Candidate",
+      name: "Show more of Casey Candidate on Healthcare",
     });
 
     await fireEvent.click(button);
     expect(desktop.getByText(fullStance)).toBeTruthy();
     expect(
-      desktop.getByRole("button", { name: "Show less for Casey Candidate" }),
+      desktop.getByRole("button", {
+        name: "Show less of Casey Candidate on Healthcare",
+      }),
     ).toBeTruthy();
   });
 
@@ -258,15 +260,55 @@ describe("CandidateComparison", () => {
         },
       },
     } as Candidate;
+    const other = {
+      ...candidate,
+      name: "Other Person",
+      issues: {
+        Healthcare: {
+          stance: "Backs a public option.",
+          confidence: "high",
+          sources: [],
+        },
+      },
+    } as Candidate;
     const { container } = render(CandidateComparison, {
-      race: { ...race, candidates: [quiet] },
-      candidates: [quiet],
+      race: { ...race, candidates: [quiet, other] },
+      candidates: [quiet, other],
     });
     const desktop = within(
       container.querySelector("[data-desktop-candidate-comparison]")!,
     );
     expect(desktop.getByText("No public position found")).toBeTruthy();
-    expect(desktop.queryByText("Confidence")).toBeNull();
+    expect(desktop.getAllByText("Confidence")).toHaveLength(1);
+  });
+
+  it("collapses issues nobody compared has a position on into one line", () => {
+    const quiet = {
+      ...candidate,
+      issues: {
+        Healthcare: {
+          stance: "No public position found",
+          confidence: "low",
+          sources: [],
+        },
+        Economy: {
+          stance: "No public stance found on taxes.",
+          confidence: "low",
+          sources: [],
+        },
+      },
+    } as Candidate;
+    const { container } = render(CandidateComparison, {
+      race: { ...race, candidates: [quiet] },
+      candidates: [quiet],
+    });
+    const desktop = container.querySelector(
+      "[data-desktop-candidate-comparison]",
+    )!;
+    expect(desktop.querySelector("#compare-issue-healthcare")).toBeNull();
+    expect(desktop.querySelector(".no-position-row")?.textContent).toContain(
+      "No public positions found yet on these issues: Healthcare, Economy",
+    );
   });
 
   it("unescapes leaked JSON quotes in stance text", () => {

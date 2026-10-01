@@ -1,39 +1,31 @@
 import type { RaceSummary } from "$lib/types";
 import { daysUntilElection } from "$lib/utils/electionDate";
 import { canonicalRaceState, canonicalStateName } from "$lib/utils/states";
+import { racesApiBase } from "$lib/config/api";
 
 export interface ElectionGeography {
   state: string;
   congressionalDistrict: string;
 }
 
-interface CensusAddressMatch {
-  geographies?: Record<string, Array<Record<string, unknown>>>;
+/** Response of the races-api Census proxy (`POST /geocode/census`). */
+interface CensusProxyResponse {
+  state?: unknown;
+  /** Raw Census fields: CD### (named for the Congress), GEOID, BASENAME, NAME. */
+  congressional_district?: Record<string, unknown> | null;
 }
 
-interface CensusResponse {
-  result?: { addressMatches?: CensusAddressMatch[] };
-}
-
-const CENSUS_ENDPOINT =
-  "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress";
-
-export function parseCensusGeography(
-  response: CensusResponse,
+/** The proxy's 200 body reduced to a geography, or null when unusable. */
+export function parseCensusProxyResponse(
+  body: CensusProxyResponse | null | undefined,
 ): ElectionGeography | null {
-  const match = response.result?.addressMatches?.[0];
-  if (!match?.geographies) return null;
-
-  const state = match.geographies.States?.[0]?.NAME;
-  const congressionalEntry = Object.entries(match.geographies).find(([name]) =>
-    name.endsWith("Congressional Districts"),
-  )?.[1]?.[0];
-  const district = congressionalEntry
-    ? censusDistrictCode(congressionalEntry)
-    : null;
-
-  if (typeof state !== "string" || district == null) return null;
-  return { state, congressionalDistrict: district };
+  const state = body?.state;
+  const entry = body?.congressional_district;
+  const district =
+    entry && typeof entry === "object" ? censusDistrictCode(entry) : null;
+  if (typeof state !== "string" || !state.trim() || district == null)
+    return null;
+  return { state: state.trim(), congressionalDistrict: district };
 }
 
 /**
@@ -74,48 +66,50 @@ export function normalizeDistrictCode(value: string): string | null {
   return code === "98" ? "00" : code;
 }
 
-export function lookupElectionGeography(
+const NO_MATCH = "We could not match that address.";
+const UNAVAILABLE = "The address service is unavailable right now.";
+
+/**
+ * Resolve an address to its state and congressional district through the
+ * races-api Census proxy. The address goes to that endpoint only (it is not
+ * logged or stored there) and never into the page URL or storage.
+ */
+export async function lookupElectionGeography(
   address: string,
   timeoutMs = 12000,
+  fetchFn: typeof fetch = fetch,
 ): Promise<ElectionGeography> {
-  return new Promise((resolve, reject) => {
-    const callbackName = `smarterVoteCensus_${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2)}`;
-    const script = document.createElement("script");
-    const cleanup = () => {
-      window.clearTimeout(timer);
-      script.remove();
-      delete (window as unknown as Record<string, unknown>)[callbackName];
-    };
-    const timer = window.setTimeout(() => {
-      cleanup();
-      reject(new Error("The address service took too long to respond."));
-    }, timeoutMs);
-
-    (window as unknown as Record<string, unknown>)[callbackName] = (
-      response: CensusResponse,
-    ) => {
-      const geography = parseCensusGeography(response);
-      cleanup();
-      if (geography) resolve(geography);
-      else reject(new Error("We could not match that address."));
-    };
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("The address service is unavailable right now."));
-    };
-
-    const params = new URLSearchParams({
-      address,
-      benchmark: "Public_AR_Current",
-      vintage: "Current_Current",
-      format: "jsonp",
-      callback: callbackName,
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetchFn(`${racesApiBase()}/geocode/census`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address }),
+      signal: controller.signal,
     });
-    script.src = `${CENSUS_ENDPOINT}?${params.toString()}`;
-    document.head.appendChild(script);
-  });
+  } catch {
+    throw new Error(
+      controller.signal.aborted
+        ? "The address service took too long to respond."
+        : UNAVAILABLE,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+  if (response.status === 404 || response.status === 422)
+    throw new Error(NO_MATCH);
+  if (!response.ok) throw new Error(UNAVAILABLE);
+  let body: CensusProxyResponse;
+  try {
+    body = (await response.json()) as CensusProxyResponse;
+  } catch {
+    throw new Error(UNAVAILABLE);
+  }
+  const geography = parseCensusProxyResponse(body);
+  if (!geography) throw new Error(NO_MATCH);
+  return geography;
 }
 
 function labelMatchesState(label: string, normalizedState: string): boolean {

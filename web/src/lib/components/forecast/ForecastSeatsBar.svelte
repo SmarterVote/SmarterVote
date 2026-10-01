@@ -5,6 +5,16 @@
   export let projectedSeats: Record<string, number>;
   export let totalSeats: number;
   export let threshold: number;
+
+  $: seatsLabel = [
+    `Projected seats: Democratic ${projectedSeats.Democratic ?? 0}`,
+    `Republican ${projectedSeats.Republican ?? 0}`,
+    ...(projectedSeats.Other ? [`Other ${projectedSeats.Other}`] : []),
+    `of ${totalSeats}`,
+    `${threshold} needed for a majority${
+      activeTab === "senate" ? "; a 50-50 split is marked" : ""
+    }`,
+  ].join(", ");
 </script>
 
 <div class="space-y-3">
@@ -13,7 +23,9 @@
   </div>
 
   <div class="space-y-2">
-    <div class="relative pt-4">
+    <!-- One image with every count in its name; the segments and markers
+         inside are visual only. -->
+    <div class="relative pt-4" role="img" aria-label={seatsLabel}>
       <div
         class="h-8 rounded-xl overflow-hidden bg-surface-alt flex border border-stroke/60 shadow-inner"
       >

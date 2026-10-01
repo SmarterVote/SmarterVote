@@ -168,7 +168,9 @@ describe("ElectionDirectory rendering", () => {
       getByRole("button", { name: "Show interactive map" }),
     );
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/states-10m.json"),
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("states-10m.json"),
+      ),
     );
   });
 

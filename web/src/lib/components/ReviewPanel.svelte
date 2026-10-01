@@ -1,16 +1,27 @@
 <script lang="ts">
   import type { AgentReview } from "$lib/types";
+  import {
+    flagFieldLabel,
+    publicFlags,
+    publicReviews,
+    stripMarkdown,
+  } from "$lib/utils/reviews";
 
   export let reviews: AgentReview[] = [];
+  /** Candidate names in roster order, to label flags like "candidates[1].issues.Healthcare". */
+  export let candidateNames: string[] = [];
+  /** Models that generated the race (and its forecast), shown with the review details. */
+  export let models: string[] = [];
 
   // Current reviews first: a stale review judged a roster the race has since
-  // replaced, so it must never read as a current approval.
-  $: displayReviews = (reviews || [])
-    .filter(
-      (r) =>
-        r.model !== "automated-link-validator" &&
-        r.model !== "automated-profile-quality",
-    )
+  // replaced, so it must never read as a current approval. Internal checks and
+  // empty reviews are hidden; only reader-facing warnings and errors show.
+  $: displayReviews = publicReviews(reviews)
+    .map((review) => ({
+      ...review,
+      summary: stripMarkdown(review.summary),
+      flags: publicFlags(review.flags),
+    }))
     .sort((a, b) => Number(isStale(a)) - Number(isStale(b)));
   $: staleCount = displayReviews.filter(isStale).length;
 
@@ -54,6 +65,7 @@
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         stroke-linecap="round"
@@ -76,6 +88,7 @@
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         stroke-linecap="round"
@@ -134,6 +147,10 @@
                 </summary>
                 <ul class="flags-list">
                   {#each review.flags as flag}
+                    {@const fieldLabel = flagFieldLabel(
+                      flag.field,
+                      candidateNames,
+                    )}
                     <li class="flag-item">
                       <span
                         class="flag-severity flag-severity--{severityLevel(
@@ -141,14 +158,18 @@
                         )}">{SEVERITY_LABEL[severityLevel(flag.severity)]}</span
                       >
                       <div>
-                        <span class="flag-field">{flag.field}</span>
-                        <span class="flag-concern">{flag.concern}</span>
+                        {#if fieldLabel}
+                          <span class="flag-field">{fieldLabel}</span>
+                        {/if}
+                        <span class="flag-concern"
+                          >{stripMarkdown(flag.concern)}</span
+                        >
                         {#if flag.suggestion}
                           <span class="flag-suggestion"
                             ><span class="flag-suggestion-label"
                               >Suggestion:</span
                             >
-                            {flag.suggestion}</span
+                            {stripMarkdown(flag.suggestion)}</span
                           >
                         {/if}
                       </div>
@@ -174,6 +195,12 @@
           </div>
         {/each}
       </div>
+    {/if}
+    {#if models.length > 0}
+      <p class="review-models">
+        <span class="font-semibold">Models used to research this race:</span>
+        {models.join(", ")}
+      </p>
     {/if}
   {/if}
 </div>
@@ -281,7 +308,11 @@
   }
 
   .flag-field {
-    @apply font-mono text-content-subtle block;
+    @apply block font-semibold text-content-subtle;
+  }
+
+  .review-models {
+    @apply mt-4 text-xs text-content-subtle;
   }
 
   .flag-concern {

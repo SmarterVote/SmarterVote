@@ -125,7 +125,8 @@
         <span
           class="text-xs text-content-subtle font-extrabold bg-surface-alt px-2.5 py-1 rounded-xl border border-stroke/60"
         >
-          {resultCount} races
+          {resultCount}
+          {resultCount === 1 ? "race" : "races"}
         </span>
       </div>
     </div>

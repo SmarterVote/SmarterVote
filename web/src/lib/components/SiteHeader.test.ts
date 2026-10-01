@@ -31,7 +31,14 @@ vi.mock("$app/stores", async () => {
   pageControl.setUrl = (href: string) => store.set({ url: new URL(href) });
   return { page: store };
 });
-vi.mock("$lib/api", () => ({ getRaceSummaries }));
+// The header loads the compact search index; build it from the mocked
+// summaries so these tests keep exercising the "first search loads data" path.
+vi.mock("$lib/api", async () => {
+  const { buildSearchIndex } = await import("$lib/utils/searchIndex");
+  return {
+    getSearchIndex: async () => buildSearchIndex(await getRaceSummaries()),
+  };
+});
 
 /**
  * On "/" the header adopts the URL's `?q=` only on real navigations
@@ -564,6 +571,67 @@ describe("SiteHeader global shortcuts", () => {
           "aria-expanded",
         ),
       ).toBe("false"),
+    );
+  });
+});
+
+describe("SiteHeader result options", () => {
+  it("ends the results with a 'See all' option linking to the directory", async () => {
+    const { container, getByRole } = renderHeader();
+    await type(searchBox(container), "Missouri");
+
+    const seeAll = await waitFor(() =>
+      getByRole("option", { name: /See all 1 result/ }),
+    );
+    await fireEvent.click(seeAll);
+
+    expect(goto).toHaveBeenCalledWith("/elections/?q=Missouri");
+  });
+
+  it("offers browse and address links when nothing matches", async () => {
+    const { container, getByRole } = renderHeader();
+    await type(searchBox(container), "zzzz-no-match");
+
+    await waitFor(() =>
+      expect(
+        getByRole("link", { name: "Browse all elections" }).getAttribute(
+          "href",
+        ),
+      ).toBe("/elections/"),
+    );
+    expect(
+      getByRole("link", { name: "Find races by address" }).getAttribute("href"),
+    ).toBe("/my-ballot/");
+  });
+
+  it("ranks a state's Senate race ahead of its House seats", async () => {
+    const races = [
+      ...Array.from({ length: 8 }, (_, i) =>
+        race({
+          id: `tx-house-${String(i + 1).padStart(2, "0")}-2026`,
+          title: `Texas House ${i + 1}`,
+          office: "U.S. House",
+          state: "Texas",
+          jurisdiction: "Texas",
+          candidates: [],
+        }),
+      ),
+      race({
+        id: "tx-senate-2026",
+        title: "2026 Texas U.S. Senate Election",
+        office: "U.S. Senate",
+        state: "Texas",
+        jurisdiction: "Texas",
+        candidates: [],
+      }),
+    ];
+    const { container } = renderHeader({ races });
+    await type(searchBox(container), "Texas");
+
+    await waitFor(() =>
+      expect(
+        container.querySelector("#site-search-option-0")?.textContent,
+      ).toContain("Texas U.S. Senate"),
     );
   });
 });

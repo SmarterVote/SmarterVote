@@ -11,6 +11,11 @@ import type { Race, RaceSummary } from "./types";
 import { logger } from "./utils/logger";
 import { publicDataBase, racesApiBase } from "$lib/config/api";
 import { fetchPublishedRaceSummaries } from "./prerenderData";
+import {
+  buildSearchIndex,
+  SEARCH_INDEX_VERSION,
+  type SearchIndex,
+} from "./utils/searchIndex";
 
 const USE_SAMPLE_FALLBACK = import.meta.env.DEV;
 
@@ -98,6 +103,30 @@ export async function getRaceSummaries(
     // Re-throw the error if fallback is disabled
     throw error;
   }
+}
+
+/**
+ * The header search index: the build-time /search-index.json (tens of KB),
+ * or, when that is missing or empty, one built from the full race summaries.
+ */
+export async function getSearchIndex(
+  fetchFn: typeof fetch = fetch,
+): Promise<SearchIndex> {
+  try {
+    const response = await fetchFn("/search-index.json");
+    if (response.ok) {
+      const index = (await response.json()) as SearchIndex;
+      if (
+        index?.v === SEARCH_INDEX_VERSION &&
+        Array.isArray(index.races) &&
+        index.races.length > 0
+      )
+        return index;
+    }
+  } catch {
+    // Fall through to the summaries.
+  }
+  return buildSearchIndex(await getRaceSummaries(fetchFn));
 }
 
 /**

@@ -5,6 +5,7 @@
   import { onMount, tick } from "svelte";
   import { slide } from "svelte/transition";
   import Card from "$lib/components/Card.svelte";
+  import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import IssueTable from "$lib/components/IssueTable.svelte";
@@ -14,18 +15,21 @@
   import { getRace, getDraftRace } from "$lib/api";
   import { candidateSlug } from "$lib/utils/format";
   import { partyBadgeClass } from "$lib/utils/party";
-  import { candidateInitials } from "$lib/utils/candidates";
+  import { hasNoResearchedPositions } from "$lib/utils/candidates";
   import { isExternalUrl } from "$lib/utils/url";
   import { motionDuration, scrollBehavior } from "$lib/utils/motion";
   import {
+    candidateJsonLd,
+    candidateShareImage,
     cleanDisplayText,
     formatPollDate,
     isNotFoundError,
+    jsonLdScript,
     resolveCandidate,
   } from "$lib/utils/racePage";
-  import { headshotFallback } from "$lib/utils/racePageImage";
   import {
     candidateMetaDescription,
+    candidatePageTitle,
     raceDisplayTitle,
   } from "$lib/utils/raceTitle";
 
@@ -39,8 +43,6 @@
   let isDraftPreview = false;
   let summarySourcesOpen = false;
   let summaryExpanded = false;
-  let photoFailed = false;
-  let hiddenOtherImages: Record<string, boolean> = {};
   const SUMMARY_SOURCE_LIMIT = 3;
 
   let slug: string;
@@ -81,8 +83,6 @@
     othersExpanded = false;
     summarySourcesOpen = false;
     summaryExpanded = false;
-    photoFailed = false;
-    hiddenOtherImages = {};
   }
 
   // Legacy (pre-accent-folding) slugs still resolve, then move to the
@@ -90,8 +90,31 @@
   $: if (mounted && candidate && resolved.isLegacySlug)
     redirectToCanonical(slug, canonicalSlug);
 
+  // Client-side navigation within the same race (another candidate, say)
+  // brings new embedded data; follow it unless a draft is being previewed.
+  $: if (
+    mounted &&
+    !draftParam &&
+    data.prerenderedRace &&
+    data.prerenderedRace.id === slug &&
+    race !== data.prerenderedRace
+  )
+    race = data.prerenderedRace;
+
+  /** Focus the section a shared #link points at (sections are tabindex="-1"). */
+  function focusHashTarget() {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (target?.getAttribute("tabindex") === "-1")
+      target.focus({ preventScroll: true });
+  }
+
   onMount(() => {
     mounted = true;
+    window.addEventListener("hashchange", focusHashTarget);
+    requestAnimationFrame(focusHashTarget);
+    return () => window.removeEventListener("hashchange", focusHashTarget);
   });
 
   async function redirectToCanonical(raceSlug: string, target: string) {
@@ -132,6 +155,12 @@
     isDraftPreview = draft;
     loadError = null;
     raceNotFound = false;
+    // The build embedded this race: nothing to refetch (drafts always fetch).
+    if (!draft && prerendered) {
+      race = prerendered;
+      loading = false;
+      return;
+    }
     loading = !race;
 
     try {
@@ -224,18 +253,21 @@
     candidate && candidate.education && candidate.education.length > 0;
   $: hasVoting = !!(candidate && candidate.voting_summary);
   $: hasDonors = !!(candidate && candidate.donor_summary);
+  // Only "no public position found" markers count as no researched positions.
   $: candidateDiscoveryOnly =
-    candidate != null &&
-    (!candidate.issues ||
-      Object.keys(candidate.issues).length === 0 ||
-      Object.values(candidate.issues).every((i) => !i?.stance?.trim()));
+    candidate != null && hasNoResearchedPositions(candidate);
   $: socialLinks = Object.entries(candidate?.social_media ?? {}).filter(
     (entry): entry is [string, string] => isExternalUrl(entry[1]),
   );
   $: metaDescription = candidateMetaDescription(candidate, race);
-  $: pageTitle = `${candidate?.name ?? "Candidate"} — ${
-    race ? raceDisplayTitle(race) : "Election"
-  } | Smarter.Vote`;
+  $: pageTitle = candidate
+    ? candidatePageTitle(candidate, race)
+    : "Candidate | Smarter.Vote";
+  $: share = candidateShareImage(candidate);
+  $: jsonLd =
+    race && candidate && !notFound
+      ? jsonLdScript(candidateJsonLd(race, candidate))
+      : "";
   $: canonicalUrl = `https://smarter.vote/races/${slug}/${canonicalSlug}/`;
   $: compareHref =
     candidate && otherCandidates.length > 0
@@ -259,20 +291,18 @@
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={metaDescription} />
-    <meta
-      property="og:image"
-      content={candidate?.image_url || "https://smarter.vote/og-image.png"}
-    />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content={share.image} />
+    <meta name="twitter:card" content={share.card} />
     <meta name="twitter:url" content={canonicalUrl} />
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={metaDescription} />
-    <meta
-      name="twitter:image"
-      content={candidate?.image_url || "https://smarter.vote/og-image.png"}
-    />
+    <meta name="twitter:image" content={share.image} />
     {#if isDraftPreview}
       <meta name="robots" content="noindex" />
+    {/if}
+    {#if jsonLd}
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+      {@html jsonLd}
     {/if}
   {/if}
 </svelte:head>
@@ -420,35 +450,16 @@
       <aside class="candidate-aside" aria-label="Candidate profile">
         <Card class="profile-card">
           <div class="profile-top">
-            {#if candidate.image_url && !photoFailed}
-              <img
-                src={candidate.image_url}
+            <span class="profile-avatar">
+              <CandidateAvatar
+                name={candidate.name}
+                imageUrl={candidate.image_url}
+                size={128}
+                shape="rounded"
                 alt={candidate.name}
-                width="112"
-                height="112"
-                decoding="async"
-                referrerpolicy="no-referrer"
-                class="candidate-photo"
-                use:headshotFallback={() => (photoFailed = true)}
+                loading="eager"
               />
-            {:else}
-              <div
-                class="candidate-photo-placeholder"
-                role="img"
-                aria-label={candidate.name}
-              >
-                <svg
-                  class="h-12 w-12 text-content-faint"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                  />
-                </svg>
-              </div>
-            {/if}
+            </span>
             <div class="min-w-0">
               <h1 class="candidate-detail-name">{candidate.name}</h1>
               <div class="mt-2 flex flex-wrap items-center gap-1.5">
@@ -536,8 +547,9 @@
       {#if sectionLinks.length > 1}
         <!-- Phones/tablets: a horizontal strip that sticks under the site
              header. It is a direct child of the layout grid (not of the
-             profile aside) so it stays pinned for the whole page, and it
-             publishes its height for the issue picker that sticks below it. -->
+             profile aside) so it stays pinned for the whole page. It is the
+             only secondary sticky bar: the issue picker does not stick when
+             it is present. -->
         <nav
           class="detail-nav detail-nav--strip"
           aria-label="Candidate profile sections"
@@ -559,7 +571,7 @@
 
       <div class="candidate-main">
         {#if summaryText}
-          <section id="about" class="detail-section scroll-mt-24">
+          <section id="about" class="detail-section scroll-mt-24" tabindex="-1">
             <h2 class="h-section section-heading">About</h2>
             <Card class="section-card">
               <p class="candidate-summary" class:is-expanded={summaryExpanded}>
@@ -641,20 +653,29 @@
         {/if}
 
         <!-- Issues Section -->
-        <section id="positions" class="detail-section scroll-mt-24">
+        <section
+          id="positions"
+          class="detail-section scroll-mt-24"
+          tabindex="-1"
+        >
           <h2 class="h-section section-heading">Positions on Key Issues</h2>
           <Card class="section-card">
             <IssueTable
               issues={candidate.issues}
               raceId={race.id}
               candidateName={candidate.name}
+              stickyPicker={sectionLinks.length <= 1}
             />
           </Card>
         </section>
 
         <!-- Background Section -->
         {#if hasCareer || hasEducation}
-          <section id="background" class="detail-section scroll-mt-24">
+          <section
+            id="background"
+            class="detail-section scroll-mt-24"
+            tabindex="-1"
+          >
             <h2 class="h-section section-heading">Background</h2>
             <Card class="section-card">
               <div
@@ -741,7 +762,11 @@
 
         <!-- Top Donors Section -->
         {#if hasDonors}
-          <section id="donors" class="detail-section scroll-mt-24">
+          <section
+            id="donors"
+            class="detail-section scroll-mt-24"
+            tabindex="-1"
+          >
             <h2 class="h-section section-heading">Top Donors</h2>
             <Card class="section-card">
               <DonorTable
@@ -757,7 +782,11 @@
 
         <!-- Voting Record Section -->
         {#if hasVoting}
-          <section id="voting-record" class="detail-section scroll-mt-24">
+          <section
+            id="voting-record"
+            class="detail-section scroll-mt-24"
+            tabindex="-1"
+          >
             <h2 class="h-section section-heading">Voting Record</h2>
             <Card class="section-card">
               <VotingRecordTable
@@ -802,28 +831,11 @@
                     )}/{isDraftPreview ? '?draft=true' : ''}"
                     class="other-chip"
                   >
-                    {#if other.image_url && !hiddenOtherImages[other.name]}
-                      <img
-                        src={other.image_url}
-                        alt=""
-                        width="32"
-                        height="32"
-                        loading="lazy"
-                        decoding="async"
-                        referrerpolicy="no-referrer"
-                        class="other-avatar"
-                        use:headshotFallback={() =>
-                          (hiddenOtherImages = {
-                            ...hiddenOtherImages,
-                            [other.name]: true,
-                          })}
-                      />
-                    {:else}
-                      <span
-                        class="other-avatar other-initials"
-                        aria-hidden="true">{candidateInitials(other.name)}</span
-                      >
-                    {/if}
+                    <CandidateAvatar
+                      name={other.name}
+                      imageUrl={other.image_url}
+                      size={32}
+                    />
                     <span class="other-info">
                       <span class="other-name">{other.name}</span>
                       {#if other.party}
@@ -900,12 +912,21 @@
     @apply flex items-start gap-4 lg:flex-col;
   }
 
-  .candidate-photo {
-    @apply h-24 w-24 flex-shrink-0 rounded-xl border border-stroke object-cover sm:h-28 sm:w-28 lg:h-32 lg:w-32;
+  .profile-avatar {
+    @apply flex shrink-0;
+    --avatar-display-size: 6rem;
   }
 
-  .candidate-photo-placeholder {
-    @apply flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border border-stroke bg-surface-alt sm:h-28 sm:w-28 lg:h-32 lg:w-32;
+  @media (min-width: 640px) {
+    .profile-avatar {
+      --avatar-display-size: 7rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .profile-avatar {
+      --avatar-display-size: 8rem;
+    }
   }
 
   .candidate-detail-name {
@@ -946,6 +967,18 @@
     @apply sticky top-[var(--site-header-height)] z-30 min-w-0 bg-surface/95 p-2 backdrop-blur lg:hidden;
   }
 
+  /* At 200% zoom or on a landscape phone a pinned strip would cover too
+     much of the screen. */
+  @media (max-height: 500px) {
+    .detail-nav--strip {
+      position: static;
+    }
+  }
+
+  .detail-section:focus {
+    outline: none;
+  }
+
   .detail-nav-label {
     @apply hidden px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-content-subtle lg:block;
   }
@@ -982,14 +1015,6 @@
 
   .other-chip {
     @apply flex min-h-12 min-w-0 items-center gap-3 rounded-lg border border-stroke bg-surface px-3 py-2 text-content no-underline transition-colors duration-200 hover:border-primary-300 hover:bg-surface-alt;
-  }
-
-  .other-avatar {
-    @apply h-8 w-8 shrink-0 rounded-full object-cover;
-  }
-
-  .other-initials {
-    @apply inline-flex items-center justify-center border border-stroke bg-surface-alt text-xs font-bold text-content-muted;
   }
 
   .other-info {

@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import CandidateCard from "$lib/components/CandidateCard.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import ReviewPanel from "$lib/components/ReviewPanel.svelte";
@@ -26,20 +27,24 @@
     ratingClass,
   } from "$lib/utils/forecastPresentation";
   import {
+    hasNoResearchedPositions,
     neutralCandidateOrder,
     shortCandidateName,
     uniqueCandidatesByName,
   } from "$lib/utils/candidates";
   import { motionDuration, scrollBehavior } from "$lib/utils/motion";
-  import { headshotFallback } from "$lib/utils/racePageImage";
   import {
     cleanDisplayText,
+    contestStageNotice,
     forecastHeadline,
     formatPollDate,
     formatWinProbability,
     pollDateLabel,
     isNotFoundError,
+    isPreviousCyclePoll,
+    isUncontestedRace,
     jsonLdScript,
+    pollAgeLabel,
     partyProbabilityAriaLabel,
     partyProbabilitySegments,
     raceJsonLd,
@@ -71,7 +76,6 @@
   let overviewExpanded = false;
   let withdrawnExpanded = false;
   let pollsExpanded = false;
-  let hiddenChipImages: Record<string, boolean> = {};
 
   let slug: string;
   $: slug = $page.params.slug as string;
@@ -94,8 +98,23 @@
   $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
     loadRace(slug, draftParam);
 
+  // Client-side navigation within the same race (another candidate, say)
+  // brings new embedded data; follow it unless a draft is being previewed.
+  $: if (
+    mounted &&
+    !draftParam &&
+    data.prerenderedRace &&
+    data.prerenderedRace.id === slug &&
+    race !== data.prerenderedRace
+  )
+    race = data.prerenderedRace;
+
   onMount(() => {
     mounted = true;
+    window.addEventListener("hashchange", focusHashTarget);
+    // A shared link straight to a section gets the same focus treatment.
+    requestAnimationFrame(focusHashTarget);
+    return () => window.removeEventListener("hashchange", focusHashTarget);
   });
 
   function resetRaceState() {
@@ -104,11 +123,19 @@
     overviewExpanded = false;
     withdrawnExpanded = false;
     pollsExpanded = false;
-    hiddenChipImages = {};
   }
 
-  function hideChipImage(name: string) {
-    hiddenChipImages = { ...hiddenChipImages, [name]: true };
+  /**
+   * Move focus to an in-page anchor target (#forecast, #polls, #candidates)
+   * so keyboard and screen-reader users land where the link pointed. The
+   * targets carry tabindex="-1"; scrolling is left to the browser.
+   */
+  function focusHashTarget() {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (target?.getAttribute("tabindex") === "-1")
+      target.focus({ preventScroll: true });
   }
 
   /** Drop the rejected `?draft=true` from the address bar (a real navigation, so `$page.url` agrees). */
@@ -142,6 +169,13 @@
     isDraftPreview = draft;
     error = null;
     notFound = false;
+    // The build embedded this race: nothing to refetch (drafts always fetch).
+    if (!draft && prerendered) {
+      race = prerendered;
+      usingFallbackData = false;
+      loading = false;
+      return;
+    }
     loading = !race;
 
     try {
@@ -231,21 +265,37 @@
     (overview.paragraphs.length > 0 ? 1 : 0) +
     1 +
     (withdrawnCandidates.length > 0 ? 1 : 0);
-  $: latestPoll = polls.length > 0 ? polls[0] : null;
+  // A poll from an earlier campaign is never this race's "latest poll".
+  $: latestPoll =
+    polls.find(
+      (poll) => !isPreviousCyclePoll(poll.date, race?.election_date),
+    ) ?? null;
+  $: stageNotice = race ? contestStageNotice(race, activeCandidates) : null;
+  // An uncontested race has no contest to forecast: no favorite, no odds.
+  $: uncontested = race
+    ? isUncontestedRace(race, activeCandidates.length)
+    : false;
+  $: showForecast = !!race?.forecast && !uncontested;
+  $: noPollInputs = race?.forecast?.based_on_poll_count === 0;
+  // Every model that produced this page, shown with the review details.
+  $: researchModels = [
+    ...new Set(
+      [...(race?.generator ?? []), race?.forecast?.model]
+        .filter((model): model is string => !!model)
+        .map((model) => formatModelName(model)),
+    ),
+  ];
   $: latestMatchup =
     latestPoll?.matchups?.find(
       (matchup) =>
         Array.isArray(matchup.candidates) && matchup.candidates.length > 0,
     ) ?? null;
   $: snapshotRows = latestMatchup ? orderedMatchupRows(latestMatchup) : [];
+  // Candidates with only "no public position found" markers count as having
+  // no researched positions.
   $: discoveryOnly =
     activeCandidates.length > 0 &&
-    activeCandidates.every(
-      (c) =>
-        !c.issues ||
-        Object.keys(c.issues).length === 0 ||
-        Object.values(c.issues).every((i) => !i?.stance?.trim()),
-    );
+    activeCandidates.every(hasNoResearchedPositions);
   $: jsonLd = race && !notFound ? jsonLdScript(raceJsonLd(race)) : "";
 
   // Derive ballotpedia URL: race-level field first, then fall back to any
@@ -297,11 +347,15 @@
     candidates: string[];
     percentages?: number[] | null;
   }): { name: string; pct: number | null }[] {
-    const rows = matchup.candidates.map((name, i) => ({
-      name,
-      pct: percentageAt(matchup, i),
-      party: race?.candidates?.find((c) => c.name === name)?.party,
-    }));
+    const rows = matchup.candidates.map((name, i) => {
+      const listed = race?.candidates?.find((c) => c.name === name);
+      return {
+        name,
+        pct: percentageAt(matchup, i),
+        party: listed?.party,
+        incumbent: listed?.incumbent,
+      };
+    });
     return neutralCandidateOrder(rows).map(({ name, pct }) => ({ name, pct }));
   }
 
@@ -444,12 +498,25 @@
       <div class="header-top">
         <h1 class="h-page min-w-0">{raceDisplayTitle(race)}</h1>
         {#if race.validation_grade}
-          <ValidationGradeBadge grade={race.validation_grade} />
+          <ValidationGradeBadge
+            grade={race.validation_grade}
+            reviews={race.reviews ?? []}
+          />
         {/if}
       </div>
       <p class="mt-2 text-sm text-content-muted sm:text-base">
         Compare candidates’ positions, polling, and sourced race updates.
       </p>
+      {#if stageNotice}
+        <div
+          class="alert-info stage-notice"
+          role="note"
+          data-stage={stageNotice.kind}
+        >
+          <p class="font-semibold text-content">{stageNotice.title}</p>
+          <p class="mt-1">{stageNotice.body}</p>
+        </div>
+      {/if}
       <div class="header-meta">
         {#if locationLabel}
           <span class="info-row">
@@ -509,7 +576,9 @@
           {/if}
           {#if activeCandidates.length > 1}
             <a href={compareAllHref} class="btn-primary shrink-0">
-              Compare all {activeCandidates.length} candidates
+              {activeCandidates.length === 2
+                ? "Compare both candidates"
+                : `Compare all ${activeCandidates.length} candidates`}
             </a>
           {/if}
         </div>
@@ -579,18 +648,12 @@
                   )}/{isDraftPreview ? '?draft=true' : ''}"
                   class="overview-candidate-chip"
                 >
-                  {#if candidate.image_url && !hiddenChipImages[candidate.name]}
-                    <img
-                      src={candidate.image_url}
-                      alt=""
-                      width="20"
-                      height="20"
-                      decoding="async"
-                      referrerpolicy="no-referrer"
-                      class="chip-avatar"
-                      use:headshotFallback={() => hideChipImage(candidate.name)}
-                    />
-                  {/if}
+                  <CandidateAvatar
+                    name={candidate.name}
+                    imageUrl={candidate.image_url}
+                    size={20}
+                    loading="eager"
+                  />
                   <span class="chip-name">{candidate.name}</span>
                   {#if candidate.party}
                     <span
@@ -612,14 +675,14 @@
            sidebar on desktop; right after the overview on smaller screens. -->
       <aside
         class="race-aside"
-        class:has-glance={!!race.forecast || !!(latestPoll && latestMatchup)}
+        class:has-glance={showForecast || !!(latestPoll && latestMatchup)}
         aria-label="Race at a glance"
         style="--aside-rows: {asideRowSpan}"
       >
-        {#if race.forecast || (latestPoll && latestMatchup)}
+        {#if showForecast || (latestPoll && latestMatchup)}
           <div class="card glance-card">
             <p class="eyebrow">At a glance</p>
-            {#if race.forecast}
+            {#if showForecast && race.forecast}
               {@const glance = forecastHeadline(race.forecast)}
               <div class="glance-block">
                 <div class="flex items-start justify-between gap-3">
@@ -644,11 +707,13 @@
               </div>
             {/if}
             {#if latestPoll && latestMatchup}
-              <div class="glance-block" class:glance-divider={!!race.forecast}>
+              <div class="glance-block" class:glance-divider={showForecast}>
                 <p class="glance-subtitle">Latest poll</p>
                 <p class="poll-snapshot-meta">
                   {latestPoll.pollster}{pollDateLabel(latestPoll.date)
                     ? ` · ${pollDateLabel(latestPoll.date)}`
+                    : ""}{pollAgeLabel(latestPoll.date)
+                    ? ` (${pollAgeLabel(latestPoll.date)})`
                     : ""}
                 </p>
                 <div class="poll-snapshot-bars">
@@ -688,7 +753,7 @@
       </aside>
 
       <!-- Candidates Section -->
-      <section id="candidates" class="race-main scroll-mt-24">
+      <section id="candidates" class="race-main scroll-mt-24" tabindex="-1">
         <div class="candidates-heading">
           <h2 class="h-section">Candidates</h2>
           {#if activeCandidates.length > 1}
@@ -780,11 +845,11 @@
     </div>
 
     <!-- Race Forecast -->
-    {#if race.forecast}
+    {#if showForecast && race.forecast}
       {@const forecast = race.forecast}
       {@const headline = forecastHeadline(forecast)}
       {@const segments = partyProbabilitySegments(forecast.party_probabilities)}
-      <section id="forecast" class="page-section scroll-mt-24">
+      <section id="forecast" class="page-section scroll-mt-24" tabindex="-1">
         <h2 class="h-section section-title">Forecast</h2>
         <Card class="forecast-card">
           <div class="forecast-header">
@@ -829,12 +894,20 @@
             </div>
             <div class="forecast-metric">
               <span class="forecast-metric-label">Polling Inputs</span>
-              <span class="forecast-metric-value"
-                >{forecast.based_on_poll_count} poll{forecast.based_on_poll_count ===
-                1
-                  ? ""
-                  : "s"}</span
-              >
+              {#if noPollInputs}
+                <span class="forecast-metric-note"
+                  >{polls.length > 0
+                    ? "The polls below were not used — estimate based on partisan lean, incumbency and fundraising"
+                    : "No public polls — estimate based on partisan lean, incumbency and fundraising"}</span
+                >
+              {:else}
+                <span class="forecast-metric-value"
+                  >{forecast.based_on_poll_count} poll{forecast.based_on_poll_count ===
+                  1
+                    ? ""
+                    : "s"}</span
+                >
+              {/if}
             </div>
           </div>
 
@@ -1000,9 +1073,6 @@
 
           <div class="forecast-meta">
             <span>Forecast confidence: {forecast.confidence}</span>
-            {#if forecast.model}
-              <span>Model: {formatModelName(forecast.model)}</span>
-            {/if}
             {#if forecast.generated_at}
               <span
                 >Generated: {formatPollDate(forecast.generated_at) ||
@@ -1016,7 +1086,7 @@
 
     <!-- Detailed Polls Section -->
     {#if polls.length > 0}
-      <section id="polls" class="page-section scroll-mt-24">
+      <section id="polls" class="page-section scroll-mt-24" tabindex="-1">
         <div
           class="section-title flex flex-wrap items-baseline gap-x-3 gap-y-1"
         >
@@ -1033,8 +1103,13 @@
                   <span class="poll-card-pollster">{poll.pollster}</span>
                   {#if pollDateLabel(poll.date)}
                     <span class="poll-card-date"
-                      >{pollDateLabel(poll.date)}</span
+                      >{pollDateLabel(poll.date)}{pollAgeLabel(poll.date)
+                        ? ` · ${pollAgeLabel(poll.date)}`
+                        : ""}</span
                     >
+                  {/if}
+                  {#if isPreviousCyclePoll(poll.date, race.election_date)}
+                    <span class="poll-card-cycle">Previous cycle</span>
                   {/if}
                 </div>
                 {#if poll.sample_size}
@@ -1083,6 +1158,9 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   class="poll-card-source"
+                  aria-label="Source: {poll.pollster}{pollDateLabel(poll.date)
+                    ? `, ${pollDateLabel(poll.date)}`
+                    : ''} (opens in a new tab)"
                 >
                   Source
                   <UiIcon name="external" size="sm" />
@@ -1132,31 +1210,11 @@
     </div>
 
     <!-- Automated review details (bottom) -->
-    <ReviewPanel reviews={race.reviews ?? []} />
-
-    <!-- Models used to generate this race -->
-    {#if race.generator && race.generator.length > 0}
-      <div class="model-label">
-        <svg
-          class="h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-          />
-        </svg>
-        <span>Models:</span>
-        {#each race.generator as model}
-          <span class="model-tag">{formatModelName(model)}</span>
-        {/each}
-      </div>
-    {/if}
+    <ReviewPanel
+      reviews={race.reviews ?? []}
+      candidateNames={(race.candidates ?? []).map((c) => c.name)}
+      models={researchModels}
+    />
 
     <!-- Back to Top -->
     <div class="back-to-top">
@@ -1334,10 +1392,6 @@
 
   .overview-candidate-chip {
     @apply flex min-h-10 items-center gap-1.5 rounded-full border border-stroke bg-surface px-3 py-1.5 text-sm text-content-muted no-underline transition-colors duration-200 hover:border-primary-300 hover:bg-surface-alt;
-  }
-
-  .chip-avatar {
-    @apply h-5 w-5 rounded-full object-cover;
   }
 
   .chip-name {
@@ -1561,6 +1615,10 @@
     @apply mt-0.5 block text-base font-bold text-content;
   }
 
+  .forecast-metric-note {
+    @apply mt-0.5 block text-sm leading-5 text-content-muted;
+  }
+
   .forecast-probability-bar {
     @apply mb-4 flex h-8 overflow-hidden rounded-xl border border-stroke bg-surface-alt;
   }
@@ -1699,6 +1757,10 @@
     @apply mt-0.5 block text-xs text-content-subtle;
   }
 
+  .poll-card-cycle {
+    @apply mt-1 inline-block rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle;
+  }
+
   .poll-card-sample {
     @apply shrink-0 text-xs text-content-subtle;
   }
@@ -1745,13 +1807,13 @@
     @apply mt-auto inline-flex min-h-8 items-center gap-1 self-start py-1 text-xs font-medium text-primary hover:underline;
   }
 
-  /* Footer bits */
-  .model-label {
-    @apply mb-4 mt-2 flex flex-wrap items-center gap-2 text-sm text-content-subtle;
+  .stage-notice {
+    @apply mt-3;
   }
 
-  .model-tag {
-    @apply rounded bg-surface-alt px-2 py-1 font-mono text-xs;
+  /* Anchor targets take programmatic focus only (tabindex="-1"). */
+  section[tabindex="-1"]:focus {
+    outline: none;
   }
 
   .back-to-top {

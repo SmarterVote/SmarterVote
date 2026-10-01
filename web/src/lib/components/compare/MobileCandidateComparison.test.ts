@@ -75,13 +75,13 @@ describe("MobileCandidateComparison", () => {
 
     await fireEvent.click(
       screen.getByRole("button", {
-        name: "Show 1 more source for Alex Example",
+        name: "Show 1 more source for Alex Example on Healthcare",
       }),
     );
     expect(screen.getByRole("link", { name: /Second source/ })).toBeTruthy();
     expect(
       screen.getByRole("button", {
-        name: "Show fewer sources for Alex Example",
+        name: "Show fewer sources for Alex Example on Healthcare",
       }),
     ).toBeTruthy();
   });
@@ -117,7 +117,9 @@ describe("MobileCandidateComparison", () => {
     expect(screen.queryByRole("link", { name: /First source/ })).toBeNull();
 
     await fireEvent.click(
-      screen.getByRole("button", { name: "Show more for Alex Example" }),
+      screen.getByRole("button", {
+        name: "Show more of Alex Example on Healthcare",
+      }),
     );
 
     expect(screen.getByText(longStance)).toBeTruthy();

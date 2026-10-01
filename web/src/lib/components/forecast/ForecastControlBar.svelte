@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ForecastTab } from "$lib/utils/forecast";
+  import { partyFromLabel, type ForecastTab } from "$lib/utils/forecast";
   import {
     controlProbabilities,
     controlProbability,
@@ -8,6 +8,14 @@
   export let activeTab: ForecastTab;
   export let outcomeProbabilities: Record<string, number> | undefined;
   export let projectedSeats: Record<string, number>;
+  /** Party of the vice president, who breaks a 50-50 Senate tie. */
+  export let vpTiebreakParty: string | undefined = undefined;
+
+  $: tiebreakParty = partyFromLabel(vpTiebreakParty);
+  $: tiebreakPartyName =
+    tiebreakParty === "Democratic" || tiebreakParty === "Republican"
+      ? tiebreakParty
+      : null;
 </script>
 
 <div class="space-y-3">
@@ -108,6 +116,7 @@
           class="bg-surface-alt/40 border border-stroke/60 rounded-xl p-3 flex items-start gap-2.5"
         >
           <svg
+            aria-hidden="true"
             class="w-5 h-5 text-content-subtle shrink-0 mt-0.5"
             fill="none"
             stroke="currentColor"
@@ -119,9 +128,15 @@
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <p class="text-xs text-content-muted leading-relaxed font-medium">
-            A {controlProbability(outcomeProbabilities.tie_50_50)} 50-50 tie probability
-            is counted as Republican control via VP tie-break, contributing to the
-            Republican control advantage shown above.
+            {#if tiebreakPartyName}
+              A 50-50 tie ({controlProbability(outcomeProbabilities.tie_50_50)}
+              chance) counts toward the party of the vice president, who breaks the
+              tie, so it is included in the {tiebreakPartyName} share above.
+            {:else}
+              A 50-50 tie ({controlProbability(outcomeProbabilities.tie_50_50)}
+              chance) is decided by the vice president's tie-breaking vote, so it
+              is included in the vice president's party's share above.
+            {/if}
           </p>
         </div>
       {/if}

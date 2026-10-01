@@ -4,16 +4,15 @@
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import type { RaceSummary } from "$lib/types";
-  import { getRaceSummaries } from "$lib/api";
+  import { getSearchIndex } from "$lib/api";
   import { candidateSlug } from "$lib/utils/format";
   import { debounce } from "$lib/utils/debounce";
   import {
-    getSearchTokens,
-    matchesSearchDoc,
-    prepareSearchDoc,
-  } from "$lib/utils/search";
-  import { raceDisplayTitle } from "$lib/utils/raceTitle";
-  import { officeDisplayName } from "$lib/utils/forecastPresentation";
+    buildSearchIndex,
+    prepareSearchIndex,
+    searchIndex as runSearch,
+    type SearchIndex,
+  } from "$lib/utils/searchIndex";
 
   export let races: RaceSummary[] = [];
   export let isAuthenticated = false;
@@ -26,9 +25,15 @@
   let activeIndex = -1;
   let searchContainer: HTMLElement;
   let searchInput: HTMLInputElement;
-  let searchRaces: RaceSummary[] = races;
+  // Supplied races (tests, pages that already hold the catalog) are indexed
+  // locally; otherwise the compact build-time index is fetched on first use.
+  let index: SearchIndex = buildSearchIndex(races);
   let searchLoading = false;
   let searchLoaded = races.length > 0;
+  $: if (races.length > 0) {
+    index = buildSearchIndex(races);
+    searchLoaded = true;
+  }
   let searchLoadError = false;
   let searchLoadPromise: Promise<void> | null = null;
   let mobileNavOpen = false;
@@ -57,9 +62,9 @@
     if (!browser || searchLoaded || searchLoadPromise) return searchLoadPromise;
     searchLoading = true;
     searchLoadError = false;
-    searchLoadPromise = getRaceSummaries()
-      .then((loadedRaces) => {
-        searchRaces = loadedRaces;
+    searchLoadPromise = getSearchIndex()
+      .then((loadedIndex) => {
+        index = loadedIndex;
         searchLoaded = true;
       })
       .catch(() => {
@@ -74,51 +79,17 @@
 
   const MAX_MATCHES = 5;
 
-  // Normalize every searchable field once per catalog load; doing it per
+  // Normalize every searchable field once per index load; doing it per
   // keystroke across hundreds of races is what made typing stutter.
-  $: raceIndex = searchRaces.map((race) => {
-    const raceFields = [race.title, race.office, race.state, race.jurisdiction];
-    return {
-      race,
-      doc: prepareSearchDoc(...raceFields),
-      candidates: race.candidates.map((candidate) => ({
-        candidate,
-        doc: prepareSearchDoc(candidate.name, candidate.party, ...raceFields),
-      })),
-    };
-  });
-
-  $: terms = getSearchTokens(query);
-  $: raceMatches = findRaceMatches(raceIndex, terms);
-  $: candidateMatches = findCandidateMatches(raceIndex, terms);
-  $: totalMatches = raceMatches.length + candidateMatches.length;
-
-  function findRaceMatches(index: typeof raceIndex, terms: string[]) {
-    const matches: RaceSummary[] = [];
-    for (const entry of index) {
-      if (matches.length >= MAX_MATCHES) break;
-      if (matchesSearchDoc(terms, entry.doc)) matches.push(entry.race);
-    }
-    return matches;
-  }
-
-  function findCandidateMatches(index: typeof raceIndex, terms: string[]) {
-    const matches: Array<
-      RaceSummary["candidates"][number] & { raceId: string; raceTitle: string }
-    > = [];
-    for (const entry of index) {
-      for (const { candidate, doc } of entry.candidates) {
-        if (matches.length >= MAX_MATCHES) return matches;
-        if (matchesSearchDoc(terms, doc))
-          matches.push({
-            ...candidate,
-            raceId: entry.race.id,
-            raceTitle: raceDisplayTitle(entry.race),
-          });
-      }
-    }
-    return matches;
-  }
+  $: prepared = prepareSearchIndex(index);
+  $: results = runSearch(prepared, query, MAX_MATCHES);
+  $: raceMatches = results.races;
+  $: candidateMatches = results.candidates;
+  $: resultCount = raceMatches.length + candidateMatches.length;
+  // Options: races, candidates, then "See all N results" last.
+  $: totalMatches = resultCount > 0 ? resultCount + 1 : 0;
+  $: seeAllIndex = resultCount;
+  $: electionsHref = `/elections/?q=${encodeURIComponent(query.trim())}`;
 
   // Adopt the homepage `?q=` only on real navigations (load, back/forward,
   // links). Our own URL writes are shallow, so they never echo back into the
@@ -165,6 +136,13 @@
     goto(`/races/${id}/`);
   }
 
+  function seeAllResults() {
+    open = false;
+    activeIndex = -1;
+    mobileSearchOpen = false;
+    goto(electionsHref);
+  }
+
   function selectCandidate(raceId: string, name: string) {
     open = false;
     mobileSearchOpen = false;
@@ -196,19 +174,13 @@
     } else if (event.key === "Enter") {
       event.preventDefault();
       if (activeIndex >= 0 && activeIndex < raceMatches.length)
-        selectRace(raceMatches[activeIndex].id);
-      else if (
-        activeIndex >= raceMatches.length &&
-        activeIndex < totalMatches
-      ) {
+        selectRace(raceMatches[activeIndex].i);
+      else if (activeIndex >= raceMatches.length && activeIndex < resultCount) {
         const candidate = candidateMatches[activeIndex - raceMatches.length];
         selectCandidate(candidate.raceId, candidate.name);
       } else if (query.trim()) {
-        const target = `/elections/?q=${encodeURIComponent(query.trim())}`;
-        open = false;
-        activeIndex = -1;
-        mobileSearchOpen = false;
-        goto(target);
+        // The "See all" option, or Enter with nothing highlighted.
+        seeAllResults();
       }
     }
   }
@@ -261,8 +233,8 @@
   // announced reliably (inserted live regions often are not).
   $: searchStatus = !open
     ? ""
-    : totalMatches > 0
-      ? `${totalMatches} result${totalMatches === 1 ? "" : "s"} available. Use the up and down arrows to review.`
+    : resultCount > 0
+      ? `${resultCount} result${resultCount === 1 ? "" : "s"} available. Use the up and down arrows to review.`
       : searchLoading
         ? "Loading search results…"
         : searchLoaded && query.trim()
@@ -289,10 +261,10 @@
   <div class="page-container py-3">
     <!-- Below lg the header is compact (search icon + menu); from lg up the
          nav and search box sit inline. -->
-    <div class="flex flex-wrap items-center gap-1 lg:flex-nowrap lg:gap-3">
+    <div class="sh-row flex flex-wrap items-center gap-0 min-[360px]:gap-1">
       <a
         href="/"
-        class="mr-auto text-xl sm:text-2xl font-bold text-primary hover:text-primary/80 whitespace-nowrap"
+        class="mr-auto text-lg min-[360px]:text-xl sm:text-2xl font-bold text-primary hover:text-primary/80 whitespace-nowrap"
         aria-label="Smarter.Vote home"
       >
         Smarter.Vote
@@ -301,7 +273,7 @@
       <button
         type="button"
         bind:this={searchToggle}
-        class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-sm font-medium text-content-muted hover:bg-surface-alt hover:text-content lg:hidden"
+        class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-sm font-medium text-content-muted hover:bg-surface-alt hover:text-content sh-compact-only"
         aria-label={mobileSearchOpen ? undefined : "Open search"}
         aria-controls="site-search"
         aria-expanded={mobileSearchOpen}
@@ -329,7 +301,7 @@
       <button
         type="button"
         bind:this={navToggle}
-        class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-content-muted hover:bg-surface-alt hover:text-content lg:hidden"
+        class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-content-muted hover:bg-surface-alt hover:text-content sh-compact-only"
         aria-label={mobileNavOpen
           ? "Close navigation menu"
           : "Open navigation menu"}
@@ -362,7 +334,7 @@
         id="primary-navigation"
         class="order-3 mt-2 w-full flex-col divide-y divide-stroke border-t border-stroke {mobileNavOpen
           ? 'flex'
-          : 'hidden'} lg:order-none lg:mt-0 lg:flex lg:w-auto lg:flex-row lg:items-center lg:gap-x-4 lg:divide-y-0 lg:border-t-0 lg:text-sm"
+          : 'hidden'} sh-nav"
         aria-label="Primary navigation"
       >
         {#each primaryLinks as link}
@@ -374,7 +346,7 @@
               : undefined}
             class:font-semibold={isCurrent($page.url.pathname, link.href)}
             class:text-content={isCurrent($page.url.pathname, link.href)}
-            class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content lg:px-1 lg:py-0 lg:text-sm"
+            class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content sh-nav-link"
           >
             {link.label}
           </a>
@@ -386,7 +358,7 @@
             aria-current={isCurrent($page.url.pathname, "/admin/")
               ? "page"
               : undefined}
-            class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content lg:px-1 lg:py-0 lg:text-sm"
+            class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content sh-nav-link"
             >Admin</a
           >
         {/if}
@@ -395,7 +367,7 @@
       <div
         class="relative order-2 mt-2 w-full {mobileSearchOpen
           ? 'block'
-          : 'hidden'} lg:order-none lg:mt-0 lg:block lg:w-72"
+          : 'hidden'} sh-search"
         bind:this={searchContainer}
       >
         <label class="sr-only" for="site-search"
@@ -451,7 +423,7 @@
         {#if open && totalMatches > 0}
           <div
             id={resultsId}
-            class="absolute left-0 right-0 top-full z-50 mt-2 lg:left-auto lg:w-[28rem] lg:max-w-[calc(100vw-2rem)] max-h-96 overflow-y-auto rounded-xl border border-stroke bg-surface py-2 shadow-2xl"
+            class="absolute left-0 right-0 top-full z-50 mt-2 sh-panel max-h-96 overflow-y-auto rounded-xl border border-stroke bg-surface py-2 shadow-2xl"
             role="listbox"
           >
             {#if raceMatches.length}
@@ -468,19 +440,15 @@
                     id={`site-search-option-${index}`}
                     type="button"
                     tabindex="-1"
-                    on:click={() => selectRace(race.id)}
+                    on:click={() => selectRace(race.i)}
                     class:bg-surface-alt={index === activeIndex}
                     class="block min-h-11 w-full px-3 py-2 text-left text-xs text-content hover:bg-surface-alt"
                     role="option"
                     aria-selected={index === activeIndex}
                   >
-                    <span class="block truncate font-medium"
-                      >{raceDisplayTitle(race)}</span
-                    >
+                    <span class="block truncate font-medium">{race.t}</span>
                     <span class="block truncate text-content-subtle"
-                      >{[officeDisplayName(race.office), race.state]
-                        .filter(Boolean)
-                        .join(" · ")}</span
+                      >{race.s}</span
                     >
                   </button>
                 {/each}
@@ -520,24 +488,53 @@
                 {/each}
               </div>
             {/if}
+            <button
+              id={`site-search-option-${seeAllIndex}`}
+              type="button"
+              tabindex="-1"
+              on:click={seeAllResults}
+              class:bg-surface-alt={seeAllIndex === activeIndex}
+              class="mt-1 block min-h-11 w-full border-t border-stroke px-3 py-2 text-left text-xs font-semibold text-primary-700 hover:bg-surface-alt dark:text-primary-300"
+              role="option"
+              aria-selected={seeAllIndex === activeIndex}
+            >
+              See all {results.totalRaces}
+              {results.totalRaces === 1 ? "result" : "results"} &rarr;
+            </button>
           </div>
         {:else if open && searchLoading}
           <div
-            class="absolute left-0 right-0 top-full z-50 mt-2 lg:left-auto lg:w-[28rem] lg:max-w-[calc(100vw-2rem)] rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
+            class="absolute left-0 right-0 top-full z-50 mt-2 sh-panel rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
             aria-hidden="true"
           >
             Loading search results&hellip;
           </div>
         {:else if open && searchLoaded && query.trim()}
+          <!-- Not a dead end: offer the two other ways to find a race. -->
           <div
-            class="absolute left-0 right-0 top-full z-50 mt-2 lg:left-auto lg:w-[28rem] lg:max-w-[calc(100vw-2rem)] rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
-            aria-hidden="true"
+            class="absolute left-0 right-0 top-full z-50 mt-2 sh-panel rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
           >
-            No matching elections or candidates.
+            <p aria-hidden="true">No matching elections or candidates.</p>
+            <ul class="mt-2 flex flex-wrap gap-x-4">
+              <li>
+                <a
+                  href="/elections/"
+                  class="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                  >Browse all elections</a
+                >
+              </li>
+              <li>
+                <a
+                  href="/my-ballot/"
+                  class="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                  >Find races by address</a
+                >
+              </li>
+            </ul>
           </div>
         {:else if open && searchLoadError}
           <div
-            class="absolute left-0 right-0 top-full z-50 mt-2 lg:left-auto lg:w-[28rem] lg:max-w-[calc(100vw-2rem)] rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-red-700 shadow-2xl dark:text-red-300"
+            class="absolute left-0 right-0 top-full z-50 mt-2 sh-panel rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-red-700 shadow-2xl dark:text-red-300"
             aria-hidden="true"
           >
             Search is temporarily unavailable. Press Enter to browse elections.
@@ -575,3 +572,53 @@
     </div>
   </div>
 </header>
+
+<style>
+  /*
+   * The full inline header (nav links + search box) needs about 64em of
+   * width. An em breakpoint (not Tailwind's px-based lg:) keeps the compact
+   * header when the browser's text size is enlarged, so at 200% text the
+   * search box and theme toggle no longer run off the right edge.
+   * Scoped selectors outrank the mobile `hidden`/`flex` toggles.
+   */
+  @media (min-width: 64em) {
+    .sh-row {
+      flex-wrap: nowrap;
+      gap: 0.75rem;
+    }
+    .sh-compact-only {
+      display: none;
+    }
+    .sh-nav {
+      order: 0;
+      margin-top: 0;
+      display: flex;
+      width: auto;
+      flex-direction: row;
+      align-items: center;
+      column-gap: 1rem;
+      border-top-width: 0;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+    .sh-nav > :global(:not([hidden]) ~ :not([hidden])) {
+      border-top-width: 0;
+    }
+    .sh-nav-link {
+      padding: 0 0.25rem;
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+    .sh-search {
+      order: 0;
+      margin-top: 0;
+      display: block;
+      width: 18rem;
+    }
+    .sh-panel {
+      left: auto;
+      width: 28rem;
+      max-width: calc(100vw - 2rem);
+    }
+  }
+</style>

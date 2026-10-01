@@ -44,6 +44,8 @@ const appDir = deploySha
   : "_app";
 const fixedPrerenderEntries = [
   "/",
+  // Header search loads this prebuilt index instead of the 2 MB summaries.json.
+  "/search-index.json",
   "/about/",
   "/admin/",
   "/admin/pipeline/",
