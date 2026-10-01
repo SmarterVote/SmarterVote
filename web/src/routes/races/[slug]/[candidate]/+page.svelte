@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { goto, replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount, tick } from "svelte";
   import { slide } from "svelte/transition";
@@ -14,6 +14,7 @@
   import { getRace, getDraftRace } from "$lib/api";
   import { candidateSlug } from "$lib/utils/format";
   import { partyBadgeClass } from "$lib/utils/party";
+  import { candidateInitials } from "$lib/utils/candidates";
   import { isExternalUrl } from "$lib/utils/url";
   import { motionDuration, scrollBehavior } from "$lib/utils/motion";
   import {
@@ -61,9 +62,16 @@
   let loadedKey: string | null = null;
   let requestId = 0;
   let lastCandidateKey: string | null = null;
+  /** Race whose draft fetch failed: its `?draft=true` is ignored from then on. */
+  let draftRejectedSlug: string | null = null;
 
+  // A rejected draft must stay rejected even while the URL still says
+  // `?draft=true` — otherwise the guard below refetches the draft forever.
   $: draftParam =
-    mounted && browser && $page.url.searchParams.get("draft") === "true";
+    mounted &&
+    browser &&
+    $page.url.searchParams.get("draft") === "true" &&
+    draftRejectedSlug !== slug;
   $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
     loadRace(slug, draftParam);
 
@@ -100,6 +108,17 @@
     }
   }
 
+  /** Drop the rejected `?draft=true` from the address bar (a real navigation, so `$page.url` agrees). */
+  function dropDraftParam(target: string) {
+    const params = new URLSearchParams($page.url.searchParams);
+    params.delete("draft");
+    const query = params.toString();
+    goto(
+      `/races/${target}/${candidateParam}/${query ? `?${query}` : ""}${$page.url.hash}`,
+      { replaceState: true, keepFocus: true, noScroll: true },
+    ).catch(() => undefined);
+  }
+
   async function loadRace(target: string, draft: boolean) {
     const previousSlug = loadedKey?.split("|")[0];
     loadedKey = `${target}|${draft}`;
@@ -125,11 +144,8 @@
           if (id !== requestId) return;
           isDraftPreview = false;
           loadedKey = `${target}|false`;
-          try {
-            replaceState(`/races/${target}/${candidateParam}/`, {});
-          } catch {
-            // Router not ready yet; the stale ?draft=true is harmless.
-          }
+          draftRejectedSlug = target;
+          dropDraftParam(target);
         }
       } else {
         next = await getRace(target);
@@ -157,6 +173,22 @@
     } finally {
       if (id === requestId) loading = false;
     }
+  }
+
+  /** Height of the sticky phone section strip; 0 when hidden (desktop). */
+  let sectionNavHeight = 0;
+  function measureHeight(node: HTMLElement) {
+    const update = () => (sectionNavHeight = node.offsetHeight);
+    update();
+    if (typeof ResizeObserver === "undefined") return {};
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return {
+      destroy: () => {
+        observer.disconnect();
+        sectionNavHeight = 0;
+      },
+    };
   }
 
   function jumpToSection(event: MouseEvent, id: string) {
@@ -380,7 +412,10 @@
       {/if}
     </nav>
 
-    <div class="candidate-layout">
+    <div
+      class="candidate-layout"
+      style="--section-nav-height: {sectionNavHeight}px"
+    >
       <!-- Profile: a sticky sidebar on desktop, the page header on phones. -->
       <aside class="candidate-aside" aria-label="Candidate profile">
         <Card class="profile-card">
@@ -473,7 +508,13 @@
         </Card>
 
         {#if sectionLinks.length > 1}
-          <nav class="detail-nav" aria-label="Candidate profile sections">
+          <!-- Desktop: a vertical list in the sticky sidebar. The phone strip
+               is a separate element below (display:none hides each from
+               assistive tech at the other breakpoint). -->
+          <nav
+            class="detail-nav detail-nav--sidebar"
+            aria-label="Candidate profile sections"
+          >
             <p class="detail-nav-label">On this page</p>
             <ul class="detail-nav-links">
               {#each sectionLinks as link (link.id)}
@@ -490,67 +531,31 @@
         {/if}
 
         <!-- Other Candidates (Collapsible) -->
-        {#if otherCandidates.length > 0}
-          <div class="other-candidates-bar">
-            <button
-              type="button"
-              class="toggle-others"
-              on:click={() => (othersExpanded = !othersExpanded)}
-              aria-expanded={othersExpanded}
-              aria-label={`Other Candidates (${otherCandidates.length})`}
-            >
-              <span class="flex items-center gap-2">
-                <span>Other candidates</span>
-                <span class="other-count">{otherCandidates.length}</span>
-              </span>
-              <span
-                class="inline-flex transition-transform duration-200"
-                class:rotate-180={othersExpanded}
-                ><UiIcon name="chevron-down" /></span
-              >
-            </button>
-            {#if othersExpanded}
-              <div
-                transition:slide={{ duration: motionDuration(400) }}
-                class="others-list"
-              >
-                {#each otherCandidates as other (candidateSlug(other.name))}
-                  <a
-                    href="/races/{race.id}/{candidateSlug(
-                      other.name,
-                    )}/{isDraftPreview ? '?draft=true' : ''}"
-                    class="other-chip"
-                  >
-                    {#if other.image_url && !hiddenOtherImages[other.name]}
-                      <img
-                        src={other.image_url}
-                        alt=""
-                        width="32"
-                        height="32"
-                        loading="lazy"
-                        decoding="async"
-                        referrerpolicy="no-referrer"
-                        class="other-avatar"
-                        use:headshotFallback={() =>
-                          (hiddenOtherImages = {
-                            ...hiddenOtherImages,
-                            [other.name]: true,
-                          })}
-                      />
-                    {/if}
-                    <span class="other-info">
-                      <span class="other-name">{other.name}</span>
-                      {#if other.party}
-                        <span class="other-party">{other.party}</span>
-                      {/if}
-                    </span>
-                  </a>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/if}
       </aside>
+
+      {#if sectionLinks.length > 1}
+        <!-- Phones/tablets: a horizontal strip that sticks under the site
+             header. It is a direct child of the layout grid (not of the
+             profile aside) so it stays pinned for the whole page, and it
+             publishes its height for the issue picker that sticks below it. -->
+        <nav
+          class="detail-nav detail-nav--strip"
+          aria-label="Candidate profile sections"
+          use:measureHeight
+        >
+          <ul class="detail-nav-links">
+            {#each sectionLinks as link (link.id)}
+              <li>
+                <a
+                  href="#{link.id}"
+                  on:click={(event) => jumpToSection(event, link.id)}
+                  >{link.label}</a
+                >
+              </li>
+            {/each}
+          </ul>
+        </nav>
+      {/if}
 
       <div class="candidate-main">
         {#if summaryText}
@@ -766,6 +771,72 @@
           </section>
         {/if}
 
+        {#if otherCandidates.length > 0}
+          <div class="other-candidates-bar">
+            <button
+              type="button"
+              class="toggle-others"
+              on:click={() => (othersExpanded = !othersExpanded)}
+              aria-expanded={othersExpanded}
+              aria-label={`Other Candidates (${otherCandidates.length})`}
+            >
+              <span class="flex items-center gap-2">
+                <span>Other candidates</span>
+                <span class="other-count">{otherCandidates.length}</span>
+              </span>
+              <span
+                class="inline-flex transition-transform duration-200"
+                class:rotate-180={othersExpanded}
+                ><UiIcon name="chevron-down" /></span
+              >
+            </button>
+            {#if othersExpanded}
+              <div
+                transition:slide={{ duration: motionDuration(400) }}
+                class="others-list"
+              >
+                {#each otherCandidates as other, index (`${index}-${candidateSlug(other.name)}`)}
+                  <a
+                    href="/races/{race.id}/{candidateSlug(
+                      other.name,
+                    )}/{isDraftPreview ? '?draft=true' : ''}"
+                    class="other-chip"
+                  >
+                    {#if other.image_url && !hiddenOtherImages[other.name]}
+                      <img
+                        src={other.image_url}
+                        alt=""
+                        width="32"
+                        height="32"
+                        loading="lazy"
+                        decoding="async"
+                        referrerpolicy="no-referrer"
+                        class="other-avatar"
+                        use:headshotFallback={() =>
+                          (hiddenOtherImages = {
+                            ...hiddenOtherImages,
+                            [other.name]: true,
+                          })}
+                      />
+                    {:else}
+                      <span
+                        class="other-avatar other-initials"
+                        aria-hidden="true">{candidateInitials(other.name)}</span
+                      >
+                    {/if}
+                    <span class="other-info">
+                      <span class="other-name">{other.name}</span>
+                      {#if other.party}
+                        <span class="other-party">{other.party}</span>
+                      {/if}
+                    </span>
+                  </a>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <!-- Data Note -->
         <div class="alert-info">
           <p class="font-semibold text-content">About this research</p>
@@ -809,8 +880,12 @@
     @apply grid items-start gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[19rem_minmax(0,1fr)];
   }
 
+  /* The aside stretches the full height of the layout row so its section nav
+     can stick for the whole page. Only the short nav sticks: a sticky (or
+     inner-scrolling) profile column taller than the viewport left content out
+     of reach on short screens, so "other candidates" lives in the main column. */
   .candidate-aside {
-    @apply flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--site-header-height)+1rem)];
+    @apply flex min-w-0 flex-col gap-4 lg:self-stretch;
   }
 
   .candidate-main {
@@ -860,7 +935,15 @@
   /* Section nav: a horizontal sticky strip on phones, a vertical list in the
      desktop sidebar. */
   .detail-nav {
-    @apply sticky top-[var(--site-header-height)] z-30 rounded-xl border border-stroke bg-surface/95 p-2 shadow-sm backdrop-blur lg:static lg:bg-surface lg:p-3 lg:backdrop-blur-none;
+    @apply rounded-xl border border-stroke bg-surface shadow-sm;
+  }
+
+  .detail-nav--sidebar {
+    @apply hidden p-3 lg:sticky lg:top-[calc(var(--site-header-height)+1rem)] lg:block;
+  }
+
+  .detail-nav--strip {
+    @apply sticky top-[var(--site-header-height)] z-30 min-w-0 bg-surface/95 p-2 backdrop-blur lg:hidden;
   }
 
   .detail-nav-label {
@@ -902,7 +985,11 @@
   }
 
   .other-avatar {
-    @apply h-8 w-8 rounded-full object-cover;
+    @apply h-8 w-8 shrink-0 rounded-full object-cover;
+  }
+
+  .other-initials {
+    @apply inline-flex items-center justify-center border border-stroke bg-surface-alt text-xs font-bold text-content-muted;
   }
 
   .other-info {
@@ -915,6 +1002,13 @@
 
   .other-party {
     @apply text-xs text-content-subtle;
+  }
+
+  /* Sections land below the site header and, on phones, the sticky strip. */
+  .detail-section {
+    scroll-margin-top: calc(
+      var(--site-header-height, 0px) + var(--section-nav-height, 0px) + 1rem
+    );
   }
 
   /* Sections */

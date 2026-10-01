@@ -1,18 +1,37 @@
+<script context="module" lang="ts">
+  let instanceCount = 0;
+</script>
+
 <script lang="ts">
   import UiIcon from "./UiIcon.svelte";
+  import { isExternalUrl } from "$lib/utils/url";
 
   export let ballotpediaUrl: string | null = null;
   export let registerToVoteUrl: string = "https://vote.gov/register";
   export let howToVoteUrl: string = "https://vote.gov/";
+
+  const headingId = `voter-resources-heading-${++instanceCount}`;
+
+  // Race data is untrusted: only http(s) links are rendered, and the two
+  // essential actions fall back to vote.gov rather than disappearing.
+  $: safeRegisterUrl = isExternalUrl(registerToVoteUrl)
+    ? registerToVoteUrl.trim()
+    : "https://vote.gov/register";
+  $: safeHowToVoteUrl = isExternalUrl(howToVoteUrl)
+    ? howToVoteUrl.trim()
+    : "https://vote.gov/";
+  $: safeBallotpediaUrl = isExternalUrl(ballotpediaUrl)
+    ? ballotpediaUrl.trim()
+    : null;
 </script>
 
 <!-- One primary action (registering) and two equal secondary links, instead of
      three competing colours. -->
-<section class="card voter-resources" aria-labelledby="voter-resources-heading">
-  <h2 id="voter-resources-heading" class="h-card">Voting resources</h2>
+<section class="card voter-resources" aria-labelledby={headingId}>
+  <h2 id={headingId} class="h-card">Voting resources</h2>
   <div class="voter-resource-list">
     <a
-      href={registerToVoteUrl}
+      href={safeRegisterUrl}
       target="_blank"
       rel="noopener noreferrer"
       class="btn-primary voter-resource-btn"
@@ -36,7 +55,7 @@
     </a>
 
     <a
-      href={howToVoteUrl}
+      href={safeHowToVoteUrl}
       target="_blank"
       rel="noopener noreferrer"
       class="btn-secondary voter-resource-btn"
@@ -59,9 +78,9 @@
       <UiIcon name="external" size="sm" />
     </a>
 
-    {#if ballotpediaUrl}
+    {#if safeBallotpediaUrl}
       <a
-        href={ballotpediaUrl}
+        href={safeBallotpediaUrl}
         target="_blank"
         rel="noopener noreferrer"
         class="btn-secondary voter-resource-btn"

@@ -29,6 +29,8 @@
   let mounted = false;
   let loadedKey: string | null = null;
   let requestId = 0;
+  /** Race whose draft fetch failed: its `?draft=true` is ignored from then on. */
+  let draftRejectedSlug: string | null = null;
 
   // `?candidates=` is read only in the browser: prerendering has no query
   // string, so the static page shows every active candidate.
@@ -36,7 +38,10 @@
     mounted && browser ? $page.url.searchParams.get("candidates") : null;
   $: candidates = selectComparedCandidates(race, candidatesParam);
   $: draftParam =
-    mounted && browser && $page.url.searchParams.get("draft") === "true";
+    mounted &&
+    browser &&
+    $page.url.searchParams.get("draft") === "true" &&
+    draftRejectedSlug !== slug;
   $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
     loadRace(slug, draftParam);
 
@@ -79,6 +84,7 @@
           if (id !== requestId) return;
           isDraftPreview = false;
           loadedKey = `${target}|false`;
+          draftRejectedSlug = target;
           const params = new URLSearchParams($page.url.searchParams);
           params.delete("draft");
           const query = params.toString();

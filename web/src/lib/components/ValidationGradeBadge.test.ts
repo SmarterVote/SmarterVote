@@ -177,3 +177,61 @@ describe("ValidationGradeBadge review link", () => {
     expect(container.querySelector(".popover")).toBeNull();
   });
 });
+
+describe("ValidationGradeBadge popover placement and focus", () => {
+  function rectAt(left: number, width = 140): DOMRect {
+    return {
+      left,
+      right: left + width,
+      top: 100,
+      bottom: 144,
+      width,
+      height: 44,
+      x: left,
+      y: 100,
+      toJSON: () => ({}),
+    } as DOMRect;
+  }
+
+  it("opens rightward when right-aligning would cross the left edge", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      rectAt(16),
+    );
+    const { container, getByLabelText } = render(ValidationGradeBadge, {
+      grade: makeGrade(),
+    });
+    await fireEvent.click(getByLabelText(/Automated research score/));
+    expect(
+      container.querySelector(".popover")?.classList.contains("popover--left"),
+    ).toBe(true);
+  });
+
+  it("stays right-aligned when there is room on the left", async () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      rectAt(800),
+    );
+    const { container, getByLabelText } = render(ValidationGradeBadge, {
+      grade: makeGrade(),
+    });
+    await fireEvent.click(getByLabelText(/Automated research score/));
+    expect(
+      container.querySelector(".popover")?.classList.contains("popover--left"),
+    ).toBe(false);
+  });
+
+  it("closes on Escape from inside the popover and refocuses the badge", async () => {
+    const { container, getByLabelText, getByText } = render(
+      ValidationGradeBadge,
+      { grade: makeGrade() },
+    );
+    const badge = getByLabelText(/Automated research score/);
+    await fireEvent.click(badge);
+    const link = getByText("View review details");
+    link.focus();
+
+    await fireEvent.keyDown(link, { key: "Escape" });
+
+    expect(container.querySelector(".popover")).toBeNull();
+    expect(document.activeElement).toBe(badge);
+  });
+});

@@ -41,6 +41,22 @@ test.describe("candidate comparison page", () => {
     ).toBeVisible();
   });
 
+  test("a wide comparison scrolls inside its table, not the page", async ({
+    page,
+  }) => {
+    await mockRaceJson(page, FIXTURE_RACE_IDS.senate, ohSenateRace);
+    await page.goto(`${COMPARE_PATH}/`);
+    await expect(
+      page.getByRole("heading", { name: "Compare Candidates" }),
+    ).toBeVisible();
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
   test("deselecting a candidate updates the URL and the comparison", async ({
     page,
   }) => {

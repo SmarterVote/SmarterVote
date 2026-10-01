@@ -130,6 +130,10 @@ describe("probability", () => {
     [1.2, ">99%"],
     [0, "<1%"],
     [-0.5, "<1%"],
+    // Values that would round to 100% / 0% are clamped too.
+    [0.996, ">99%"],
+    [0.995, ">99%"],
+    [0.004, "<1%"],
   ])("clamps %s to %s", (value, expected) => {
     expect(probability(value)).toBe(expected);
   });
@@ -139,6 +143,8 @@ describe("probability", () => {
     [0.674, "67%"],
     [0.675, "68%"],
     [0.009, "1%"],
+    [0.994, "99%"],
+    [0.005, "1%"],
   ])("rounds %s to %s", (value, expected) => {
     expect(probability(value)).toBe(expected);
   });

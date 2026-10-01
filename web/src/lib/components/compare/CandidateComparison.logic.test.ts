@@ -239,7 +239,8 @@ describe("CandidateComparison avatars", () => {
       candidates: [person],
     });
 
-    expect(container.textContent).toContain("AM");
+    // First and last name, like every other candidate avatar.
+    expect(container.textContent).toContain("AR");
     expect(container.textContent).not.toContain("AMGR");
   });
 

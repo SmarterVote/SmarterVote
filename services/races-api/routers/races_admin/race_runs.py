@@ -7,11 +7,7 @@ from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
 from request_models import validate_race_id
 
-from shared.config import (
-    FIRESTORE_RACE_RUNS_SUBCOLLECTION,
-    FIRESTORE_RACES_COLLECTION,
-    FIRESTORE_RUNS_COLLECTION,
-)
+from shared.config import FIRESTORE_RACE_RUNS_SUBCOLLECTION, FIRESTORE_RACES_COLLECTION, FIRESTORE_RUNS_COLLECTION
 
 router = APIRouter()
 

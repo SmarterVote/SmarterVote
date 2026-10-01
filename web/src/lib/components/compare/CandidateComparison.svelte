@@ -6,7 +6,12 @@
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
-  import { hasStance, neutralCandidateOrder } from "$lib/utils/candidates";
+  import {
+    candidateInitials,
+    hasStance,
+    neutralCandidateOrder,
+    uniqueCandidatesByName,
+  } from "$lib/utils/candidates";
   import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
@@ -14,6 +19,7 @@
     candidateForecastProbability,
     cleanDisplayText,
     comparePreview,
+    formatWinProbability,
     isNoPositionStance,
   } from "$lib/utils/racePage";
   import { headshotFallback } from "$lib/utils/racePageImage";
@@ -79,14 +85,6 @@
     failedImages = { ...failedImages, [candidate.name]: true };
   }
 
-  function initials(name: string): string {
-    return name
-      .split(" ")
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("");
-  }
-
   const backgroundRows: Array<{
     label: string;
     summary: "donor_summary" | "voting_summary";
@@ -117,7 +115,9 @@
     : CANONICAL_ISSUES;
 
   $: activeCandidates = neutralCandidateOrder(
-    race.candidates.filter((candidate) => !candidate.withdrawn),
+    uniqueCandidatesByName(race.candidates).filter(
+      (candidate) => !candidate.withdrawn,
+    ),
   );
 
   function forecastProbability(candidate: Candidate): number | undefined {
@@ -138,7 +138,7 @@
       </p>
     </div>
     <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
-      {#each activeCandidates as candidate (candidateSlug(candidate.name))}
+      {#each activeCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
         {@const checked = candidates.some(
           (selected) => selected.name === candidate.name,
         )}
@@ -181,7 +181,7 @@
      box into a scroll container, so the header can stick to the viewport. -->
 <div
   data-desktop-candidate-comparison
-  class="isolate hidden overflow-clip rounded-xl border border-stroke bg-surface shadow-sm lg:block"
+  class="relative isolate hidden overflow-clip rounded-xl border border-stroke bg-surface shadow-sm lg:block"
 >
   {#if showQuality && race.validation_grade}
     <div
@@ -223,14 +223,14 @@
         >
           {compact ? "Compare" : "Candidates"}
         </div>
-        <div class="min-w-0 flex-1 overflow-hidden">
+        <div class="relative min-w-0 flex-1 overflow-hidden">
           <div
             class="grid"
             style="width: {tableWidth
               ? `${tableWidth - labelWidth}px`
               : '100%'}; grid-template-columns: repeat({candidates.length}, minmax(0, 1fr)); transform: translateX(-{scrollLeft}px)"
           >
-            {#each candidates as candidate (candidateSlug(candidate.name))}
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
               <div
                 role="columnheader"
                 class="flex min-w-0 items-center gap-3 border-r border-stroke px-4 py-3 last:border-none"
@@ -250,7 +250,7 @@
                   <div
                     class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-stroke bg-surface-alt text-sm font-bold text-content-muted"
                   >
-                    {initials(candidate.name)}
+                    {candidateInitials(candidate.name)}
                   </div>
                 {/if}
                 <div class="min-w-0">
@@ -280,8 +280,11 @@
       </div>
     </div>
 
+    <!-- `relative` makes this scroller the containing block of the sr-only
+         (position:absolute) labels inside it; otherwise they resolve against
+         the page, escape the clip, and widen the whole document. -->
     <div
-      class="custom-scrollbar overflow-x-auto"
+      class="custom-scrollbar relative overflow-x-auto"
       on:scroll={(event) => (scrollLeft = event.currentTarget.scrollLeft)}
     >
       <div
@@ -296,7 +299,7 @@
           style="grid-template-columns: {gridColumns}"
         >
           <div role="rowheader" class="row-label">Biography</div>
-          {#each candidates as candidate (candidateSlug(candidate.name))}
+          {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
             {@const summaryText = cleanDisplayText(candidate.summary)}
             {@const summaryKey = `summary:${candidate.name}`}
             {@const isSummaryExpanded = expandedTexts[summaryKey] ?? false}
@@ -357,7 +360,7 @@
             <div role="rowheader" class="row-label">
               {getIssueDisplayName(issueKey)}
             </div>
-            {#each candidates as candidate (candidateSlug(candidate.name))}
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
               {@const rawStance = candidate.issues?.[issueKey]}
               {@const stance = hasStance(rawStance) ? rawStance : undefined}
               {@const stanceText = stance
@@ -455,7 +458,7 @@
             style="grid-template-columns: {gridColumns}"
           >
             <div role="rowheader" class="row-label">Career</div>
-            {#each candidates as candidate (candidateSlug(candidate.name))}<div
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}<div
                 role="cell"
                 class="border-r border-stroke p-5 text-sm text-content-muted last:border-none"
               >
@@ -491,7 +494,7 @@
             style="grid-template-columns: {gridColumns}"
           >
             <div role="rowheader" class="row-label">Education</div>
-            {#each candidates as candidate (candidateSlug(candidate.name))}<div
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}<div
                 role="cell"
                 class="border-r border-stroke p-5 text-sm text-content-muted last:border-none"
               >
@@ -519,7 +522,7 @@
               style="grid-template-columns: {gridColumns}"
             >
               <div role="rowheader" class="row-label">{row.label}</div>
-              {#each candidates as candidate (candidateSlug(candidate.name))}
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
                 {@const summary = cleanDisplayText(candidate[row.summary])}
                 {@const sourceUrl = candidate[row.url]}
                 {@const rowKey = `${row.summary}:${candidate.name}`}
@@ -573,7 +576,7 @@
                 >Model estimate</span
               >
             </div>
-            {#each candidates as candidate (candidateSlug(candidate.name))}
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
               {@const probability = forecastProbability(candidate)}
               <div
                 role="cell"
@@ -581,7 +584,7 @@
               >
                 {#if probability !== undefined}
                   <div class="text-2xl font-extrabold text-content">
-                    {Math.round(probability * 100)}%
+                    {formatWinProbability(probability)}
                   </div>
                   <p class="mt-1 text-xs text-content-muted">
                     estimated win probability

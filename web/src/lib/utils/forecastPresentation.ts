@@ -192,8 +192,10 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
 
 export function probability(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
-  if (value >= 1) return ">99%";
-  if (value <= 0) return "<1%";
+  // Clamp before rounding: 0.996 must read ">99%", never "100%" (no race is a
+  // certainty), and 0.004 must read "<1%", never "0%".
+  if (value >= 0.995) return ">99%";
+  if (value < 0.005) return "<1%";
   return `${Math.round(value * 100)}%`;
 }
 
@@ -386,7 +388,7 @@ export function buildSeatOutcomeChart(
 /** Returns a URL's hostname (without a leading "www.") for compact source display. */
 export function getHostname(urlString: string): string {
   try {
-    return new URL(urlString).hostname.replace("www.", "");
+    return new URL(urlString).hostname.replace(/^www\./, "");
   } catch {
     return "Source Link";
   }

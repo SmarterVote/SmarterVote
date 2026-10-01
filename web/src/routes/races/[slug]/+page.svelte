@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import { replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import CandidateCard from "$lib/components/CandidateCard.svelte";
@@ -19,17 +19,16 @@
   import { isExternalUrl } from "$lib/utils/url";
   import { formatRating } from "$lib/utils/forecast";
   import {
-    getHostname,
     marketAsOf,
     marketSignalTarget,
     marketSpread,
-    probability,
     probabilityOneDecimal,
     ratingClass,
   } from "$lib/utils/forecastPresentation";
   import {
     neutralCandidateOrder,
     shortCandidateName,
+    uniqueCandidatesByName,
   } from "$lib/utils/candidates";
   import { motionDuration, scrollBehavior } from "$lib/utils/motion";
   import { headshotFallback } from "$lib/utils/racePageImage";
@@ -37,6 +36,8 @@
     cleanDisplayText,
     forecastHeadline,
     formatPollDate,
+    formatWinProbability,
+    pollDateLabel,
     isNotFoundError,
     jsonLdScript,
     partyProbabilityAriaLabel,
@@ -44,6 +45,7 @@
     raceJsonLd,
     raceLocationLabel,
     sortPollsByDate,
+    sourceHostname,
     splitSourcedText,
   } from "$lib/utils/racePage";
   import {
@@ -77,9 +79,16 @@
   let mounted = false;
   let loadedKey: string | null = null;
   let requestId = 0;
+  /** Race whose draft fetch failed: its `?draft=true` is ignored from then on. */
+  let draftRejectedSlug: string | null = null;
 
+  // A rejected draft must stay rejected even while the URL still says
+  // `?draft=true` — otherwise the guard below refetches the draft forever.
   $: draftParam =
-    mounted && browser && $page.url.searchParams.get("draft") === "true";
+    mounted &&
+    browser &&
+    $page.url.searchParams.get("draft") === "true" &&
+    draftRejectedSlug !== slug;
   // Client-side navigation between races reuses this component, so the race
   // (and every bit of per-race UI state) must follow the URL, not mount time.
   $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
@@ -100,6 +109,18 @@
 
   function hideChipImage(name: string) {
     hiddenChipImages = { ...hiddenChipImages, [name]: true };
+  }
+
+  /** Drop the rejected `?draft=true` from the address bar (a real navigation, so `$page.url` agrees). */
+  function dropDraftParam(target: string) {
+    const params = new URLSearchParams($page.url.searchParams);
+    params.delete("draft");
+    const query = params.toString();
+    goto(`/races/${target}/${query ? `?${query}` : ""}${$page.url.hash}`, {
+      replaceState: true,
+      keepFocus: true,
+      noScroll: true,
+    }).catch(() => undefined);
   }
 
   async function loadRace(target: string, draft: boolean) {
@@ -133,11 +154,8 @@
           if (id !== requestId) return;
           isDraftPreview = false;
           loadedKey = `${target}|false`;
-          try {
-            replaceState(`/races/${target}/`, {});
-          } catch {
-            // Router not ready yet; the stale ?draft=true is harmless.
-          }
+          draftRejectedSlug = target;
+          dropDraftParam(target);
         }
       } else {
         next = await getRace(target);
@@ -188,11 +206,13 @@
     forecastExpanded = !forecastExpanded;
   }
 
+  // Exact-duplicate roster entries are dropped so each candidate renders once.
+  $: roster = uniqueCandidatesByName(race?.candidates);
   $: activeCandidates = neutralCandidateOrder(
-    race?.candidates?.filter((c) => !c.withdrawn),
+    roster.filter((c) => !c.withdrawn),
   );
   $: withdrawnCandidates = neutralCandidateOrder(
-    race?.candidates?.filter((c) => c.withdrawn),
+    roster.filter((c) => c.withdrawn),
   );
   $: compareAllHref = race
     ? `/races/${race.id}/compare/?candidates=${activeCandidates
@@ -228,13 +248,16 @@
     );
   $: jsonLd = race && !notFound ? jsonLdScript(raceJsonLd(race)) : "";
 
-  // Derive ballotpedia URL: race-level field first, then fall back to any candidate link
+  // Derive ballotpedia URL: race-level field first, then fall back to any
+  // candidate link. Only http(s) URLs qualify.
   $: ballotpediaUrl =
-    race?.ballotpedia_url ??
-    race?.candidates
-      ?.flatMap((c) => c.links ?? [])
-      .find((l) => l.type === "ballotpedia")?.url ??
-    null;
+    [
+      race?.ballotpedia_url,
+      ...(race?.candidates ?? [])
+        .flatMap((c) => c.links ?? [])
+        .filter((l) => l.type === "ballotpedia")
+        .map((l) => l.url),
+    ].find((url) => isExternalUrl(url)) ?? null;
 
   // Derive voter action URLs: race-level fields first, then fall back to vote.gov
   $: registerToVoteUrl =
@@ -549,7 +572,7 @@
               class="overview-candidates"
               aria-label="Candidates in this race"
             >
-              {#each activeCandidates as candidate (candidateSlug(candidate.name))}
+              {#each activeCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
                 <a
                   href="/races/{race.id}/{candidateSlug(
                     candidate.name,
@@ -609,7 +632,7 @@
                 </div>
                 {#if glance.leader && typeof race.forecast.win_probability === "number"}
                   <p class="glance-text">
-                    {glance.leader}: {probability(
+                    {glance.leader}: {formatWinProbability(
                       race.forecast.win_probability,
                     )}
                     modeled win probability
@@ -624,12 +647,8 @@
               <div class="glance-block" class:glance-divider={!!race.forecast}>
                 <p class="glance-subtitle">Latest poll</p>
                 <p class="poll-snapshot-meta">
-                  {latestPoll.pollster}{formatPollDate(latestPoll.date)
-                    ? ` · ${formatPollDate(latestPoll.date, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}`
+                  {latestPoll.pollster}{pollDateLabel(latestPoll.date)
+                    ? ` · ${pollDateLabel(latestPoll.date)}`
                     : ""}
                 </p>
                 <div class="poll-snapshot-bars">
@@ -702,7 +721,7 @@
           class="candidate-grid"
           class:single-column={activeCandidates.length === 1}
         >
-          {#each activeCandidates as candidate (candidateSlug(candidate.name))}
+          {#each activeCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
             <CandidateCard
               {candidate}
               raceId={race.id}
@@ -747,7 +766,7 @@
               transition:slide={{ duration: motionDuration(400) }}
               class="candidate-grid withdrawn-grid mt-3"
             >
-              {#each withdrawnCandidates as candidate (candidateSlug(candidate.name))}
+              {#each withdrawnCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
                 <CandidateCard
                   {candidate}
                   raceId={race.id}
@@ -775,7 +794,7 @@
               {#if headline.leader && typeof forecast.win_probability === "number"}
                 <p class="forecast-summary">
                   <strong>{headline.leader}:</strong>
-                  {probability(forecast.win_probability)} modeled win probability
+                  {formatWinProbability(forecast.win_probability)} modeled win probability
                   {#if typeof forecast.margin_estimate === "number"}
                     with a {signedMargin(forecast.margin_estimate)} estimated margin
                   {/if}
@@ -790,12 +809,18 @@
           </div>
 
           <div class="forecast-grid">
-            <div class="forecast-metric">
-              <span class="forecast-metric-label">Win Probability</span>
-              <span class="forecast-metric-value"
-                >{probability(forecast.win_probability)}</span
-              >
-            </div>
+            {#if headline.leader && typeof forecast.win_probability === "number"}
+              <!-- A bare probability with no named leader is meaningless, so
+                   the metric only shows when the forecast says whose it is. -->
+              <div class="forecast-metric">
+                <span class="forecast-metric-label"
+                  >{headline.leader} win probability</span
+                >
+                <span class="forecast-metric-value"
+                  >{formatWinProbability(forecast.win_probability)}</span
+                >
+              </div>
+            {/if}
             <div class="forecast-metric">
               <span class="forecast-metric-label">Estimated Margin</span>
               <span class="forecast-metric-value"
@@ -963,7 +988,7 @@
                         class="source-chip"
                         title={url}
                       >
-                        {getHostname(url)}
+                        {sourceHostname(url)}
                         <UiIcon name="external" size="sm" />
                       </a>
                     {/if}
@@ -1006,9 +1031,9 @@
               <div class="poll-card-header">
                 <div>
                   <span class="poll-card-pollster">{poll.pollster}</span>
-                  {#if formatPollDate(poll.date)}
+                  {#if pollDateLabel(poll.date)}
                     <span class="poll-card-date"
-                      >{formatPollDate(poll.date)}</span
+                      >{pollDateLabel(poll.date)}</span
                     >
                   {/if}
                 </div>
@@ -1158,6 +1183,15 @@
       </button>
     </div>
 
+    <!-- Announces selection changes; always rendered so updates are heard. -->
+    <p class="sr-only" role="status" aria-live="polite">
+      {#if selectedCandidates.size === 1}
+        1 candidate selected. Select at least one more to compare.
+      {:else if selectedCandidates.size > 1}
+        {selectedCandidates.size} candidates selected to compare.
+      {/if}
+    </p>
+
     <!-- Compare sticky drawer -->
     {#if selectedCandidates.size > 0}
       <div
@@ -1190,7 +1224,9 @@
               Compare Now &rarr;
             </a>
           {:else}
-            <span class="text-xs text-content-subtle">Select one more</span>
+            <span class="text-xs text-content-subtle"
+              >Select 1 more to compare</span
+            >
           {/if}
         </div>
       </div>
@@ -1456,6 +1492,9 @@
 
   .candidate-grid {
     @apply grid items-start gap-4 sm:gap-5 md:grid-cols-2;
+    /* An expanded right-column card jumps to its own row; dense packing pulls
+       the next card up so the left cell it vacated is not left empty. */
+    grid-auto-flow: row dense;
   }
 
   /* An expanded card shows the full issue table, which needs the whole row. */
@@ -1505,8 +1544,9 @@
     @apply border-t border-stroke pt-4 sm:pt-6;
   }
 
+  /* Two or three metrics (win probability only shows with a named leader). */
   .forecast-grid {
-    @apply grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3;
+    @apply grid grid-cols-1 gap-2 sm:auto-cols-fr sm:grid-flow-col sm:gap-3;
   }
 
   .forecast-metric {

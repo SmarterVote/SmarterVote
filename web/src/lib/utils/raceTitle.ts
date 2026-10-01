@@ -6,6 +6,7 @@ import {
 } from "$lib/types";
 import { neutralCandidateOrder } from "$lib/utils/candidates";
 import { formatElectionDate } from "$lib/utils/electionDate";
+import { isNoPositionStance } from "$lib/utils/stance";
 import { canonicalRaceState } from "$lib/utils/states";
 
 type TitleRace = Pick<Race | RaceSummary, "id"> &
@@ -147,12 +148,8 @@ export function candidateMetaDescription(
 
   const issueNames = Object.entries(candidate.issues ?? {})
     .filter(([, issue]) => {
-      const stance = issue?.stance?.trim().toLowerCase() ?? "";
-      return Boolean(
-        stance &&
-          !stance.includes("no public position found") &&
-          !stance.includes("no publicly stated position"),
-      );
+      const stance = issue?.stance?.trim() ?? "";
+      return Boolean(stance && !isNoPositionStance(stance));
     })
     .map(([issue]) => getIssueDisplayName(issue))
     .slice(0, 2);
