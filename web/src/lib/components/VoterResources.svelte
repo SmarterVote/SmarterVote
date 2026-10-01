@@ -1,151 +1,103 @@
 <script lang="ts">
+  import UiIcon from "./UiIcon.svelte";
+
   export let ballotpediaUrl: string | null = null;
   export let registerToVoteUrl: string = "https://vote.gov/register";
   export let howToVoteUrl: string = "https://vote.gov/";
 </script>
 
-<div class="voter-resources">
-  {#if ballotpediaUrl}
+<!-- One primary action (registering) and two equal secondary links, instead of
+     three competing colours. -->
+<section class="card voter-resources" aria-labelledby="voter-resources-heading">
+  <h2 id="voter-resources-heading" class="h-card">Voting resources</h2>
+  <div class="voter-resource-list">
     <a
-      href={ballotpediaUrl}
+      href={registerToVoteUrl}
       target="_blank"
       rel="noopener noreferrer"
-      class="voter-resource-btn voter-resource-btn--ballotpedia"
+      class="btn-primary voter-resource-btn"
     >
       <svg
-        class="w-5 h-5 shrink-0"
+        class="h-5 w-5 shrink-0"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
+        aria-hidden="true"
       >
         <path
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-width="2"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
         />
       </svg>
-      Election on Ballotpedia
-      <svg
-        class="w-3.5 h-3.5 shrink-0 opacity-60"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-        />
-      </svg>
+      <span class="flex-1">Register to Vote</span>
+      <UiIcon name="external" size="sm" />
     </a>
-  {/if}
 
-  <a
-    href={registerToVoteUrl}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="voter-resource-btn voter-resource-btn--register"
-  >
-    <svg
-      class="w-5 h-5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
+    <a
+      href={howToVoteUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="btn-secondary voter-resource-btn"
     >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-      />
-    </svg>
-    Register to Vote
-    <svg
-      class="w-3.5 h-3.5 shrink-0 opacity-60"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-      />
-    </svg>
-  </a>
+      <svg
+        class="h-5 w-5 shrink-0 text-content-subtle"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+        />
+      </svg>
+      <span class="flex-1">How to Vote</span>
+      <UiIcon name="external" size="sm" />
+    </a>
 
-  <a
-    href={howToVoteUrl}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="voter-resource-btn voter-resource-btn--howtovote"
-  >
-    <svg
-      class="w-5 h-5 shrink-0"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-      />
-    </svg>
-    How to Vote
-    <svg
-      class="w-3.5 h-3.5 shrink-0 opacity-60"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-      />
-    </svg>
-  </a>
-</div>
+    {#if ballotpediaUrl}
+      <a
+        href={ballotpediaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn-secondary voter-resource-btn"
+      >
+        <svg
+          class="h-5 w-5 shrink-0 text-content-subtle"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          />
+        </svg>
+        <span class="flex-1">Election on Ballotpedia</span>
+        <UiIcon name="external" size="sm" />
+      </a>
+    {/if}
+  </div>
+</section>
 
 <style lang="postcss">
-  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
-     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .voter-resources {
-    @apply flex flex-wrap gap-3 mb-6;
+    @apply p-5;
+  }
+
+  /* Stacked in the desktop sidebar and on phones; a row on tablets. */
+  .voter-resource-list {
+    @apply mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-col;
   }
 
   .voter-resource-btn {
-    @apply inline-flex min-h-11 items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm
-           transition-all duration-200 no-underline shadow-sm;
-  }
-
-  .voter-resource-btn--ballotpedia {
-    @apply bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:shadow;
-  }
-
-  :global(.dark) .voter-resource-btn--ballotpedia {
-    @apply bg-amber-900/20 border-amber-700 text-amber-300 hover:bg-amber-900/40 hover:border-amber-600;
-  }
-
-  .voter-resource-btn--register {
-    @apply bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700 hover:shadow;
-  }
-
-  :global(.dark) .voter-resource-btn--register {
-    @apply bg-blue-700 border-blue-600 hover:bg-blue-600;
-  }
-
-  .voter-resource-btn--howtovote {
-    @apply bg-green-700 border border-green-700 text-white hover:bg-green-800 hover:border-green-800 hover:shadow;
-  }
-
-  :global(.dark) .voter-resource-btn--howtovote {
-    @apply bg-green-700 border-green-600 hover:bg-green-800;
+    @apply justify-start text-left no-underline sm:flex-1 lg:flex-none;
   }
 </style>

@@ -11,7 +11,7 @@
       case "A":
         return "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
       case "B":
-        return "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+        return "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700";
       case "C":
         return "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700";
       case "D":
@@ -35,7 +35,7 @@
     class="grade-badge {gradeColor(grade.grade)}"
     on:click={() => (showPopover = !showPopover)}
     on:keydown={(e) => e.key === "Escape" && (showPopover = false)}
-    aria-label="Automated Research Score: {grade.grade}"
+    aria-label="Automated research score: {grade.grade}"
     aria-expanded={showPopover}
     aria-controls={showPopover ? "validation-grade-popover" : undefined}
   >
@@ -59,10 +59,10 @@
       class="popover"
       id="validation-grade-popover"
       role="dialog"
-      aria-label="Automated Research Score details"
+      aria-label="Automated research score details"
     >
       <div class="popover-header">
-        <span class="popover-title">Automated Research Score</span>
+        <span class="popover-title">Automated research score</span>
         <span class="popover-grade {gradeColor(grade.grade)}"
           >{grade.grade}</span
         >
@@ -120,8 +120,9 @@
   }
 
   .popover {
-    @apply absolute top-full left-0 mt-2 z-50 w-72
-           bg-surface border border-stroke rounded-lg shadow-lg p-4;
+    @apply absolute top-full left-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)]
+           bg-surface border border-stroke rounded-xl shadow-lg p-4
+           sm:left-auto sm:right-0;
   }
 
   .popover-header {
@@ -149,14 +150,8 @@
   }
 
   .popover-link {
-    @apply inline-flex items-center gap-1 text-sm font-medium
-           text-blue-600 hover:text-blue-800
+    @apply inline-flex min-h-10 items-center gap-1 text-sm font-medium
+           text-primary hover:underline
            cursor-pointer transition-colors duration-150;
-  }
-
-  /* Scoped `dark:` variants never match (Svelte scopes the `.dark` ancestor),
-     so dark-mode overrides target the global class explicitly. */
-  :global(.dark) .popover-link {
-    @apply text-blue-400 hover:text-blue-300;
   }
 </style>

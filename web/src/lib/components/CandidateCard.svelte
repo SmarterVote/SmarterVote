@@ -6,9 +6,10 @@
   import Card from "./Card.svelte";
   import type { Candidate } from "$lib/types";
   import { candidateSlug } from "$lib/utils/format";
-  import { partyAbbr, partyBadgeClass } from "$lib/utils/party";
+  import { partyBadgeClass } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
   import { headshotFallback } from "$lib/utils/racePageImage";
+  import { cleanDisplayText } from "$lib/utils/racePage";
   import { createEventDispatcher } from "svelte";
 
   export let candidate: Candidate;
@@ -45,118 +46,126 @@
   $: hasBackground = hasCareer || hasEducation;
   $: hasVoting = !!candidate.voting_summary;
   $: hasDonors = !!candidate.donor_summary;
-  $: candidateSummary =
-    typeof candidate.summary === "string" ? candidate.summary : "";
-  $: summaryPreview =
-    candidateSummary.length > 600
-      ? `${candidateSummary.slice(0, 600)}...`
-      : candidateSummary;
+  $: candidateSummary = cleanDisplayText(
+    typeof candidate.summary === "string" ? candidate.summary : "",
+  );
+  $: profileHref = `/races/${raceId}/${candidateSlug(candidate.name)}/${draftQuery}`;
+  $: initials = candidate.name
+    .split(" ")
+    .filter((n) => n.length > 0)
+    .map((n) => n[0].toUpperCase())
+    .slice(0, 2)
+    .join("");
 </script>
 
-<Card class="candidate-card group" id={candidateSlug(candidate.name)}>
+<Card
+  class="candidate-card{expanded ? ' candidate-card--expanded' : ''}"
+  id={candidateSlug(candidate.name)}
+>
   <!-- Candidate Header -->
-  <div class="mb-6">
-    <div class="flex items-start justify-between mb-3">
-      <div class="flex items-start gap-4">
+  <div class="flex items-start gap-3 sm:gap-4">
+    {#if candidate.image_url && !imageError}
+      <img
+        src={candidate.image_url}
+        alt={candidate.name}
+        class="candidate-image"
+        width="64"
+        height="64"
+        loading="lazy"
+        decoding="async"
+        referrerpolicy="no-referrer"
+        use:headshotFallback={() => (imageError = true)}
+      />
+    {:else}
+      <div
+        class="candidate-image-placeholder"
+        role="img"
+        aria-label={candidate.name}
+      >
+        <span class="candidate-initials" aria-hidden="true">{initials}</span>
+      </div>
+    {/if}
+    <div class="min-w-0 flex-1">
+      <div class="flex items-start justify-between gap-2">
+        <h3 class="candidate-name">
+          <a href={profileHref} class="candidate-name-link">{candidate.name}</a>
+        </h3>
         {#if selectable}
-          <div class="flex items-center shrink-0 self-center">
+          <label class="compare-toggle" class:is-selected={selected}>
             <input
               type="checkbox"
               checked={selected}
               on:change={() => dispatch("toggleSelect")}
-              class="w-6 h-6 cursor-pointer text-blue-600 border-stroke rounded focus:ring-blue-500 bg-surface"
+              class="compare-checkbox"
               aria-label="Select {candidate.name} to compare"
             />
-          </div>
+            <span aria-hidden="true">Compare</span>
+          </label>
         {/if}
-        <!-- Candidate Image -->
-        {#if candidate.image_url && !imageError}
-          <img
-            src={candidate.image_url}
-            alt={candidate.name}
-            class="candidate-image"
-            width="80"
-            height="80"
-            loading="lazy"
-            decoding="async"
-            referrerpolicy="no-referrer"
-            use:headshotFallback={() => (imageError = true)}
-          />
-        {:else}
-          <div
-            class="candidate-image-placeholder"
-            role="img"
-            aria-label={candidate.name}
+      </div>
+      <div class="mt-1 flex flex-wrap items-center gap-1.5">
+        {#if candidate.party}
+          <span
+            class="badge {partyBadgeClass(candidate.party)}"
+            title={candidate.party}>{candidate.party}</span
           >
-            <span class="candidate-initials" aria-hidden="true">
-              {candidate.name
-                .split(" ")
-                .filter((n) => n.length > 0)
-                .map((n) => n[0].toUpperCase())
-                .slice(0, 2)
-                .join("")}
-            </span>
-          </div>
         {/if}
-        <div>
-          <h3 class="candidate-name">
-            <a
-              href="/races/{raceId}/{candidateSlug(
-                candidate.name,
-              )}/{draftQuery}"
-              class="candidate-name-link"
-            >
-              {candidate.name}
-              <svg
-                class="inline w-4 h-4 ml-1 opacity-60"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-            </a>
-          </h3>
-          <div class="flex flex-wrap items-center gap-1 mt-1">
-            {#if candidate.party}
-              <span
-                class="badge {partyBadgeClass(candidate.party)}"
-                title={candidate.party}>{partyAbbr(candidate.party)}</span
-              >
-            {/if}
-            {#if candidate.incumbent}
-              <span class="badge incumbent-badge">Incumbent</span>
-            {/if}
-          </div>
-        </div>
+        {#if candidate.incumbent}
+          <span class="badge incumbent-badge">Incumbent</span>
+        {/if}
       </div>
     </div>
+  </div>
 
-    <!-- Summary -->
-    <p class="summary">
-      {expanded ? candidateSummary : summaryPreview}
+  <!-- Summary: clamped until expanded so a grid of cards stays scannable. -->
+  {#if candidateSummary}
+    <p class="summary" class:summary-clamped={!expanded}>
+      {candidateSummary}
     </p>
+  {/if}
 
-    <!-- Website Link -->
-    {#if isExternalUrl(candidate.website)}
-      <div class="mt-3">
+  <div class="card-actions">
+    <button
+      type="button"
+      class="expand-button"
+      on:click={toggleExpanded}
+      aria-expanded={expanded}
+      aria-label={expanded
+        ? "Collapse candidate details"
+        : "Expand candidate details"}
+    >
+      <span>{expanded ? "Show less" : "Show more"}</span>
+      <svg
+        class="expand-icon"
+        class:expanded
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 9l-7 7-7-7"
+        />
+      </svg>
+    </button>
+    <span class="card-actions-links">
+      {#if isExternalUrl(candidate.website)}
         <a
           href={candidate.website.trim()}
           target="_blank"
           rel="noopener noreferrer"
-          class="website-link"
+          class="card-link"
         >
-          Campaign website
+          Website
           <svg
-            class="w-4 h-4"
+            class="h-3.5 w-3.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               stroke-linecap="round"
@@ -165,39 +174,14 @@
               d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
             />
           </svg>
+          <span class="sr-only">(campaign website for {candidate.name})</span>
         </a>
-      </div>
-    {/if}
-
-    <!-- Expand/Collapse Button -->
-    <div class="mt-4">
-      <button
-        class="expand-button"
-        on:click={toggleExpanded}
-        aria-expanded={expanded}
-        aria-label={expanded
-          ? "Collapse candidate details"
-          : "Expand candidate details"}
-      >
-        <span class="expand-text">
-          {expanded ? "Show less" : "Show more"}
-        </span>
-        <svg
-          class="expand-icon"
-          class:expanded
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
-    </div>
+      {/if}
+      <a href={profileHref} class="card-link">
+        Full profile<span class="sr-only"> of {candidate.name}</span>
+        <span aria-hidden="true">&rarr;</span>
+      </a>
+    </span>
   </div>
 
   <!-- Expanded Content - Only show when expanded -->
@@ -369,52 +353,48 @@
   /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
      `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   :global(.candidate-card) {
-    @apply p-3 sm:p-4 lg:p-6 h-full w-full mx-auto shadow-lg;
+    @apply flex h-full w-full flex-col p-4 sm:p-5;
   }
 
   .candidate-image {
-    @apply w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-stroke flex-shrink-0;
+    @apply h-14 w-14 flex-shrink-0 rounded-full border-2 border-stroke object-cover sm:h-16 sm:w-16;
   }
 
   .candidate-image-placeholder {
-    @apply w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 border-2 border-blue-200 flex items-center justify-center flex-shrink-0;
-  }
-
-  :global(.dark) .candidate-image-placeholder {
-    @apply bg-blue-900 border-blue-700;
+    @apply flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full border-2 border-stroke bg-surface-alt sm:h-16 sm:w-16;
   }
 
   .candidate-initials {
-    @apply text-blue-700 font-bold text-lg sm:text-xl select-none;
-  }
-
-  :global(.dark) .candidate-initials {
-    @apply text-blue-300;
+    @apply select-none text-lg font-bold text-content-muted;
   }
 
   .candidate-name {
-    @apply text-lg sm:text-xl lg:text-2xl font-bold text-content;
-    @apply flex items-center gap-2;
+    @apply min-w-0 text-lg font-bold leading-snug text-content sm:text-xl;
   }
 
   .candidate-name-link {
-    @apply text-blue-700 hover:text-blue-600 hover:underline transition-colors duration-200 no-underline;
+    @apply text-content no-underline transition-colors duration-200 hover:text-primary hover:underline;
   }
 
-  :global(.dark) .candidate-name-link {
-    @apply text-blue-400 hover:text-blue-300;
+  /* Labelled toggle chip rather than a bare checkbox. */
+  .compare-toggle {
+    @apply inline-flex min-h-9 shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-full border border-stroke bg-surface px-2.5 py-1 text-xs font-semibold text-content-muted transition-colors hover:border-primary-300 hover:text-content;
+  }
+
+  .compare-toggle.is-selected {
+    @apply border-primary-500 bg-primary-50 text-primary-800;
+  }
+
+  :global(.dark) .compare-toggle.is-selected {
+    @apply border-primary-400 bg-primary-950/50 text-primary-200;
+  }
+
+  .compare-checkbox {
+    @apply h-4 w-4 cursor-pointer rounded border-stroke bg-surface text-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-0;
   }
 
   .badge {
-    @apply px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium;
-  }
-
-  .party-badge {
-    @apply bg-gray-100 text-gray-700;
-  }
-
-  :global(.dark) .party-badge {
-    @apply bg-gray-700 text-gray-300;
+    @apply rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
 
   .incumbent-badge {
@@ -422,56 +402,35 @@
   }
 
   :global(.dark) .incumbent-badge {
-    @apply bg-green-900 text-green-200;
+    @apply bg-green-900/60 text-green-200;
   }
 
   .summary {
-    @apply text-content-muted leading-relaxed text-xs sm:text-sm lg:text-base;
+    @apply mt-4 text-sm leading-relaxed text-content-muted;
   }
 
-  .website-link {
-    @apply inline-flex items-center gap-1 text-blue-600 font-medium;
+  .summary-clamped {
+    @apply line-clamp-4;
   }
 
-  :global(.dark) .website-link {
-    @apply text-blue-400;
+  .card-actions {
+    @apply mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-3;
   }
 
-  .website-link:hover {
-    @apply text-blue-500;
+  .card-actions-links {
+    @apply flex flex-wrap items-center gap-x-4;
   }
 
-  :global(.dark) .website-link:hover {
-    @apply text-blue-300;
-  }
-
-  .section-title {
-    @apply text-base sm:text-lg font-semibold text-content mb-3 sm:mb-4;
+  .card-link {
+    @apply inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary no-underline hover:underline;
   }
 
   .expand-button {
-    @apply flex min-h-11 items-center gap-2 text-blue-600 font-medium;
-    @apply transition-colors duration-200;
-  }
-
-  :global(.dark) .expand-button {
-    @apply text-blue-400;
-  }
-
-  .expand-button:hover {
-    @apply text-blue-500;
-  }
-
-  :global(.dark) .expand-button:hover {
-    @apply text-blue-300;
-  }
-
-  .expand-text {
-    @apply text-xs sm:text-sm font-medium;
+    @apply inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary transition-colors duration-200 hover:underline;
   }
 
   .expand-icon {
-    @apply w-4 h-4 transition-transform duration-200;
+    @apply h-4 w-4 transition-transform duration-200;
   }
 
   .expand-icon.expanded {
@@ -479,36 +438,15 @@
   }
 
   .expanded-content {
-    @apply border-t border-stroke pt-4 sm:pt-6;
+    @apply mt-3 border-t border-stroke pt-4 sm:pt-5;
   }
 
   .tab-navigation {
-    @apply flex border-b border-stroke mb-6 overflow-x-auto;
+    @apply mb-5 flex overflow-x-auto border-b border-stroke;
   }
 
   .tab-content {
     @apply min-h-32;
-  }
-
-  .issues-preview {
-    @apply border-t border-stroke pt-4 sm:pt-6;
-  }
-
-  .issues-tags {
-    @apply flex flex-wrap gap-1 sm:gap-2;
-  }
-
-  .issue-tag {
-    @apply bg-surface-alt text-content-muted px-2 sm:px-3 py-1 rounded-full;
-    @apply text-xs sm:text-sm font-medium;
-  }
-
-  .more-tag {
-    @apply bg-blue-100 text-blue-700;
-  }
-
-  :global(.dark) .more-tag {
-    @apply bg-blue-900 text-blue-300;
   }
 
   /* Background / Career / Education styles */
@@ -516,16 +454,16 @@
     @apply space-y-4;
   }
 
+  .section-title {
+    @apply mb-3 text-base font-semibold text-content;
+  }
+
   .timeline {
     @apply space-y-3;
   }
 
   .timeline-entry {
-    @apply border-l-2 border-blue-200 pl-4 py-1;
-  }
-
-  :global(.dark) .timeline-entry {
-    @apply border-blue-700;
+    @apply border-l-2 border-stroke py-1 pl-4;
   }
 
   .timeline-header {
@@ -533,7 +471,7 @@
   }
 
   .timeline-title {
-    @apply font-medium text-content text-sm;
+    @apply text-sm font-medium text-content;
   }
 
   .timeline-years {
@@ -541,19 +479,15 @@
   }
 
   .timeline-org {
-    @apply text-sm text-content-muted block;
+    @apply block text-sm text-content-muted;
   }
 
   .timeline-desc {
-    @apply text-xs text-content-subtle mt-1;
+    @apply mt-1 text-xs text-content-subtle;
   }
 
   .entry-source-link {
-    @apply inline-flex min-h-6 items-center gap-1 mt-2 py-1 text-xs text-blue-600 hover:underline;
-  }
-
-  :global(.dark) .entry-source-link {
-    @apply text-blue-400;
+    @apply mt-2 inline-flex min-h-6 items-center gap-1 py-1 text-xs text-primary hover:underline;
   }
 
   .education-list {
@@ -565,7 +499,7 @@
   }
 
   .edu-institution {
-    @apply font-medium text-content text-sm;
+    @apply text-sm font-medium text-content;
   }
 
   .edu-degree {

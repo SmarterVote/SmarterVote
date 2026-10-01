@@ -23,7 +23,7 @@
     role="note"
     class="mt-2 block rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-normal leading-5 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100"
   >
-    <strong>Automated Research Score:</strong> Separate AI models review sourcing,
+    <strong>Automated research score:</strong> Separate AI models review sourcing,
     completeness, consistency, and neutrality. The score summarizes those research
     checks; it is not a guarantee that every claim is correct.
   </span>

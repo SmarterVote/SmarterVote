@@ -6,6 +6,7 @@
   import { RENAMED_ISSUE_NOTES, getIssueDisplayName } from "$lib/types";
   import { hasStance } from "$lib/utils/candidates";
   import { candidateSlug } from "$lib/utils/format";
+  import { cleanDisplayText } from "$lib/utils/racePage";
 
   export let issues: Partial<Record<IssueKey, IssueStance>>;
   export let raceId: string = "";
@@ -62,32 +63,39 @@
   <NoDataFallback dataType="issues" {raceId} {candidateName} />
 {:else}
   <div class="hidden lg:block overflow-x-auto">
-    <table class="w-full border-collapse">
+    <table class="w-full table-fixed border-collapse">
       <thead>
         <tr class="border-b border-stroke">
-          <th class="text-left py-3 px-4 font-semibold text-content">Issue</th>
-          <th class="text-left py-3 px-4 font-semibold text-content w-2/5">
+          <th
+            class="w-[18%] py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
+            >Issue</th
+          >
+          <th
+            class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
+          >
             Stance
           </th>
-          <th class="text-center py-3 px-4 font-semibold text-content"
+          <th
+            class="w-28 py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
             >Confidence</th
           >
-          <th class="text-center py-3 px-4 font-semibold text-content"
+          <th
+            class="w-[24%] py-3 pl-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
             >Sources</th
           >
         </tr>
       </thead>
       <tbody>
         {#each issueEntries as [issue, stance]}
-          <tr class="border-b border-stroke hover:bg-surface-alt">
-            <td class="py-3 px-4 font-medium text-content">
+          <tr class="border-b border-stroke align-top last:border-b-0">
+            <td class="py-4 pr-4 font-semibold text-content">
               <span class="inline-flex items-center gap-1">
                 {getIssueDisplayName(issue)}
                 {#if RENAMED_ISSUE_NOTES[issue]}
                   <span class="relative inline-block">
                     <button
                       type="button"
-                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                       aria-label="About this issue name"
                       title="About this issue name"
                       aria-expanded={visibleTooltip === issue}
@@ -132,15 +140,17 @@
                 {/if}
               </span>
             </td>
-            <td class="py-3 px-4 text-content-muted w-2/5 whitespace-normal">
-              {stance.stance}
+            <td
+              class="whitespace-normal py-4 px-4 text-sm leading-relaxed text-content-muted"
+            >
+              {cleanDisplayText(stance.stance)}
             </td>
-            <td class="py-3 px-4 text-center">
+            <td class="py-4 px-4">
               <ConfidenceIndicator confidence={stance.confidence} />
             </td>
-            <td class="py-3 px-4 text-center">
+            <td class="py-4 pl-4">
               {#if stance.sources?.length > 0}
-                <div class="text-left space-y-1">
+                <div class="space-y-0.5 break-words">
                   {#each visibleSources(stance, expandedSources.has(issue)) as source}
                     <div>
                       <SourceLink {source} />
@@ -151,7 +161,7 @@
                   <button
                     type="button"
                     aria-expanded={expandedSources.has(issue)}
-                    class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
+                    class="mt-2 inline-flex min-h-11 items-center text-primary hover:text-primary-700 dark:hover:text-primary-300 text-sm underline"
                     aria-label={expandedSources.has(issue)
                       ? `Show fewer sources for ${getIssueDisplayName(issue)}`
                       : `Show ${
@@ -197,7 +207,7 @@
       <select
         id={issueSelectId}
         bind:value={selectedIssue}
-        class="min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-base font-semibold text-content focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        class="min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-base font-semibold text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
       >
         {#each issueEntries as [issue]}
           <option value={issue}>{getIssueDisplayName(issue)}</option>
@@ -213,7 +223,7 @@
               <span class="relative inline-block">
                 <button
                   type="button"
-                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label="About this issue name"
                   aria-expanded={visibleTooltip === issue + "-mobile"}
                   aria-controls={visibleTooltip === issue + "-mobile"
@@ -260,7 +270,9 @@
           </h3>
           <ConfidenceIndicator confidence={stance.confidence} />
         </div>
-        <p class="text-content-muted mb-3">{stance.stance}</p>
+        <p class="mb-3 text-sm leading-relaxed text-content-muted">
+          {cleanDisplayText(stance.stance)}
+        </p>
         {#if stance.sources?.length > 0}
           <div class="text-sm">
             <span class="text-content-muted">Sources:</span>
@@ -275,7 +287,7 @@
               <button
                 type="button"
                 aria-expanded={expandedSources.has(issue + "-mobile")}
-                class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
+                class="mt-2 inline-flex min-h-11 items-center text-primary hover:text-primary-700 dark:hover:text-primary-300 text-sm underline"
                 aria-label={expandedSources.has(issue + "-mobile")
                   ? `Show fewer sources for ${getIssueDisplayName(issue)}`
                   : `Show ${

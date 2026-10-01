@@ -9,6 +9,7 @@
   import ValidationGradeBadge from "$lib/components/ValidationGradeBadge.svelte";
   import Card from "$lib/components/Card.svelte";
   import ElectionCountdown from "$lib/components/ElectionCountdown.svelte";
+  import EmptyState from "$lib/components/EmptyState.svelte";
   import { fade, slide } from "svelte/transition";
   import VoterResources from "$lib/components/VoterResources.svelte";
   import type { Race } from "$lib/types";
@@ -26,7 +27,6 @@
     probabilityOneDecimal,
     ratingClass,
   } from "$lib/utils/forecastPresentation";
-  import { formatElectionDate } from "$lib/utils/electionDate";
   import {
     neutralCandidateOrder,
     shortCandidateName,
@@ -34,6 +34,7 @@
   import { motionDuration, scrollBehavior } from "$lib/utils/motion";
   import { headshotFallback } from "$lib/utils/racePageImage";
   import {
+    cleanDisplayText,
     forecastHeadline,
     formatPollDate,
     isNotFoundError,
@@ -41,7 +42,9 @@
     partyProbabilityAriaLabel,
     partyProbabilitySegments,
     raceJsonLd,
+    raceLocationLabel,
     sortPollsByDate,
+    splitSourcedText,
   } from "$lib/utils/racePage";
   import {
     raceDisplayTitle,
@@ -58,10 +61,14 @@
   let usingFallbackData = false;
   let isDraftPreview = false;
 
+  /** Poll cards shown before "Show all polls"; a full grid buried the page. */
+  const POLL_PREVIEW_COUNT = 6;
+
   let selectedCandidates: Set<string> = new Set();
   let forecastExpanded = false;
   let overviewExpanded = false;
   let withdrawnExpanded = false;
+  let pollsExpanded = false;
   let hiddenChipImages: Record<string, boolean> = {};
 
   let slug: string;
@@ -87,6 +94,7 @@
     forecastExpanded = false;
     overviewExpanded = false;
     withdrawnExpanded = false;
+    pollsExpanded = false;
     hiddenChipImages = {};
   }
 
@@ -192,6 +200,17 @@
         .join(",")}${isDraftPreview ? "&draft=true" : ""}`
     : "";
   $: polls = sortPollsByDate(race?.polling);
+  $: visiblePolls =
+    pollsExpanded || polls.length <= POLL_PREVIEW_COUNT
+      ? polls
+      : polls.slice(0, POLL_PREVIEW_COUNT);
+  $: overview = splitSourcedText(race?.description);
+  $: locationLabel = race ? raceLocationLabel(race) : "";
+  // The desktop sidebar spans every main-column block so it can stay sticky.
+  $: asideRowSpan =
+    (overview.paragraphs.length > 0 ? 1 : 0) +
+    1 +
+    (withdrawnCandidates.length > 0 ? 1 : 0);
   $: latestPoll = polls.length > 0 ? polls[0] : null;
   $: latestMatchup =
     latestPoll?.matchups?.find(
@@ -305,45 +324,41 @@
   {/if}
 </svelte:head>
 
-<div class="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+<div class="page-container py-6 sm:py-8">
   {#if loading}
     <div class="loading-wrapper">
       <div class="spinner"></div>
       <span class="loading-text">Loading race data...</span>
     </div>
   {:else if notFound}
-    <div class="not-found-box">
-      <h1 class="not-found-title">Race not found</h1>
-      <p class="not-found-text">
-        We couldn't find a published race at this address. It may have been
-        renamed, retired after the election, or never published.
-      </p>
-      <div class="not-found-actions">
-        <a href="/elections/" class="not-found-primary">Browse elections</a>
-        <a href="/" class="not-found-secondary">Go to the homepage</a>
-      </div>
-    </div>
+    <EmptyState
+      title="Race not found"
+      body="We couldn't find a published race at this address. It may have been renamed, retired after the election, or never published."
+    />
   {:else if error}
-    <div class="error-box" role="alert">
-      <h2 class="error-title">We couldn't load this race</h2>
-      <p class="error-text">
+    <div class="alert-error mx-auto max-w-xl p-6 text-center" role="alert">
+      <h1 class="text-xl font-semibold">We couldn't load this race</h1>
+      <p class="mt-2">
         Something went wrong while loading the race data. Please check your
         connection and try again.
       </p>
-      <button class="error-button" on:click={() => window.location.reload()}>
+      <button
+        type="button"
+        class="btn-secondary mt-4"
+        on:click={() => window.location.reload()}
+      >
         Try again
       </button>
     </div>
   {:else if race}
     {#if isDraftPreview}
-      <div
-        class="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600 px-4 py-3 text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2"
-      >
+      <div class="alert-warn mb-4 flex items-center gap-2">
         <svg
-          class="w-5 h-5 flex-shrink-0"
+          class="h-5 w-5 flex-shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
           ><path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -357,15 +372,23 @@
         >
       </div>
     {/if}
+    {#if usingFallbackData}
+      <div class="alert-warn mb-4">
+        <p class="font-semibold">Using Sample Data</p>
+        <p class="mt-1">
+          Live data is currently unavailable. The information shown below is
+          sample data for demonstration purposes.
+        </p>
+      </div>
+    {/if}
     {#if discoveryOnly}
-      <div
-        class="mb-4 rounded-lg border-2 border-blue-300 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-600 px-4 py-3 text-sm text-blue-800 dark:text-blue-200 flex items-start gap-3"
-      >
+      <div class="alert-info mb-4 flex items-start gap-3">
         <svg
-          class="w-5 h-5 flex-shrink-0 mt-0.5"
+          class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
           ><path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -374,85 +397,69 @@
           /></svg
         >
         <div>
-          <p class="font-semibold">Limited Data — Discovery Only</p>
-          <p class="mt-1 text-blue-700 dark:text-blue-300">
+          <p class="font-semibold text-content">
+            Limited Data — Discovery Only
+          </p>
+          <p class="mt-1">
             This race has basic candidate information but detailed issue
             positions have not been researched yet. Want detailed data on this
             race? <a
               href="https://github.com/SmarterVote/SmarterVote/issues/new/choose"
               target="_blank"
               rel="noopener noreferrer"
-              class="underline font-medium hover:text-blue-900 dark:hover:text-blue-100"
-              >Request a research run</a
+              class="inline-link">Request a research run</a
             >
             or
-            <a
-              href="/support/"
-              class="underline font-medium hover:text-blue-900 dark:hover:text-blue-100"
-              >sponsor to help fund it</a
-            >!
+            <a href="/support/" class="inline-link">sponsor to help fund it</a>.
           </p>
         </div>
       </div>
     {/if}
+
     <!-- Race Header -->
-    <Card tag="header" class="header-card">
+    <Card tag="header" class="race-header">
       <div class="header-top">
-        <h1 class="header-title">{raceDisplayTitle(race)}</h1>
+        <h1 class="h-page min-w-0">{raceDisplayTitle(race)}</h1>
         {#if race.validation_grade}
           <ValidationGradeBadge grade={race.validation_grade} />
         {/if}
       </div>
-      <p class="mt-2 text-sm text-content-muted">
+      <p class="mt-2 text-sm text-content-muted sm:text-base">
         Compare candidates’ positions, polling, and sourced race updates.
       </p>
       <div class="header-meta">
-        <div class="info-row">
+        {#if locationLabel}
+          <span class="info-row">
+            <svg
+              class="h-4 w-4 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            <span>{locationLabel}</span>
+          </span>
+        {/if}
+        <span class="info-row">
           <svg
-            class="w-5 h-5"
+            class="h-4 w-4 shrink-0"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <span>Election: {formatElectionDate(race.election_date)}</span>
-        </div>
-        <div class="info-row">
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          <span
-            >{race.office}{race.district ? ` · ${race.district}` : ""} &bull; {race.jurisdiction}</span
-          >
-        </div>
-        <div class="info-row">
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <path
               stroke-linecap="round"
@@ -462,501 +469,539 @@
             />
           </svg>
           <span
-            >Updated: {formatPollDate(race.updated_utc, {
+            >Updated {formatPollDate(race.updated_utc, {
               month: "long",
               day: "numeric",
               year: "numeric",
             }) || "date unavailable"}</span
           >
-        </div>
+        </span>
       </div>
-      {#if activeCandidates.length > 1}
-        <a href={compareAllHref} class="header-compare-link">
-          Compare all {activeCandidates.length} candidates
-        </a>
+      {#if race.election_date || activeCandidates.length > 1}
+        <div class="header-actions">
+          {#if race.election_date}
+            <div class="min-w-0 sm:flex-1">
+              <ElectionCountdown electionDate={race.election_date} />
+            </div>
+          {/if}
+          {#if activeCandidates.length > 1}
+            <a href={compareAllHref} class="btn-primary shrink-0">
+              Compare all {activeCandidates.length} candidates
+            </a>
+          {/if}
+        </div>
       {/if}
     </Card>
 
-    <!-- Election Countdown -->
-    {#if race.election_date}
-      <div class="mb-6 sm:mb-8">
-        <ElectionCountdown electionDate={race.election_date} />
-      </div>
-    {/if}
-
-    <!-- Voter Resources -->
-    <VoterResources {ballotpediaUrl} {registerToVoteUrl} {howToVoteUrl} />
-
-    <!-- Race Overview -->
-    <Card class="overview-card">
-      <div class="overview-layout">
-        <!-- Left: description + candidate chips -->
-        <div class="overview-main">
-          {#if race.description}
-            <p
-              class="overview-description"
-              class:overview-description-collapsed={!overviewExpanded}
-            >
-              {race.description}
-            </p>
-            {#if race.description.length > 320}
+    <div class="race-layout">
+      <!-- Race Overview -->
+      {#if overview.paragraphs.length > 0}
+        <section
+          class="race-main card overview-card"
+          aria-label="Race overview"
+        >
+          <h2 class="h-card">About this race</h2>
+          <div class="overview-text">
+            {#each overview.paragraphs as paragraph, index}
+              <p class:overview-extra={index > 0 && !overviewExpanded}>
+                {paragraph}
+              </p>
+            {/each}
+          </div>
+          {#if overview.paragraphs.length > 1}
+            <div class="sm:hidden">
               <button
                 type="button"
-                class="overview-toggle"
+                class="link-button"
                 aria-expanded={overviewExpanded}
                 on:click={() => (overviewExpanded = !overviewExpanded)}
               >
                 {overviewExpanded ? "Show less overview" : "Read full overview"}
+                <span
+                  class="inline-flex transition-transform duration-200"
+                  class:rotate-180={overviewExpanded}
+                  ><UiIcon name="chevron-down" size="sm" /></span
+                >
               </button>
-            {/if}
-          {/if}
-          <div class="overview-candidates">
-            {#each activeCandidates as candidate (candidateSlug(candidate.name))}
-              <a
-                href="/races/{race.id}/{candidateSlug(
-                  candidate.name,
-                )}/{isDraftPreview ? '?draft=true' : ''}"
-                class="overview-candidate-chip"
-              >
-                {#if candidate.image_url && !hiddenChipImages[candidate.name]}
-                  <img
-                    src={candidate.image_url}
-                    alt=""
-                    width="20"
-                    height="20"
-                    decoding="async"
-                    referrerpolicy="no-referrer"
-                    class="chip-avatar"
-                    use:headshotFallback={() => hideChipImage(candidate.name)}
-                  />
-                {/if}
-                <span class="chip-name">{candidate.name}</span>
-                {#if candidate.party}
-                  <span
-                    class="chip-party chip-party-{partyKey(candidate.party)}"
-                    title={candidate.party}>{partyAbbr(candidate.party)}</span
-                  >
-                {/if}
-                {#if candidate.incumbent}
-                  <span class="chip-incumbent">Incumbent</span>
-                {/if}
-              </a>
-            {/each}
-          </div>
-        </div>
-
-        <!-- Right: poll snapshot widget -->
-        {#if latestPoll && latestMatchup}
-          <a href="#polls" class="poll-snapshot">
-            <div class="poll-snapshot-header">
-              <svg
-                class="w-4 h-4 text-blue-500 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              <span class="poll-snapshot-title">Latest Poll</span>
             </div>
-            <p class="poll-snapshot-meta">
-              {latestPoll.pollster}{formatPollDate(latestPoll.date)
-                ? ` · ${formatPollDate(latestPoll.date, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}`
-                : ""}
-            </p>
-            <div class="poll-snapshot-bars">
-              {#each snapshotRows as row, rowIndex (`${row.name}|${rowIndex}`)}
-                {@const name = row.name}
-                {@const pct = row.pct}
-                <div class="poll-snap-row">
-                  <span class="poll-snap-name" title={name}
-                    >{shortCandidateName(name, latestMatchup.candidates)}</span
+          {/if}
+          {#if overview.sources.length > 0}
+            <div class="overview-sources">
+              <span class="overview-sources-label">Sources</span>
+              {#each overview.sources as source (source.url)}
+                {#if isExternalUrl(source.url)}
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="source-chip"
+                    title={source.url}
                   >
-                  <div class="poll-snap-bar-wrap">
-                    <div
-                      class="poll-snap-bar {partyClassForName(name)}"
-                      style="width:{Math.min(pct ?? 0, 100)}%"
-                    ></div>
-                  </div>
-                  <span class="poll-snap-pct"
-                    >{pct !== null ? `${pct}%` : "n/a"}</span
-                  >
-                </div>
+                    {source.label}
+                    <UiIcon name="external" size="sm" />
+                  </a>
+                {/if}
               {/each}
             </div>
-            {#if polls.length > 1}
-              <span class="poll-snapshot-more"
-                >{polls.length} polls total — view all
-                <UiIcon name="chevron-down" size="sm" /></span
-              >
-            {:else}
-              <span class="poll-snapshot-more"
-                >View detailed results
-                <UiIcon name="chevron-down" size="sm" /></span
-              >
-            {/if}
-          </a>
-        {/if}
-      </div>
-    </Card>
+          {/if}
+          {#if activeCandidates.length > 0}
+            <div
+              class="overview-candidates"
+              aria-label="Candidates in this race"
+            >
+              {#each activeCandidates as candidate (candidateSlug(candidate.name))}
+                <a
+                  href="/races/{race.id}/{candidateSlug(
+                    candidate.name,
+                  )}/{isDraftPreview ? '?draft=true' : ''}"
+                  class="overview-candidate-chip"
+                >
+                  {#if candidate.image_url && !hiddenChipImages[candidate.name]}
+                    <img
+                      src={candidate.image_url}
+                      alt=""
+                      width="20"
+                      height="20"
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                      class="chip-avatar"
+                      use:headshotFallback={() => hideChipImage(candidate.name)}
+                    />
+                  {/if}
+                  <span class="chip-name">{candidate.name}</span>
+                  {#if candidate.party}
+                    <span
+                      class="chip-party chip-party-{partyKey(candidate.party)}"
+                      title={candidate.party}>{partyAbbr(candidate.party)}</span
+                    >
+                  {/if}
+                  {#if candidate.incumbent}
+                    <span class="chip-incumbent">Incumbent</span>
+                  {/if}
+                </a>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
-    <!-- Fallback Data Notice -->
-    {#if usingFallbackData}
-      <div class="fallback-notice">
-        <div class="fallback-content">
-          <svg
-            class="w-5 h-5 text-yellow-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
-          </svg>
-          <div>
-            <p class="fallback-title">Using Sample Data</p>
-            <p class="fallback-text">
-              Live data is currently unavailable. The information shown below is
-              sample data for demonstration purposes.
+      <!-- At a glance: forecast + latest poll + voting resources. A sticky
+           sidebar on desktop; right after the overview on smaller screens. -->
+      <aside
+        class="race-aside"
+        class:has-glance={!!race.forecast || !!(latestPoll && latestMatchup)}
+        aria-label="Race at a glance"
+        style="--aside-rows: {asideRowSpan}"
+      >
+        {#if race.forecast || (latestPoll && latestMatchup)}
+          <div class="card glance-card">
+            <p class="eyebrow">At a glance</p>
+            {#if race.forecast}
+              {@const glance = forecastHeadline(race.forecast)}
+              <div class="glance-block">
+                <div class="flex items-start justify-between gap-3">
+                  <p class="glance-title">{glance.title}</p>
+                  <span
+                    class="forecast-rating shrink-0 {ratingClass(
+                      race.forecast.rating,
+                    )}">{ratingLabel(race.forecast.rating)}</span
+                  >
+                </div>
+                {#if glance.leader && typeof race.forecast.win_probability === "number"}
+                  <p class="glance-text">
+                    {glance.leader}: {probability(
+                      race.forecast.win_probability,
+                    )}
+                    modeled win probability
+                  </p>
+                {/if}
+                <a href="#forecast" class="glance-link"
+                  >Forecast details <UiIcon name="chevron-down" size="sm" /></a
+                >
+              </div>
+            {/if}
+            {#if latestPoll && latestMatchup}
+              <div class="glance-block" class:glance-divider={!!race.forecast}>
+                <p class="glance-subtitle">Latest poll</p>
+                <p class="poll-snapshot-meta">
+                  {latestPoll.pollster}{formatPollDate(latestPoll.date)
+                    ? ` · ${formatPollDate(latestPoll.date, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}`
+                    : ""}
+                </p>
+                <div class="poll-snapshot-bars">
+                  {#each snapshotRows as row, rowIndex (`${row.name}|${rowIndex}`)}
+                    {@const name = row.name}
+                    {@const pct = row.pct}
+                    <div class="poll-snap-row">
+                      <span class="poll-snap-name" title={name}
+                        >{shortCandidateName(
+                          name,
+                          latestMatchup.candidates,
+                        )}</span
+                      >
+                      <div class="poll-snap-bar-wrap" aria-hidden="true">
+                        <div
+                          class="poll-snap-bar {partyClassForName(name)}"
+                          style="width:{Math.min(pct ?? 0, 100)}%"
+                        ></div>
+                      </div>
+                      <span class="poll-snap-pct"
+                        >{pct !== null ? `${pct}%` : "n/a"}</span
+                      >
+                    </div>
+                  {/each}
+                </div>
+                <a href="#polls" class="glance-link">
+                  {polls.length > 1
+                    ? `All ${polls.length} polls`
+                    : "Poll details"}
+                  <UiIcon name="chevron-down" size="sm" />
+                </a>
+              </div>
+            {/if}
+          </div>
+        {/if}
+        <VoterResources {ballotpediaUrl} {registerToVoteUrl} {howToVoteUrl} />
+      </aside>
+
+      <!-- Candidates Section -->
+      <section id="candidates" class="race-main scroll-mt-24">
+        <div class="candidates-heading">
+          <h2 class="h-section">Candidates</h2>
+          {#if activeCandidates.length > 1}
+            <p class="text-sm text-content-subtle">
+              Tick <strong class="font-semibold text-content-muted"
+                >Compare</strong
+              > on two or more cards to see them side by side.
+            </p>
+          {/if}
+        </div>
+        {#if activeCandidates.length === 0}
+          <div class="candidates-empty">
+            <p class="candidates-empty-title">
+              No active candidates listed yet
+            </p>
+            <p class="candidates-empty-text">
+              {#if withdrawnCandidates.length > 0}
+                Every candidate we tracked for this race has withdrawn or is not
+                running. Check back after the filing deadline for an updated
+                field.
+              {:else}
+                We haven't published a candidate field for this race yet. Check
+                back closer to the filing deadline, or see your state's election
+                office for the official list.
+              {/if}
             </p>
           </div>
-        </div>
-      </div>
-    {/if}
-
-    <!-- Candidates Section -->
-    <section id="candidates" class="scroll-mt-24">
-      <div class="candidates-heading">
-        <h2 class="candidates-title">Candidates</h2>
-        {#if activeCandidates.length > 1}
-          <a href={compareAllHref} class="compare-all-link">
-            Compare all <span aria-hidden="true">&rarr;</span>
-          </a>
         {/if}
-      </div>
-      {#if activeCandidates.length === 0}
-        <div class="candidates-empty">
-          <p class="candidates-empty-title">No active candidates listed yet</p>
-          <p class="candidates-empty-text">
-            {#if withdrawnCandidates.length > 0}
-              Every candidate we tracked for this race has withdrawn or is not
-              running. Check back after the filing deadline for an updated
-              field.
-            {:else}
-              We haven't published a candidate field for this race yet. Check
-              back closer to the filing deadline, or see your state's election
-              office for the official list.
-            {/if}
-          </p>
-        </div>
-      {/if}
-      <div class="candidate-grid">
-        {#each activeCandidates as candidate (candidateSlug(candidate.name))}
-          <CandidateCard
-            {candidate}
-            raceId={race.id}
-            draft={isDraftPreview}
-            selectable={activeCandidates.length > 1}
-            selected={selectedCandidates.has(candidateSlug(candidate.name))}
-            on:toggleSelect={() => toggleCandidateSelect(candidate.name)}
-          />
-        {/each}
-      </div>
-    </section>
-
-    <!-- Withdrawn Candidates -->
-    {#if withdrawnCandidates.length > 0}
-      <section class="mt-4">
-        <button
-          class="flex items-center gap-2 text-sm text-content-muted hover:text-content transition-colors"
-          on:click={() => (withdrawnExpanded = !withdrawnExpanded)}
-          aria-expanded={withdrawnExpanded}
+        <div
+          class="candidate-grid"
+          class:single-column={activeCandidates.length === 1}
         >
-          <svg
-            class="w-4 h-4 transition-transform {withdrawnExpanded
-              ? 'rotate-90'
-              : ''}"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
+          {#each activeCandidates as candidate (candidateSlug(candidate.name))}
+            <CandidateCard
+              {candidate}
+              raceId={race.id}
+              draft={isDraftPreview}
+              selectable={activeCandidates.length > 1}
+              selected={selectedCandidates.has(candidateSlug(candidate.name))}
+              on:toggleSelect={() => toggleCandidateSelect(candidate.name)}
             />
-          </svg>
-          Withdrawn / Not Running ({withdrawnCandidates.length})
-        </button>
-        {#if withdrawnExpanded}
-          <div
-            transition:slide={{ duration: motionDuration(400) }}
-            class="candidate-grid mt-3 opacity-60"
-          >
-            {#each withdrawnCandidates as candidate (candidateSlug(candidate.name))}
-              <CandidateCard
-                {candidate}
-                raceId={race.id}
-                draft={isDraftPreview}
-              />
-            {/each}
-          </div>
-        {/if}
+          {/each}
+        </div>
       </section>
-    {/if}
+
+      <!-- Withdrawn Candidates -->
+      {#if withdrawnCandidates.length > 0}
+        <section class="race-main">
+          <button
+            type="button"
+            class="flex min-h-11 items-center gap-2 text-sm font-medium text-content-muted transition-colors hover:text-content"
+            on:click={() => (withdrawnExpanded = !withdrawnExpanded)}
+            aria-expanded={withdrawnExpanded}
+          >
+            <svg
+              class="h-4 w-4 transition-transform {withdrawnExpanded
+                ? 'rotate-90'
+                : ''}"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            Withdrawn / Not Running ({withdrawnCandidates.length})
+          </button>
+          {#if withdrawnExpanded}
+            <div
+              transition:slide={{ duration: motionDuration(400) }}
+              class="candidate-grid withdrawn-grid mt-3"
+            >
+              {#each withdrawnCandidates as candidate (candidateSlug(candidate.name))}
+                <CandidateCard
+                  {candidate}
+                  raceId={race.id}
+                  draft={isDraftPreview}
+                />
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+    </div>
 
     <!-- Race Forecast -->
     {#if race.forecast}
       {@const forecast = race.forecast}
       {@const headline = forecastHeadline(forecast)}
       {@const segments = partyProbabilitySegments(forecast.party_probabilities)}
-      <Card id="forecast" class="forecast-card scroll-mt-6">
-        <div class="forecast-header">
-          <div>
-            <p class="forecast-eyebrow">Race Forecast</p>
-            <h2 class="forecast-title">{headline.title}</h2>
+      <section id="forecast" class="page-section scroll-mt-24">
+        <h2 class="h-section section-title">Forecast</h2>
+        <Card class="forecast-card">
+          <div class="forecast-header">
+            <div>
+              <h3 class="forecast-title">{headline.title}</h3>
 
-            {#if headline.leader && typeof forecast.win_probability === "number"}
-              <p class="forecast-summary">
-                <strong>{headline.leader}:</strong>
-                {probability(forecast.win_probability)} modeled win probability
-                {#if typeof forecast.margin_estimate === "number"}
-                  with a {signedMargin(forecast.margin_estimate)} estimated margin
-                {/if}
-              </p>
-            {/if}
-          </div>
-          <div class="forecast-actions">
-            <span class="forecast-rating {ratingClass(forecast.rating)}">
+              {#if headline.leader && typeof forecast.win_probability === "number"}
+                <p class="forecast-summary">
+                  <strong>{headline.leader}:</strong>
+                  {probability(forecast.win_probability)} modeled win probability
+                  {#if typeof forecast.margin_estimate === "number"}
+                    with a {signedMargin(forecast.margin_estimate)} estimated margin
+                  {/if}
+                </p>
+              {/if}
+            </div>
+            <span
+              class="forecast-rating shrink-0 {ratingClass(forecast.rating)}"
+            >
               {ratingLabel(forecast.rating)}
             </span>
           </div>
-        </div>
 
-        <div class="forecast-grid">
-          <div class="forecast-metric">
-            <span class="forecast-metric-label">Win Probability</span>
-            <span class="forecast-metric-value"
-              >{probability(forecast.win_probability)}</span
-            >
+          <div class="forecast-grid">
+            <div class="forecast-metric">
+              <span class="forecast-metric-label">Win Probability</span>
+              <span class="forecast-metric-value"
+                >{probability(forecast.win_probability)}</span
+              >
+            </div>
+            <div class="forecast-metric">
+              <span class="forecast-metric-label">Estimated Margin</span>
+              <span class="forecast-metric-value"
+                >{signedMargin(forecast.margin_estimate)}</span
+              >
+            </div>
+            <div class="forecast-metric">
+              <span class="forecast-metric-label">Polling Inputs</span>
+              <span class="forecast-metric-value"
+                >{forecast.based_on_poll_count} poll{forecast.based_on_poll_count ===
+                1
+                  ? ""
+                  : "s"}</span
+              >
+            </div>
           </div>
-          <div class="forecast-metric">
-            <span class="forecast-metric-label">Estimated Margin</span>
-            <span class="forecast-metric-value"
-              >{signedMargin(forecast.margin_estimate)}</span
-            >
-          </div>
-          <div class="forecast-metric">
-            <span class="forecast-metric-label">Polling Inputs</span>
-            <span class="forecast-metric-value"
-              >{forecast.based_on_poll_count} poll{forecast.based_on_poll_count ===
-              1
-                ? ""
-                : "s"}</span
-            >
-          </div>
-        </div>
 
-        <!-- Toggle Button placed at bottom left of primary info -->
-        <div class="mt-4">
           <button
             type="button"
-            class="expand-button"
+            class="link-button mt-2"
             aria-expanded={forecastExpanded}
             aria-controls={forecastExpanded ? "forecast-details" : undefined}
             on:click={toggleForecastExpanded}
           >
-            <span class="expand-text">
-              {forecastExpanded ? "Hide details" : "Show details"}
-            </span>
-            <svg
-              class="expand-icon"
-              class:expanded={forecastExpanded}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            {forecastExpanded ? "Hide details" : "Show details"}
+            <span
+              class="inline-flex transition-transform duration-200"
+              class:rotate-180={forecastExpanded}
+              ><UiIcon name="chevron-down" size="sm" /></span
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
           </button>
-        </div>
 
-        <!-- Expanded Content - slide transitions for details -->
-        {#if forecastExpanded}
-          <div
-            transition:slide={{ duration: motionDuration(400) }}
-            class="expanded-content mt-6"
-          >
-            {#if segments.length > 0}
-              <div
-                class="forecast-probability-bar"
-                role="img"
-                aria-label={partyProbabilityAriaLabel(segments)}
-              >
-                {#each segments as segment (segment.party)}
-                  <div
-                    class="forecast-probability-segment forecast-probability-segment-{segment.key}"
-                    style="flex: {segment.value} 1 0%"
-                    title="{segment.party} {segment.label}"
-                  >
-                    {#if segment.value >= 0.15}
-                      <span aria-hidden="true"
-                        >{segment.party} {segment.label}</span
-                      >
-                    {:else}
-                      <span class="sr-only"
-                        >{segment.party} {segment.label}</span
-                      >
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-              {#if segments.some((segment) => segment.value < 0.15)}
-                <ul class="forecast-probability-legend">
+          {#if forecastExpanded}
+            <div
+              transition:slide={{ duration: motionDuration(400) }}
+              class="expanded-content mt-4"
+            >
+              {#if segments.length > 0}
+                <div
+                  class="forecast-probability-bar"
+                  role="img"
+                  aria-label={partyProbabilityAriaLabel(segments)}
+                >
                   {#each segments as segment (segment.party)}
-                    <li>
-                      <span
-                        class="forecast-legend-swatch forecast-probability-segment-{segment.key}"
-                        aria-hidden="true"
-                      ></span>
-                      {segment.party}
-                      {segment.label}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            {/if}
-
-            <div class="forecast-body" id="forecast-details">
-              <p class="forecast-takeaway font-semibold leading-relaxed mb-4">
-                {forecast.takeaway || forecast.rationale}
-              </p>
-              {#if forecast.market_signals?.length}
-                <div class="forecast-market-signals">
-                  <div class="forecast-market-header">
-                    <h3>Kalshi Market Signals</h3>
-                    <span
-                      >{forecast.market_signals.length} market{forecast
-                        .market_signals.length === 1
-                        ? ""
-                        : "s"}</span
+                    <div
+                      class="forecast-probability-segment forecast-probability-segment-{segment.key}"
+                      style="flex: {segment.value} 1 0%"
+                      title="{segment.party} {segment.label}"
                     >
-                  </div>
-                  <div class="forecast-market-grid">
-                    {#each forecast.market_signals as signal}
-                      <div class="forecast-market-signal">
-                        <div>
-                          <span class="forecast-market-target"
-                            >{marketSignalTarget(signal)}</span
-                          >
-                          <span class="forecast-market-title"
-                            >{signal.title}</span
-                          >
-                        </div>
-                        <div class="forecast-market-values">
-                          <span class="forecast-market-probability">
-                            {probabilityOneDecimal(signal.implied_probability)}
-                          </span>
-                          {#if marketSpread(signal)}
-                            <span>{marketSpread(signal)}</span>
-                          {/if}
-                          <span class="capitalize"
-                            >{signal.confidence} confidence</span
-                          >
-                          {#if marketAsOf(signal.as_of)}
-                            <span>As of {marketAsOf(signal.as_of)}</span>
-                          {/if}
-                          {#if signal.url && isExternalUrl(signal.url)}
-                            <a
-                              href={signal.url}
-                              target="_blank"
-                              rel="noopener noreferrer">Kalshi</a
-                            >
-                          {/if}
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
+                      {#if segment.value >= 0.15}
+                        <span aria-hidden="true"
+                          >{segment.party} {segment.label}</span
+                        >
+                      {:else}
+                        <span class="sr-only"
+                          >{segment.party} {segment.label}</span
+                        >
+                      {/if}
+                    </div>
+                  {/each}
                 </div>
-              {/if}
-              {#if forecast.key_reasons?.length}
-                <div class="forecast-detail-block">
-                  <h3>Key Drivers</h3>
-                  <ul>
-                    {#each forecast.key_reasons as reason}
-                      <li>{reason}</li>
+                {#if segments.some((segment) => segment.value < 0.15)}
+                  <ul class="forecast-probability-legend">
+                    {#each segments as segment (segment.party)}
+                      <li>
+                        <span
+                          class="forecast-legend-swatch forecast-probability-segment-{segment.key}"
+                          aria-hidden="true"
+                        ></span>
+                        {segment.party}
+                        {segment.label}
+                      </li>
                     {/each}
                   </ul>
-                </div>
+                {/if}
               {/if}
-              {#if forecast.uncertainty}
-                <div class="forecast-detail-block">
-                  <h3>Uncertainty</h3>
-                  <p>{forecast.uncertainty}</p>
-                </div>
-              {/if}
-              {#if forecast.rationale && forecast.takeaway}
-                <div class="forecast-detail-block">
-                  <h3>Model Rationale</h3>
-                  <p>{forecast.rationale}</p>
+
+              <div class="forecast-body" id="forecast-details">
+                <p class="forecast-takeaway">
+                  {cleanDisplayText(forecast.takeaway || forecast.rationale)}
+                </p>
+                {#if forecast.market_signals?.length}
+                  <div class="forecast-market-signals">
+                    <div class="forecast-market-header">
+                      <h4>Kalshi Market Signals</h4>
+                      <span
+                        >{forecast.market_signals.length} market{forecast
+                          .market_signals.length === 1
+                          ? ""
+                          : "s"}</span
+                      >
+                    </div>
+                    <div class="forecast-market-grid">
+                      {#each forecast.market_signals as signal}
+                        <div class="forecast-market-signal">
+                          <div>
+                            <span class="forecast-market-target"
+                              >{marketSignalTarget(signal)}</span
+                            >
+                            <span class="forecast-market-title"
+                              >{signal.title}</span
+                            >
+                          </div>
+                          <div class="forecast-market-values">
+                            <span class="forecast-market-probability">
+                              {probabilityOneDecimal(
+                                signal.implied_probability,
+                              )}
+                            </span>
+                            {#if marketSpread(signal)}
+                              <span>{marketSpread(signal)}</span>
+                            {/if}
+                            <span class="capitalize"
+                              >{signal.confidence} confidence</span
+                            >
+                            {#if marketAsOf(signal.as_of)}
+                              <span>As of {marketAsOf(signal.as_of)}</span>
+                            {/if}
+                            {#if signal.url && isExternalUrl(signal.url)}
+                              <a
+                                href={signal.url}
+                                target="_blank"
+                                rel="noopener noreferrer">Kalshi</a
+                              >
+                            {/if}
+                          </div>
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+                {#if forecast.key_reasons?.length}
+                  <div class="forecast-detail-block">
+                    <h4>Key Drivers</h4>
+                    <ul>
+                      {#each forecast.key_reasons as reason}
+                        <li>{cleanDisplayText(reason)}</li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+                {#if forecast.uncertainty}
+                  <div class="forecast-detail-block">
+                    <h4>Uncertainty</h4>
+                    <p>{cleanDisplayText(forecast.uncertainty)}</p>
+                  </div>
+                {/if}
+                {#if forecast.rationale && forecast.takeaway}
+                  <div class="forecast-detail-block">
+                    <h4>Model Rationale</h4>
+                    <p>{cleanDisplayText(forecast.rationale)}</p>
+                  </div>
+                {/if}
+              </div>
+
+              {#if forecast.source_urls?.length}
+                <div class="forecast-sources">
+                  <span class="overview-sources-label">Sources</span>
+                  {#each forecast.source_urls as url}
+                    {#if isExternalUrl(url)}
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="source-chip"
+                        title={url}
+                      >
+                        {getHostname(url)}
+                        <UiIcon name="external" size="sm" />
+                      </a>
+                    {/if}
+                  {/each}
                 </div>
               {/if}
             </div>
+          {/if}
 
-            {#if forecast.source_urls?.length}
-              <div class="forecast-sources">
-                {#each forecast.source_urls as url}
-                  {#if isExternalUrl(url)}
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      {getHostname(url)}
-                    </a>
-                  {/if}
-                {/each}
-              </div>
+          <div class="forecast-meta">
+            <span>Forecast confidence: {forecast.confidence}</span>
+            {#if forecast.model}
+              <span>Model: {formatModelName(forecast.model)}</span>
+            {/if}
+            {#if forecast.generated_at}
+              <span
+                >Generated: {formatPollDate(forecast.generated_at) ||
+                  "date unavailable"}</span
+              >
             {/if}
           </div>
-        {/if}
-
-        <div class="forecast-meta">
-          <span>Forecast confidence: {forecast.confidence}</span>
-          {#if forecast.model}
-            <span>Model: {formatModelName(forecast.model)}</span>
-          {/if}
-          {#if forecast.generated_at}
-            <span
-              >Generated: {formatPollDate(forecast.generated_at) ||
-                "date unavailable"}</span
-            >
-          {/if}
-        </div>
-      </Card>
+        </Card>
+      </section>
     {/if}
 
     <!-- Detailed Polls Section -->
     {#if polls.length > 0}
-      <section id="polls" class="polls-section">
-        <h2 class="section-heading">Polling</h2>
+      <section id="polls" class="page-section scroll-mt-24">
+        <div
+          class="section-title flex flex-wrap items-baseline gap-x-3 gap-y-1"
+        >
+          <h2 class="h-section">Polling</h2>
+          <span class="text-sm text-content-subtle"
+            >{polls.length} poll{polls.length === 1 ? "" : "s"}, newest first</span
+          >
+        </div>
         <div class="polls-grid">
-          {#each polls as poll, pollIndex (`${poll.pollster}|${poll.date ?? ""}|${pollIndex}`)}
+          {#each visiblePolls as poll, pollIndex (`${poll.pollster}|${poll.date ?? ""}|${pollIndex}`)}
             <div class="poll-card">
               <div class="poll-card-header">
                 <div>
@@ -1014,34 +1059,36 @@
                   rel="noopener noreferrer"
                   class="poll-card-source"
                 >
-                  <svg
-                    class="w-3 h-3"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                    />
-                  </svg>
                   Source
+                  <UiIcon name="external" size="sm" />
                 </a>
               {/if}
             </div>
           {/each}
         </div>
+        {#if polls.length > POLL_PREVIEW_COUNT}
+          <div class="mt-4 text-center">
+            <button
+              type="button"
+              class="btn-secondary"
+              aria-expanded={pollsExpanded}
+              on:click={() => (pollsExpanded = !pollsExpanded)}
+            >
+              {pollsExpanded
+                ? "Show fewer polls"
+                : `Show all ${polls.length} polls`}
+            </button>
+          </div>
+        {/if}
       </section>
     {/if}
 
     <!-- Data Note -->
-    <div class="data-note">
-      <p class="data-note-title">
+    <div class="alert-info page-section mb-6">
+      <p class="font-semibold text-content">
         {usingFallbackData ? "Sample Data Information" : "About this research"}
       </p>
-      <p class="data-note-text">
+      <p class="mt-1">
         {#if usingFallbackData}
           This is sample data for demonstration purposes. The actual race data
           is currently unavailable.
@@ -1066,10 +1113,11 @@
     {#if race.generator && race.generator.length > 0}
       <div class="model-label">
         <svg
-          class="w-4 h-4"
+          class="h-4 w-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             stroke-linecap="round"
@@ -1088,14 +1136,16 @@
     <!-- Back to Top -->
     <div class="back-to-top">
       <button
-        class="back-to-top-link"
+        type="button"
+        class="btn-ghost"
         on:click={() => window.scrollTo({ top: 0, behavior: scrollBehavior() })}
       >
         <svg
-          class="w-4 h-4"
+          class="h-4 w-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             stroke-linecap="round"
@@ -1112,21 +1162,22 @@
     {#if selectedCandidates.size > 0}
       <div
         transition:fade={{ duration: motionDuration(200) }}
-        class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-surface/95 backdrop-blur-md border border-stroke py-4 px-6 shadow-2xl rounded-2xl flex items-center justify-between gap-6 max-w-md w-[calc(100%-2rem)] transition-all duration-300"
+        class="fixed bottom-6 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-4 rounded-2xl border border-stroke bg-surface/95 px-5 py-3 shadow-2xl backdrop-blur-md"
       >
         <div class="flex items-center gap-3">
           <span
-            class="inline-flex items-center justify-center bg-blue-600 text-white font-bold rounded-full w-6 h-6 text-xs"
+            class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-700 text-xs font-bold text-white dark:bg-primary-600"
             >{selectedCandidates.size}</span
           >
           <span class="text-sm font-semibold text-content"
             >Selected to compare</span
           >
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
           <button
+            type="button"
             on:click={clearSelection}
-            class="text-xs text-content-muted hover:text-content font-medium transition-colors"
+            class="btn-ghost min-h-10 px-3 text-xs text-content-muted"
             >Clear</button
           >
           {#if selectedCandidates.size >= 2}
@@ -1134,7 +1185,7 @@
               href="/races/{race.id}/compare/?candidates={[
                 ...selectedCandidates,
               ].join(',')}{isDraftPreview ? '&draft=true' : ''}"
-              class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors no-underline shadow-sm"
+              class="btn-primary min-h-10 px-4 text-xs"
             >
               Compare Now &rarr;
             </a>
@@ -1155,159 +1206,106 @@
   }
 
   .spinner {
-    @apply animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600;
+    @apply h-12 w-12 animate-spin rounded-full border-b-2 border-primary-600;
   }
 
   .loading-text {
     @apply ml-3 text-lg text-content-muted;
   }
 
-  .error-box {
-    @apply bg-red-50 border border-red-200 rounded-lg p-6 text-center;
+  .inline-link {
+    @apply font-medium text-primary underline hover:no-underline;
   }
 
-  :global(.dark) .error-box {
-    @apply bg-red-950/30 border-red-800;
+  .link-button {
+    @apply inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary hover:underline;
   }
 
-  .error-title {
-    @apply text-2xl font-bold text-red-800 mb-2;
-  }
-
-  :global(.dark) .error-title {
-    @apply text-red-200;
-  }
-
-  .error-text {
-    @apply text-red-700;
-  }
-
-  :global(.dark) .error-text {
-    @apply text-red-200;
-  }
-
-  .error-button {
-    @apply mt-4 bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 transition-colors;
-  }
-
-  .not-found-box {
-    @apply mx-auto max-w-2xl rounded-2xl border border-stroke bg-surface p-6 text-center shadow-sm sm:p-10;
-  }
-
-  .not-found-title {
-    @apply text-2xl font-bold text-content sm:text-3xl;
-  }
-
-  .not-found-text {
-    @apply mt-3 text-sm leading-relaxed text-content-muted sm:text-base;
-  }
-
-  .not-found-actions {
-    @apply mt-6 flex flex-wrap items-center justify-center gap-3;
-  }
-
-  .not-found-primary {
-    @apply inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white no-underline hover:bg-blue-800;
-  }
-
-  .not-found-secondary {
-    @apply inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 no-underline hover:underline;
-  }
-
-  :global(.dark) .not-found-secondary {
-    @apply text-blue-400;
-  }
-
-  :global(.header-card) {
-    @apply p-4 sm:p-6 mb-6 sm:mb-8 shadow-sm;
-  }
-
-  .header-title {
-    @apply text-2xl sm:text-3xl lg:text-4xl font-bold text-content capitalize;
+  /* Header */
+  :global(.race-header) {
+    @apply mb-6 p-5 sm:p-6 lg:p-8;
   }
 
   .header-top {
-    @apply flex flex-wrap items-start sm:items-center justify-between gap-3 mb-4;
+    @apply flex flex-wrap items-start justify-between gap-3;
   }
 
   .header-meta {
-    @apply flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 sm:gap-6 text-content-muted;
-  }
-
-  .header-compare-link {
-    @apply mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white no-underline shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600;
+    @apply mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-content-muted;
   }
 
   .info-row {
-    @apply flex items-center gap-2;
+    @apply inline-flex items-center gap-1.5;
   }
 
-  /* Voter Resources styled within component */
-
-  .model-label {
-    @apply mt-2 mb-4 flex flex-wrap items-center gap-2 text-sm text-content-subtle;
+  .header-actions {
+    @apply mt-5 flex flex-col gap-3 sm:flex-row sm:items-center;
   }
 
-  .model-tag {
-    @apply bg-surface-alt px-2 py-1 rounded text-xs font-mono;
+  /* Overview + sidebar layout */
+  .race-layout {
+    @apply grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8;
   }
 
-  .candidates-title {
-    @apply text-xl sm:text-2xl font-semibold text-content mb-4 sm:mb-6;
+  .race-main {
+    @apply min-w-0 lg:col-start-1;
   }
 
-  /* Race Overview */
-  :global(.overview-card) {
-    @apply p-4 sm:p-6 mb-6 sm:mb-8 shadow-sm;
+  .race-aside {
+    @apply flex min-w-0 flex-col gap-4 lg:sticky lg:col-start-2 lg:top-[calc(var(--site-header-height)+1rem)];
   }
 
-  .overview-layout {
-    @apply flex flex-col lg:flex-row gap-6;
+  /* Tablets: the glance card and voting resources sit side by side. */
+  .race-aside.has-glance {
+    @apply md:grid md:grid-cols-2 md:items-start lg:flex lg:items-stretch;
   }
 
-  .overview-main {
-    @apply flex-1 min-w-0;
-  }
-
-  .overview-description {
-    @apply text-content-muted text-sm sm:text-base leading-relaxed mb-4;
-  }
-
-  .overview-toggle {
-    @apply mb-4 inline-flex min-h-11 items-center text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline sm:hidden;
-  }
-
-  :global(.dark) .overview-toggle {
-    @apply text-blue-400 hover:text-blue-300;
-  }
-
-  @media (max-width: 639px) {
-    .overview-description-collapsed {
-      display: -webkit-box;
-      overflow: hidden;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 6;
+  @media (min-width: 1024px) {
+    .race-aside {
+      grid-row: 1 / span var(--aside-rows, 2);
     }
   }
 
+  .overview-card {
+    @apply p-5 sm:p-6;
+  }
+
+  .overview-text {
+    @apply mt-3 space-y-3 text-sm leading-relaxed text-content-muted sm:text-base;
+  }
+
+  @media (max-width: 639px) {
+    .overview-extra {
+      display: none;
+    }
+  }
+
+  .overview-sources {
+    @apply mt-4 flex flex-wrap items-center gap-2;
+  }
+
+  .overview-sources-label {
+    @apply mr-1 text-xs font-semibold uppercase tracking-wider text-content-subtle;
+  }
+
+  .source-chip {
+    @apply inline-flex min-h-8 items-center gap-1 rounded-full border border-stroke bg-page px-3 py-1 text-xs font-medium text-primary no-underline transition-colors hover:border-primary-300 hover:bg-surface-alt;
+  }
+
   .overview-candidates {
-    @apply flex flex-wrap gap-2;
+    @apply mt-5 hidden flex-wrap gap-2 border-t border-stroke pt-4 sm:flex;
   }
 
   .overview-candidate-chip {
-    @apply flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-surface border border-stroke rounded-full hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200 text-sm no-underline text-content-muted;
-  }
-
-  :global(.dark) .overview-candidate-chip {
-    @apply hover:bg-blue-950/30;
+    @apply flex min-h-10 items-center gap-1.5 rounded-full border border-stroke bg-surface px-3 py-1.5 text-sm text-content-muted no-underline transition-colors duration-200 hover:border-primary-300 hover:bg-surface-alt;
   }
 
   .chip-avatar {
-    @apply w-5 h-5 rounded-full object-cover;
+    @apply h-5 w-5 rounded-full object-cover;
   }
 
   .chip-name {
-    @apply font-medium text-content text-sm;
+    @apply text-sm font-medium text-content;
   }
 
   .chip-party {
@@ -1316,35 +1314,30 @@
   .chip-party-dem {
     @apply text-blue-700;
   }
-
   :global(.dark) .chip-party-dem {
     @apply text-blue-300;
   }
   .chip-party-rep {
     @apply text-red-700;
   }
-
   :global(.dark) .chip-party-rep {
     @apply text-red-300;
   }
   .chip-party-ind {
     @apply text-purple-700;
   }
-
   :global(.dark) .chip-party-ind {
     @apply text-purple-300;
   }
   .chip-party-grn {
     @apply text-emerald-700;
   }
-
   :global(.dark) .chip-party-grn {
     @apply text-emerald-300;
   }
   .chip-party-lib {
     @apply text-amber-800;
   }
-
   :global(.dark) .chip-party-lib {
     @apply text-amber-300;
   }
@@ -1353,37 +1346,47 @@
   }
 
   .chip-incumbent {
-    @apply bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full;
+    @apply rounded-full bg-green-100 px-1.5 py-0.5 text-xs text-green-800;
   }
-
   :global(.dark) .chip-incumbent {
-    @apply bg-green-900 text-green-300;
+    @apply bg-green-900/60 text-green-200;
   }
 
-  /* Poll Snapshot Widget */
-  .poll-snapshot {
-    @apply flex flex-col gap-2 p-4 bg-page border border-stroke rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors no-underline lg:w-64 lg:shrink-0 cursor-pointer;
+  /* At-a-glance card */
+  .glance-card {
+    @apply p-5;
   }
 
-  :global(.dark) /* Poll Snapshot Widget */
-  .poll-snapshot {
-    @apply hover:border-blue-700 hover:bg-blue-950/30;
+  .glance-block {
+    @apply mt-3;
   }
 
-  .poll-snapshot-header {
-    @apply flex items-center gap-1.5;
+  .glance-divider {
+    @apply mt-4 border-t border-stroke pt-4;
   }
 
-  .poll-snapshot-title {
+  .glance-title {
+    @apply text-base font-semibold leading-snug text-content;
+  }
+
+  .glance-subtitle {
     @apply text-sm font-semibold text-content;
   }
 
+  .glance-text {
+    @apply mt-1 text-sm leading-snug text-content-muted;
+  }
+
+  .glance-link {
+    @apply mt-1 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-primary no-underline hover:underline;
+  }
+
   .poll-snapshot-meta {
-    @apply text-xs text-content-subtle;
+    @apply mt-0.5 text-xs text-content-subtle;
   }
 
   .poll-snapshot-bars {
-    @apply space-y-1.5 my-1;
+    @apply my-2 space-y-1.5;
   }
 
   .poll-snap-row {
@@ -1391,11 +1394,11 @@
   }
 
   .poll-snap-name {
-    @apply text-xs font-medium text-content-muted w-16 shrink-0 truncate;
+    @apply w-20 shrink-0 truncate text-xs font-medium text-content-muted;
   }
 
   .poll-snap-bar-wrap {
-    @apply flex-1 bg-surface-alt rounded-full h-2 overflow-hidden;
+    @apply h-2 flex-1 overflow-hidden rounded-full bg-surface-alt;
   }
 
   .poll-snap-bar {
@@ -1403,15 +1406,7 @@
   }
 
   .poll-snap-pct {
-    @apply text-xs font-bold text-content-muted w-8 text-right shrink-0;
-  }
-
-  .poll-snapshot-more {
-    @apply text-xs text-blue-700 font-medium mt-1;
-  }
-
-  :global(.dark) .poll-snapshot-more {
-    @apply text-blue-400;
+    @apply w-10 shrink-0 text-right text-xs font-bold tabular-nums text-content;
   }
 
   /* Party fills shared by the snapshot and detailed poll bars. Third parties
@@ -1442,62 +1437,68 @@
     @apply bg-teal-600;
   }
 
+  /* Candidates */
+  .candidates-heading {
+    @apply mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1;
+  }
+
+  .candidates-empty {
+    @apply mb-6 rounded-xl border border-dashed border-stroke bg-surface p-6 text-center;
+  }
+
+  .candidates-empty-title {
+    @apply text-base font-semibold text-content;
+  }
+
+  .candidates-empty-text {
+    @apply mt-1 text-sm text-content-muted;
+  }
+
+  .candidate-grid {
+    @apply grid items-start gap-4 sm:gap-5 md:grid-cols-2;
+  }
+
+  /* An expanded card shows the full issue table, which needs the whole row. */
+  .candidate-grid > :global(.candidate-card--expanded) {
+    grid-column: 1 / -1;
+  }
+
+  .candidate-grid.single-column {
+    @apply md:grid-cols-1;
+  }
+
+  .withdrawn-grid {
+    @apply opacity-75;
+  }
+
+  /* Lower page sections */
+  .page-section {
+    @apply mt-10 sm:mt-12;
+  }
+
+  .section-title {
+    @apply mb-4;
+  }
+
   /* Forecast */
   :global(.forecast-card) {
-    @apply mt-10 sm:mt-12 p-4 sm:p-5 mb-6 sm:mb-7 shadow-sm;
+    @apply p-5 sm:p-6;
   }
 
   .forecast-header {
-    @apply flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3;
-  }
-
-  .forecast-eyebrow {
-    @apply text-xs font-bold uppercase tracking-wide text-content-subtle mb-1;
+    @apply mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
   }
 
   .forecast-title {
-    @apply text-lg sm:text-xl font-semibold text-content;
+    @apply text-lg font-semibold text-content sm:text-xl;
   }
 
   .forecast-summary {
     @apply mt-1 text-sm leading-snug text-content-muted;
   }
 
-  .forecast-actions {
-    @apply flex shrink-0 items-center gap-2 sm:flex-col sm:items-end;
-  }
-
   .forecast-rating {
     @apply inline-flex self-start rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide;
-  }
-
-  .expand-button {
-    @apply flex min-h-11 items-center gap-2 text-blue-600 font-medium;
-    @apply transition-colors duration-200;
-  }
-
-  :global(.dark) .expand-button {
-    @apply text-blue-400;
-  }
-
-  .expand-button:hover {
-    @apply text-blue-500;
-  }
-
-  :global(.dark) .expand-button:hover {
-    @apply text-blue-300;
-  }
-
-  .expand-text {
-    @apply text-xs sm:text-sm font-medium;
-  }
-
-  .expand-icon {
-    @apply w-4 h-4 transition-transform duration-200;
-  }
-
-  .expand-icon.expanded {
-    @apply rotate-180;
   }
 
   .expanded-content {
@@ -1505,7 +1506,7 @@
   }
 
   .forecast-grid {
-    @apply grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3;
+    @apply grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3;
   }
 
   .forecast-metric {
@@ -1564,14 +1565,15 @@
   }
 
   .forecast-takeaway {
-    @apply text-sm sm:text-base font-medium leading-relaxed text-content;
+    @apply text-sm font-medium leading-relaxed text-content sm:text-base;
   }
 
   .forecast-detail-block {
     @apply rounded-xl border border-stroke bg-page p-4;
   }
 
-  .forecast-detail-block h3 {
+  .forecast-detail-block h4,
+  .forecast-market-header h4 {
     @apply mb-2 text-xs font-bold uppercase tracking-wide text-content-subtle;
   }
 
@@ -1592,8 +1594,8 @@
     @apply mb-3 flex flex-wrap items-center justify-between gap-2;
   }
 
-  .forecast-market-header h3 {
-    @apply text-xs font-bold uppercase tracking-wide text-content-subtle;
+  .forecast-market-header h4 {
+    @apply mb-0;
   }
 
   .forecast-market-header span {
@@ -1625,11 +1627,7 @@
   }
 
   .forecast-market-values a {
-    @apply font-semibold text-blue-600 hover:underline;
-  }
-
-  :global(.dark) .forecast-market-values a {
-    @apply text-blue-400;
+    @apply font-semibold text-primary hover:underline;
   }
 
   .forecast-meta {
@@ -1637,65 +1635,16 @@
   }
 
   .forecast-sources {
-    @apply mt-3 flex flex-wrap gap-2;
+    @apply mt-4 flex flex-wrap items-center gap-2;
   }
 
-  .forecast-sources a {
-    @apply rounded-full border border-stroke bg-page px-3 py-1 text-xs font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50;
-  }
-
-  :global(.dark) .forecast-sources a {
-    @apply text-blue-400 hover:border-blue-700 hover:bg-blue-950/30;
-  }
-
-  /* Candidates */
-  .candidates-heading {
-    @apply mb-4 flex items-center justify-between gap-4 sm:mb-6;
-  }
-
-  .candidates-title {
-    @apply text-xl font-semibold text-content sm:text-2xl;
-  }
-
-  .compare-all-link {
-    @apply inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-blue-600 no-underline transition-colors hover:text-blue-800 hover:underline;
-  }
-
-  :global(.dark) .compare-all-link {
-    @apply text-blue-400 hover:text-blue-300;
-  }
-
-  .candidates-empty {
-    @apply mb-6 rounded-xl border border-dashed border-stroke bg-surface p-6 text-center;
-  }
-
-  .candidates-empty-title {
-    @apply text-base font-semibold text-content;
-  }
-
-  .candidates-empty-text {
-    @apply mt-1 text-sm text-content-muted;
-  }
-
-  .candidate-grid {
-    @apply grid gap-6 sm:gap-8 justify-items-stretch;
-  }
-
-  /* Detailed Polls Section */
-  .polls-section {
-    @apply mt-10 mb-8;
-  }
-
-  .section-heading {
-    @apply text-xl sm:text-2xl font-semibold text-content mb-4 sm:mb-6;
-  }
-
+  /* Detailed polls */
   .polls-grid {
     @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
   }
 
   .poll-card {
-    @apply bg-surface border border-stroke rounded-xl p-4 shadow-sm flex flex-col gap-3;
+    @apply flex flex-col gap-3 rounded-xl border border-stroke bg-surface p-4 shadow-sm;
   }
 
   .poll-card-header {
@@ -1703,15 +1652,15 @@
   }
 
   .poll-card-pollster {
-    @apply text-sm font-semibold text-content block;
+    @apply block text-sm font-semibold text-content;
   }
 
   .poll-card-date {
-    @apply text-xs text-content-subtle block mt-0.5;
+    @apply mt-0.5 block text-xs text-content-subtle;
   }
 
   .poll-card-sample {
-    @apply text-xs text-content-subtle shrink-0;
+    @apply shrink-0 text-xs text-content-subtle;
   }
 
   .poll-matchup-divider {
@@ -1727,11 +1676,11 @@
   }
 
   .poll-bar-name {
-    @apply text-xs font-medium text-content-muted w-28 shrink-0 truncate;
+    @apply w-28 shrink-0 truncate text-xs font-medium text-content-muted;
   }
 
   .poll-bar-track {
-    @apply flex-1 bg-surface-alt rounded-full h-3 overflow-hidden;
+    @apply h-3 flex-1 overflow-hidden rounded-full bg-surface-alt;
   }
 
   .poll-bar-fill {
@@ -1749,80 +1698,23 @@
   }
 
   .poll-missing-note {
-    @apply text-xs text-content-muted italic;
+    @apply text-xs italic text-content-muted;
   }
 
   .poll-card-source {
-    @apply inline-flex min-h-6 items-center gap-1 py-1 text-xs text-blue-700 hover:underline mt-auto;
+    @apply mt-auto inline-flex min-h-8 items-center gap-1 self-start py-1 text-xs font-medium text-primary hover:underline;
   }
 
-  :global(.dark) .poll-card-source {
-    @apply text-blue-400;
+  /* Footer bits */
+  .model-label {
+    @apply mb-4 mt-2 flex flex-wrap items-center gap-2 text-sm text-content-subtle;
   }
 
-  /* Misc */
-  .data-note {
-    @apply mt-8 sm:mt-10 bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 text-center;
-  }
-
-  :global(.dark) /* Misc */
-  .data-note {
-    @apply bg-blue-950/30 border-blue-800;
-  }
-
-  .data-note-title {
-    @apply text-blue-800 font-medium mb-2 text-sm sm:text-base;
-  }
-
-  :global(.dark) .data-note-title {
-    @apply text-blue-200;
-  }
-
-  .data-note-text {
-    @apply text-blue-700 text-xs sm:text-sm;
-  }
-
-  :global(.dark) .data-note-text {
-    @apply text-blue-300;
-  }
-
-  .fallback-notice {
-    @apply bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-6 sm:mb-8;
-  }
-
-  :global(.dark) .fallback-notice {
-    @apply bg-yellow-950/30 border-yellow-800;
-  }
-
-  .fallback-content {
-    @apply flex items-start gap-2 sm:gap-3;
-  }
-
-  .fallback-title {
-    @apply font-medium text-yellow-800 text-sm sm:text-base;
-  }
-
-  :global(.dark) .fallback-title {
-    @apply text-yellow-200;
-  }
-
-  .fallback-text {
-    @apply text-yellow-700 text-xs sm:text-sm mt-1;
-  }
-
-  :global(.dark) .fallback-text {
-    @apply text-yellow-300;
+  .model-tag {
+    @apply rounded bg-surface-alt px-2 py-1 font-mono text-xs;
   }
 
   .back-to-top {
     @apply mt-8 text-center;
-  }
-
-  .back-to-top-link {
-    @apply inline-flex items-center gap-2 text-content-muted hover:text-blue-700 font-medium transition-colors duration-200 border-none bg-transparent cursor-pointer;
-  }
-
-  :global(.dark) .back-to-top-link {
-    @apply hover:text-blue-400;
   }
 </style>

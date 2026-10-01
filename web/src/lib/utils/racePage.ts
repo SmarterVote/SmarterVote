@@ -304,3 +304,237 @@ export function jsonLdScript(data: unknown): string {
     "\\u003c",
   )}</script>`;
 }
+
+// ---------------------------------------------------------------------------
+// Display text
+// ---------------------------------------------------------------------------
+
+/**
+ * A parenthetical (or bracketed) group that holds nothing but URLs, e.g.
+ * "(https://a.gov/x; https://b.com/y)". Research prose cites sources this way;
+ * the page shows those as links instead of printing them inline.
+ */
+const URL_GROUP = /\s*[([]\s*(?:https?:\/\/[^\s;,()[\]]+[\s;,]*)+[)\]]/g;
+const URL_IN_GROUP = /https?:\/\/[^\s;,()[\]]+/g;
+
+/** Undo JSON escapes that leaked into stored prose (`\"`, `\'`, `’`). */
+function unescapeLeakedJson(text: string): string {
+  return text
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/\\(["'])/g, "$1")
+    .replace(/\\[nrt]/g, " ");
+}
+
+function tidySpacing(text: string): string {
+  return text
+    .replace(/[ \t\u00a0]{2,}/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
+/**
+ * Prose as it should be read on the page: leaked JSON escapes undone and
+ * URL-only citations removed (render those with `splitSourcedText`).
+ */
+export function cleanDisplayText(text: string | null | undefined): string {
+  if (typeof text !== "string") return "";
+  return tidySpacing(unescapeLeakedJson(text).replace(URL_GROUP, ""));
+}
+
+/** Hostname without a leading "www.", or the input when it is not a URL. */
+export function sourceHostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+const SENTENCE_ABBREVIATIONS = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "dr",
+  "prof",
+  "sen",
+  "sens",
+  "rep",
+  "reps",
+  "gov",
+  "lt",
+  "gen",
+  "col",
+  "maj",
+  "capt",
+  "sgt",
+  "st",
+  "jr",
+  "sr",
+  "vs",
+  "etc",
+  "inc",
+  "co",
+  "corp",
+  "ltd",
+  "no",
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "sept",
+  "oct",
+  "nov",
+  "dec",
+  "rev",
+  "hon",
+  "pres",
+  "atty",
+  "sec",
+  "dept",
+  "ft",
+  "mt",
+  "al",
+  "approx",
+]);
+
+function endsWithAbbreviation(textThroughPeriod: string): boolean {
+  const token = textThroughPeriod
+    .trim()
+    .split(/\s+/)
+    .at(-1)
+    ?.replace(/^[("“‘']+/, "")
+    .replace(/\.$/, "")
+    .toLowerCase();
+  if (!token) return false;
+  // Initials and dotted acronyms: "J.D.", "U.S.", a middle initial "H."
+  if (/^[a-z]$/.test(token) || /^(?:[a-z]\.)+[a-z]$/.test(token)) return true;
+  return SENTENCE_ABBREVIATIONS.has(token);
+}
+
+/** Split prose into sentences without breaking on "Gov.", "U.S." or "Aug. 6". */
+export function splitSentences(text: string): string[] {
+  const sentences: string[] = [];
+  const boundary = /[.!?]["'”’)]*\s+(?=["“‘'(]?[A-Z0-9])/g;
+  let start = 0;
+  for (const match of text.matchAll(boundary)) {
+    const end = (match.index ?? 0) + match[0].trimEnd().length;
+    const candidate = text.slice(start, end);
+    if (match[0][0] === "." && endsWithAbbreviation(candidate)) continue;
+    sentences.push(candidate.trim());
+    start = (match.index ?? 0) + match[0].length;
+  }
+  const rest = text.slice(start).trim();
+  if (rest) sentences.push(rest);
+  return sentences.filter(Boolean);
+}
+
+export interface SourcedText {
+  /** Readable paragraphs with inline URL citations removed. */
+  paragraphs: string[];
+  /** Cited URLs in first-seen order, deduplicated. */
+  sources: { url: string; label: string }[];
+}
+
+/**
+ * Turn one long research paragraph with inline "(https://…)" citations into
+ * short paragraphs plus a deduplicated source list. Paragraphs break at
+ * sentence boundaries once they pass `targetLength` characters.
+ */
+export function splitSourcedText(
+  text: string | null | undefined,
+  targetLength = 320,
+): SourcedText {
+  if (typeof text !== "string" || !text.trim())
+    return { paragraphs: [], sources: [] };
+  const unescaped = unescapeLeakedJson(text);
+  const seen = new Set<string>();
+  const sources: SourcedText["sources"] = [];
+  for (const group of unescaped.match(URL_GROUP) ?? []) {
+    for (const raw of group.match(URL_IN_GROUP) ?? []) {
+      const url = raw.replace(/[.,;:]+$/, "");
+      if (seen.has(url)) continue;
+      seen.add(url);
+      sources.push({ url, label: sourceHostname(url) });
+    }
+  }
+  const prose = tidySpacing(unescaped.replace(URL_GROUP, ""));
+  const blocks = prose
+    .split(/\n\s*\n/)
+    .map((block) => block.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const paragraphs: string[] = [];
+  for (const block of blocks) {
+    const local: string[] = [];
+    let current = "";
+    for (const sentence of splitSentences(block)) {
+      current = current ? `${current} ${sentence}` : sentence;
+      if (current.length >= targetLength) {
+        local.push(current);
+        current = "";
+      }
+    }
+    if (current) {
+      // A short tail reads better attached to the paragraph before it.
+      if (local.length > 0 && current.length < targetLength / 3)
+        local[local.length - 1] = `${local[local.length - 1]} ${current}`;
+      else local.push(current);
+    }
+    paragraphs.push(...local);
+  }
+  return { paragraphs, sources };
+}
+
+/**
+ * "Office · District · Jurisdiction" without repeating a place: a part that
+ * another part already contains ("10th Congressional District" inside
+ * "Florida's 10th Congressional District") is dropped.
+ */
+export function raceLocationLabel(
+  race: Pick<Race, "office" | "district" | "jurisdiction">,
+): string {
+  const parts = [race.office, race.district, race.jurisdiction]
+    .map((part) => (part ?? "").trim())
+    .filter(Boolean);
+  const kept = parts.filter((part, index) => {
+    const lower = part.toLowerCase();
+    return !parts.some((other, otherIndex) => {
+      if (otherIndex === index) return false;
+      const otherLower = other.toLowerCase();
+      if (otherLower === lower) return otherIndex < index;
+      return otherLower.includes(lower);
+    });
+  });
+  return kept.join(" · ");
+}
+
+/**
+ * Collapsed text for a side-by-side comparison cell: whole sentences up to
+ * about `limit` characters, hard-capped at a word boundary when the opening
+ * sentence alone runs long. Keeps comparison rows a similar, scannable height.
+ */
+export function comparePreview(text: string, limit = 240): string {
+  const normalized = text.trim();
+  if (normalized.length <= limit + 40) return normalized;
+  let preview = "";
+  for (const sentence of splitSentences(normalized)) {
+    const next = preview ? `${preview} ${sentence}` : sentence;
+    if (next.length > limit) break;
+    preview = next;
+  }
+  if (preview.length >= limit / 2) return preview;
+  const shortened = normalized.slice(0, limit);
+  const lastSpace = shortened.lastIndexOf(" ");
+  return `${shortened.slice(0, lastSpace > limit * 0.66 ? lastSpace : limit).trim()}…`;
+}
+
+/** True for the pipeline's explicit "nothing found" stance marker. */
+export function isNoPositionStance(text: string | null | undefined): boolean {
+  return /^no public position found\.?$/i.test((text ?? "").trim());
+}

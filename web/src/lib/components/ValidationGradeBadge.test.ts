@@ -25,14 +25,14 @@ describe("ValidationGradeBadge rendering", () => {
       grade: makeGrade({ grade: "B" }),
     });
 
-    expect(getByLabelText("Automated Research Score: B")).toBeTruthy();
+    expect(getByLabelText("Automated research score: B")).toBeTruthy();
     expect(container.textContent).toContain("B");
     expect(container.textContent).toContain("Research score");
   });
 
   it.each([
     ["A", "green"],
-    ["B", "blue"],
+    ["B", "teal"],
     ["C", "yellow"],
     ["D", "orange"],
     ["F", "red"],
@@ -66,7 +66,7 @@ describe("ValidationGradeBadge popover", () => {
       grade: makeGrade({ score: 74, summary: "Two issues lack sources." }),
     });
 
-    await fireEvent.click(getByLabelText(/Automated Research Score/));
+    await fireEvent.click(getByLabelText(/Automated research score/));
 
     const popover = container.querySelector(".popover");
     expect(popover).not.toBeNull();
@@ -83,7 +83,7 @@ describe("ValidationGradeBadge popover", () => {
     const { container, getByLabelText } = render(ValidationGradeBadge, {
       grade: makeGrade(),
     });
-    const badge = getByLabelText(/Automated Research Score/);
+    const badge = getByLabelText(/Automated research score/);
 
     await fireEvent.click(badge);
     expect(container.querySelector(".popover")).not.toBeNull();
@@ -96,7 +96,7 @@ describe("ValidationGradeBadge popover", () => {
     const { container, getByLabelText } = render(ValidationGradeBadge, {
       grade: makeGrade(),
     });
-    const badge = getByLabelText(/Automated Research Score/);
+    const badge = getByLabelText(/Automated research score/);
 
     await fireEvent.click(badge);
     expect(container.querySelector(".popover")).not.toBeNull();
@@ -109,7 +109,7 @@ describe("ValidationGradeBadge popover", () => {
     const { container, getByLabelText } = render(ValidationGradeBadge, {
       grade: makeGrade(),
     });
-    const badge = getByLabelText(/Automated Research Score/);
+    const badge = getByLabelText(/Automated research score/);
 
     await fireEvent.click(badge);
     await fireEvent.keyDown(badge, { key: "a" });
@@ -122,7 +122,7 @@ describe("ValidationGradeBadge popover", () => {
       grade: makeGrade(),
     });
 
-    await fireEvent.click(getByLabelText(/Automated Research Score/));
+    await fireEvent.click(getByLabelText(/Automated research score/));
     const backdrop = container.querySelector(".popover-backdrop");
     expect(backdrop).not.toBeNull();
 
@@ -135,7 +135,7 @@ describe("ValidationGradeBadge popover", () => {
       grade: makeGrade({ grade: "C" }),
     });
 
-    await fireEvent.click(getByLabelText(/Automated Research Score/));
+    await fireEvent.click(getByLabelText(/Automated research score/));
 
     expect(container.querySelector(".popover-grade")?.textContent).toContain(
       "C",
@@ -156,7 +156,7 @@ describe("ValidationGradeBadge review link", () => {
       { grade: makeGrade() },
     );
 
-    await fireEvent.click(getByLabelText(/Automated Research Score/));
+    await fireEvent.click(getByLabelText(/Automated research score/));
     await fireEvent.click(getByText("View review details"));
 
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
@@ -171,7 +171,7 @@ describe("ValidationGradeBadge review link", () => {
       { grade: makeGrade() },
     );
 
-    await fireEvent.click(getByLabelText(/Automated Research Score/));
+    await fireEvent.click(getByLabelText(/Automated research score/));
     await fireEvent.click(getByText("View review details"));
 
     expect(container.querySelector(".popover")).toBeNull();

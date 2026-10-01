@@ -31,7 +31,7 @@ test.describe("race detail page", () => {
 
     // Validation grade badge
     await expect(
-      page.getByRole("button", { name: "Automated Research Score: A" }),
+      page.getByRole("button", { name: "Automated research score: A" }),
     ).toBeVisible();
 
     // Forecast section (rating is "tossup" -> renders as "Toss-up" heading)

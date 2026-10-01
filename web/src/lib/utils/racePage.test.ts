@@ -2,16 +2,22 @@ import { describe, expect, it } from "vitest";
 import type { Candidate, Race, RaceForecast } from "$lib/types";
 import {
   candidateForecastProbability,
+  cleanDisplayText,
+  comparePreview,
   forecastHeadline,
   formatPollDate,
+  isNoPositionStance,
   isNotFoundError,
   jsonLdScript,
   partyProbabilityAriaLabel,
   partyProbabilitySegments,
   raceJsonLd,
+  raceLocationLabel,
   resolveCandidate,
   selectComparedCandidates,
   sortPollsByDate,
+  splitSentences,
+  splitSourcedText,
 } from "./racePage";
 
 function candidate(name: string, overrides: Partial<Candidate> = {}) {
@@ -261,5 +267,128 @@ describe("raceJsonLd", () => {
     const html = jsonLdScript({ name: "</script><script>alert(1)" });
     expect(html).not.toContain("</script><script>");
     expect(html.endsWith("</script>")).toBe(true);
+  });
+});
+
+describe("cleanDisplayText", () => {
+  it("unescapes leaked JSON quotes and unicode escapes", () => {
+    expect(
+      cleanDisplayText('Backs a public option (\\"Medicare for Y\\\'all\\").'),
+    ).toBe('Backs a public option ("Medicare for Y\'all").');
+    expect(cleanDisplayText("Alaska\\u2019s universities")).toBe(
+      "Alaska\u2019s universities",
+    );
+  });
+
+  it("drops URL-only citations but keeps other parentheticals", () => {
+    expect(
+      cleanDisplayText(
+        "He won in 2024 (https://a.gov/x; https://b.com/y). He serves (since 2025).",
+      ),
+    ).toBe("He won in 2024. He serves (since 2025).");
+  });
+
+  it("returns an empty string for missing text", () => {
+    expect(cleanDisplayText(undefined)).toBe("");
+    expect(cleanDisplayText(null)).toBe("");
+  });
+});
+
+describe("splitSentences", () => {
+  it("does not split on titles, initials, or abbreviated months", () => {
+    expect(
+      splitSentences(
+        "Gov. Mike DeWine appointed J.D. Vance's successor on Aug. 6. Sen. Brown ran again. The U.S. Senate race is close.",
+      ),
+    ).toEqual([
+      "Gov. Mike DeWine appointed J.D. Vance's successor on Aug. 6.",
+      "Sen. Brown ran again.",
+      "The U.S. Senate race is close.",
+    ]);
+  });
+});
+
+describe("splitSourcedText", () => {
+  const text =
+    "First point about the race (https://www.ohiosos.gov/a; https://news.example.com/b). " +
+    "Second point adds context about the candidates in the field. " +
+    "Third point covers polling (https://news.example.com/b). Fourth point closes.";
+
+  it("collects cited URLs once, labelled by hostname", () => {
+    expect(splitSourcedText(text).sources).toEqual([
+      { url: "https://www.ohiosos.gov/a", label: "ohiosos.gov" },
+      { url: "https://news.example.com/b", label: "news.example.com" },
+    ]);
+  });
+
+  it("removes the inline URLs and splits long prose into paragraphs", () => {
+    const { paragraphs } = splitSourcedText(text, 80);
+    expect(paragraphs.join(" ")).not.toContain("http");
+    expect(paragraphs.length).toBeGreaterThan(1);
+    expect(paragraphs[0].startsWith("First point about the race.")).toBe(true);
+  });
+
+  it("keeps short text as one paragraph", () => {
+    expect(splitSourcedText("Just one sentence.").paragraphs).toEqual([
+      "Just one sentence.",
+    ]);
+    expect(splitSourcedText(undefined)).toEqual({
+      paragraphs: [],
+      sources: [],
+    });
+  });
+});
+
+describe("raceLocationLabel", () => {
+  it("does not repeat the same place twice", () => {
+    expect(
+      raceLocationLabel({
+        office: "United States Senate",
+        district: "Ohio",
+        jurisdiction: "Ohio",
+      }),
+    ).toBe("United States Senate · Ohio");
+  });
+
+  it("drops a district already named by the jurisdiction", () => {
+    expect(
+      raceLocationLabel({
+        office: "United States House of Representatives",
+        district: "10th Congressional District",
+        jurisdiction: "Florida's 10th Congressional District",
+      }),
+    ).toBe(
+      "United States House of Representatives · Florida's 10th Congressional District",
+    );
+  });
+});
+
+describe("comparePreview", () => {
+  it("keeps short text verbatim", () => {
+    expect(comparePreview("Short stance.")).toBe("Short stance.");
+  });
+
+  it("previews whole sentences up to the limit", () => {
+    const sentence =
+      "This sentence is about sixty characters long, give or take.";
+    const text = Array.from({ length: 8 }, () => sentence).join(" ");
+    const preview = comparePreview(text, 200);
+    expect(preview.length).toBeLessThanOrEqual(200);
+    expect(preview.endsWith(".")).toBe(true);
+  });
+
+  it("hard-caps a single run-on sentence at a word boundary", () => {
+    const text = `${"word ".repeat(120).trim()}.`;
+    const preview = comparePreview(text, 100);
+    expect(preview.endsWith("…")).toBe(true);
+    expect(preview.length).toBeLessThanOrEqual(101);
+  });
+});
+
+describe("isNoPositionStance", () => {
+  it("recognises the pipeline marker", () => {
+    expect(isNoPositionStance("No public position found")).toBe(true);
+    expect(isNoPositionStance("No public position found.")).toBe(true);
+    expect(isNoPositionStance("Supports expanding coverage.")).toBe(false);
   });
 });

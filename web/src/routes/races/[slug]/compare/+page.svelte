@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import EmptyState from "$lib/components/EmptyState.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import { getDraftRace, getRace } from "$lib/api";
   import type { Race } from "$lib/types";
@@ -177,110 +178,70 @@
   {/if}
 </svelte:head>
 
-<div class="container mx-auto max-w-7xl px-4 py-6 sm:py-8">
-  <header class="compare-header">
-    <a href="/races/{slug}/{draftQuery}" class="compare-back-link">
-      <UiIcon name="arrow-left" size="sm" /> Race overview
-    </a>
-    <div class="mt-3">
-      <p class="compare-eyebrow">Candidate comparison</p>
-      <h1
-        class="text-2xl font-extrabold tracking-tight text-content sm:text-3xl"
-      >
-        Compare Candidates
-      </h1>
-      {#if race}<p class="mt-1 text-sm leading-6 text-content-muted">
+<div class="page-container py-6 sm:py-8">
+  {#if notFound}
+    <EmptyState
+      title="Race not found"
+      body="We couldn't find a published race at this address. It may have been renamed, retired after the election, or never published."
+    />
+  {:else}
+    <header class="compare-header">
+      <a href="/races/{slug}/{draftQuery}" class="compare-back-link">
+        <UiIcon name="arrow-left" size="sm" /> Race overview
+      </a>
+      <p class="eyebrow mt-3">Candidate comparison</p>
+      <h1 class="h-page mt-1">Compare Candidates</h1>
+      {#if race}<p class="mt-2 text-sm text-content-muted sm:text-base">
           {raceDisplayTitle(race)}
         </p>{/if}
-    </div>
-  </header>
+    </header>
 
-  {#if loading}
-    <div class="space-y-6">
-      <div
-        class="h-16 animate-pulse rounded-xl border border-stroke bg-surface"
-      ></div>
-      <div
-        class="h-96 animate-pulse rounded-xl border border-stroke bg-surface"
-      ></div>
-    </div>
-  {:else if notFound}
-    <div
-      class="rounded-2xl border border-stroke bg-surface p-6 text-center shadow-sm sm:p-10"
-    >
-      <h2 class="text-xl font-bold text-content sm:text-2xl">Race not found</h2>
-      <p class="mt-2 text-sm text-content-muted">
-        We couldn't find a published race at this address. It may have been
-        renamed, retired after the election, or never published.
-      </p>
-      <a
-        href="/elections/"
-        class="btn-primary mt-4 inline-flex text-sm font-semibold no-underline"
-        >Browse elections</a
-      >
-    </div>
-  {:else if error}
-    <div
-      class="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950/30"
-      role="alert"
-    >
-      <h2 class="mb-2 text-xl font-bold text-red-800 dark:text-red-200">
-        We couldn't load this comparison
-      </h2>
-      <p class="text-red-700 dark:text-red-200">
-        Something went wrong while loading the race data. Please check your
-        connection and try again.
-      </p>
-      <a
-        href="/races/{slug}/{draftQuery}"
-        class="mt-4 inline-block font-semibold text-blue-700 underline dark:text-blue-400"
-        >Return to Race Overview</a
-      >
-    </div>
-  {:else if race && candidates.length === 0}
-    <div
-      class="rounded-xl border border-stroke bg-surface p-8 text-center text-content-subtle"
-    >
-      <p class="text-lg font-semibold text-content">No Candidates Selected</p>
-      <p class="mt-2 text-sm">
-        Please select candidates from the race detail page to compare them.
-      </p>
-      <a
-        href="/races/{slug}/{draftQuery}"
-        class="btn-primary mt-4 inline-flex text-sm font-semibold no-underline"
-        >Go Select Candidates</a
-      >
-    </div>
-  {:else if race}
-    <CandidateComparison
-      {race}
-      {candidates}
-      {isDraftPreview}
-      onToggle={toggleSelection}
-    />
+    {#if loading}
+      <div class="space-y-6">
+        <div
+          class="h-16 animate-pulse rounded-xl border border-stroke bg-surface"
+        ></div>
+        <div
+          class="h-96 animate-pulse rounded-xl border border-stroke bg-surface"
+        ></div>
+      </div>
+    {:else if error}
+      <div class="alert-error mx-auto max-w-xl p-6 text-center" role="alert">
+        <h2 class="text-xl font-semibold">We couldn't load this comparison</h2>
+        <p class="mt-2">
+          Something went wrong while loading the race data. Please check your
+          connection and try again.
+        </p>
+        <a href="/races/{slug}/{draftQuery}" class="btn-secondary mt-4"
+          >Return to Race Overview</a
+        >
+      </div>
+    {:else if race && candidates.length === 0}
+      <EmptyState
+        level={2}
+        title="No candidates to compare"
+        body="This race has no active candidates listed yet. Check the race page for the latest field."
+        primaryHref="/races/{slug}/{draftQuery}"
+        primaryLabel="Back to race overview"
+        secondaryHref={null}
+      />
+    {:else if race}
+      <CandidateComparison
+        {race}
+        {candidates}
+        {isDraftPreview}
+        onToggle={toggleSelection}
+      />
+    {/if}
   {/if}
 </div>
 
 <style lang="postcss">
-  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
-     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .compare-header {
-    @apply mb-5 rounded-2xl border border-stroke bg-surface p-4 shadow-sm sm:mb-6 sm:p-6;
+    @apply mb-5 sm:mb-6;
   }
 
   .compare-back-link {
-    @apply inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-blue-700 no-underline transition-colors hover:bg-blue-50 hover:text-blue-900 sm:px-3;
-  }
-
-  :global(.dark) .compare-back-link {
-    @apply text-blue-400 hover:bg-blue-950/30 hover:text-blue-300;
-  }
-
-  .compare-eyebrow {
-    @apply mb-1 text-xs font-extrabold uppercase tracking-wider text-blue-600;
-  }
-
-  :global(.dark) .compare-eyebrow {
-    @apply text-blue-400;
+    @apply -ml-2 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-primary no-underline transition-colors hover:bg-surface-alt;
   }
 </style>
