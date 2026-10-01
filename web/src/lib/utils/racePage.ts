@@ -314,7 +314,12 @@ export function jsonLdScript(data: unknown): string {
  * "(https://a.gov/x; https://b.com/y)". Research prose cites sources this way;
  * the page shows those as links instead of printing them inline.
  */
-const URL_GROUP = /\s*[([]\s*(?:https?:\/\/[^\s;,()[\]]+[\s;,]*)+[)\]]/g;
+// Each URL after the first must be preceded by at least one separator, which
+// a URL body can never contain — so there is exactly one way to match and no
+// catastrophic backtracking on input like "(http://!http://!http://…".
+// Surrounding whitespace is collapsed afterwards by tidySpacing().
+const URL_GROUP =
+  /[([]\s*https?:\/\/[^\s;,()[\]]+(?:[\s;,]+https?:\/\/[^\s;,()[\]]+)*[\s;,]*[)\]]/g;
 const URL_IN_GROUP = /https?:\/\/[^\s;,()[\]]+/g;
 
 /** Undo JSON escapes that leaked into stored prose (`\"`, `\'`, `’`). */

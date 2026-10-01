@@ -392,3 +392,20 @@ describe("isNoPositionStance", () => {
     expect(isNoPositionStance("Supports expanding coverage.")).toBe(false);
   });
 });
+
+describe("cleanDisplayText regex safety", () => {
+  it("strips multi-URL citation groups", () => {
+    expect(
+      cleanDisplayText(
+        "Seat is open (https://a.gov/x; https://b.com/y). Next.",
+      ),
+    ).toBe("Seat is open. Next.");
+  });
+
+  it("stays linear on adversarial citation-like input", () => {
+    const evil = "(http://" + "!http://".repeat(5000);
+    const start = performance.now();
+    cleanDisplayText(evil);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+});
