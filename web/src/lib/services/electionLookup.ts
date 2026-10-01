@@ -113,7 +113,15 @@ function raceMatchesState(race: RaceSummary, state: string): boolean {
   );
 }
 
-const ID_DISTRICT = /^[a-z]{2}-house-(\d+|al)\b/i;
+// House race ids come in three shapes; the district must be followed by the
+// cycle year (or the end), so the year in an at-large id like "ak-house-2026"
+// is never read as district 2026.
+const ID_DISTRICT_PATTERNS = [
+  /^[a-z]{2}-house-(\d{1,2}|al)(?=-\d{4}\b|$)/i, // ca-house-12-2026
+  /^[a-z]{2}-(\d{1,2}|al)-house(?=-\d{4}\b|$)/i, // az-01-house-2026
+];
+// No district number at all ("ak-house-2026"): the state's single at-large seat.
+const ID_AT_LARGE = /^[a-z]{2}-house(?:-\d{4})?$/i;
 const TEXT_DISTRICT_PATTERNS = [
   /(\d+)(?:st|nd|rd|th)?\s+congressional\s+district/i,
   /\bcongressional\s+district\s+(?:no\.?\s*)?(\d+)\b/i,
@@ -123,11 +131,14 @@ const TEXT_DISTRICT_PATTERNS = [
 ];
 
 export function districtFromRace(race: RaceSummary): string | null {
-  const idMatch = race.id?.match(ID_DISTRICT);
-  if (idMatch) {
-    const value = idMatch[1].toLocaleLowerCase();
-    return value === "al" ? "00" : String(Number(value)).padStart(2, "0");
+  for (const pattern of ID_DISTRICT_PATTERNS) {
+    const idMatch = race.id?.match(pattern);
+    if (idMatch) {
+      const value = idMatch[1].toLocaleLowerCase();
+      return value === "al" ? "00" : String(Number(value)).padStart(2, "0");
+    }
   }
+  if (race.id && ID_AT_LARGE.test(race.id)) return "00";
 
   const text = `${race.jurisdiction ?? ""} ${race.title ?? ""}`;
   if (/\bat[- ]large\b/i.test(text)) return "00";

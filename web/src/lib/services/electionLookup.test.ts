@@ -202,6 +202,22 @@ describe("districtFromRace", () => {
     expect(districtFromRace(race({ id: "tx-house-8-2026" }))).toBe("08");
     expect(districtFromRace(race({ id: "tx-house-08-2026" }))).toBe("08");
     expect(districtFromRace(race({ id: "ak-house-al-2026" }))).toBe("00");
+    expect(districtFromRace(race({ id: "az-01-house-2026" }))).toBe("01");
+  });
+
+  // Regression: the year in at-large ids was read as district "2026", so every
+  // at-large state's House race silently vanished from My Ballot.
+  it("treats a House id with no district as the at-large seat", () => {
+    for (const id of [
+      "ak-house-2026",
+      "de-house-2026",
+      "nd-house-2026",
+      "sd-house-2026",
+      "vt-house-2026",
+      "wy-house-2026",
+    ]) {
+      expect(districtFromRace(race({ id }))).toBe("00");
+    }
   });
 
   it("parses common title and jurisdiction forms", () => {

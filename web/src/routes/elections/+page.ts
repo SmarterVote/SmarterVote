@@ -4,9 +4,9 @@ import { refreshPrerenderedRaces } from "$lib/prerenderData";
 import { directoryRaces } from "$lib/utils/homepage";
 
 export const load: PageLoad = async ({ data, fetch }) => {
-  // Prerendering (and SSR) already has the build-time data. In the browser,
-  // pick up anything published since the build without ever blanking the
-  // prerendered list if the refresh fails.
-  if (!browser) return data;
+  // Production serves summaries.json from the same build as this page, so a
+  // browser refetch would block hydration to re-download identical data (2 MB+).
+  // Only refresh when the build had nothing (local dev, CI fixtures).
+  if (!browser || data.races.length > 0) return data;
   return refreshPrerenderedRaces(data, directoryRaces, fetch);
 };
