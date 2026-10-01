@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   districtFromRace,
   matchingNationalRaces,
+  normalizeDistrictCode,
   parseCensusGeography,
 } from "./electionLookup";
 import type { RaceSummary } from "$lib/types";
@@ -16,6 +17,81 @@ const race = (overrides: Partial<RaceSummary>): RaceSummary => ({
   updated_utc: "2026-07-01T00:00:00Z",
   candidates: [],
   ...overrides,
+});
+
+// Live Census shape (Oct 2026): the district field is CD120, and at-large
+// states carry the text "Congressional District (at Large)" in BASENAME.
+function censusResponse(state: string, entry: Record<string, unknown>) {
+  return {
+    result: {
+      addressMatches: [
+        {
+          geographies: {
+            States: [{ NAME: state }],
+            "120th Congressional Districts": [entry],
+          },
+        },
+      ],
+    },
+  };
+}
+
+describe("parseCensusGeography with newer Congress vintages", () => {
+  it("reads CD120 for an at-large state instead of the BASENAME text", () => {
+    expect(
+      parseCensusGeography(
+        censusResponse("Alaska", {
+          BASENAME: "Congressional District (at Large)",
+          GEOID: "0200",
+          CD120: "00",
+        }),
+      ),
+    ).toEqual({ state: "Alaska", congressionalDistrict: "00" });
+  });
+
+  it("reads CD120 for numbered districts", () => {
+    expect(
+      parseCensusGeography(
+        censusResponse("Texas", { BASENAME: "10", GEOID: "4810", CD120: "10" }),
+      ),
+    ).toEqual({ state: "Texas", congressionalDistrict: "10" });
+  });
+
+  it("falls back to GEOID, then to the at-large text", () => {
+    expect(
+      parseCensusGeography(censusResponse("Ohio", { GEOID: "3907" })),
+    ).toEqual({ state: "Ohio", congressionalDistrict: "07" });
+    expect(
+      parseCensusGeography(
+        censusResponse("Wyoming", {
+          BASENAME: "Congressional District (at Large)",
+        }),
+      ),
+    ).toEqual({ state: "Wyoming", congressionalDistrict: "00" });
+  });
+
+  it("maps the D.C. delegate code 98 to the at-large seat", () => {
+    expect(
+      parseCensusGeography(
+        censusResponse("District of Columbia", { GEOID: "1198", CD120: "98" }),
+      )?.congressionalDistrict,
+    ).toBe("00");
+  });
+});
+
+describe("normalizeDistrictCode", () => {
+  it.each([
+    ["8", "08"],
+    ["08", "08"],
+    ["98", "00"],
+    ["al", "00"],
+    ["at-large", "00"],
+    ["Congressional District (at Large)", "00"],
+    ["NaN", null],
+    ["2026", null],
+  ])("%s -> %s", (input, expected) => {
+    expect(normalizeDistrictCode(input)).toBe(expected);
+  });
 });
 
 describe("parseCensusGeography", () => {

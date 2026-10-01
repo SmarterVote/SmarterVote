@@ -7,6 +7,7 @@
   import {
     lookupElectionGeography,
     matchingNationalRaces,
+    normalizeDistrictCode,
   } from "$lib/services/electionLookup";
   import {
     abandonAddressSession,
@@ -147,8 +148,10 @@
   function restoreFromGeography(savedState: string, savedDistrict: string) {
     // Shared links may carry a postal code or any case (`?state=AK`).
     const normalizedState = canonicalStateName(savedState) ?? savedState.trim();
-    const normalizedDistrict = savedDistrict.trim().padStart(2, "0");
-    if (!normalizedState || !/^\d{2}$/.test(normalizedDistrict)) return false;
+    // Accept every form earlier links used: "8", "08", "98" (D.C.), "al",
+    // or the Census at-large text.
+    const normalizedDistrict = normalizeDistrictCode(savedDistrict);
+    if (!normalizedState || !normalizedDistrict) return false;
 
     state = normalizedState;
     district = normalizedDistrict;
@@ -178,8 +181,14 @@
     const url = new URL(window.location.href);
     const urlState = url.searchParams.get("state");
     const urlDistrict = url.searchParams.get("district");
-    if (urlState && urlDistrict && restoreFromGeography(urlState, urlDistrict))
-      return;
+    if (urlState && urlDistrict) {
+      if (restoreFromGeography(urlState, urlDistrict)) return;
+      // Unrecognised link: drop the stale parameters instead of leaving them
+      // in a URL that would be shared on.
+      url.searchParams.delete("state");
+      url.searchParams.delete("district");
+      replaceState(url, {});
+    }
 
     try {
       const saved = JSON.parse(readSession() ?? "null") as {

@@ -28,18 +28,50 @@ export function parseCensusGeography(
   const congressionalEntry = Object.entries(match.geographies).find(([name]) =>
     name.endsWith("Congressional Districts"),
   )?.[1]?.[0];
-  const district = congressionalEntry?.CD119 ?? congressionalEntry?.BASENAME;
+  const district = congressionalEntry
+    ? censusDistrictCode(congressionalEntry)
+    : null;
 
   if (typeof state !== "string" || district == null) return null;
-  const normalizedDistrict = String(district).padStart(2, "0");
-  return {
-    state,
-    // Census uses 98 for non-voting delegate districts such as Washington,
-    // D.C. Treat it like the other at-large districts throughout the UI and
-    // race matcher rather than exposing the internal Census code to voters.
-    congressionalDistrict:
-      normalizedDistrict === "98" ? "00" : normalizedDistrict,
-  };
+  return { state, congressionalDistrict: district };
+}
+
+/**
+ * The two-digit district code from a Census congressional-district entry.
+ *
+ * The field is named for the Congress (CD119, then CD120 after redistricting
+ * vintages roll over), so read whichever CD### key is present — newest first —
+ * then fall back to the GEOID's last two digits. BASENAME is never used as a
+ * code: for at-large states it is the text "Congressional District (at Large)".
+ */
+export function censusDistrictCode(
+  entry: Record<string, unknown>,
+): string | null {
+  const cdKeys = Object.keys(entry)
+    .filter((key) => /^CD\d+$/.test(key) && entry[key] != null)
+    .sort((a, b) => Number(b.slice(2)) - Number(a.slice(2)));
+  const raw =
+    cdKeys.length > 0
+      ? String(entry[cdKeys[0]])
+      : typeof entry.GEOID === "string" && /^\d{4}$/.test(entry.GEOID)
+        ? entry.GEOID.slice(2)
+        : /at[- ]large/i.test(String(entry.BASENAME ?? ""))
+          ? "00"
+          : null;
+  return raw == null ? null : normalizeDistrictCode(raw);
+}
+
+/**
+ * Normalise a district from Census or a shared URL to two digits. Census uses
+ * 98 for non-voting delegate districts (Washington, D.C.) and 00 / "at large"
+ * for single-district states; all of those are the at-large seat here.
+ */
+export function normalizeDistrictCode(value: string): string | null {
+  const text = value.trim().toLowerCase();
+  if (/^(al|at[- ]?large)$/.test(text) || /at[- ]large/.test(text)) return "00";
+  if (!/^\d{1,2}$/.test(text)) return null;
+  const code = text.padStart(2, "0");
+  return code === "98" ? "00" : code;
 }
 
 export function lookupElectionGeography(
