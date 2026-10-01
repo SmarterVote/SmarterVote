@@ -16,7 +16,9 @@ import {
   fetchWithAuth,
   initializeAuth,
   SessionExpiredError,
+  SignInRequiredError,
   setSessionExpiredHandler,
+  setSignInRequiredHandler,
 } from "./apiStore";
 
 /** A fetch stub that never settles until its AbortSignal fires. */
@@ -374,5 +376,54 @@ describe("fetchWithAuth untimed (long-running) request paths", () => {
     await expect(fetchWithAuth("https://api.test/runs/run-1")).rejects.toThrow(
       "Request timed out due to abort signal: GET https://api.test/runs/run-1",
     );
+  });
+});
+
+describe("sign-in required vs session expired", () => {
+  it("routes a never-authenticated page to sign-in instead of 'expired'", async () => {
+    const onSignIn = vi.fn();
+    setSignInRequiredHandler(onSignIn);
+    const auth0 = {
+      getTokenSilently: vi.fn().mockRejectedValue(
+        Object.assign(new Error("Login required"), {
+          error: "login_required",
+        }),
+      ),
+    };
+    // Direct visit: the client exists but no request ever authenticated.
+    apiStore.set({
+      auth0: auth0 as never,
+      isAuthenticated: false,
+      sessionExpired: false,
+    });
+    vi.stubGlobal("fetch", vi.fn());
+
+    const error = await fetchWithAuth("https://api.test/races").catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(SignInRequiredError);
+    expect(onSignIn).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(get(apiStore).sessionExpired).toBe(false);
+  });
+
+  it("still reports expiry after a session had authenticated", async () => {
+    const onSignIn = vi.fn();
+    setSignInRequiredHandler(onSignIn);
+    withClient("tok");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response),
+    );
+
+    const error = await fetchWithAuth("https://api.test/races").catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(SessionExpiredError);
+    expect(error).not.toBeInstanceOf(SignInRequiredError);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(onSignIn).not.toHaveBeenCalled();
   });
 });

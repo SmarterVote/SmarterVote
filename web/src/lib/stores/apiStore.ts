@@ -26,12 +26,26 @@ export const apiStore = writable<ApiState>(initialState);
 
 export const SESSION_EXPIRED_MESSAGE = "Session expired — sign in again.";
 export const SESSION_EXPIRED_PATH = "/admin/?session_expired=1";
+export const SIGN_IN_REQUIRED_MESSAGE = "Sign in required.";
+export const SIGN_IN_PATH = "/admin/";
 
 /** Raised when the API keeps rejecting the session after a forced token refresh. */
 export class SessionExpiredError extends Error {
   constructor(message: string = SESSION_EXPIRED_MESSAGE) {
     super(message);
     this.name = "SessionExpiredError";
+  }
+}
+
+/**
+ * Raised when there was never a session in this page (e.g. a direct visit to
+ * /admin/pipeline/ while signed out). Not an "expiry": the user is routed to
+ * the normal sign-in flow instead of the session-expired notice.
+ */
+export class SignInRequiredError extends SessionExpiredError {
+  constructor(message: string = SIGN_IN_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "SignInRequiredError";
   }
 }
 
@@ -44,7 +58,7 @@ const LOGIN_REQUIRED_CODES = new Set([
   "invalid_grant",
 ]);
 
-function isLoginRequired(error: unknown): boolean {
+export function isLoginRequired(error: unknown): boolean {
   const code = (error as { error?: unknown } | null)?.error;
   return typeof code === "string" && LOGIN_REQUIRED_CODES.has(code);
 }
@@ -61,7 +75,41 @@ export function setSessionExpiredHandler(handler: () => void): void {
   sessionExpiredHandler = handler;
 }
 
+let signInRequiredHandler: () => void = () => {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/admin/pipeline")) {
+    window.location.assign(SIGN_IN_PATH);
+  }
+};
+
+/** Override the redirect used when no session ever existed (tests, embedding). */
+export function setSignInRequiredHandler(handler: () => void): void {
+  signInRequiredHandler = handler;
+}
+
+function wasAuthenticated(): boolean {
+  let authenticated = false;
+  const unsubscribe = apiStore.subscribe((state) => {
+    authenticated = state.isAuthenticated || state.sessionExpired;
+  });
+  unsubscribe();
+  return authenticated;
+}
+
+/**
+ * Only a session that was authenticated in this page can "expire". Without
+ * one (a signed-out direct visit, or a request racing initializeAuth), route
+ * to the normal sign-in flow instead of showing a misleading expiry notice.
+ */
 function markSessionExpired(): SessionExpiredError {
+  if (!wasAuthenticated()) {
+    try {
+      signInRequiredHandler();
+    } catch (error) {
+      logger.error("Sign-in-required handler failed:", error);
+    }
+    return new SignInRequiredError();
+  }
   apiStore.update((state) => ({
     ...state,
     isAuthenticated: false,

@@ -67,24 +67,24 @@ type Case = {
 const cases: Case[] = [
   // -- Runs -----------------------------------------------------------------
   {
-    name: "loadRunHistory",
-    run: () => svc.loadRunHistory(),
-    path: "/runs?limit=500",
+    name: "loadRunHistoryPage (poll default)",
+    run: () => svc.loadRunHistoryPage(),
+    path: "/runs?limit=50",
     timeout: API_TIMEOUT_ARTIFACT,
     payload: { runs: [] },
+  },
+  {
+    name: "getRunLogsTail",
+    run: () => svc.getRunLogsTail("run-1", 500),
+    path: "/runs/run-1/logs?tail=true&limit=500",
+    timeout: API_TIMEOUT_SHORT,
+    payload: { logs: [] },
   },
   {
     name: "cancelRun",
     run: () => svc.cancelRun("run-1"),
     path: "/runs/run-1/cancel",
     method: "POST",
-    timeout: API_TIMEOUT_SHORT,
-  },
-  {
-    name: "deleteRun",
-    run: () => svc.deleteRun("run-1"),
-    path: "/runs/run-1",
-    method: "DELETE",
     timeout: API_TIMEOUT_SHORT,
   },
   {
@@ -203,13 +203,6 @@ const cases: Case[] = [
     path: "/api/races/recheck",
     method: "POST",
     timeout: API_TIMEOUT_ARTIFACT,
-  },
-  {
-    name: "runRace",
-    run: () => svc.runRace("mo-senate-2024"),
-    path: "/api/races/mo-senate-2024/run",
-    method: "POST",
-    timeout: undefined,
   },
   {
     name: "publishRace",
@@ -337,11 +330,9 @@ describe("PipelineApiService error propagation", () => {
   // The mutating endpoints append the response body, because "HTTP 400" alone
   // is useless when the API is explaining *why* a publish was refused.
   it.each([
-    ["deleteRun", () => svc.deleteRun("r")],
     ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
-    ["runRace", () => svc.runRace("r")],
     ["publishRace", () => svc.publishRace("r")],
     ["batchPublishRaces", () => svc.batchPublishRaces(["r"])],
     ["unpublishRaceRecord", () => svc.unpublishRaceRecord("r")],
@@ -359,13 +350,11 @@ describe("PipelineApiService error propagation", () => {
   // An unreadable body must still produce a usable error rather than a rejected
   // promise from inside the error path itself.
   it.each([
-    ["deleteRun", () => svc.deleteRun("r")],
     ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["deleteDraftRace", () => svc.deleteDraftRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
     ["queueRaces", () => svc.queueRaces(["r"])],
-    ["runRace", () => svc.runRace("r")],
     ["publishRace", () => svc.publishRace("r")],
     ["batchPublishRaces", () => svc.batchPublishRaces(["r"])],
     ["unpublishRaceRecord", () => svc.unpublishRaceRecord("r")],
@@ -614,7 +603,7 @@ describe("normalizeRun", () => {
   });
 });
 
-describe("loadRunHistory shaping", () => {
+describe("loadRunHistoryPage shaping", () => {
   it("numbers runs newest-first and derives updated_at", async () => {
     fetchWithAuth.mockResolvedValue(
       jsonResponse({
@@ -625,7 +614,7 @@ describe("loadRunHistory shaping", () => {
       }),
     );
 
-    const history = await svc.loadRunHistory();
+    const history = (await svc.loadRunHistoryPage()).runs;
 
     expect(history.map((h) => h.display_id)).toEqual([2, 1]);
     // completed_at wins when present, else started_at.
@@ -636,7 +625,10 @@ describe("loadRunHistory shaping", () => {
   it("tolerates a response with no runs key", async () => {
     fetchWithAuth.mockResolvedValue(jsonResponse({}));
 
-    await expect(svc.loadRunHistory()).resolves.toEqual([]);
+    await expect(svc.loadRunHistoryPage()).resolves.toMatchObject({
+      runs: [],
+      truncated: false,
+    });
   });
 });
 
@@ -670,52 +662,36 @@ describe("getRunLogsTail", () => {
     timestamp: "2026-01-01T00:00:00Z",
   });
 
-  it("pages until has_more is false and keeps only the newest entries", async () => {
-    fetchWithAuth
-      .mockResolvedValueOnce(
-        jsonResponse({
-          logs: [log("1"), log("2")],
-          next_cursor: "c2",
-          has_more: true,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({
-          logs: [log("3"), log("4")],
-          next_cursor: "c4",
-          has_more: false,
-        }),
-      );
+  it("reads the newest entries in one bounded tail request", async () => {
+    fetchWithAuth.mockResolvedValueOnce(
+      jsonResponse({
+        logs: [log("8"), log("9"), log("10")],
+        next_cursor: "10",
+        has_more: false,
+        truncated: true,
+      }),
+    );
 
     const tail = await svc.getRunLogsTail("run-1", 3);
 
+    expect(fetchWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWithAuth.mock.calls[0][0]).toBe(
+      `${BASE}/runs/run-1/logs?tail=true&limit=3`,
+    );
     expect(tail.logs.map((l) => (l as { id?: string }).id)).toEqual([
-      "2",
-      "3",
-      "4",
+      "8",
+      "9",
+      "10",
     ]);
     expect(tail.truncated).toBe(true);
-    expect(tail.complete).toBe(true);
-    expect(tail.next_cursor).toBe("c4");
-    expect(fetchWithAuth.mock.calls[1][0]).toContain("cursor=c2");
+    expect(tail.next_cursor).toBe("10");
   });
 
-  it("stops when the caller cancels between pages", async () => {
-    let cancelled = false;
-    fetchWithAuth.mockImplementation(async () => {
-      cancelled = true;
-      return jsonResponse({
-        logs: [log("1")],
-        next_cursor: "c1",
-        has_more: true,
-      });
-    });
+  it("reports an empty run as untruncated with no cursor", async () => {
+    fetchWithAuth.mockResolvedValueOnce(jsonResponse({ logs: [] }));
 
-    const tail = await svc.getRunLogsTail("run-1", 10, {
-      isCancelled: () => cancelled,
-    });
+    const tail = await svc.getRunLogsTail("run-1", 500);
 
-    expect(fetchWithAuth).toHaveBeenCalledTimes(1);
-    expect(tail.complete).toBe(false);
+    expect(tail).toEqual({ logs: [], next_cursor: null, truncated: false });
   });
 });

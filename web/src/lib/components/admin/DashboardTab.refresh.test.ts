@@ -204,6 +204,29 @@ describe("DashboardTab per-range in-flight keys", () => {
   });
 });
 
+describe("DashboardTab race listing", () => {
+  it("lists races once on mount, not again when analytics finish", async () => {
+    const listRaces = vi.fn().mockResolvedValue([]);
+    await renderDashboard({ listRaces } as unknown as PipelineApiService);
+    await waitFor(() => expect(listRaces).toHaveBeenCalled());
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(listRaces).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-lists races on an explicit refresh", async () => {
+    const listRaces = vi.fn().mockResolvedValue([]);
+    const { component } = await renderDashboard({
+      listRaces,
+    } as unknown as PipelineApiService);
+    await waitFor(() => expect(listRaces).toHaveBeenCalledTimes(1));
+
+    await component.refresh();
+
+    expect(listRaces).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("DashboardTab partial failures", () => {
   it("reports a failed overview request", async () => {
     analyticsService.getOverview.mockRejectedValue(new Error("down"));

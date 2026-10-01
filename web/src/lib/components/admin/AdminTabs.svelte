@@ -31,6 +31,11 @@
 
   let tabButtons: HTMLButtonElement[] = [];
 
+  /**
+   * Manual activation (WAI-ARIA APG): arrows/Home/End only move focus;
+   * Enter/Space (the button's native click) activates. Arrowing across tabs
+   * therefore never triggers each tab's data loads.
+   */
   function handleKeydown(event: KeyboardEvent, index: number) {
     let next: number | null = null;
     if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
@@ -40,7 +45,6 @@
     else if (event.key === "End") next = tabs.length - 1;
     if (next === null) return;
     event.preventDefault();
-    selectTab(tabs[next].id);
     tabButtons[next]?.focus();
   }
   const VALID_TABS = new Set<string>(tabs.map((t) => t.id));
@@ -78,9 +82,9 @@
         type="button"
         id={tabId(tab.id)}
         bind:this={tabButtons[index]}
-        class="relative px-5 py-3 text-sm font-medium transition-colors rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-blue-400
+        class="relative px-5 py-3 text-sm font-medium transition-colors rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
           {activeTab === tab.id
-          ? 'border-b-2 border-blue-600 dark:border-blue-400 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20'
+          ? 'border-b-2 border-primary-600 dark:border-primary-400 text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/20'
           : 'text-content-subtle hover:text-content-muted hover:bg-surface-alt'}"
         on:click={() => selectTab(tab.id)}
         on:keydown={(event) => handleKeydown(event, index)}

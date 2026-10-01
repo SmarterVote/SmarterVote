@@ -73,7 +73,7 @@ The admin dashboard should target `services/races-api`.
 | GET    | `/runs/active`                                              | List currently pending/running runs              |
 | POST   | `/runs/reconcile`                                           | Persist stale/superseded run reconciliation      |
 | GET    | `/runs/{run_id}`                                            | Get run details                                  |
-| GET    | `/runs/{run_id}/logs`                                       | Get run logs                                     |
+| GET    | `/runs/{run_id}/logs`                                       | Get run logs (`?cursor=` forward page; `?tail=true&limit=N` newest N, one bounded read) |
 | GET    | `/runs/{run_id}/diagnostics`                                | Export sanitized run diagnostics                  |
 | DELETE | `/runs`                                                     | Prune terminal pipeline runs                     |
 | POST   | `/runs/{run_id}/cancel`                                     | Cancel an active run (409 if already finished)   |
@@ -119,7 +119,18 @@ Run, queue, and race-catalog GET endpoints are read-only projections. Stale run
 and queue state is persisted only through the explicit `/runs/reconcile` and
 `/api/queue/reconcile` POST endpoints. Run writers maintain a canonical
 `activity_at` timestamp so recent views use one indexed Firestore query; the
-API retains a bounded legacy fallback for older records.
+API retains a bounded legacy fallback for older records, consulted only when the
+canonical page is short and cached briefly (that legacy set can no longer grow).
+The admin Runs tab polls a 50-run page and fetches the 500-run window only on an
+explicit "Load more" (or the first history filter over a truncated page).
+
+Cancel writes (`/runs/{run_id}/cancel`, `/api/races/{race_id}/cancel`, the queue
+cancel endpoints) carry a Firestore `last_update_time` precondition: if the run
+finished between read and write the API re-reads and answers 409 rather than
+overwriting it. A cancelled race returns to `published`/`draft` when it has those
+copies, else `cancelled` (or `idle` for a withdrawn pending item). The MCP
+`cancel_run` tool uses the non-destructive cancel endpoint; deleting history is
+the separate, explicit `delete_finished_run` tool.
 
 The admin race list is intentionally Firestore-catalog-first. It should not enumerate GCS blobs or fetch per-race
 JSON on the hot path; draft/published filter state, candidate counts, grades, and freshness all come from the

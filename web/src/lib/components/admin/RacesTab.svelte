@@ -79,6 +79,52 @@
     return row.draft_updated_at > row.published_at;
   }
 
+  type RowAction = { value: string; label: string };
+
+  /** The actions a row offers for its current state (also used to validate). */
+  function rowActionOptions(row: RaceRecord): RowAction[] {
+    const options: RowAction[] = [];
+    if (hasDraft(row) && (!hasPublished(row) || hasPendingDraft(row)))
+      options.push({ value: "publish", label: "Publish draft" });
+    if (hasPublished(row))
+      options.push({ value: "unpublish", label: "Unpublish" });
+    if (row.status === "queued" || row.status === "running") {
+      options.push({ value: "cancel", label: "Cancel run" });
+      options.push({ value: "recheck", label: "Recheck status" });
+    } else {
+      options.push({ value: "run", label: "Queue refresh (~$0.09)" });
+      options.push({ value: "run-full", label: "Queue full research…" });
+    }
+    options.push({ value: "delete", label: "Delete race" });
+    return options;
+  }
+
+  function isValidRowAction(row: RaceRecord, action: string | undefined) {
+    return (
+      !!action &&
+      rowActionOptions(row).some((option) => option.value === action)
+    );
+  }
+
+  /**
+   * A refresh can change a row's state (e.g. queued → draft) under a choice
+   * made earlier; drop choices the row no longer offers so "Go" can never run
+   * a stale action.
+   */
+  function pruneRowActionChoices(current: RaceRecord[]) {
+    const byId = new Map(current.map((row) => [row.race_id, row]));
+    let changed = false;
+    const next: Record<string, string> = {};
+    for (const [raceId, action] of Object.entries(rowActionChoice)) {
+      const row = byId.get(raceId);
+      if (action && row && isValidRowAction(row, action)) next[raceId] = action;
+      else if (action) changed = true;
+    }
+    if (changed) rowActionChoice = next;
+  }
+
+  $: pruneRowActionChoices(rows);
+
   function isDiscoveryOnly(row: RaceRecord): boolean {
     const opts = (row.last_run_options ?? row.queue_options) as
       | { enabled_steps?: string[] }
@@ -478,7 +524,7 @@
     const estimate =
       mode === "refresh"
         ? refreshCostEstimate(1)
-        : fullResearchCostEstimate(row.candidate_count ?? 0);
+        : fullResearchCostEstimate(row.candidate_count);
     const prompt =
       mode === "refresh"
         ? `Queue a lightweight refresh for ${raceId}?\n\nSteps: ${steps.join(", ")}\nModel profile: default\nEstimated cost: ${estimate}`
@@ -590,8 +636,8 @@
    */
   function handleRowAction(row: RaceRecord) {
     const action = rowActionChoice[row.race_id] ?? "";
-    if (!action) return;
     rowActionChoice = { ...rowActionChoice, [row.race_id]: "" };
+    if (!isValidRowAction(row, action)) return;
 
     if (action === "publish") void handlePublish(row.race_id);
     if (action === "unpublish") void handleUnpublish(row.race_id);
@@ -1194,28 +1240,18 @@
                               ? "Working..."
                               : "Actions..."}
                           </option>
-                          {#if hasDraft(row) && (!hasPublished(row) || hasPendingDraft(row))}
-                            <option value="publish">Publish draft</option>
-                          {/if}
-                          {#if hasPublished(row)}
-                            <option value="unpublish">Unpublish</option>
-                          {/if}
-                          {#if row.status === "queued" || row.status === "running"}
-                            <option value="cancel">Cancel run</option>
-                            <option value="recheck">Recheck status</option>
-                          {:else}
-                            <option value="run">Queue refresh (~$0.09)</option>
-                            <option value="run-full"
-                              >Queue full research…</option
-                            >
-                          {/if}
-                          <option value="delete">Delete race</option>
+                          {#each rowActionOptions(row) as option (option.value)}
+                            <option value={option.value}>{option.label}</option>
+                          {/each}
                         </select>
                         <button
                           type="button"
                           class="rounded border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
                           disabled={!!rowActionLoading[row.race_id] ||
-                            !rowActionChoice[row.race_id]}
+                            !isValidRowAction(
+                              row,
+                              rowActionChoice[row.race_id],
+                            )}
                           aria-label="Run selected action for {row.race_id}"
                           on:click={() => handleRowAction(row)}
                         >
