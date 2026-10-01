@@ -1,4 +1,5 @@
 import type { Candidate, IssueStance } from "$lib/types";
+import { partyKey } from "$lib/utils/party";
 
 const NAME_SUFFIXES = new Set([
   "jr",
@@ -44,32 +45,33 @@ export function shortCandidateName(
   return collisions.length > 0 ? name.trim() : last;
 }
 
-const collator = new Intl.Collator("en", { sensitivity: "base" });
+function isMajorParty(party: string | undefined): boolean {
+  const key = partyKey(party);
+  return key === "dem" || key === "rep";
+}
 
 /**
- * The one neutral, documented order for showing candidates: alphabetical by
- * last name, then full name. It deliberately ignores party, incumbency, and
- * pipeline/roster order so no candidate gets top billing from data plumbing.
+ * Display order for candidates: major-party (Democratic/Republican) candidates
+ * first, then everyone else, otherwise keeping the roster's existing order.
+ * The sort is stable, so this only lifts major-party candidates ahead of
+ * minor-party and independent ones.
  */
-export function compareCandidatesNeutral(
-  a: Pick<Candidate, "name">,
-  b: Pick<Candidate, "name">,
+export function compareCandidatesForDisplay(
+  a: Pick<Candidate, "name" | "party">,
+  b: Pick<Candidate, "name" | "party">,
 ): number {
-  return (
-    collator.compare(candidateLastName(a.name), candidateLastName(b.name)) ||
-    collator.compare(a.name, b.name)
-  );
+  return Number(isMajorParty(b.party)) - Number(isMajorParty(a.party));
 }
 
-/** Return a new array of candidates in the neutral display order. */
-export function neutralCandidateOrder<T extends Pick<Candidate, "name">>(
-  candidates: readonly T[] | null | undefined,
-): T[] {
-  return [...(candidates ?? [])].sort(compareCandidatesNeutral);
+/** Return a new array of candidates in display order (major parties first). */
+export function neutralCandidateOrder<
+  T extends Pick<Candidate, "name" | "party">,
+>(candidates: readonly T[] | null | undefined): T[] {
+  return [...(candidates ?? [])].sort(compareCandidatesForDisplay);
 }
 
-export const NEUTRAL_ORDER_NOTE =
-  "Candidates are listed alphabetically by last name.";
+/** @deprecated alias kept for callers written against the earlier name. */
+export const compareCandidatesNeutral = compareCandidatesForDisplay;
 
 /** True when an issue stance has displayable text. */
 export function hasStance(
