@@ -1,105 +1,183 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
+  import { goto, replaceState } from "$app/navigation";
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { slide } from "svelte/transition";
   import Card from "$lib/components/Card.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import IssueTable from "$lib/components/IssueTable.svelte";
   import DonorTable from "$lib/components/DonorTable.svelte";
   import VotingRecordTable from "$lib/components/VotingRecordTable.svelte";
-  import type { Race, Candidate } from "$lib/types";
+  import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
   import { candidateSlug } from "$lib/utils/format";
+  import { partyBadgeClass } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
+  import { motionDuration, scrollBehavior } from "$lib/utils/motion";
+  import {
+    formatPollDate,
+    isNotFoundError,
+    resolveCandidate,
+  } from "$lib/utils/racePage";
+  import { headshotFallback } from "$lib/utils/racePageImage";
   import {
     candidateMetaDescription,
     raceDisplayTitle,
   } from "$lib/utils/raceTitle";
 
-  export let data: { prerenderedRace?: Race };
+  export let data: { prerenderedRace?: Race | null };
 
   let race: Race | null = data.prerenderedRace ?? null;
-  let candidate: Candidate | null = null;
-  let otherCandidates: Candidate[] = [];
   let loading = !race;
-  let error: string | null = null;
+  let loadError: string | null = null;
+  let raceNotFound = false;
   let othersExpanded = false;
   let isDraftPreview = false;
   let summarySourcesOpen = false;
   let summaryExpanded = false;
+  let photoFailed = false;
+  let hiddenOtherImages: Record<string, boolean> = {};
   const SUMMARY_SOURCE_LIMIT = 3;
 
   let slug: string;
   let candidateParam: string;
   $: slug = $page.params.slug as string;
   $: candidateParam = $page.params.candidate as string;
-  $: if (race && candidateParam && !candidate) hydrateCandidate();
 
-  onMount(async () => {
-    const params = new URLSearchParams(window.location.search);
-    isDraftPreview = params.get("draft") === "true";
-    const hasPrerenderedRace = !!race && !isDraftPreview;
+  // Candidate and the rest of the field are derived, so navigating between
+  // candidates (or races) always shows the one in the URL.
+  $: resolved = resolveCandidate(race, candidateParam);
+  $: candidate = resolved.candidate;
+  $: otherCandidates = resolved.others;
+  $: canonicalSlug = resolved.canonicalSlug ?? candidateParam;
+  $: candidateNotFound = !loading && !!race && !candidate;
+  $: notFound = raceNotFound || candidateNotFound;
+  $: error = loadError;
 
-    if (hasPrerenderedRace) {
-      hydrateCandidate();
-    }
+  let mounted = false;
+  let loadedKey: string | null = null;
+  let requestId = 0;
+  let lastCandidateKey: string | null = null;
 
-    try {
-      if (isDraftPreview) {
-        try {
-          race = await getDraftRace(slug);
-        } catch {
-          race = await getRace(slug, fetch, false);
-          isDraftPreview = false;
-          window.history.replaceState(
-            {},
-            "",
-            `/races/${slug}/${candidateParam}/`,
-          );
-        }
-      } else {
-        race = await getRace(slug);
-      }
-    } catch (err) {
-      if (hasPrerenderedRace && candidate) {
-        loading = false;
-        return;
-      }
+  $: draftParam =
+    mounted && browser && $page.url.searchParams.get("draft") === "true";
+  $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
+    loadRace(slug, draftParam);
 
-      try {
-        race = await getRace(slug, fetch, true);
-      } catch {
-        error = err instanceof Error ? err.message : "Failed to load race data";
-      }
-    }
+  // Fresh UI state per candidate.
+  $: if (`${slug}/${candidateParam}` !== lastCandidateKey) {
+    lastCandidateKey = `${slug}/${candidateParam}`;
+    othersExpanded = false;
+    summarySourcesOpen = false;
+    summaryExpanded = false;
+    photoFailed = false;
+    hiddenOtherImages = {};
+  }
 
-    hydrateCandidate();
-    loading = false;
+  // Legacy (pre-accent-folding) slugs still resolve, then move to the
+  // canonical URL so there is one indexable address per candidate.
+  $: if (mounted && candidate && resolved.isLegacySlug)
+    redirectToCanonical(slug, canonicalSlug);
+
+  onMount(() => {
+    mounted = true;
   });
 
-  function hydrateCandidate() {
-    if (!race) return;
-    candidate =
-      race.candidates?.find((c) => candidateSlug(c.name) === candidateParam) ??
-      null;
-    otherCandidates =
-      race.candidates?.filter(
-        (c) => candidateSlug(c.name) !== candidateParam && !c.withdrawn,
-      ) ?? [];
-    if (!candidate) {
-      error = "Candidate not found";
+  async function redirectToCanonical(raceSlug: string, target: string) {
+    const search = isDraftPreview ? "?draft=true" : "";
+    await tick();
+    try {
+      await goto(`/races/${raceSlug}/${target}/${search}${location.hash}`, {
+        replaceState: true,
+        noScroll: true,
+        keepFocus: true,
+      });
+    } catch {
+      // Navigation was superseded; nothing to do.
     }
   }
 
-  function jumpToSection(event: Event) {
-    const select = event.currentTarget as HTMLSelectElement;
-    const id = select.value;
-    if (!id) return;
-    const target = document.getElementById(id);
-    select.value = "";
-    select.blur();
-    requestAnimationFrame(() => target?.scrollIntoView({ behavior: "smooth" }));
+  async function loadRace(target: string, draft: boolean) {
+    const previousSlug = loadedKey?.split("|")[0];
+    loadedKey = `${target}|${draft}`;
+    const id = ++requestId;
+    const prerendered =
+      data.prerenderedRace && data.prerenderedRace.id === target
+        ? data.prerenderedRace
+        : null;
+
+    if (previousSlug !== target) race = prerendered;
+    isDraftPreview = draft;
+    loadError = null;
+    raceNotFound = false;
+    loading = !race;
+
+    try {
+      let next: Race;
+      if (draft) {
+        try {
+          next = await getDraftRace(target);
+        } catch {
+          next = await getRace(target, fetch, false);
+          if (id !== requestId) return;
+          isDraftPreview = false;
+          loadedKey = `${target}|false`;
+          try {
+            replaceState(`/races/${target}/${candidateParam}/`, {});
+          } catch {
+            // Router not ready yet; the stale ?draft=true is harmless.
+          }
+        }
+      } else {
+        next = await getRace(target);
+      }
+      if (id !== requestId) return;
+      race = next;
+    } catch (err) {
+      if (id !== requestId) return;
+      if (race && race.id === target) {
+        if (draft) isDraftPreview = false;
+        return;
+      }
+      try {
+        const fallback = await getRace(target, fetch, true);
+        if (id !== requestId) return;
+        race = fallback;
+      } catch {
+        if (id !== requestId) return;
+        race = null;
+        if (isNotFoundError(err)) raceNotFound = true;
+        else
+          loadError =
+            err instanceof Error ? err.message : "Failed to load race data";
+      }
+    } finally {
+      if (id === requestId) loading = false;
+    }
   }
+
+  function jumpToSection(event: MouseEvent, id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: scrollBehavior() });
+    // Move focus so keyboard and screen-reader users land in the section.
+    const heading = target.querySelector<HTMLElement>("h2");
+    if (heading) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    }
+  }
+
+  $: sectionLinks = [
+    { id: "positions", label: "Positions" },
+    ...(hasCareer || hasEducation
+      ? [{ id: "background", label: "Background" }]
+      : []),
+    ...(hasDonors ? [{ id: "donors", label: "Top donors" }] : []),
+    ...(hasVoting ? [{ id: "voting-record", label: "Voting record" }] : []),
+  ];
 
   $: hasCareer =
     candidate &&
@@ -113,56 +191,53 @@
     candidate != null &&
     (!candidate.issues ||
       Object.keys(candidate.issues).length === 0 ||
-      Object.values(candidate.issues).every((i) => !i?.stance));
+      Object.values(candidate.issues).every((i) => !i?.stance?.trim()));
   $: socialLinks = Object.entries(candidate?.social_media ?? {}).filter(
     (entry): entry is [string, string] => isExternalUrl(entry[1]),
   );
   $: metaDescription = candidateMetaDescription(candidate, race);
+  $: pageTitle = `${candidate?.name ?? "Candidate"} — ${
+    race ? raceDisplayTitle(race) : "Election"
+  } | Smarter.Vote`;
+  $: canonicalUrl = `https://smarter.vote/races/${slug}/${canonicalSlug}/`;
+  $: compareHref =
+    candidate && otherCandidates.length > 0
+      ? `/races/${slug}/compare/?candidates=${candidateSlug(
+          candidate.name,
+        )},${candidateSlug(otherCandidates[0].name)}${
+          isDraftPreview ? "&draft=true" : ""
+        }`
+      : "";
 </script>
 
 <svelte:head>
-  <title
-    >{candidate?.name ?? "Candidate"} — {race
-      ? raceDisplayTitle(race)
-      : "Loading..."} | Smarter.Vote</title
-  >
-  <meta name="description" content={metaDescription} />
-  <link
-    rel="canonical"
-    href="https://smarter.vote/races/{slug}/{candidateParam}/"
-  />
-  <meta property="og:type" content="profile" />
-  <meta
-    property="og:url"
-    content="https://smarter.vote/races/{slug}/{candidateParam}/"
-  />
-  <meta
-    property="og:title"
-    content="{candidate?.name ?? 'Candidate'} — {race
-      ? raceDisplayTitle(race)
-      : 'Election'} | Smarter.Vote"
-  />
-  <meta property="og:description" content={metaDescription} />
-  <meta
-    property="og:image"
-    content={candidate?.image_url || "https://smarter.vote/og-image.png"}
-  />
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta
-    property="twitter:url"
-    content="https://smarter.vote/races/{slug}/{candidateParam}/"
-  />
-  <meta
-    property="twitter:title"
-    content="{candidate?.name ?? 'Candidate'} — {race
-      ? raceDisplayTitle(race)
-      : 'Election'} | Smarter.Vote"
-  />
-  <meta property="twitter:description" content={metaDescription} />
-  <meta
-    property="twitter:image"
-    content={candidate?.image_url || "https://smarter.vote/og-image.png"}
-  />
+  {#if notFound}
+    <title>Candidate not found | Smarter.Vote</title>
+    <meta name="robots" content="noindex" />
+  {:else}
+    <title>{pageTitle}</title>
+    <meta name="description" content={metaDescription} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:type" content="profile" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={metaDescription} />
+    <meta
+      property="og:image"
+      content={candidate?.image_url || "https://smarter.vote/og-image.png"}
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={metaDescription} />
+    <meta
+      name="twitter:image"
+      content={candidate?.image_url || "https://smarter.vote/og-image.png"}
+    />
+    {#if isDraftPreview}
+      <meta name="robots" content="noindex" />
+    {/if}
+  {/if}
 </svelte:head>
 
 <div class="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
@@ -173,16 +248,49 @@
       ></div>
       <span class="ml-3 text-lg text-content-muted">Loading candidate...</span>
     </div>
+  {:else if notFound}
+    <div
+      class="mx-auto max-w-2xl rounded-2xl border border-stroke bg-surface p-6 text-center shadow-sm sm:p-10"
+    >
+      <h1 class="text-2xl font-bold text-content sm:text-3xl">
+        {raceNotFound ? "Race not found" : "Candidate not found"}
+      </h1>
+      <p class="mt-3 text-sm leading-relaxed text-content-muted sm:text-base">
+        {#if raceNotFound}
+          We couldn't find a published race at this address. It may have been
+          renamed, retired after the election, or never published.
+        {:else}
+          We couldn't find this candidate in the {race
+            ? raceDisplayTitle(race)
+            : "race"}. They may have been removed from the field or the link may
+          be out of date.
+        {/if}
+      </p>
+      <a
+        href={raceNotFound
+          ? "/elections/"
+          : `/races/${slug}/${isDraftPreview ? "?draft=true" : ""}`}
+        class="mt-6 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white no-underline hover:bg-blue-800"
+      >
+        <UiIcon name="arrow-left" size="sm" />
+        {raceNotFound ? "Browse elections" : "See all candidates in this race"}
+      </a>
+    </div>
   {:else if error}
     <div
       class="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center"
+      role="alert"
     >
       <h2 class="text-2xl font-bold text-red-800 dark:text-red-200 mb-2">
-        {error}
+        We couldn't load this candidate
       </h2>
+      <p class="text-red-700 dark:text-red-200">
+        Something went wrong while loading the race data. Please check your
+        connection and try again.
+      </p>
       <a
         href="/races/{slug}/{isDraftPreview ? '?draft=true' : ''}"
-        class="mt-4 inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-400 font-medium"
+        class="mt-4 inline-flex min-h-11 items-center gap-1.5 text-blue-700 hover:underline dark:text-blue-400 font-medium"
       >
         <UiIcon name="arrow-left" size="sm" /> Back to race overview
       </a>
@@ -284,12 +392,7 @@
         <span class="hidden sm:inline">Back to {raceDisplayTitle(race)}</span>
       </a>
       {#if otherCandidates.length > 0}
-        <a
-          href="/races/{slug}/compare/?candidates={candidateParam},{candidateSlug(
-            otherCandidates[0].name,
-          )}{isDraftPreview ? '&draft=true' : ''}"
-          class="compare-link"
-        >
+        <a href={compareHref} class="compare-link">
           Compare
           <span class="hidden sm:inline">candidates</span>
         </a>
@@ -316,23 +419,32 @@
           >
         </button>
         {#if othersExpanded}
-          <div transition:slide class="others-list">
-            {#each otherCandidates as other}
+          <div
+            transition:slide={{ duration: motionDuration(400) }}
+            class="others-list"
+          >
+            {#each otherCandidates as other (candidateSlug(other.name))}
               <a
                 href="/races/{race.id}/{candidateSlug(
                   other.name,
                 )}/{isDraftPreview ? '?draft=true' : ''}"
                 class="other-chip"
               >
-                {#if other.image_url}
+                {#if other.image_url && !hiddenOtherImages[other.name]}
                   <img
                     src={other.image_url}
                     alt=""
+                    width="32"
+                    height="32"
+                    loading="lazy"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
                     class="other-avatar"
-                    on:error={(e) => {
-                      if (e.currentTarget instanceof HTMLImageElement)
-                        e.currentTarget.style.display = "none";
-                    }}
+                    use:headshotFallback={() =>
+                      (hiddenOtherImages = {
+                        ...hiddenOtherImages,
+                        [other.name]: true,
+                      })}
                   />
                 {/if}
                 <div class="other-info">
@@ -351,18 +463,23 @@
     <!-- Candidate Header -->
     <Card class="candidate-header-card">
       <div class="candidate-top">
-        {#if candidate.image_url}
+        {#if candidate.image_url && !photoFailed}
           <img
             src={candidate.image_url}
             alt={candidate.name}
+            width="112"
+            height="112"
+            decoding="async"
+            referrerpolicy="no-referrer"
             class="candidate-photo"
-            on:error={(e) => {
-              if (e.currentTarget instanceof HTMLImageElement)
-                e.currentTarget.style.display = "none";
-            }}
+            use:headshotFallback={() => (photoFailed = true)}
           />
         {:else}
-          <div class="candidate-photo-placeholder">
+          <div
+            class="candidate-photo-placeholder"
+            role="img"
+            aria-label={candidate.name}
+          >
             <svg
               class="w-12 h-12 text-gray-400"
               fill="currentColor"
@@ -378,7 +495,9 @@
           <h1 class="candidate-detail-name">{candidate.name}</h1>
           <div class="flex flex-wrap items-center gap-2 mt-1">
             {#if candidate.party}
-              <span class="badge party-badge">{candidate.party}</span>
+              <span class="badge {partyBadgeClass(candidate.party)}"
+                >{candidate.party}</span
+              >
             {/if}
             {#if candidate.incumbent}
               <span class="badge incumbent-badge">Incumbent</span>
@@ -510,28 +629,17 @@
     </Card>
 
     <nav class="detail-nav" aria-label="Candidate profile sections">
-      <label for="candidate-section-select" class="sr-only">
-        Jump to candidate profile section
-      </label>
-      <select
-        id="candidate-section-select"
-        class="detail-nav-select"
-        on:change={jumpToSection}
-      >
-        <option value="">Jump to a section…</option>
-        <option value="positions">Positions on key issues</option>
-        {#if hasCareer || hasEducation}<option value="background"
-            >Background</option
-          >{/if}
-        {#if hasDonors}<option value="donors">Top donors</option>{/if}
-        {#if hasVoting}<option value="voting-record">Voting record</option>{/if}
-      </select>
-      <div class="detail-nav-links">
-        <a href="#positions">Positions</a>
-        {#if hasCareer || hasEducation}<a href="#background">Background</a>{/if}
-        {#if hasDonors}<a href="#donors">Top donors</a>{/if}
-        {#if hasVoting}<a href="#voting-record">Voting record</a>{/if}
-      </div>
+      <ul class="detail-nav-links">
+        {#each sectionLinks as link (link.id)}
+          <li>
+            <a
+              href="#{link.id}"
+              on:click={(event) => jumpToSection(event, link.id)}
+              >{link.label}</a
+            >
+          </li>
+        {/each}
+      </ul>
     </nav>
 
     <!-- Issues Section -->
@@ -683,30 +791,38 @@
       <p class="data-note-title">About this research</p>
       <p class="data-note-text">
         Data compiled from public sources and analyzed using AI. Last updated
-        {new Date(race.updated_utc).toLocaleDateString()}. Visit candidate
-        websites for the most current information.
+        {formatPollDate(race.updated_utc, {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        }) || "recently"}. Visit candidate websites for the most current
+        information.
       </p>
     </div>
   {/if}
 </div>
 
 <style lang="postcss">
+  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
+     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .nav-bar {
     @apply mb-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:mb-6 sm:gap-3;
   }
 
   .back-link {
-    @apply inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-sm font-semibold
-           text-blue-700 no-underline transition-colors duration-200 hover:bg-blue-50 hover:text-blue-900
-           dark:text-blue-300 dark:hover:bg-blue-950/30 dark:hover:text-blue-200 sm:px-3;
+    @apply inline-flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-blue-700 no-underline transition-colors duration-200 hover:bg-blue-50 hover:text-blue-900 sm:px-3;
+  }
+
+  :global(.dark) .back-link {
+    @apply text-blue-400 hover:bg-blue-950/30 hover:text-blue-300;
   }
 
   .compare-link {
-    @apply inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-blue-200
-           bg-surface px-3 py-1.5 text-sm font-bold text-blue-700 no-underline transition-colors
-           hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 focus-visible:outline
-           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
-           dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/30 dark:hover:text-blue-200;
+    @apply inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-blue-200 bg-surface px-3 py-1.5 text-sm font-bold text-blue-700 no-underline transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600;
+  }
+
+  :global(.dark) .compare-link {
+    @apply border-blue-800 text-blue-300 hover:bg-blue-950/30 hover:text-blue-200;
   }
 
   /* Other candidates collapsible */
@@ -721,8 +837,12 @@
 
   .other-count,
   .source-count {
-    @apply inline-flex min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 py-0.5
-           text-[11px] font-extrabold text-blue-700 dark:bg-blue-900/50 dark:text-blue-200;
+    @apply inline-flex min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-extrabold text-blue-700;
+  }
+
+  :global(.dark) .other-count,
+  :global(.dark) .source-count {
+    @apply bg-blue-900/50 text-blue-200;
   }
 
   .others-list {
@@ -730,9 +850,11 @@
   }
 
   .other-chip {
-    @apply flex min-h-14 min-w-0 items-center gap-3 rounded-xl border border-stroke bg-surface px-3 py-2.5
-           text-content no-underline shadow-sm transition-colors duration-200 hover:border-blue-400
-           hover:bg-blue-50 dark:hover:bg-blue-950;
+    @apply flex min-h-14 min-w-0 items-center gap-3 rounded-xl border border-stroke bg-surface px-3 py-2.5 text-content no-underline shadow-sm transition-colors duration-200 hover:border-blue-400 hover:bg-blue-50;
+  }
+
+  :global(.dark) .other-chip {
+    @apply hover:bg-blue-950;
   }
 
   .other-avatar {
@@ -777,12 +899,12 @@
     @apply px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium;
   }
 
-  .party-badge {
-    @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+  .incumbent-badge {
+    @apply bg-green-100 text-green-800;
   }
 
-  .incumbent-badge {
-    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+  :global(.dark) .incumbent-badge {
+    @apply bg-green-900 text-green-200;
   }
 
   .candidate-summary {
@@ -805,8 +927,11 @@
   }
 
   .summary-toggle {
-    @apply mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-600
-           hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300;
+    @apply mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800;
+  }
+
+  :global(.dark) .summary-toggle {
+    @apply text-blue-400 hover:text-blue-300;
   }
 
   .quick-links {
@@ -814,10 +939,11 @@
   }
 
   .quick-link {
-    @apply inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-surface-alt border
-           border-stroke rounded-md text-sm text-content hover:bg-blue-50 dark:hover:bg-blue-950
-           hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors
-           duration-200 no-underline;
+    @apply inline-flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-surface-alt border border-stroke rounded-md text-sm text-content hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600 transition-colors duration-200 no-underline;
+  }
+
+  :global(.dark) .quick-link {
+    @apply hover:bg-blue-950 hover:text-blue-400;
   }
 
   /* Sections */
@@ -829,16 +955,23 @@
     @apply sticky top-[var(--site-header-height)] z-30 mb-6 rounded-xl border border-stroke bg-surface/95 p-3 shadow-sm backdrop-blur;
   }
 
-  .detail-nav-select {
-    @apply min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm font-semibold text-content focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:hidden;
+  /* A horizontally scrollable row of in-page links on small screens, so the
+     section jump works with plain keyboard/AT semantics (the old <select>
+     scrolled on every arrow keypress). */
+  .detail-nav-links {
+    @apply -mx-1 flex gap-1 overflow-x-auto px-1 sm:flex-wrap sm:gap-2;
   }
 
-  .detail-nav-links {
-    @apply hidden flex-wrap gap-2 lg:flex;
+  .detail-nav-links li {
+    @apply shrink-0;
   }
 
   .detail-nav-links a {
-    @apply inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 no-underline hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30 dark:hover:text-blue-300;
+    @apply inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 no-underline hover:bg-blue-50 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600;
+  }
+
+  :global(.dark) .detail-nav-links a {
+    @apply text-blue-400 hover:bg-blue-950/30 hover:text-blue-300;
   }
 
   .section-heading {
@@ -859,7 +992,11 @@
   }
 
   .timeline-entry {
-    @apply border-l-2 border-blue-300 dark:border-blue-700 pl-4 py-1;
+    @apply border-l-2 border-blue-300 pl-4 py-1;
+  }
+
+  :global(.dark) .timeline-entry {
+    @apply border-blue-700;
   }
 
   .timeline-header {
@@ -905,7 +1042,11 @@
   }
 
   .summary-sources-toggle {
-    @apply mt-2 inline-flex min-h-11 items-center text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium;
+    @apply mt-2 inline-flex min-h-11 items-center text-xs text-blue-600 hover:underline font-medium;
+  }
+
+  :global(.dark) .summary-sources-toggle {
+    @apply text-blue-400;
   }
 
   .summary-sources-list {
@@ -913,9 +1054,11 @@
   }
 
   .summary-source-link {
-    @apply inline-flex min-h-9 min-w-0 max-w-full items-start gap-2 rounded-lg px-2 py-1.5 text-xs
-           leading-5 text-blue-600 no-underline hover:bg-blue-50 hover:text-blue-800
-           dark:text-blue-400 dark:hover:bg-blue-950/30 dark:hover:text-blue-300 sm:text-sm;
+    @apply inline-flex min-h-9 min-w-0 max-w-full items-start gap-2 rounded-lg px-2 py-1.5 text-xs leading-5 text-blue-600 no-underline hover:bg-blue-50 hover:text-blue-800 sm:text-sm;
+  }
+
+  :global(.dark) .summary-source-link {
+    @apply text-blue-400 hover:bg-blue-950/30 hover:text-blue-300;
   }
 
   .summary-source-link span {
@@ -931,20 +1074,37 @@
 
   /* Entry source link (career + education) */
   .entry-source-link {
-    @apply inline-flex items-center gap-1 mt-1 text-xs text-blue-600 dark:text-blue-400
-           hover:underline no-underline;
+    @apply inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:underline no-underline;
+  }
+
+  :global(.dark) /* Entry source link (career + education) */
+  .entry-source-link {
+    @apply text-blue-400;
   }
 
   /* Data note */
   .data-note {
-    @apply mt-8 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 text-center;
+    @apply mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 text-center;
+  }
+
+  :global(.dark) /* Data note */
+  .data-note {
+    @apply bg-blue-950 border-blue-800;
   }
 
   .data-note-title {
-    @apply text-blue-800 dark:text-blue-200 font-medium mb-2 text-sm sm:text-base;
+    @apply text-blue-800 font-medium mb-2 text-sm sm:text-base;
+  }
+
+  :global(.dark) .data-note-title {
+    @apply text-blue-200;
   }
 
   .data-note-text {
-    @apply text-blue-700 dark:text-blue-300 text-xs sm:text-sm;
+    @apply text-blue-700 text-xs sm:text-sm;
+  }
+
+  :global(.dark) .data-note-text {
+    @apply text-blue-300;
   }
 </style>

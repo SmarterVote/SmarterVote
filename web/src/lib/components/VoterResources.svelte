@@ -114,6 +114,8 @@
 </div>
 
 <style lang="postcss">
+  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
+     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .voter-resources {
     @apply flex flex-wrap gap-3 mb-6;
   }
@@ -124,23 +126,26 @@
   }
 
   .voter-resource-btn--ballotpedia {
-    @apply bg-amber-50 border border-amber-300 text-amber-800
-           hover:bg-amber-100 hover:border-amber-400 hover:shadow
-           dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300
-           dark:hover:bg-amber-900/40 dark:hover:border-amber-600;
+    @apply bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:shadow;
+  }
+
+  :global(.dark) .voter-resource-btn--ballotpedia {
+    @apply bg-amber-900/20 border-amber-700 text-amber-300 hover:bg-amber-900/40 hover:border-amber-600;
   }
 
   .voter-resource-btn--register {
-    @apply bg-blue-600 border border-blue-600 text-white
-           hover:bg-blue-700 hover:border-blue-700 hover:shadow
-           dark:bg-blue-700 dark:border-blue-600
-           dark:hover:bg-blue-600;
+    @apply bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700 hover:shadow;
+  }
+
+  :global(.dark) .voter-resource-btn--register {
+    @apply bg-blue-700 border-blue-600 hover:bg-blue-600;
   }
 
   .voter-resource-btn--howtovote {
-    @apply bg-green-600 border border-green-600 text-white
-           hover:bg-green-700 hover:border-green-700 hover:shadow
-           dark:bg-green-700 dark:border-green-600
-           dark:hover:bg-green-600;
+    @apply bg-green-700 border border-green-700 text-white hover:bg-green-800 hover:border-green-800 hover:shadow;
+  }
+
+  :global(.dark) .voter-resource-btn--howtovote {
+    @apply bg-green-700 border-green-600 hover:bg-green-800;
   }
 </style>

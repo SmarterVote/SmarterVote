@@ -6,8 +6,12 @@
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
+  import { hasStance, neutralCandidateOrder } from "$lib/utils/candidates";
+  import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
+  import { candidateForecastProbability } from "$lib/utils/racePage";
+  import { headshotFallback } from "$lib/utils/racePageImage";
   import { collapsedPreview, stancePreview } from "$lib/utils/stance";
   import { isExternalUrl } from "$lib/utils/url";
 
@@ -93,24 +97,21 @@
     ? CANONICAL_ISSUES.filter((key) =>
         candidates.some((candidate) => {
           const stance = candidate.issues?.[key];
-          return stance && stance.sources && stance.sources.length > 0;
+          return hasStance(stance) && (stance?.sources?.length ?? 0) > 0;
         }),
       ).slice(0, 1)
     : CANONICAL_ISSUES;
 
+  $: activeCandidates = neutralCandidateOrder(
+    race.candidates.filter((candidate) => !candidate.withdrawn),
+  );
+
   function forecastProbability(candidate: Candidate): number | undefined {
-    const forecast = race.forecast;
-    if (!forecast) return undefined;
-    if (forecast.predicted_winner_name === candidate.name)
-      return forecast.win_probability;
-    const party = candidate.party?.toLowerCase() ?? "";
-    const match = Object.entries(forecast.party_probabilities ?? {}).find(
-      ([key]) =>
-        party.includes(key.toLowerCase()) ||
-        key.toLowerCase().includes(party) ||
-        key.toLowerCase() === party.charAt(0),
+    return candidateForecastProbability(
+      candidate,
+      race.forecast,
+      activeCandidates,
     );
-    return match?.[1];
   }
 </script>
 
@@ -125,7 +126,7 @@
       </p>
     </div>
     <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
-      {#each race.candidates.filter((candidate) => !candidate.withdrawn) as candidate}
+      {#each activeCandidates as candidate (candidateSlug(candidate.name))}
         {@const checked = candidates.some(
           (selected) => selected.name === candidate.name,
         )}
@@ -142,7 +143,7 @@
           />
           {candidate.name}
           {#if candidate.party}<span
-              class="ml-auto rounded-md bg-surface-alt px-1.5 py-0.5 text-[10px] font-bold text-content-subtle sm:ml-0"
+              class="ml-auto rounded-md bg-surface-alt px-1.5 py-0.5 text-xs font-bold text-content-subtle sm:ml-0"
               >{partyAbbr(candidate.party)}</span
             >{/if}
         </label>
@@ -174,7 +175,7 @@
       >
       <div class="min-w-0 text-sm leading-6 text-content-muted">
         <span
-          class="mr-1.5 text-[10px] font-bold uppercase tracking-wider text-content-subtle"
+          class="mr-1.5 text-xs font-bold uppercase tracking-wider text-content-subtle"
           >Automated Research Score</span
         >
         <strong class="text-content">{race.validation_grade.score}/100</strong
@@ -211,7 +212,7 @@
           >
             {compact ? "Compare" : "Candidate comparison"}
           </div>
-          {#each candidates as candidate}
+          {#each candidates as candidate (candidateSlug(candidate.name))}
             <div
               role="columnheader"
               class="flex items-center gap-3 border-r border-stroke px-5 last:border-none"
@@ -220,8 +221,12 @@
                 <img
                   src={candidate.image_url}
                   alt=""
+                  width="48"
+                  height="48"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
                   class="h-12 w-12 flex-shrink-0 rounded-full border-2 border-stroke object-cover"
-                  on:error={() => markImageFailed(candidate)}
+                  use:headshotFallback={() => markImageFailed(candidate)}
                 />
               {:else}
                 <div
@@ -235,16 +240,16 @@
                   href="/races/{race.id}/{candidateSlug(
                     candidate.name,
                   )}/{isDraftPreview ? '?draft=true' : ''}"
-                  class="block truncate text-sm font-extrabold text-content hover:text-blue-600"
-                  >{candidate.name}</a
+                  class="block truncate text-sm font-extrabold text-content hover:text-blue-600 dark:hover:text-blue-400"
+                  title={candidate.name}>{candidate.name}</a
                 >
                 <div class="mt-0.5 flex items-center gap-1.5">
                   {#if candidate.party}<span
-                      class="rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-[10px] font-bold leading-none text-content-muted"
+                      class="rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-xs font-bold leading-none text-content-muted"
                       >{partyAbbr(candidate.party)}</span
                     >{/if}
                   {#if candidate.incumbent}<span
-                      class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
+                      class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
                       >Incumbent</span
                     >{/if}
                 </div>
@@ -268,7 +273,7 @@
           >
             Biography & Summary
           </div>
-          {#each candidates as candidate}
+          {#each candidates as candidate (candidateSlug(candidate.name))}
             {@const isSummaryExpanded =
               expandedSummaries[candidate.name] ?? false}
             {@const summaryText = candidate.summary ?? ""}
@@ -336,8 +341,9 @@
             >
               {getIssueDisplayName(issueKey)}
             </div>
-            {#each candidates as candidate}
-              {@const stance = candidate.issues?.[issueKey]}
+            {#each candidates as candidate (candidateSlug(candidate.name))}
+              {@const rawStance = candidate.issues?.[issueKey]}
+              {@const stance = hasStance(rawStance) ? rawStance : undefined}
               {@const preview = stance
                 ? collapseText
                   ? collapsedPreview(stance.stance)
@@ -372,7 +378,7 @@
                   </div>
                   <div class="flex items-center gap-2 pt-1">
                     <span
-                      class="text-[10px] font-medium uppercase tracking-wide text-content-subtle"
+                      class="text-xs font-medium uppercase tracking-wide text-content-subtle"
                       >Confidence</span
                     ><ConfidenceIndicator confidence={stance.confidence} />
                   </div>
@@ -434,7 +440,7 @@
             >
               Career Timeline
             </div>
-            {#each candidates as candidate}<div
+            {#each candidates as candidate (candidateSlug(candidate.name))}<div
                 role="cell"
                 class="border-r border-stroke p-6 text-sm text-content-muted last:border-none"
               >
@@ -448,7 +454,7 @@
                           <span class="text-xs font-semibold text-content"
                             >{entry.title}</span
                           >{#if entry.start_year}<span
-                              class="text-[10px] text-content-subtle"
+                              class="text-xs text-content-subtle"
                               >{entry.start_year}{entry.end_year
                                 ? ` – ${entry.end_year}`
                                 : " – Present"}</span
@@ -475,7 +481,7 @@
             >
               Education
             </div>
-            {#each candidates as candidate}<div
+            {#each candidates as candidate (candidateSlug(candidate.name))}<div
                 role="cell"
                 class="border-r border-stroke p-6 text-sm text-content-muted last:border-none"
               >
@@ -484,7 +490,7 @@
                         <span class="block text-xs font-semibold text-content"
                           >{edu.institution}</span
                         >{#if edu.degree || edu.field}<span
-                            class="text-[11px] text-content-subtle"
+                            class="text-xs text-content-subtle"
                             >{[edu.degree, edu.field]
                               .filter(Boolean)
                               .join(" in ")}{#if edu.year}
@@ -508,7 +514,7 @@
               >
                 {row.label}
               </div>
-              {#each candidates as candidate}{@const summary =
+              {#each candidates as candidate (candidateSlug(candidate.name))}{@const summary =
                   candidate[row.summary]}{@const sourceUrl = candidate[row.url]}
                 <div
                   role="cell"
@@ -546,11 +552,11 @@
             >
               Forecast
               <span
-                class="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-content-subtle"
+                class="mt-1 block text-xs font-semibold uppercase tracking-wider text-content-subtle"
                 >Model estimate</span
               >
             </div>
-            {#each candidates as candidate}
+            {#each candidates as candidate (candidateSlug(candidate.name))}
               {@const probability = forecastProbability(candidate)}
               <div
                 role="cell"
@@ -564,8 +570,9 @@
                     estimated win probability
                   </p>
                 {:else}
-                  <p class="text-sm font-semibold capitalize text-content">
-                    {race.forecast.rating.replaceAll("_", " ")}
+                  <p class="text-sm font-semibold text-content">
+                    {formatRating(race.forecast.rating) ??
+                      race.forecast.rating.replaceAll("_", " ")}
                   </p>
                   <p class="mt-1 text-xs text-content-muted">
                     race-level rating

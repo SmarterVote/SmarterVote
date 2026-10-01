@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ValidationGrade } from "$lib/types";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let grade: ValidationGrade;
 
@@ -25,7 +26,7 @@
   function scrollToReview() {
     showPopover = false;
     const el = document.getElementById("ai-review");
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+    if (el) el.scrollIntoView({ behavior: scrollBehavior() });
   }
 </script>
 
@@ -35,6 +36,8 @@
     on:click={() => (showPopover = !showPopover)}
     on:keydown={(e) => e.key === "Escape" && (showPopover = false)}
     aria-label="Automated Research Score: {grade.grade}"
+    aria-expanded={showPopover}
+    aria-controls={showPopover ? "validation-grade-popover" : undefined}
   >
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
@@ -52,7 +55,12 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="popover-backdrop" on:click={() => (showPopover = false)}></div>
-    <div class="popover" role="tooltip">
+    <div
+      class="popover"
+      id="validation-grade-popover"
+      role="dialog"
+      aria-label="Automated Research Score details"
+    >
       <div class="popover-header">
         <span class="popover-title">Automated Research Score</span>
         <span class="popover-grade {gradeColor(grade.grade)}"
@@ -101,8 +109,10 @@
     @apply text-base font-bold leading-none;
   }
 
+  /* Full-opacity text: the old 75% opacity dropped green-800 on green-100
+     below 4.5:1. */
   .grade-label {
-    @apply text-xs font-medium opacity-75;
+    @apply text-xs font-medium;
   }
 
   .popover-backdrop {
@@ -140,7 +150,13 @@
 
   .popover-link {
     @apply inline-flex items-center gap-1 text-sm font-medium
-           text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300
+           text-blue-600 hover:text-blue-800
            cursor-pointer transition-colors duration-150;
+  }
+
+  /* Scoped `dark:` variants never match (Svelte scopes the `.dark` ancestor),
+     so dark-mode overrides target the global class explicitly. */
+  :global(.dark) .popover-link {
+    @apply text-blue-400 hover:text-blue-300;
   }
 </style>

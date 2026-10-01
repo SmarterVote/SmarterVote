@@ -8,6 +8,7 @@
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr, partyBadgeClass } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
+  import { headshotFallback } from "$lib/utils/racePageImage";
   import { createEventDispatcher } from "svelte";
 
   export let candidate: Candidate;
@@ -22,6 +23,12 @@
 
   let expanded = false;
   let imageError = false;
+  let imageUrlSeen: string | undefined = candidate?.image_url;
+  // A different headshot gets a fresh chance to load.
+  $: if (candidate.image_url !== imageUrlSeen) {
+    imageUrlSeen = candidate.image_url;
+    imageError = false;
+  }
   let activeTab: "issues" | "background" | "donors" | "voting" = "issues";
 
   function toggleExpanded() {
@@ -30,15 +37,6 @@
 
   function setActiveTab(tab: "issues" | "background" | "donors" | "voting") {
     activeTab = tab;
-  }
-
-  // Generate a URL-safe ID from candidate name
-  function generateCandidateId(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
   }
 
   $: hasCareer =
@@ -55,7 +53,7 @@
       : candidateSummary;
 </script>
 
-<Card class="candidate-card group" id={generateCandidateId(candidate.name)}>
+<Card class="candidate-card group" id={candidateSlug(candidate.name)}>
   <!-- Candidate Header -->
   <div class="mb-6">
     <div class="flex items-start justify-between mb-3">
@@ -77,13 +75,20 @@
             src={candidate.image_url}
             alt={candidate.name}
             class="candidate-image"
-            on:error={() => {
-              imageError = true;
-            }}
+            width="80"
+            height="80"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            use:headshotFallback={() => (imageError = true)}
           />
         {:else}
-          <div class="candidate-image-placeholder">
-            <span class="candidate-initials">
+          <div
+            class="candidate-image-placeholder"
+            role="img"
+            aria-label={candidate.name}
+          >
+            <span class="candidate-initials" aria-hidden="true">
               {candidate.name
                 .split(" ")
                 .filter((n) => n.length > 0)
@@ -361,6 +366,8 @@
 </Card>
 
 <style lang="postcss">
+  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
+     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   :global(.candidate-card) {
     @apply p-3 sm:p-4 lg:p-6 h-full w-full mx-auto shadow-lg;
   }
@@ -370,11 +377,19 @@
   }
 
   .candidate-image-placeholder {
-    @apply w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 dark:bg-blue-900 border-2 border-blue-200 dark:border-blue-700 flex items-center justify-center flex-shrink-0;
+    @apply w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-blue-100 border-2 border-blue-200 flex items-center justify-center flex-shrink-0;
+  }
+
+  :global(.dark) .candidate-image-placeholder {
+    @apply bg-blue-900 border-blue-700;
   }
 
   .candidate-initials {
-    @apply text-blue-700 dark:text-blue-300 font-bold text-lg sm:text-xl select-none;
+    @apply text-blue-700 font-bold text-lg sm:text-xl select-none;
+  }
+
+  :global(.dark) .candidate-initials {
+    @apply text-blue-300;
   }
 
   .candidate-name {
@@ -383,7 +398,11 @@
   }
 
   .candidate-name-link {
-    @apply text-blue-600 hover:text-blue-500 dark:hover:text-blue-400 hover:underline transition-colors duration-200 no-underline;
+    @apply text-blue-700 hover:text-blue-600 hover:underline transition-colors duration-200 no-underline;
+  }
+
+  :global(.dark) .candidate-name-link {
+    @apply text-blue-400 hover:text-blue-300;
   }
 
   .badge {
@@ -391,11 +410,19 @@
   }
 
   .party-badge {
-    @apply bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300;
+    @apply bg-gray-100 text-gray-700;
+  }
+
+  :global(.dark) .party-badge {
+    @apply bg-gray-700 text-gray-300;
   }
 
   .incumbent-badge {
-    @apply bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+    @apply bg-green-100 text-green-800;
+  }
+
+  :global(.dark) .incumbent-badge {
+    @apply bg-green-900 text-green-200;
   }
 
   .summary {
@@ -403,11 +430,19 @@
   }
 
   .website-link {
-    @apply inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium;
+    @apply inline-flex items-center gap-1 text-blue-600 font-medium;
+  }
+
+  :global(.dark) .website-link {
+    @apply text-blue-400;
   }
 
   .website-link:hover {
-    @apply text-blue-500 dark:text-blue-300;
+    @apply text-blue-500;
+  }
+
+  :global(.dark) .website-link:hover {
+    @apply text-blue-300;
   }
 
   .section-title {
@@ -415,12 +450,20 @@
   }
 
   .expand-button {
-    @apply flex min-h-11 items-center gap-2 text-blue-600 dark:text-blue-400 font-medium;
+    @apply flex min-h-11 items-center gap-2 text-blue-600 font-medium;
     @apply transition-colors duration-200;
   }
 
+  :global(.dark) .expand-button {
+    @apply text-blue-400;
+  }
+
   .expand-button:hover {
-    @apply text-blue-500 dark:text-blue-300;
+    @apply text-blue-500;
+  }
+
+  :global(.dark) .expand-button:hover {
+    @apply text-blue-300;
   }
 
   .expand-text {
@@ -461,7 +504,11 @@
   }
 
   .more-tag {
-    @apply bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300;
+    @apply bg-blue-100 text-blue-700;
+  }
+
+  :global(.dark) .more-tag {
+    @apply bg-blue-900 text-blue-300;
   }
 
   /* Background / Career / Education styles */
@@ -474,7 +521,11 @@
   }
 
   .timeline-entry {
-    @apply border-l-2 border-blue-200 dark:border-blue-700 pl-4 py-1;
+    @apply border-l-2 border-blue-200 pl-4 py-1;
+  }
+
+  :global(.dark) .timeline-entry {
+    @apply border-blue-700;
   }
 
   .timeline-header {
@@ -498,7 +549,11 @@
   }
 
   .entry-source-link {
-    @apply inline-flex min-h-6 items-center gap-1 mt-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:underline;
+    @apply inline-flex min-h-6 items-center gap-1 mt-2 py-1 text-xs text-blue-600 hover:underline;
+  }
+
+  :global(.dark) .entry-source-link {
+    @apply text-blue-400;
   }
 
   .education-list {

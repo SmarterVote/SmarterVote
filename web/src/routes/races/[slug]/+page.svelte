@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
+  import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import CandidateCard from "$lib/components/CandidateCard.svelte";
@@ -12,68 +14,153 @@
   import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
   import { formatModelName, candidateSlug } from "$lib/utils/format";
-  import { partySlug, partyAbbr } from "$lib/utils/party";
+  import { partyAbbr, partyKey } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
-  import { normalizeForecastParty } from "$lib/utils/forecast";
+  import { formatRating } from "$lib/utils/forecast";
+  import {
+    getHostname,
+    marketAsOf,
+    marketSignalTarget,
+    marketSpread,
+    probability,
+    probabilityOneDecimal,
+    ratingClass,
+  } from "$lib/utils/forecastPresentation";
   import { formatElectionDate } from "$lib/utils/electionDate";
+  import {
+    neutralCandidateOrder,
+    shortCandidateName,
+  } from "$lib/utils/candidates";
+  import { motionDuration, scrollBehavior } from "$lib/utils/motion";
+  import { headshotFallback } from "$lib/utils/racePageImage";
+  import {
+    forecastHeadline,
+    formatPollDate,
+    isNotFoundError,
+    jsonLdScript,
+    partyProbabilityAriaLabel,
+    partyProbabilitySegments,
+    raceJsonLd,
+    sortPollsByDate,
+  } from "$lib/utils/racePage";
   import {
     raceDisplayTitle,
     raceMetaDescription,
     racePageTitle,
   } from "$lib/utils/raceTitle";
 
-  export let data: { prerenderedRace?: Race };
+  export let data: { prerenderedRace?: Race | null };
 
   let race: Race | null = data.prerenderedRace ?? null;
   let loading = !race;
   let error: string | null = null;
+  let notFound = false;
   let usingFallbackData = false;
   let isDraftPreview = false;
-
-  let slug: string;
-  $: slug = $page.params.slug as string;
-
-  onMount(async () => {
-    const params = new URLSearchParams(window.location.search);
-    isDraftPreview = params.get("draft") === "true";
-    const hasPrerenderedRace = !!race && !isDraftPreview;
-
-    try {
-      if (isDraftPreview) {
-        try {
-          race = await getDraftRace(slug);
-        } catch {
-          race = await getRace(slug, fetch, false);
-          isDraftPreview = false;
-          window.history.replaceState({}, "", `/races/${slug}/`);
-        }
-      } else {
-        race = await getRace(slug);
-      }
-      usingFallbackData = false;
-    } catch (err) {
-      if (hasPrerenderedRace && race) {
-        loading = false;
-        return;
-      }
-
-      // Try to use fallback data
-      try {
-        race = await getRace(slug, fetch, true);
-        usingFallbackData = true;
-        error = null;
-      } catch (fallbackErr) {
-        error = err instanceof Error ? err.message : "Failed to load race data";
-        usingFallbackData = false;
-      }
-    } finally {
-      loading = false;
-    }
-  });
 
   let selectedCandidates: Set<string> = new Set();
   let forecastExpanded = false;
   let overviewExpanded = false;
+  let withdrawnExpanded = false;
+  let hiddenChipImages: Record<string, boolean> = {};
+
+  let slug: string;
+  $: slug = $page.params.slug as string;
+
+  let mounted = false;
+  let loadedKey: string | null = null;
+  let requestId = 0;
+
+  $: draftParam =
+    mounted && browser && $page.url.searchParams.get("draft") === "true";
+  // Client-side navigation between races reuses this component, so the race
+  // (and every bit of per-race UI state) must follow the URL, not mount time.
+  $: if (mounted && `${slug}|${draftParam}` !== loadedKey)
+    loadRace(slug, draftParam);
+
+  onMount(() => {
+    mounted = true;
+  });
+
+  function resetRaceState() {
+    selectedCandidates = new Set();
+    forecastExpanded = false;
+    overviewExpanded = false;
+    withdrawnExpanded = false;
+    hiddenChipImages = {};
+  }
+
+  function hideChipImage(name: string) {
+    hiddenChipImages = { ...hiddenChipImages, [name]: true };
+  }
+
+  async function loadRace(target: string, draft: boolean) {
+    const previousSlug = loadedKey?.split("|")[0];
+    loadedKey = `${target}|${draft}`;
+    const id = ++requestId;
+    const prerendered =
+      data.prerenderedRace && data.prerenderedRace.id === target
+        ? data.prerenderedRace
+        : null;
+
+    if (previousSlug !== target) {
+      resetRaceState();
+      // Show the matching prerendered race (never the previous race) while
+      // the fresh copy loads.
+      race = prerendered;
+      usingFallbackData = false;
+    }
+    isDraftPreview = draft;
+    error = null;
+    notFound = false;
+    loading = !race;
+
+    try {
+      let next: Race;
+      if (draft) {
+        try {
+          next = await getDraftRace(target);
+        } catch {
+          next = await getRace(target, fetch, false);
+          if (id !== requestId) return;
+          isDraftPreview = false;
+          loadedKey = `${target}|false`;
+          try {
+            replaceState(`/races/${target}/`, {});
+          } catch {
+            // Router not ready yet; the stale ?draft=true is harmless.
+          }
+        }
+      } else {
+        next = await getRace(target);
+      }
+      if (id !== requestId) return;
+      race = next;
+      usingFallbackData = false;
+    } catch (err) {
+      if (id !== requestId) return;
+      // Keep the prerendered copy if the refresh fails.
+      if (race && race.id === target) {
+        if (draft) isDraftPreview = false;
+        return;
+      }
+      try {
+        const fallback = await getRace(target, fetch, true);
+        if (id !== requestId) return;
+        race = fallback;
+        usingFallbackData = true;
+      } catch {
+        if (id !== requestId) return;
+        race = null;
+        if (isNotFoundError(err)) notFound = true;
+        else
+          error =
+            err instanceof Error ? err.message : "Failed to load race data";
+      }
+    } finally {
+      if (id === requestId) loading = false;
+    }
+  }
 
   function toggleCandidateSelect(candidateName: string) {
     const s = candidateSlug(candidateName);
@@ -93,24 +180,34 @@
     forecastExpanded = !forecastExpanded;
   }
 
-  $: activeCandidates = race?.candidates?.filter((c) => !c.withdrawn) ?? [];
-  $: withdrawnCandidates = race?.candidates?.filter((c) => c.withdrawn) ?? [];
-  let withdrawnExpanded = false;
-  $: polls = race?.polling ?? [];
+  $: activeCandidates = neutralCandidateOrder(
+    race?.candidates?.filter((c) => !c.withdrawn),
+  );
+  $: withdrawnCandidates = neutralCandidateOrder(
+    race?.candidates?.filter((c) => c.withdrawn),
+  );
+  $: compareAllHref = race
+    ? `/races/${race.id}/compare/?candidates=${activeCandidates
+        .map((candidate) => candidateSlug(candidate.name))
+        .join(",")}${isDraftPreview ? "&draft=true" : ""}`
+    : "";
+  $: polls = sortPollsByDate(race?.polling);
   $: latestPoll = polls.length > 0 ? polls[0] : null;
   $: latestMatchup =
     latestPoll?.matchups?.find(
       (matchup) =>
         Array.isArray(matchup.candidates) && matchup.candidates.length > 0,
     ) ?? null;
+  $: snapshotRows = latestMatchup ? orderedMatchupRows(latestMatchup) : [];
   $: discoveryOnly =
     activeCandidates.length > 0 &&
     activeCandidates.every(
       (c) =>
         !c.issues ||
         Object.keys(c.issues).length === 0 ||
-        Object.values(c.issues).every((i) => !i?.stance),
+        Object.values(c.issues).every((i) => !i?.stance?.trim()),
     );
+  $: jsonLd = race && !notFound ? jsonLdScript(raceJsonLd(race)) : "";
 
   // Derive ballotpedia URL: race-level field first, then fall back to any candidate link
   $: ballotpediaUrl =
@@ -125,9 +222,10 @@
     race?.register_to_vote_url ?? "https://vote.gov/register";
   $: howToVoteUrl = race?.how_to_vote_url ?? "https://vote.gov/";
 
+  /** Colour bucket for a poll name: its party, or "unknown" when not on the roster. */
   function partyClassForName(name: string): string {
     const candidate = race?.candidates?.find((c) => c.name === name);
-    return partySlug(candidate?.party);
+    return candidate ? partyKey(candidate.party) : "unknown";
   }
 
   function matchupPercentages(matchup: {
@@ -152,85 +250,17 @@
     return typeof value === "number" ? value : null;
   }
 
-  function forecastPartyClass(
-    party?: string | null,
-    probs?: Record<string, number> | null,
-    candidates?:
-      | {
-          name?: string;
-          party?: string;
-          incumbent: boolean;
-        }[]
-      | null,
-  ): string {
-    const normalized = normalizeForecastParty(party, probs, candidates);
-    if (normalized === "Democratic") return "dem";
-    if (normalized === "Republican") return "rep";
-    return "other";
-  }
-
-  function forecastRatingLabel(rating?: string): string {
-    const labels: Record<string, string> = {
-      safe_d: "Safe D",
-      likely_d: "Likely D",
-      lean_d: "Lean D",
-      tilt_d: "Tilt D",
-      tossup: "Toss-up",
-      tilt_r: "Tilt R",
-      lean_r: "Lean R",
-      likely_r: "Likely R",
-      safe_r: "Safe R",
-      other: "Other",
-    };
-    return rating ? (labels[rating] ?? rating.replace(/_/g, " ")) : "Unrated";
-  }
-
-  function probability(value?: number | null): string {
-    if (typeof value !== "number") return "n/a";
-    if (value >= 1) return ">99%";
-    if (value <= 0) return "<1%";
-    return `${Math.round(value * 100)}%`;
-  }
-
-  function probabilityOneDecimal(value?: number | null): string {
-    if (typeof value !== "number") return "n/a";
-    return `${(value * 100).toFixed(1)}%`;
-  }
-
-  function marketSignalTarget(signal: {
-    matched_to: string;
-    matched_party?: string;
-  }): string {
-    if (signal.matched_party && signal.matched_party !== signal.matched_to) {
-      return `${signal.matched_to} (${signal.matched_party})`;
-    }
-    return signal.matched_to;
-  }
-
-  function marketSpread(signal: {
-    yes_bid?: number | null;
-    yes_ask?: number | null;
-  }): string | null {
-    if (
-      typeof signal.yes_bid !== "number" ||
-      typeof signal.yes_ask !== "number"
-    ) {
-      return null;
-    }
-    return `${probabilityOneDecimal(
-      signal.yes_bid,
-    )} bid / ${probabilityOneDecimal(signal.yes_ask)} ask`;
-  }
-
-  function marketAsOf(value?: string | null): string {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  /** Matchup rows in the same neutral order the rest of the page uses. */
+  function orderedMatchupRows(matchup: {
+    candidates: string[];
+    percentages?: number[] | null;
+  }): { name: string; pct: number | null }[] {
+    const rows = matchup.candidates.map((name, i) => ({
+      name,
+      pct: percentageAt(matchup, i),
+      party: race?.candidates?.find((c) => c.name === name)?.party,
+    }));
+    return neutralCandidateOrder(rows).map(({ name, pct }) => ({ name, pct }));
   }
 
   function signedMargin(value?: number | null): string {
@@ -238,29 +268,41 @@
     return `${value > 0 ? "+" : ""}${value.toFixed(1)} pts`;
   }
 
-  function hostName(urlString: string): string {
-    try {
-      return new URL(urlString).hostname.replace(/^www\./, "");
-    } catch {
-      return "Source";
-    }
+  function ratingLabel(rating: string | undefined): string {
+    if (!rating) return "Unrated";
+    return (
+      formatRating(rating as Parameters<typeof formatRating>[0]) ??
+      rating.replace(/_/g, " ")
+    );
   }
 </script>
 
 <svelte:head>
-  <title>{racePageTitle(race)}</title>
-  <meta name="description" content={raceMetaDescription(race)} />
-  <link rel="canonical" href="https://smarter.vote/races/{slug}/" />
-  <meta property="og:type" content="article" />
-  <meta property="og:url" content="https://smarter.vote/races/{slug}/" />
-  <meta property="og:title" content={racePageTitle(race)} />
-  <meta property="og:description" content={raceMetaDescription(race)} />
-  <meta property="og:image" content="https://smarter.vote/og-image.png" />
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://smarter.vote/races/{slug}/" />
-  <meta property="twitter:title" content={racePageTitle(race)} />
-  <meta property="twitter:description" content={raceMetaDescription(race)} />
-  <meta property="twitter:image" content="https://smarter.vote/og-image.png" />
+  {#if notFound}
+    <title>Race not found | Smarter.Vote</title>
+    <meta name="robots" content="noindex" />
+  {:else}
+    <title>{racePageTitle(race)}</title>
+    <meta name="description" content={raceMetaDescription(race)} />
+    <link rel="canonical" href="https://smarter.vote/races/{slug}/" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://smarter.vote/races/{slug}/" />
+    <meta property="og:title" content={racePageTitle(race)} />
+    <meta property="og:description" content={raceMetaDescription(race)} />
+    <meta property="og:image" content="https://smarter.vote/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://smarter.vote/races/{slug}/" />
+    <meta name="twitter:title" content={racePageTitle(race)} />
+    <meta name="twitter:description" content={raceMetaDescription(race)} />
+    <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
+    {#if isDraftPreview}
+      <meta name="robots" content="noindex" />
+    {/if}
+    {#if jsonLd}
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+      {@html jsonLd}
+    {/if}
+  {/if}
 </svelte:head>
 
 <div class="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
@@ -269,10 +311,25 @@
       <div class="spinner"></div>
       <span class="loading-text">Loading race data...</span>
     </div>
+  {:else if notFound}
+    <div class="not-found-box">
+      <h1 class="not-found-title">Race not found</h1>
+      <p class="not-found-text">
+        We couldn't find a published race at this address. It may have been
+        renamed, retired after the election, or never published.
+      </p>
+      <div class="not-found-actions">
+        <a href="/elections/" class="not-found-primary">Browse elections</a>
+        <a href="/" class="not-found-secondary">Go to the homepage</a>
+      </div>
+    </div>
   {:else if error}
-    <div class="error-box">
-      <h2 class="error-title">Error loading race</h2>
-      <p class="text-red-600">{error}</p>
+    <div class="error-box" role="alert">
+      <h2 class="error-title">We couldn't load this race</h2>
+      <p class="error-text">
+        Something went wrong while loading the race data. Please check your
+        connection and try again.
+      </p>
       <button class="error-button" on:click={() => window.location.reload()}>
         Try again
       </button>
@@ -404,17 +461,17 @@
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span>Updated: {new Date(race.updated_utc).toLocaleDateString()}</span
+          <span
+            >Updated: {formatPollDate(race.updated_utc, {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            }) || "date unavailable"}</span
           >
         </div>
       </div>
       {#if activeCandidates.length > 1}
-        <a
-          href="/races/{race.id}/compare/?candidates={activeCandidates
-            .map((candidate) => candidateSlug(candidate.name))
-            .join(',')}{isDraftPreview ? '&draft=true' : ''}"
-          class="header-compare-link"
-        >
+        <a href={compareAllHref} class="header-compare-link">
           Compare all {activeCandidates.length} candidates
         </a>
       {/if}
@@ -454,30 +511,30 @@
             {/if}
           {/if}
           <div class="overview-candidates">
-            {#each activeCandidates as candidate}
+            {#each activeCandidates as candidate (candidateSlug(candidate.name))}
               <a
                 href="/races/{race.id}/{candidateSlug(
                   candidate.name,
                 )}/{isDraftPreview ? '?draft=true' : ''}"
                 class="overview-candidate-chip"
               >
-                {#if candidate.image_url}
+                {#if candidate.image_url && !hiddenChipImages[candidate.name]}
                   <img
                     src={candidate.image_url}
                     alt=""
+                    width="20"
+                    height="20"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
                     class="chip-avatar"
-                    on:error={(e) => {
-                      if (e.currentTarget instanceof HTMLImageElement)
-                        e.currentTarget.style.display = "none";
-                    }}
+                    use:headshotFallback={() => hideChipImage(candidate.name)}
                   />
                 {/if}
                 <span class="chip-name">{candidate.name}</span>
                 {#if candidate.party}
                   <span
-                    class="chip-party chip-party-{partyClassForName(
-                      candidate.name,
-                    )}">{partyAbbr(candidate.party)}</span
+                    class="chip-party chip-party-{partyKey(candidate.party)}"
+                    title={candidate.party}>{partyAbbr(candidate.party)}</span
                   >
                 {/if}
                 {#if candidate.incumbent}
@@ -508,18 +565,22 @@
               <span class="poll-snapshot-title">Latest Poll</span>
             </div>
             <p class="poll-snapshot-meta">
-              {latestPoll.pollster}{latestPoll.date
-                ? ` · ${new Date(latestPoll.date).toLocaleDateString("en-US", {
+              {latestPoll.pollster}{formatPollDate(latestPoll.date)
+                ? ` · ${formatPollDate(latestPoll.date, {
                     month: "short",
                     day: "numeric",
+                    year: "numeric",
                   })}`
                 : ""}
             </p>
             <div class="poll-snapshot-bars">
-              {#each latestMatchup.candidates as name, i}
-                {@const pct = percentageAt(latestMatchup, i)}
+              {#each snapshotRows as row, rowIndex (`${row.name}|${rowIndex}`)}
+                {@const name = row.name}
+                {@const pct = row.pct}
                 <div class="poll-snap-row">
-                  <span class="poll-snap-name">{name.split(" ").pop()}</span>
+                  <span class="poll-snap-name" title={name}
+                    >{shortCandidateName(name, latestMatchup.candidates)}</span
+                  >
                   <div class="poll-snap-bar-wrap">
                     <div
                       class="poll-snap-bar {partyClassForName(name)}"
@@ -581,18 +642,29 @@
       <div class="candidates-heading">
         <h2 class="candidates-title">Candidates</h2>
         {#if activeCandidates.length > 1}
-          <a
-            href="/races/{race.id}/compare/?candidates={activeCandidates
-              .map((candidate) => candidateSlug(candidate.name))
-              .join(',')}{isDraftPreview ? '&draft=true' : ''}"
-            class="compare-all-link"
-          >
+          <a href={compareAllHref} class="compare-all-link">
             Compare all <span aria-hidden="true">&rarr;</span>
           </a>
         {/if}
       </div>
+      {#if activeCandidates.length === 0}
+        <div class="candidates-empty">
+          <p class="candidates-empty-title">No active candidates listed yet</p>
+          <p class="candidates-empty-text">
+            {#if withdrawnCandidates.length > 0}
+              Every candidate we tracked for this race has withdrawn or is not
+              running. Check back after the filing deadline for an updated
+              field.
+            {:else}
+              We haven't published a candidate field for this race yet. Check
+              back closer to the filing deadline, or see your state's election
+              office for the official list.
+            {/if}
+          </p>
+        </div>
+      {/if}
       <div class="candidate-grid">
-        {#each activeCandidates as candidate}
+        {#each activeCandidates as candidate (candidateSlug(candidate.name))}
           <CandidateCard
             {candidate}
             raceId={race.id}
@@ -631,8 +703,11 @@
           Withdrawn / Not Running ({withdrawnCandidates.length})
         </button>
         {#if withdrawnExpanded}
-          <div transition:slide class="candidate-grid mt-3 opacity-60">
-            {#each withdrawnCandidates as candidate}
+          <div
+            transition:slide={{ duration: motionDuration(400) }}
+            class="candidate-grid mt-3 opacity-60"
+          >
+            {#each withdrawnCandidates as candidate (candidateSlug(candidate.name))}
               <CandidateCard
                 {candidate}
                 raceId={race.id}
@@ -647,44 +722,27 @@
     <!-- Race Forecast -->
     {#if race.forecast}
       {@const forecast = race.forecast}
-      {@const forecastParty = normalizeForecastParty(
-        forecast.predicted_winner_party,
-        forecast.party_probabilities,
-        race.candidates,
-      )}
-      {@const forecastClass = forecastPartyClass(
-        forecast.predicted_winner_party,
-        forecast.party_probabilities,
-        race.candidates,
-      )}
-      {@const forecastLeader =
-        forecast.predicted_winner_name ||
-        (forecastParty === "Other"
-          ? "Leading candidate"
-          : `${forecastParty} candidate`)}
+      {@const headline = forecastHeadline(forecast)}
+      {@const segments = partyProbabilitySegments(forecast.party_probabilities)}
       <Card id="forecast" class="forecast-card scroll-mt-6">
         <div class="forecast-header">
           <div>
             <p class="forecast-eyebrow">Race Forecast</p>
-            <h2 class="forecast-title">
-              {#if forecast.rating === "tossup"}
-                Toss-up
-              {:else}
-                {forecast.predicted_winner_name || forecastParty} favored
-              {/if}
-            </h2>
+            <h2 class="forecast-title">{headline.title}</h2>
 
-            <p class="forecast-summary">
-              <strong>{forecastLeader}:</strong>
-              {probability(forecast.win_probability)} modeled win probability
-              {#if typeof forecast.margin_estimate === "number"}
-                with a {signedMargin(forecast.margin_estimate)} estimated margin
-              {/if}
-            </p>
+            {#if headline.leader && typeof forecast.win_probability === "number"}
+              <p class="forecast-summary">
+                <strong>{headline.leader}:</strong>
+                {probability(forecast.win_probability)} modeled win probability
+                {#if typeof forecast.margin_estimate === "number"}
+                  with a {signedMargin(forecast.margin_estimate)} estimated margin
+                {/if}
+              </p>
+            {/if}
           </div>
           <div class="forecast-actions">
-            <span class="forecast-rating forecast-rating-{forecastClass}">
-              {forecastRatingLabel(forecast.rating)}
+            <span class="forecast-rating {ratingClass(forecast.rating)}">
+              {ratingLabel(forecast.rating)}
             </span>
           </div>
         </div>
@@ -744,37 +802,48 @@
 
         <!-- Expanded Content - slide transitions for details -->
         {#if forecastExpanded}
-          <div transition:slide class="expanded-content mt-6">
-            {#if forecast.party_probabilities}
-              {@const demProbability =
-                forecast.party_probabilities.Democratic ?? 0}
-              {@const repProbability =
-                forecast.party_probabilities.Republican ?? 0}
+          <div
+            transition:slide={{ duration: motionDuration(400) }}
+            class="expanded-content mt-6"
+          >
+            {#if segments.length > 0}
               <div
                 class="forecast-probability-bar"
-                aria-label="Party probabilities"
+                role="img"
+                aria-label={partyProbabilityAriaLabel(segments)}
               >
-                {#if demProbability > 0}
+                {#each segments as segment (segment.party)}
                   <div
-                    class="forecast-probability-segment forecast-probability-segment-dem"
-                    style="width: {Math.max(2, demProbability * 100)}%"
+                    class="forecast-probability-segment forecast-probability-segment-{segment.key}"
+                    style="flex: {segment.value} 1 0%"
+                    title="{segment.party} {segment.label}"
                   >
-                    {#if demProbability > 0.12}D {probability(
-                        demProbability,
-                      )}{/if}
+                    {#if segment.value >= 0.15}
+                      <span aria-hidden="true"
+                        >{segment.party} {segment.label}</span
+                      >
+                    {:else}
+                      <span class="sr-only"
+                        >{segment.party} {segment.label}</span
+                      >
+                    {/if}
                   </div>
-                {/if}
-                {#if repProbability > 0}
-                  <div
-                    class="forecast-probability-segment forecast-probability-segment-rep"
-                    style="width: {Math.max(2, repProbability * 100)}%"
-                  >
-                    {#if repProbability > 0.12}R {probability(
-                        repProbability,
-                      )}{/if}
-                  </div>
-                {/if}
+                {/each}
               </div>
+              {#if segments.some((segment) => segment.value < 0.15)}
+                <ul class="forecast-probability-legend">
+                  {#each segments as segment (segment.party)}
+                    <li>
+                      <span
+                        class="forecast-legend-swatch forecast-probability-segment-{segment.key}"
+                        aria-hidden="true"
+                      ></span>
+                      {segment.party}
+                      {segment.label}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
             {/if}
 
             <div class="forecast-body" id="forecast-details">
@@ -858,7 +927,7 @@
                 {#each forecast.source_urls as url}
                   {#if isExternalUrl(url)}
                     <a href={url} target="_blank" rel="noopener noreferrer">
-                      {hostName(url)}
+                      {getHostname(url)}
                     </a>
                   {/if}
                 {/each}
@@ -874,9 +943,8 @@
           {/if}
           {#if forecast.generated_at}
             <span
-              >Generated: {new Date(
-                forecast.generated_at,
-              ).toLocaleDateString()}</span
+              >Generated: {formatPollDate(forecast.generated_at) ||
+                "date unavailable"}</span
             >
           {/if}
         </div>
@@ -888,18 +956,14 @@
       <section id="polls" class="polls-section">
         <h2 class="section-heading">Polling</h2>
         <div class="polls-grid">
-          {#each polls as poll}
+          {#each polls as poll, pollIndex (`${poll.pollster}|${poll.date ?? ""}|${pollIndex}`)}
             <div class="poll-card">
               <div class="poll-card-header">
                 <div>
                   <span class="poll-card-pollster">{poll.pollster}</span>
-                  {#if poll.date}
+                  {#if formatPollDate(poll.date)}
                     <span class="poll-card-date"
-                      >{new Date(poll.date).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}</span
+                      >{formatPollDate(poll.date)}</span
                     >
                   {/if}
                 </div>
@@ -913,22 +977,26 @@
               {#each poll.matchups ?? [] as matchup, mi}
                 {#if mi > 0}<div class="poll-matchup-divider"></div>{/if}
                 <div class="poll-matchup">
-                  {#each matchup.candidates as name, i}
-                    {@const pc = partyClassForName(name)}
-                    {@const pct = percentageAt(matchup, i)}
+                  {#each orderedMatchupRows(matchup) as row, rowIndex (`${row.name}|${rowIndex}`)}
+                    {@const pc = partyClassForName(row.name)}
+                    {@const pct = row.pct}
                     <div class="poll-bar-row">
-                      <span class="poll-bar-name">{name}</span>
-                      <div class="poll-bar-track">
-                        <div
-                          class="poll-bar-fill {pc}"
-                          class:poll-bar-fill--missing={pct === null}
-                          style="width:{Math.min(pct ?? 0, 100)}%"
-                        >
-                          <span class="poll-bar-label"
-                            >{pct !== null ? `${pct}%` : "n/a"}</span
-                          >
-                        </div>
+                      <span class="poll-bar-name" title={row.name}
+                        >{row.name}</span
+                      >
+                      <div class="poll-bar-track" aria-hidden="true">
+                        {#if pct !== null}
+                          <div
+                            class="poll-bar-fill {pc}"
+                            style="width:{Math.min(Math.max(pct, 0), 100)}%"
+                          ></div>
+                        {/if}
                       </div>
+                      <span
+                        class="poll-bar-label"
+                        class:poll-bar-label--missing={pct === null}
+                        >{pct !== null ? `${pct}%` : "n/a"}</span
+                      >
                     </div>
                   {/each}
                   {#if !matchupHasPercentages(matchup)}
@@ -978,9 +1046,14 @@
           This is sample data for demonstration purposes. The actual race data
           is currently unavailable.
         {:else}
-          Data compiled from public sources and analyzed using AI. Last updated {new Date(
+          Data compiled from public sources and analyzed using AI. Last updated {formatPollDate(
             race.updated_utc,
-          ).toLocaleDateString()}. Visit candidate websites for the most current
+            {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            },
+          ) || "recently"}. Visit candidate websites for the most current
           information.
         {/if}
       </p>
@@ -1016,7 +1089,7 @@
     <div class="back-to-top">
       <button
         class="back-to-top-link"
-        on:click={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        on:click={() => window.scrollTo({ top: 0, behavior: scrollBehavior() })}
       >
         <svg
           class="w-4 h-4"
@@ -1038,7 +1111,7 @@
     <!-- Compare sticky drawer -->
     {#if selectedCandidates.size > 0}
       <div
-        transition:fade={{ duration: 200 }}
+        transition:fade={{ duration: motionDuration(200) }}
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-surface/95 backdrop-blur-md border border-stroke py-4 px-6 shadow-2xl rounded-2xl flex items-center justify-between gap-6 max-w-md w-[calc(100%-2rem)] transition-all duration-300"
       >
         <div class="flex items-center gap-3">
@@ -1075,6 +1148,8 @@
 </div>
 
 <style lang="postcss">
+  /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
+     `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .loading-wrapper {
     @apply flex items-center justify-center py-20;
   }
@@ -1088,15 +1163,59 @@
   }
 
   .error-box {
-    @apply bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center;
+    @apply bg-red-50 border border-red-200 rounded-lg p-6 text-center;
+  }
+
+  :global(.dark) .error-box {
+    @apply bg-red-950/30 border-red-800;
   }
 
   .error-title {
-    @apply text-2xl font-bold text-red-800 dark:text-red-200 mb-2;
+    @apply text-2xl font-bold text-red-800 mb-2;
+  }
+
+  :global(.dark) .error-title {
+    @apply text-red-200;
+  }
+
+  .error-text {
+    @apply text-red-700;
+  }
+
+  :global(.dark) .error-text {
+    @apply text-red-200;
   }
 
   .error-button {
-    @apply mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors;
+    @apply mt-4 bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800 transition-colors;
+  }
+
+  .not-found-box {
+    @apply mx-auto max-w-2xl rounded-2xl border border-stroke bg-surface p-6 text-center shadow-sm sm:p-10;
+  }
+
+  .not-found-title {
+    @apply text-2xl font-bold text-content sm:text-3xl;
+  }
+
+  .not-found-text {
+    @apply mt-3 text-sm leading-relaxed text-content-muted sm:text-base;
+  }
+
+  .not-found-actions {
+    @apply mt-6 flex flex-wrap items-center justify-center gap-3;
+  }
+
+  .not-found-primary {
+    @apply inline-flex min-h-11 items-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white no-underline hover:bg-blue-800;
+  }
+
+  .not-found-secondary {
+    @apply inline-flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 no-underline hover:underline;
+  }
+
+  :global(.dark) .not-found-secondary {
+    @apply text-blue-400;
   }
 
   :global(.header-card) {
@@ -1155,7 +1274,11 @@
   }
 
   .overview-toggle {
-    @apply mb-4 inline-flex min-h-11 items-center text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300 sm:hidden;
+    @apply mb-4 inline-flex min-h-11 items-center text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline sm:hidden;
+  }
+
+  :global(.dark) .overview-toggle {
+    @apply text-blue-400 hover:text-blue-300;
   }
 
   @media (max-width: 639px) {
@@ -1172,8 +1295,11 @@
   }
 
   .overview-candidate-chip {
-    @apply flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-surface border border-stroke rounded-full
-           hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors duration-200 text-sm no-underline text-content-muted;
+    @apply flex min-h-11 items-center gap-1.5 px-3 py-1.5 bg-surface border border-stroke rounded-full hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200 text-sm no-underline text-content-muted;
+  }
+
+  :global(.dark) .overview-candidate-chip {
+    @apply hover:bg-blue-950/30;
   }
 
   .chip-avatar {
@@ -1188,21 +1314,60 @@
     @apply text-xs font-semibold;
   }
   .chip-party-dem {
-    @apply text-blue-600;
+    @apply text-blue-700;
+  }
+
+  :global(.dark) .chip-party-dem {
+    @apply text-blue-300;
   }
   .chip-party-rep {
-    @apply text-red-600;
+    @apply text-red-700;
+  }
+
+  :global(.dark) .chip-party-rep {
+    @apply text-red-300;
+  }
+  .chip-party-ind {
+    @apply text-purple-700;
+  }
+
+  :global(.dark) .chip-party-ind {
+    @apply text-purple-300;
+  }
+  .chip-party-grn {
+    @apply text-emerald-700;
+  }
+
+  :global(.dark) .chip-party-grn {
+    @apply text-emerald-300;
+  }
+  .chip-party-lib {
+    @apply text-amber-800;
+  }
+
+  :global(.dark) .chip-party-lib {
+    @apply text-amber-300;
+  }
+  .chip-party-other {
+    @apply text-content-muted;
   }
 
   .chip-incumbent {
-    @apply bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs px-1.5 py-0.5 rounded-full;
+    @apply bg-green-100 text-green-700 text-xs px-1.5 py-0.5 rounded-full;
+  }
+
+  :global(.dark) .chip-incumbent {
+    @apply bg-green-900 text-green-300;
   }
 
   /* Poll Snapshot Widget */
   .poll-snapshot {
-    @apply flex flex-col gap-2 p-4 bg-page border border-stroke rounded-xl
-           hover:border-blue-300 hover:bg-blue-50 transition-colors no-underline
-           lg:w-64 lg:shrink-0 cursor-pointer;
+    @apply flex flex-col gap-2 p-4 bg-page border border-stroke rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors no-underline lg:w-64 lg:shrink-0 cursor-pointer;
+  }
+
+  :global(.dark) /* Poll Snapshot Widget */
+  .poll-snapshot {
+    @apply hover:border-blue-700 hover:bg-blue-950/30;
   }
 
   .poll-snapshot-header {
@@ -1234,13 +1399,7 @@
   }
 
   .poll-snap-bar {
-    @apply h-full rounded-full bg-content-faint;
-  }
-  .poll-snap-bar.dem {
-    @apply bg-blue-500;
-  }
-  .poll-snap-bar.rep {
-    @apply bg-red-500;
+    @apply h-full rounded-full bg-slate-500;
   }
 
   .poll-snap-pct {
@@ -1248,7 +1407,39 @@
   }
 
   .poll-snapshot-more {
-    @apply text-xs text-blue-600 font-medium mt-1;
+    @apply text-xs text-blue-700 font-medium mt-1;
+  }
+
+  :global(.dark) .poll-snapshot-more {
+    @apply text-blue-400;
+  }
+
+  /* Party fills shared by the snapshot and detailed poll bars. Third parties
+     get their own colours; "unknown" (a name not on the roster) is neutral
+     slate, and a missing value draws no bar at all. */
+  .poll-snap-bar.dem,
+  .poll-bar-fill.dem {
+    @apply bg-blue-600;
+  }
+  .poll-snap-bar.rep,
+  .poll-bar-fill.rep {
+    @apply bg-red-600;
+  }
+  .poll-snap-bar.ind,
+  .poll-bar-fill.ind {
+    @apply bg-purple-600;
+  }
+  .poll-snap-bar.grn,
+  .poll-bar-fill.grn {
+    @apply bg-emerald-600;
+  }
+  .poll-snap-bar.lib,
+  .poll-bar-fill.lib {
+    @apply bg-amber-500;
+  }
+  .poll-snap-bar.other,
+  .poll-bar-fill.other {
+    @apply bg-teal-600;
   }
 
   /* Forecast */
@@ -1279,23 +1470,22 @@
   .forecast-rating {
     @apply inline-flex self-start rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide;
   }
-  .forecast-rating-dem {
-    @apply bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800;
-  }
-  .forecast-rating-rep {
-    @apply bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800;
-  }
-  .forecast-rating-other {
-    @apply bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-200 dark:border-slate-700;
-  }
 
   .expand-button {
-    @apply flex min-h-11 items-center gap-2 text-blue-600 dark:text-blue-400 font-medium;
+    @apply flex min-h-11 items-center gap-2 text-blue-600 font-medium;
     @apply transition-colors duration-200;
   }
 
+  :global(.dark) .expand-button {
+    @apply text-blue-400;
+  }
+
   .expand-button:hover {
-    @apply text-blue-500 dark:text-blue-300;
+    @apply text-blue-500;
+  }
+
+  :global(.dark) .expand-button:hover {
+    @apply text-blue-300;
   }
 
   .expand-text {
@@ -1323,7 +1513,7 @@
   }
 
   .forecast-metric-label {
-    @apply block text-[11px] font-semibold uppercase tracking-wide text-content-subtle;
+    @apply block text-xs font-semibold uppercase tracking-wide text-content-subtle;
   }
 
   .forecast-metric-value {
@@ -1335,13 +1525,38 @@
   }
 
   .forecast-probability-segment {
-    @apply flex items-center justify-center text-xs font-bold text-white transition-all duration-300;
+    @apply flex min-w-[4px] items-center justify-center overflow-hidden whitespace-nowrap px-1 text-xs font-bold text-white transition-all duration-300;
   }
+  /* 600/700 shades keep white labels at >= 4.5:1. */
   .forecast-probability-segment-dem {
-    @apply bg-blue-600;
+    @apply bg-blue-700;
   }
   .forecast-probability-segment-rep {
-    @apply bg-red-600 ml-auto;
+    @apply bg-red-700;
+  }
+  .forecast-probability-segment-ind {
+    @apply bg-purple-700;
+  }
+  .forecast-probability-segment-grn {
+    @apply bg-emerald-700;
+  }
+  .forecast-probability-segment-lib {
+    @apply bg-amber-700;
+  }
+  .forecast-probability-segment-other {
+    @apply bg-slate-600;
+  }
+
+  .forecast-probability-legend {
+    @apply -mt-2 mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-content-muted;
+  }
+
+  .forecast-probability-legend li {
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .forecast-legend-swatch {
+    @apply inline-block h-2.5 w-2.5 rounded-sm;
   }
 
   .forecast-body {
@@ -1410,7 +1625,11 @@
   }
 
   .forecast-market-values a {
-    @apply font-semibold text-blue-600 hover:underline dark:text-blue-400;
+    @apply font-semibold text-blue-600 hover:underline;
+  }
+
+  :global(.dark) .forecast-market-values a {
+    @apply text-blue-400;
   }
 
   .forecast-meta {
@@ -1422,7 +1641,11 @@
   }
 
   .forecast-sources a {
-    @apply rounded-full border border-stroke bg-page px-3 py-1 text-xs font-medium text-blue-600 hover:border-blue-300 hover:bg-blue-50 dark:text-blue-400;
+    @apply rounded-full border border-stroke bg-page px-3 py-1 text-xs font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50;
+  }
+
+  :global(.dark) .forecast-sources a {
+    @apply text-blue-400 hover:border-blue-700 hover:bg-blue-950/30;
   }
 
   /* Candidates */
@@ -1435,7 +1658,23 @@
   }
 
   .compare-all-link {
-    @apply inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-blue-600 no-underline transition-colors hover:text-blue-800 hover:underline dark:text-blue-400 dark:hover:text-blue-300;
+    @apply inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-sm font-semibold text-blue-600 no-underline transition-colors hover:text-blue-800 hover:underline;
+  }
+
+  :global(.dark) .compare-all-link {
+    @apply text-blue-400 hover:text-blue-300;
+  }
+
+  .candidates-empty {
+    @apply mb-6 rounded-xl border border-dashed border-stroke bg-surface p-6 text-center;
+  }
+
+  .candidates-empty-title {
+    @apply text-base font-semibold text-content;
+  }
+
+  .candidates-empty-text {
+    @apply mt-1 text-sm text-content-muted;
   }
 
   .candidate-grid {
@@ -1472,7 +1711,7 @@
   }
 
   .poll-card-sample {
-    @apply text-xs text-content-faint shrink-0;
+    @apply text-xs text-content-subtle shrink-0;
   }
 
   .poll-matchup-divider {
@@ -1492,49 +1731,67 @@
   }
 
   .poll-bar-track {
-    @apply flex-1 bg-surface-alt rounded-full h-6 overflow-hidden;
+    @apply flex-1 bg-surface-alt rounded-full h-3 overflow-hidden;
   }
 
   .poll-bar-fill {
-    @apply h-full rounded-full bg-content-faint flex items-center justify-end pr-2 min-w-[2rem] transition-all duration-300;
-  }
-  .poll-bar-fill.dem {
-    @apply bg-blue-500;
-  }
-  .poll-bar-fill.rep {
-    @apply bg-red-500;
-  }
-  .poll-bar-fill--missing {
-    @apply bg-content-faint;
+    @apply h-full rounded-full bg-slate-500 transition-all duration-300;
   }
 
+  /* Labels sit outside the bar in body text colour so they stay readable on
+     any fill (white on a 500-shade fill failed contrast). */
   .poll-bar-label {
-    @apply text-xs font-bold text-white;
+    @apply w-10 shrink-0 text-right text-xs font-bold tabular-nums text-content;
+  }
+
+  .poll-bar-label--missing {
+    @apply font-medium italic text-content-muted;
   }
 
   .poll-missing-note {
-    @apply text-xs text-content-faint italic;
+    @apply text-xs text-content-muted italic;
   }
 
   .poll-card-source {
-    @apply inline-flex min-h-6 items-center gap-1 py-1 text-xs text-blue-500 hover:text-blue-700 mt-auto;
+    @apply inline-flex min-h-6 items-center gap-1 py-1 text-xs text-blue-700 hover:underline mt-auto;
+  }
+
+  :global(.dark) .poll-card-source {
+    @apply text-blue-400;
   }
 
   /* Misc */
   .data-note {
-    @apply mt-8 sm:mt-10 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 text-center;
+    @apply mt-8 sm:mt-10 bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6 text-center;
+  }
+
+  :global(.dark) /* Misc */
+  .data-note {
+    @apply bg-blue-950/30 border-blue-800;
   }
 
   .data-note-title {
-    @apply text-blue-800 dark:text-blue-200 font-medium mb-2 text-sm sm:text-base;
+    @apply text-blue-800 font-medium mb-2 text-sm sm:text-base;
+  }
+
+  :global(.dark) .data-note-title {
+    @apply text-blue-200;
   }
 
   .data-note-text {
-    @apply text-blue-700 dark:text-blue-300 text-xs sm:text-sm;
+    @apply text-blue-700 text-xs sm:text-sm;
+  }
+
+  :global(.dark) .data-note-text {
+    @apply text-blue-300;
   }
 
   .fallback-notice {
-    @apply bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 sm:p-4 mb-6 sm:mb-8;
+    @apply bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 mb-6 sm:mb-8;
+  }
+
+  :global(.dark) .fallback-notice {
+    @apply bg-yellow-950/30 border-yellow-800;
   }
 
   .fallback-content {
@@ -1542,11 +1799,19 @@
   }
 
   .fallback-title {
-    @apply font-medium text-yellow-800 dark:text-yellow-200 text-sm sm:text-base;
+    @apply font-medium text-yellow-800 text-sm sm:text-base;
+  }
+
+  :global(.dark) .fallback-title {
+    @apply text-yellow-200;
   }
 
   .fallback-text {
-    @apply text-yellow-700 dark:text-yellow-300 text-xs sm:text-sm mt-1;
+    @apply text-yellow-700 text-xs sm:text-sm mt-1;
+  }
+
+  :global(.dark) .fallback-text {
+    @apply text-yellow-300;
   }
 
   .back-to-top {
@@ -1554,6 +1819,10 @@
   }
 
   .back-to-top-link {
-    @apply inline-flex items-center gap-2 text-content-muted hover:text-blue-600 font-medium transition-colors duration-200 border-none bg-transparent cursor-pointer;
+    @apply inline-flex items-center gap-2 text-content-muted hover:text-blue-700 font-medium transition-colors duration-200 border-none bg-transparent cursor-pointer;
+  }
+
+  :global(.dark) .back-to-top-link {
+    @apply hover:text-blue-400;
   }
 </style>

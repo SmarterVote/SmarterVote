@@ -4,6 +4,8 @@
   import NoDataFallback from "./NoDataFallback.svelte";
   import type { IssueKey, IssueStance } from "$lib/types";
   import { RENAMED_ISSUE_NOTES, getIssueDisplayName } from "$lib/types";
+  import { hasStance } from "$lib/utils/candidates";
+  import { candidateSlug } from "$lib/utils/format";
 
   export let issues: Partial<Record<IssueKey, IssueStance>>;
   export let raceId: string = "";
@@ -13,7 +15,17 @@
 
   $: issueEntries = (
     Object.entries(issues) as [IssueKey, IssueStance][]
-  ).filter(([, stance]) => Boolean(stance?.stance));
+  ).filter(([, stance]) => hasStance(stance));
+  // Several IssueTables can share a page (one per candidate card), so every id
+  // is namespaced by race and candidate.
+  $: idBase = `issues-${candidateSlug(raceId || "race")}-${candidateSlug(
+    candidateName || "candidate",
+  )}`;
+  $: issueSelectId = `${idBase}-select`;
+
+  function noteId(key: string): string {
+    return `${idBase}-${candidateSlug(key)}-note`;
+  }
   $: hasIssues = issueEntries.length > 0;
   let selectedIssue: IssueKey | "" = "";
   $: if (
@@ -74,9 +86,17 @@
                 {#if RENAMED_ISSUE_NOTES[issue]}
                   <span class="relative inline-block">
                     <button
-                      class="inline-flex min-h-11 min-w-11 items-center justify-center text-blue-500 hover:text-blue-400 focus:outline-none leading-none"
+                      type="button"
+                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                       aria-label="About this issue name"
                       title="About this issue name"
+                      aria-expanded={visibleTooltip === issue}
+                      aria-controls={visibleTooltip === issue
+                        ? noteId(issue)
+                        : undefined}
+                      aria-describedby={visibleTooltip === issue
+                        ? noteId(issue)
+                        : undefined}
                       on:click|stopPropagation={() => toggleTooltip(issue)}
                     >
                       <svg
@@ -94,12 +114,14 @@
                     </button>
                     {#if visibleTooltip === issue}
                       <div
+                        id={noteId(issue)}
                         class="absolute z-10 left-0 top-11 w-72 rounded-lg border border-stroke bg-surface p-3 shadow-lg text-sm text-content-muted"
                         role="tooltip"
                       >
                         <p>{RENAMED_ISSUE_NOTES[issue]}</p>
                         <button
-                          class="mt-2 inline-flex min-h-11 items-center text-xs text-content-faint hover:text-content underline"
+                          type="button"
+                          class="mt-2 inline-flex min-h-11 items-center text-xs text-content-subtle hover:text-content underline"
                           on:click|stopPropagation={() => {
                             visibleTooltip = null;
                           }}>Dismiss</button
@@ -127,7 +149,9 @@
                 </div>
                 {#if stance.sources.length > INITIAL_SOURCE_LIMIT}
                   <button
-                    class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:hover:text-blue-400 text-sm underline"
+                    type="button"
+                    aria-expanded={expandedSources.has(issue)}
+                    class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
                     aria-label={expandedSources.has(issue)
                       ? `Show fewer sources for ${getIssueDisplayName(issue)}`
                       : `Show ${
@@ -165,13 +189,13 @@
       class="sticky top-[calc(var(--site-header-height)+4.5rem)] z-20 rounded-lg border border-stroke bg-surface p-3 shadow-sm"
     >
       <label
-        for="candidate-issue-select"
+        for={issueSelectId}
         class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-content-subtle"
       >
         Review an issue
       </label>
       <select
-        id="candidate-issue-select"
+        id={issueSelectId}
         bind:value={selectedIssue}
         class="min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-base font-semibold text-content focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
@@ -188,8 +212,16 @@
             {#if RENAMED_ISSUE_NOTES[issue]}
               <span class="relative inline-block">
                 <button
-                  class="inline-flex min-h-11 min-w-11 items-center justify-center text-blue-500 hover:text-blue-400 focus:outline-none leading-none"
+                  type="button"
+                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label="About this issue name"
+                  aria-expanded={visibleTooltip === issue + "-mobile"}
+                  aria-controls={visibleTooltip === issue + "-mobile"
+                    ? noteId(issue + "-mobile")
+                    : undefined}
+                  aria-describedby={visibleTooltip === issue + "-mobile"
+                    ? noteId(issue + "-mobile")
+                    : undefined}
                   on:click|stopPropagation={() =>
                     toggleTooltip(issue + "-mobile")}
                 >
@@ -208,13 +240,15 @@
                 </button>
                 {#if visibleTooltip === issue + "-mobile"}
                   <div
+                    id={noteId(issue + "-mobile")}
                     class="absolute z-10 left-0 top-11 w-64 rounded-lg border border-stroke bg-surface p-3 shadow-lg text-sm text-content-muted"
                     role="tooltip"
                   >
                     <p>{RENAMED_ISSUE_NOTES[issue]}</p>
 
                     <button
-                      class="mt-2 inline-flex min-h-11 items-center text-xs text-content-faint hover:text-content underline"
+                      type="button"
+                      class="mt-2 inline-flex min-h-11 items-center text-xs text-content-subtle hover:text-content underline"
                       on:click|stopPropagation={() => {
                         visibleTooltip = null;
                       }}>Dismiss</button
@@ -239,7 +273,9 @@
             </div>
             {#if stance.sources.length > INITIAL_SOURCE_LIMIT}
               <button
-                class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:hover:text-blue-400 text-sm underline"
+                type="button"
+                aria-expanded={expandedSources.has(issue + "-mobile")}
+                class="mt-2 inline-flex min-h-11 items-center text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 text-sm underline"
                 aria-label={expandedSources.has(issue + "-mobile")
                   ? `Show fewer sources for ${getIssueDisplayName(issue)}`
                   : `Show ${

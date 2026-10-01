@@ -5,8 +5,11 @@
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, CanonicalIssue, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
+  import { hasStance } from "$lib/utils/candidates";
+  import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
+  import { headshotFallback } from "$lib/utils/racePageImage";
   import { collapsedPreview, stancePreview } from "$lib/utils/stance";
 
   export let race: Race;
@@ -22,7 +25,7 @@
   let failedImages: Record<string, boolean> = {};
 
   $: issueKeys = CANONICAL_ISSUES.filter((key) =>
-    candidates.some((candidate) => candidate.issues?.[key]?.stance),
+    candidates.some((candidate) => hasStance(candidate.issues?.[key])),
   );
   $: if (!issueKeys.includes(selectedIssue))
     selectedIssue = issueKeys[0] ?? "Healthcare";
@@ -88,7 +91,7 @@
     class="hide-scrollbar flex snap-x snap-mandatory overflow-x-auto border-b border-stroke bg-surface-alt/30"
     aria-label="Candidates in this comparison"
   >
-    {#each candidates as candidate}
+    {#each candidates as candidate (candidateSlug(candidate.name))}
       <a
         href="/races/{race.id}/{candidateSlug(candidate.name)}/{isDraftPreview
           ? '?draft=true'
@@ -100,8 +103,12 @@
           <img
             src={candidate.image_url}
             alt=""
+            width="56"
+            height="56"
+            decoding="async"
+            referrerpolicy="no-referrer"
             class="h-14 w-14 rounded-full border-2 border-white object-cover shadow"
-            on:error={() => markImageFailed(candidate)}
+            use:headshotFallback={() => markImageFailed(candidate)}
           />
         {:else}
           <span
@@ -114,7 +121,7 @@
           >{candidate.name}</span
         >
         {#if candidate.party}
-          <span class="mt-1 text-[11px] font-semibold text-content-muted"
+          <span class="mt-1 text-xs font-semibold text-content-muted"
             >{partyAbbr(candidate.party)}</span
           >
         {/if}
@@ -151,8 +158,9 @@
     </select>
 
     <div class="mt-4 space-y-3">
-      {#each candidates as candidate}
-        {@const stance = candidate.issues?.[selectedIssue]}
+      {#each candidates as candidate (candidateSlug(candidate.name))}
+        {@const rawStance = candidate.issues?.[selectedIssue]}
+        {@const stance = hasStance(rawStance) ? rawStance : undefined}
         {@const preview = stance ? positionPreview(stance.stance) : ""}
         {@const isExpanded = expandedStances[stanceKey(candidate)] ?? false}
         {@const isTruncated = stance ? preview !== stance.stance.trim() : false}
@@ -231,13 +239,14 @@
           >
             Forecast
           </p>
-          <p class="mt-1 text-sm capitalize text-content">
-            {race.forecast.rating.replaceAll("_", " ")}
+          <p class="mt-1 text-sm text-content">
+            {formatRating(race.forecast.rating) ??
+              race.forecast.rating.replaceAll("_", " ")}
           </p>
         </div>
         <a
           href="/races/{race.id}/{isDraftPreview ? '?draft=true' : ''}#forecast"
-          class="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600"
+          class="inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-blue-700 hover:underline dark:text-blue-400"
           >View forecast <UiIcon name="arrow-right" size="sm" /></a
         >
       </div>
