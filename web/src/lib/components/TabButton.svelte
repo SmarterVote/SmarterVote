@@ -21,9 +21,9 @@
     @apply rounded-t-md;
   }
 
+  /* Inset so the ring isn't clipped by scrolling tab strips. */
   .tab-button:focus-visible {
-    outline: 2px solid rgb(var(--sv-primary));
-    outline-offset: -2px;
+    @apply outline-none ring-2 ring-inset ring-primary;
   }
 
   .tab-button.active {

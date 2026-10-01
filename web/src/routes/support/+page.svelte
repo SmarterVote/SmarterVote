@@ -11,6 +11,7 @@
   title="Support Smarter.Vote"
   description="Help Smarter.Vote LLC build broader, dependable election coverage."
   path="/support/"
+  eyebrow="Get involved"
 >
   {#if paymentsEnabled}
     <SupportTiers />

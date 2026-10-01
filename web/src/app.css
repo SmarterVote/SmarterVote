@@ -135,6 +135,28 @@
   .alert-info {
     @apply rounded-lg border border-stroke bg-surface-alt px-4 py-3 text-sm text-content-muted;
   }
+
+  /* Disabled buttons: one muted look in both themes. The dark-mode and hover
+     fills above carry higher specificity (`:is(.dark *)`), so restate the
+     disabled colors with selectors that outrank them. */
+  .btn-primary:disabled,
+  .btn-danger:disabled,
+  .dark .btn-primary:disabled:hover,
+  .dark .btn-danger:disabled:hover,
+  .btn-primary:disabled:hover,
+  .btn-danger:disabled:hover {
+    background-color: rgb(var(--sv-surface-alt));
+    color: rgb(var(--sv-text-subtle));
+    box-shadow: inset 0 0 0 1px rgb(var(--sv-border));
+  }
+  .btn-secondary:disabled:hover {
+    background-color: rgb(var(--sv-surface));
+  }
+  .btn-ghost:disabled,
+  .btn-ghost:disabled:hover {
+    background-color: transparent;
+    color: rgb(var(--sv-text-subtle));
+  }
 }
 
 /* Fallback focus indicator for keyboard users. Many controls strip the UA

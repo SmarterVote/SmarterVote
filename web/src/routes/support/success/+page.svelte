@@ -35,9 +35,9 @@
   <div role="status" aria-live="polite" aria-busy={status === "checking"}>
     {#if status === "confirmed"}
       <div
-        class="rounded-xl border border-green-300 bg-green-50 p-6 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100"
+        class="rounded-xl border border-green-300 bg-green-50 p-6 text-green-900 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-100"
       >
-        <h2 class="mb-2 text-lg font-semibold">Payment confirmed</h2>
+        <h2 class="h-card mb-2 text-inherit">Payment confirmed</h2>
         <p>
           Thank you — your support goes directly toward election research and
           broader coverage. Stripe will send a receipt to the email provided at
@@ -46,9 +46,9 @@
       </div>
     {:else if status === "pending"}
       <div
-        class="rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+        class="rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100"
       >
-        <h2 class="mb-2 text-lg font-semibold">Payment processing</h2>
+        <h2 class="h-card mb-2 text-inherit">Payment processing</h2>
         <p>
           Stripe has not confirmed the payment yet. Check your receipt or return
           to this page shortly.
@@ -58,7 +58,7 @@
       <div
         class="rounded-xl border border-stroke bg-surface-alt p-6 text-content"
       >
-        <h2 class="mb-2 text-lg font-semibold">
+        <h2 class="h-card mb-2 text-inherit">
           We could not verify this payment
         </h2>
         <p>

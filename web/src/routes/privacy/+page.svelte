@@ -8,6 +8,8 @@
   title="Privacy"
   description="A plain-language description of how Smarter.Vote handles visitor, inquiry, and payment data."
   path="/privacy/"
+  eyebrow="Policy"
+  updated="2026-10-01"
 >
   <PolicySection title="Data we handle">
     <p>

@@ -132,10 +132,7 @@
   </div>
 
   {#if error}
-    <p
-      role="alert"
-      class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
-    >
+    <p role="alert" class="alert-error">
       {error}
     </p>
   {/if}
@@ -143,13 +140,13 @@
   <!-- CTA -->
   <button
     type="submit"
-    class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:opacity-50 disabled:cursor-not-allowed"
+    class="btn-primary w-full py-3 text-base"
     disabled={!canSubmit}
   >
     {#if loading}
       <svg
         aria-hidden="true"
-        class="mr-2 h-4 w-4 animate-spin"
+        class="h-4 w-4 animate-spin"
         viewBox="0 0 24 24"
         fill="none"
       >

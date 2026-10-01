@@ -8,6 +8,7 @@
   title="Partner with Smarter.Vote"
   description="Information for newsrooms, universities, civic organizations, grantmakers, sponsors, and data partners."
   path="/partners/"
+  eyebrow="Get involved"
 >
   <PolicySection title="Ways to collaborate">
     <p>
