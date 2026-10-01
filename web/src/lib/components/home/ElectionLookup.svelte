@@ -14,6 +14,7 @@
     type AddressSuggestion,
   } from "$lib/services/googlePlaces";
   import { debounce } from "$lib/utils/debounce";
+  import { canonicalStateName } from "$lib/utils/states";
 
   export let races: RaceSummary[] = [];
   /** True when the published race list could not be loaded at all. */
@@ -144,7 +145,8 @@
   }
 
   function restoreFromGeography(savedState: string, savedDistrict: string) {
-    const normalizedState = savedState.trim();
+    // Shared links may carry a postal code or any case (`?state=AK`).
+    const normalizedState = canonicalStateName(savedState) ?? savedState.trim();
     const normalizedDistrict = savedDistrict.trim().padStart(2, "0");
     if (!normalizedState || !/^\d{2}$/.test(normalizedDistrict)) return false;
 

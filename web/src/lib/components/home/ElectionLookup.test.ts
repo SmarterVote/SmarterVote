@@ -127,6 +127,33 @@ describe("ElectionLookup", () => {
     expect(lookupElectionGeography).not.toHaveBeenCalled();
   });
 
+  it("restores a shared link that uses a postal code", async () => {
+    window.history.replaceState({}, "", "/my-ballot/?state=AK&district=00");
+
+    render(ElectionLookup, {
+      races: [
+        {
+          id: "ak-house-2026",
+          title: "Alaska's At-Large Congressional District Election, 2026",
+          office: "U.S. House of Representatives",
+          state: "Alaska",
+          election_date: "2099-11-03",
+          updated_utc: "2026-07-01T00:00:00Z",
+          candidates: [],
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Alaska · At-large congressional district/),
+      ).toBeTruthy(),
+    );
+    expect(
+      screen.getByRole("tab", { name: "U.S. House", selected: true }),
+    ).toBeTruthy();
+  });
+
   it("renders Census delegate districts as at-large", async () => {
     window.history.replaceState(
       {},

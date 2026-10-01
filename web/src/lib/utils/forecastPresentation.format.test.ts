@@ -3,6 +3,7 @@ import {
   cleanDisplayText,
   colorForRating,
   controlProbability,
+  controlProbabilities,
   officeDisplayName,
   raceShortLabel,
   marketAsOf,
@@ -252,12 +253,43 @@ describe("oneDecimal", () => {
 });
 
 describe("display helpers", () => {
-  it("formats control probabilities to one decimal so complements sum to 100", () => {
+  it("formats a single control probability to one decimal", () => {
     expect(controlProbability(0.725)).toBe("72.5%");
     expect(controlProbability(0.275)).toBe("27.5%");
     expect(controlProbability(1)).toBe(">99.9%");
     expect(controlProbability(0)).toBe("<0.1%");
     expect(controlProbability(undefined)).toBe("n/a");
+  });
+
+  it("shows the second of a pair as 100 minus the first", () => {
+    // Formatting each side on its own showed 0.3% / 99.8%.
+    expect(controlProbabilities([0.0025, 0.9975])).toEqual(["0.3%", "99.7%"]);
+    expect(controlProbabilities([0.725, 0.275])).toEqual(["72.5%", "27.5%"]);
+    expect(controlProbabilities([0, 1])).toEqual(["<0.1%", ">99.9%"]);
+    expect(controlProbabilities([1, 0])).toEqual([">99.9%", "<0.1%"]);
+    expect(controlProbabilities([0.3, 0.1, 0.6])).toEqual([
+      "30.0%",
+      "10.0%",
+      "60.0%",
+    ]);
+    // Values that do not cover every outcome are not complemented.
+    expect(controlProbabilities([0.3, 0.3])).toEqual(["30.0%", "30.0%"]);
+    expect(controlProbabilities([0.3, undefined])).toEqual(["30.0%", "n/a"]);
+  });
+
+  it("always sums a complementary pair to exactly 100.0 (brute force, 0.0001 steps)", () => {
+    const parse = (text: string) => {
+      if (text === "<0.1%") return { tenths: 0, bound: true };
+      if (text === ">99.9%") return { tenths: 1000, bound: true };
+      expect(text).toMatch(/^\d{1,2}\.\d%$/);
+      return { tenths: Math.round(parseFloat(text) * 10), bound: false };
+    };
+    for (let step = 0; step <= 10000; step += 1) {
+      const p = step / 10000;
+      const [first, second] = controlProbabilities([p, 1 - p]).map(parse);
+      expect(first.tenths + second.tenths, `p=${p}`).toBe(1000);
+      expect(first.bound, `p=${p}`).toBe(second.bound);
+    }
   });
 
   it("derives compact race labels from the race id", () => {

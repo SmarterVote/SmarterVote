@@ -160,7 +160,7 @@
   <div class="card mt-7 overflow-hidden">
     <div class="border-b border-stroke bg-surface-alt/50 px-5 py-5 sm:px-7">
       <p class="eyebrow">Explore your races</p>
-      <h3 class="mt-1 text-xl font-bold text-content">Your matched races</h3>
+      <h2 class="mt-1 text-xl font-bold text-content">Your matched races</h2>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-content-muted">
         Choose a race to compare candidates and sourced positions without
         leaving this page.

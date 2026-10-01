@@ -129,14 +129,12 @@ describe("BallotExplorer", () => {
     const danaPosition = screen.getByRole("article", {
       name: "Dana Democrat position on Healthcare",
     });
+    // Mobile previews match the desktop cells: a short stance shows in full.
     expect(
-      within(danaPosition).getByText("Dana Democrat healthcare position."),
-    ).toBeTruthy();
-    await fireEvent.click(
-      within(danaPosition).getByRole("button", {
+      within(danaPosition).queryByRole("button", {
         name: "Show more for Dana Democrat",
       }),
-    );
+    ).toBeNull();
     expect(
       within(danaPosition).getByText(
         "Dana Democrat healthcare position. Additional policy context.",

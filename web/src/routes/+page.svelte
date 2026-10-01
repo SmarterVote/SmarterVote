@@ -75,7 +75,7 @@
                 ><UiIcon name="arrow-right" /></span
               ></span
             >
-            <span class="mt-1 block text-sm text-white/90"
+            <span class="mt-1 block text-sm text-white"
               >Find the national races tied to your address</span
             >
           </a>

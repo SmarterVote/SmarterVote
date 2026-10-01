@@ -3,8 +3,10 @@
   import USMap, { RACE_COUNT_BUCKETS } from "$lib/components/USMap.svelte";
   import RaceCard from "$lib/components/RaceCard.svelte";
   import { page } from "$app/stores";
+  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
   import { afterNavigate, replaceState } from "$app/navigation";
-  import { canonicalRaceState } from "$lib/utils/states";
+  import { canonicalRaceState, canonicalStateName } from "$lib/utils/states";
   import {
     getSearchTokens,
     matchesSearchDoc,
@@ -31,13 +33,41 @@
   let debouncedSearchQuery = "";
   let mapExpanded = false;
 
+  // Below `sm` the map is collapsed behind a toggle, and USMap downloads a
+  // 224 KB topology the moment it mounts — so on phones mount it only once the
+  // visitor asks for it. Read the breakpoint synchronously on the client so a
+  // wide screen mounts the map during hydration, with no flash of the skeleton
+  // the prerendered page already shows. Without matchMedia (tests, very old
+  // browsers) assume the map is visible, which is the previous behaviour.
+  const SM_QUERY = "(min-width: 640px)";
+  const wideQuery =
+    browser && typeof window.matchMedia === "function"
+      ? window.matchMedia(SM_QUERY)
+      : null;
+  let isWideViewport = wideQuery ? wideQuery.matches : true;
+  let mapMounted = false;
+  // Sticky: once loaded, collapsing or narrowing the window keeps it mounted.
+  $: mapMounted = mapMounted || mapExpanded || isWideViewport;
+
+  onMount(() => {
+    if (!wideQuery) return;
+    const update = (event: MediaQueryListEvent) => {
+      isWideViewport = event.matches;
+    };
+    wideQuery.addEventListener("change", update);
+    return () => wideQuery.removeEventListener("change", update);
+  });
+
   // Adopt `?q=`, `?state=`, and `?office=` only on real navigations (load,
   // back/forward, header search). Typing writes the URL shallowly, so it can
   // never echo back into the box and overwrite characters typed while an older
   // write was in flight.
   afterNavigate(({ to }) => {
     const params = to?.url.searchParams;
-    selectedState = params?.get("state") || null;
+    // Shared links use postal codes or any case (`?state=TX`, `texas`);
+    // canonicalize to the full name the race list is keyed by.
+    const stateParam = params?.get("state")?.trim() || null;
+    selectedState = canonicalStateName(stateParam) ?? stateParam;
     selectedOffice = params?.get("office") || null;
     const q = params?.get("q") || "";
     if (q === debouncedSearchQuery) return;
@@ -407,14 +437,16 @@
       class:hidden={!mapExpanded}
       class="mx-auto max-w-3xl sm:block"
     >
-      <USMap
-        {activeStates}
-        {selectedState}
-        raceCounts={filteredRaceCounts}
-        {matchingCandidatesByState}
-        shadeByCount
-        on:stateClick={handleStateClick}
-      />
+      {#if mapMounted}
+        <USMap
+          {activeStates}
+          {selectedState}
+          raceCounts={filteredRaceCounts}
+          {matchingCandidatesByState}
+          shadeByCount
+          on:stateClick={handleStateClick}
+        />
+      {/if}
       <div
         class="mt-3 flex flex-col items-center justify-between gap-2 text-xs text-content-muted sm:flex-row"
       >

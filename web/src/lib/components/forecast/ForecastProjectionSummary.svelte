@@ -66,7 +66,7 @@
       class="h-6 rounded-full overflow-hidden bg-surface-alt flex border border-stroke/60"
     >
       <div
-        class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
+        class="bg-blue-600 dark:bg-blue-700 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
         style={`width: ${Math.min(
           100,
           ((projectedSeats.Democratic ?? 0) / totalExpected) * 100,
@@ -79,7 +79,7 @@
       </div>
       {#if projectedSeats.Other}
         <div
-          class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
+          class="bg-slate-500 dark:bg-slate-600 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
           style={`width: ${Math.min(
             100,
             ((projectedSeats.Other ?? 0) / totalExpected) * 100,
@@ -92,7 +92,7 @@
         </div>
       {/if}
       <div
-        class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner ml-auto"
+        class="bg-red-600 dark:bg-red-700 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner ml-auto"
         style={`width: ${Math.min(
           100,
           ((projectedSeats.Republican ?? 0) / totalExpected) * 100,

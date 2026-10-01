@@ -299,13 +299,34 @@ describe("forecast utilities", () => {
       ).toBe("Democratic");
     });
 
-    it("resolves a Senate 50-50 projection to Republican via VP tie-break", () => {
+    it("resolves a Senate 50-50 projection via the data's VP tie-break party", () => {
+      const tiedAggregate = {
+        ...aggregate,
+        projected: { Democratic: 50, Republican: 50, Other: 0 },
+      };
+      expect(
+        resolveControlParty(
+          "senate",
+          { vp_tiebreak_party: "Democratic" } as never,
+          tiedAggregate,
+        ),
+      ).toBe("Democratic");
+      expect(
+        resolveControlParty(
+          "senate",
+          { vp_tiebreak_party: "Republican" } as never,
+          tiedAggregate,
+        ),
+      ).toBe("Republican");
+    });
+
+    it("leaves a Senate 50-50 undetermined when the tie-break party is unknown", () => {
       const tiedAggregate = {
         ...aggregate,
         projected: { Democratic: 50, Republican: 50, Other: 0 },
       };
       expect(resolveControlParty("senate", undefined, tiedAggregate)).toBe(
-        "Republican",
+        "Other",
       );
     });
 

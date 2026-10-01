@@ -117,7 +117,7 @@
                 : 'border-stroke bg-surface text-content-muted hover:border-content-subtle hover:text-content'}"
               title="{race.jurisdiction} · {race.office}"
             >
-              <span class="mr-1 tabular-nums opacity-70"
+              <span class="mr-1 font-medium tabular-nums"
                 >{String(index + 1).padStart(2, "0")}</span
               >
               {chipLabel(race)}

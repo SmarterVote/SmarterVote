@@ -236,13 +236,42 @@ ABBR_TO_STATE = {
 }
 
 
-def normalize_party(party: Any) -> Party:
-    value = str(party or "").lower()
-    if "democrat" in value or value == "dfl":
+# One party-label vocabulary shared with `partyFromLabel` in
+# web/src/lib/utils/forecast.ts; tests/fixtures/forecast_parity.json pins both
+# sides to the same answers. A label the two sides read differently counts the
+# same seat for different parties on the API and on the forecast page.
+DEMOCRATIC_PARTY_LABELS = frozenset({"d", "dem", "dfl"})
+REPUBLICAN_PARTY_LABELS = frozenset({"r", "rep", "gop"})
+UNSPECIFIED_WINNER_LABELS = frozenset(
+    {"", "other", "unknown", "none", "n/a", "na", "null", "tbd", "undecided", "tossup", "toss-up"}
+)
+
+
+def classify_party(party: Any) -> Optional[Party]:
+    """Democratic, Republican, a named non-major party ("Other"), or None.
+
+    None means the label is empty or one of the pipeline's placeholders for
+    "unspecified" (including a bare "Other"), so the caller must look elsewhere.
+    """
+    value = str(party or "").strip().lower()
+    if value in UNSPECIFIED_WINNER_LABELS:
+        return None
+    if value in DEMOCRATIC_PARTY_LABELS or "democrat" in value:
         return "Democratic"
-    if "republican" in value or value == "gop":
+    if value in REPUBLICAN_PARTY_LABELS or "republican" in value:
         return "Republican"
     return "Other"
+
+
+def normalize_party(party: Any) -> Party:
+    return classify_party(party) or "Other"
+
+
+def _probability_key_party(key: Any) -> Optional[Party]:
+    """Party for a `party_probabilities` key; a bare "Other" key is the Other bucket."""
+    if str(key).strip().lower() == "other":
+        return "Other"
+    return classify_party(key)
 
 
 # `office` is free text written by the research model, so the same chamber shows
@@ -276,14 +305,37 @@ def office_group(race: Dict[str, Any]) -> Chamber | None:
     return None
 
 
+DISTRICT_OF_COLUMBIA = "District of Columbia"
+_STATE_LOOKUP = {
+    **ABBR_TO_STATE,
+    **{name.lower(): name for name in ABBR_TO_STATE.values()},
+    "dc": DISTRICT_OF_COLUMBIA,
+    DISTRICT_OF_COLUMBIA.lower(): DISTRICT_OF_COLUMBIA,
+}
+
+
+def _canonical_state_value(value: Any) -> str | None:
+    normalized = str(value or "").strip().lower()
+    return _STATE_LOOKUP.get(normalized) if normalized else None
+
+
 def race_state(race: Dict[str, Any]) -> str | None:
-    state = race.get("state") or race.get("jurisdiction")
-    if state:
-        # Some races store the postal code ("CA"), which silently missed every
-        # state-keyed table: holders, holdovers and the holdover trim alike.
-        return ABBR_TO_STATE.get(str(state).strip().lower(), str(state))
-    race_id = str(race.get("id") or race.get("race_id") or "")
-    return ABBR_TO_STATE.get(race_id.split("-")[0].lower())
+    """Canonical full state name for a race, or None.
+
+    Mirrors `canonicalRaceState` + `getRaceState` in the frontend: a recognised
+    `state`, then `jurisdiction` (postal code or any-case full name), then the
+    race ID's postal prefix, then the raw text. DC never enters chamber math.
+    A lowercase "virginia" used to miss every state-keyed table, so Virginia's
+    holdover seats were counted on top of its race.
+    """
+    state = _canonical_state_value(race.get("state")) or _canonical_state_value(race.get("jurisdiction"))
+    if not state:
+        race_id = str(race.get("id") or race.get("race_id") or "")
+        state = _STATE_LOOKUP.get(race_id.split("-", 1)[0].lower()) if race_id else None
+    if not state:
+        raw = str(race.get("state") or "").strip() or str(race.get("jurisdiction") or "").strip()
+        state = raw or None
+    return None if state == DISTRICT_OF_COLUMBIA else state
 
 
 _RACE_ID_YEAR = re.compile(r"-(\d{4})$")
@@ -328,12 +380,23 @@ def is_chamber_control_race(race: Dict[str, Any], chamber: Chamber) -> bool:
     return True
 
 
-def fallback_party_for_race(race: Dict[str, Any]) -> Party:
+def fallback_party_for_race(race: Dict[str, Any]) -> Optional[Party]:
+    """Best guess at who holds a race's seat, or None when nothing says.
+
+    Mirrors `fallbackPartyForRace` in web/src/lib/utils/forecast.ts: the
+    roster's incumbent (an Independent incumbent is an "Other" seat, never
+    skipped), then the roster's D/R majority, then the per-state table, then
+    the Senate holdover table. None leaves the seat out of the projected tally
+    on both sides rather than inventing an "Other" seat.
+    """
     candidates = race.get("candidates")
     if isinstance(candidates, list):
         for candidate in candidates:
             if isinstance(candidate, dict) and candidate.get("incumbent"):
-                return normalize_party(candidate.get("party"))
+                incumbent_party = classify_party(candidate.get("party"))
+                if incumbent_party:
+                    return incumbent_party
+                break
         party_counts: Dict[Party, int] = {"Democratic": 0, "Republican": 0, "Other": 0}
         for candidate in candidates:
             if isinstance(candidate, dict):
@@ -350,7 +413,7 @@ def fallback_party_for_race(race: Dict[str, Any]) -> Party:
 
     if chamber == "senate" and state and state in SENATE_HOLDOVERS:
         return SENATE_HOLDOVERS[state][-1]
-    return "Other"
+    return None
 
 
 def _default_probability_for_rating(rating: str, party: Party) -> Dict[Party, float]:
@@ -371,13 +434,11 @@ def _default_probability_for_rating(rating: str, party: Party) -> Dict[Party, fl
 
 
 def _race_party_probabilities(forecast: Dict[str, Any]) -> Dict[Party, float]:
-    raw = forecast.get("party_probabilities")
-    if isinstance(raw, dict):
-        dem = float(raw.get("Democratic") or raw.get("Democrat") or raw.get("D") or 0)
-        rep = float(raw.get("Republican") or raw.get("GOP") or raw.get("R") or 0)
-        other = max(0.0, 1.0 - dem - rep)
-        if dem or rep:
-            return {"Democratic": dem, "Republican": rep, "Other": other}
+    totals = _party_probability_totals(forecast)
+    dem = totals.get("Democratic", 0.0)
+    rep = totals.get("Republican", 0.0)
+    if dem or rep:
+        return {"Democratic": dem, "Republican": rep, "Other": max(0.0, 1.0 - dem - rep)}
 
     party = normalize_party(forecast.get("predicted_winner_party"))
     win_probability = forecast.get("win_probability")
@@ -389,36 +450,42 @@ def _race_party_probabilities(forecast: Dict[str, Any]) -> Dict[Party, float]:
     return _default_probability_for_rating(str(forecast.get("rating") or ""), party)
 
 
-UNSPECIFIED_WINNER_LABELS = frozenset(
-    {"", "other", "unknown", "none", "n/a", "na", "null", "tbd", "undecided", "tossup", "toss-up"}
-)
-
-
-def _probable_party(forecast: Dict[str, Any]) -> Optional[Party]:
-    """The single most likely party from explicit probabilities, or None on a tie/no data."""
+def _party_probability_totals(forecast: Dict[str, Any]) -> Dict[Party, float]:
     raw = forecast.get("party_probabilities")
-    if not isinstance(raw, dict):
-        return None
     totals: Dict[Party, float] = {}
+    if not isinstance(raw, dict):
+        return totals
     for key, value in raw.items():
         try:
             prob = float(value)
         except (TypeError, ValueError):
             continue
-        label = str(key).strip().lower()
-        if label in ("d", "dem"):
-            party: Party = "Democratic"
-        elif label in ("r", "gop"):
-            party = "Republican"
-        else:
-            party = normalize_party(label)
+        party = _probability_key_party(key)
+        if party is None or prob != prob:  # unspecified key, or NaN
+            continue
         totals[party] = totals.get(party, 0.0) + prob
+    return totals
+
+
+def _probable_party(forecast: Dict[str, Any]) -> Optional[Party]:
+    """The single most likely party from explicit probabilities, or None on a tie/no data."""
+    totals = _party_probability_totals(forecast)
     if not totals:
         return None
     ranked = sorted(totals.items(), key=lambda item: item[1], reverse=True)
     if ranked[0][1] <= 0 or (len(ranked) > 1 and ranked[0][1] == ranked[1][1]):
         return None
     return ranked[0][0]
+
+
+def forecast_winner_party(forecast: Dict[str, Any]) -> Optional[Party]:
+    """Mirrors `forecastWinnerParty` in web/src/lib/utils/forecast.ts.
+
+    A named non-major favorite (e.g. an Independent) is "Other" and never folded
+    into a major party. Only an unspecified label resolves from the
+    probabilities; None means neither says anything.
+    """
+    return classify_party(forecast.get("predicted_winner_party")) or _probable_party(forecast)
 
 
 def _chamber_races(summaries: Iterable[Dict[str, Any]], chamber: Chamber) -> list[Dict[str, Any]]:
@@ -519,23 +586,28 @@ def summarize_chamber(
             if party == "Republican":
                 rep_holdovers += 1
 
+    # Seats with no forecast party and no holder evidence at all (an empty
+    # roster outside every fallback table). They are left out of the per-race
+    # tally, exactly like `uncountedForecasts` on the forecast page, rather than
+    # being invented as "Other" seats — so the two tallies agree.
+    uncounted = 0
     for race in races:
         forecast = race.get("forecast") if isinstance(race.get("forecast"), dict) else None
         if not forecast:
             fallback_party = fallback_party_for_race(race)
+            if fallback_party is None:
+                uncounted += 1
+                continue
             projected[fallback_party] += 1
             expected[fallback_party] += 1
             continue
-        # A named non-major favorite (e.g. an Independent) is an "Other" seat and is
-        # never folded into a major party. Only an unspecified label ("", "Other",
-        # "Unknown", ...) resolves from the probabilities, then the current holder.
-        # Mirrors forecastWinnerParty in web/src/lib/utils/forecast.ts.
-        raw_winner_party = str(forecast.get("predicted_winner_party") or "").strip().lower()
-        if raw_winner_party in UNSPECIFIED_WINNER_LABELS:
-            party = _probable_party(forecast) or fallback_party_for_race(race)
+        # Mirrors aggregateForecasts in web/src/lib/utils/forecast.ts: the
+        # forecast's own party, then its probabilities, then the seat holder.
+        party = forecast_winner_party(forecast) or fallback_party_for_race(race)
+        if party is None:
+            uncounted += 1
         else:
-            party = normalize_party(raw_winner_party)
-        projected[party] += 1
+            projected[party] += 1
         for key, value in _race_party_probabilities(forecast).items():
             expected[key] += value
         rating = str(forecast.get("rating") or "")
@@ -682,6 +754,7 @@ def summarize_chamber(
             "tie_50_50": round(tie_probability, 3) if chamber in ("senate", "governors") else 0.0,
         },
         "projected_seats": projected,
+        "uncounted_seats": uncounted,
         "expected_seats": {key: round(value, 1) for key, value in expected.items()},
         "threshold": THRESHOLDS[chamber],
         "total_seats": EXPECTED_TOTALS[chamber],
