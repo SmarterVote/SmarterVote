@@ -2,7 +2,9 @@
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Race } from "$lib/types";
+  import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { candidateSlug } from "$lib/utils/format";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: Race[] = [];
   let selectedId = races[0]?.id ?? "";
@@ -11,8 +13,9 @@
     selectedId = races[0].id;
   $: selectedIndex = races.findIndex((race) => race.id === selectedId);
   $: selectedRace = races[selectedIndex] ?? races[0];
-  $: candidates =
-    selectedRace?.candidates.filter((candidate) => !candidate.withdrawn) ?? [];
+  $: candidates = neutralCandidateOrder(
+    selectedRace?.candidates.filter((candidate) => !candidate.withdrawn),
+  );
   // Keep the active pill visible when the selection changes from either the
   // arrow buttons or a pill click.
   $: centerPill(selectedIndex);
@@ -25,7 +28,7 @@
         0,
         pill.offsetLeft - (pillList.clientWidth - pill.offsetWidth) / 2,
       ),
-      behavior: "smooth",
+      behavior: scrollBehavior(),
     });
   }
 
@@ -44,7 +47,7 @@
     >
       <div>
         <div
-          class="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
+          class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
         >
           Featured comparison
         </div>
@@ -63,13 +66,14 @@
 
     <div
       class="border-b border-stroke px-4 py-3 sm:px-6"
+      role="group"
       aria-label="Choose a featured race"
     >
       <div class="flex items-center gap-3">
         <button
           type="button"
           on:click={() => moveRace(-1)}
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-blue-600"
+          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-primary"
           aria-label="Previous featured race"
           ><UiIcon name="arrow-left" /></button
         >
@@ -97,13 +101,13 @@
         <button
           type="button"
           on:click={() => moveRace(1)}
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-blue-600"
+          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-primary"
           aria-label="Next featured race"><UiIcon name="arrow-right" /></button
         >
       </div>
     </div>
 
-    <div class="p-3 lg:p-5" aria-label="Featured comparison preview">
+    <section class="p-3 lg:p-5" aria-label="Featured comparison preview">
       <CandidateComparison
         race={selectedRace}
         {candidates}
@@ -122,6 +126,6 @@
           <UiIcon name="arrow-right" size="sm" />
         </a>
       </div>
-    </div>
+    </section>
   </div>
 {/if}

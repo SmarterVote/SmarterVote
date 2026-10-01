@@ -33,6 +33,8 @@
   let mobileNavOpen = false;
   let mobileSearchOpen = false;
   let siteHeader: HTMLElement;
+  let searchToggle: HTMLButtonElement | undefined;
+  let navToggle: HTMLButtonElement | undefined;
   const resultsId = "site-search-results";
 
   onMount(() => {
@@ -121,6 +123,12 @@
   // links). Our own URL writes are shallow, so they never echo back into the
   // box and overwrite characters typed since.
   afterNavigate(({ to }) => {
+    // Any navigation (link, back/forward, search result) closes the mobile
+    // panels and the results dropdown.
+    mobileNavOpen = false;
+    mobileSearchOpen = false;
+    open = false;
+    activeIndex = -1;
     if (!to || to.url.pathname !== "/") {
       lastQuery = "";
       return;
@@ -178,7 +186,12 @@
       event.preventDefault();
       activeIndex = (activeIndex - 1 + totalMatches) % totalMatches;
     } else if (event.key === "Escape") {
-      open = false;
+      if (open) {
+        // First Escape only closes the results; keep the panel open.
+        event.stopPropagation();
+        open = false;
+        activeIndex = -1;
+      }
     } else if (event.key === "Enter") {
       event.preventDefault();
       if (activeIndex >= 0 && activeIndex < raceMatches.length)
@@ -189,15 +202,26 @@
       ) {
         const candidate = candidateMatches[activeIndex - raceMatches.length];
         selectCandidate(candidate.raceId, candidate.name);
-      } else if (query.trim())
-        goto(`/elections/?q=${encodeURIComponent(query.trim())}`);
+      } else if (query.trim()) {
+        const target = `/elections/?q=${encodeURIComponent(query.trim())}`;
+        open = false;
+        activeIndex = -1;
+        mobileSearchOpen = false;
+        goto(target);
+      }
     }
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && (mobileNavOpen || mobileSearchOpen)) {
+      // Return focus to the toggle that opened the panel instead of letting
+      // it fall to <body> when the focused element disappears.
+      const returnTo = mobileSearchOpen ? searchToggle : navToggle;
+      const focusWasInside = siteHeader?.contains(document.activeElement);
       mobileNavOpen = false;
       mobileSearchOpen = false;
+      open = false;
+      if (focusWasInside) void tick().then(() => returnTo?.focus());
     }
     if (
       event.key === "/" &&
@@ -228,6 +252,24 @@
       open = false;
   }
 
+  function isCurrent(pathname: string, href: string): boolean {
+    return pathname === href || pathname.startsWith(href);
+  }
+
+  // One persistent live region whose text changes, so status messages are
+  // announced reliably (inserted live regions often are not).
+  $: searchStatus = !open
+    ? ""
+    : totalMatches > 0
+      ? `${totalMatches} result${totalMatches === 1 ? "" : "s"} available. Use the up and down arrows to review.`
+      : searchLoading
+        ? "Loading search results…"
+        : searchLoaded && query.trim()
+          ? "No matching elections or candidates."
+          : searchLoadError
+            ? "Search is temporarily unavailable. Press Enter to browse elections."
+            : "";
+
   const primaryLinks = [
     { href: "/my-ballot/", label: "My Ballot" },
     { href: "/elections/", label: "Elections" },
@@ -255,6 +297,7 @@
 
       <button
         type="button"
+        bind:this={searchToggle}
         class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-content-muted hover:bg-surface-alt hover:text-content sm:hidden"
         aria-label={mobileSearchOpen ? "Close search" : "Open search"}
         aria-controls="site-search"
@@ -280,6 +323,7 @@
 
       <button
         type="button"
+        bind:this={navToggle}
         class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-content-muted hover:bg-surface-alt hover:text-content sm:hidden"
         aria-label={mobileNavOpen
           ? "Close navigation menu"
@@ -306,7 +350,10 @@
           <a
             href={link.href}
             on:click={() => (mobileNavOpen = false)}
-            class:font-semibold={$page.url.pathname.startsWith(link.href)}
+            aria-current={isCurrent($page.url.pathname, link.href)
+              ? "page"
+              : undefined}
+            class:font-semibold={isCurrent($page.url.pathname, link.href)}
             class="inline-flex min-h-11 items-center whitespace-nowrap px-1 text-content-muted hover:text-content"
           >
             {link.label}
@@ -316,6 +363,9 @@
           <a
             href="/admin/"
             on:click={() => (mobileNavOpen = false)}
+            aria-current={isCurrent($page.url.pathname, "/admin/")
+              ? "page"
+              : undefined}
             class="inline-flex min-h-11 items-center whitespace-nowrap px-1 text-content-muted hover:text-content"
             >Admin</a
           >
@@ -331,6 +381,14 @@
         <label class="sr-only" for="site-search"
           >Search elections and candidates</label
         >
+        <div
+          class="sr-only"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {searchStatus}
+        </div>
         <input
           id="site-search"
           bind:this={searchInput}
@@ -368,78 +426,88 @@
             role="listbox"
           >
             {#if raceMatches.length}
-              <p
-                class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-content-subtle"
-              >
-                Elections
-              </p>
-              {#each raceMatches as race, index}
-                <button
-                  id={`site-search-option-${index}`}
-                  type="button"
-                  on:click={() => selectRace(race.id)}
-                  class:bg-surface-alt={index === activeIndex}
-                  class="block min-h-11 w-full px-3 py-2 text-left text-xs text-content hover:bg-surface-alt"
-                  role="option"
-                  aria-selected={index === activeIndex}
+              <div role="group" aria-labelledby="site-search-group-elections">
+                <div
+                  id="site-search-group-elections"
+                  role="presentation"
+                  class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-content-subtle"
                 >
-                  <span class="block truncate font-medium"
-                    >{raceDisplayTitle(race)}</span
+                  Elections
+                </div>
+                {#each raceMatches as race, index}
+                  <button
+                    id={`site-search-option-${index}`}
+                    type="button"
+                    tabindex="-1"
+                    on:click={() => selectRace(race.id)}
+                    class:bg-surface-alt={index === activeIndex}
+                    class="block min-h-11 w-full px-3 py-2 text-left text-xs text-content hover:bg-surface-alt"
+                    role="option"
+                    aria-selected={index === activeIndex}
                   >
-                  <span class="block truncate text-content-subtle"
-                    >{race.office || ""}{race.state
-                      ? ` · ${race.state}`
-                      : ""}</span
-                  >
-                </button>
-              {/each}
+                    <span class="block truncate font-medium"
+                      >{raceDisplayTitle(race)}</span
+                    >
+                    <span class="block truncate text-content-subtle"
+                      >{race.office || ""}{race.state
+                        ? ` · ${race.state}`
+                        : ""}</span
+                    >
+                  </button>
+                {/each}
+              </div>
             {/if}
             {#if candidateMatches.length}
-              <p
-                class="border-t border-stroke px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-content-subtle"
-              >
-                Candidates
-              </p>
-              {#each candidateMatches as candidate, index}
-                {@const itemIndex = raceMatches.length + index}
-                <button
-                  id={`site-search-option-${itemIndex}`}
-                  type="button"
-                  on:click={() =>
-                    selectCandidate(candidate.raceId, candidate.name)}
-                  class:bg-surface-alt={itemIndex === activeIndex}
-                  class="block min-h-11 w-full px-3 py-2 text-left text-xs text-content hover:bg-surface-alt"
-                  role="option"
-                  aria-selected={itemIndex === activeIndex}
+              <div role="group" aria-labelledby="site-search-group-candidates">
+                <div
+                  id="site-search-group-candidates"
+                  role="presentation"
+                  class="border-t border-stroke px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-content-subtle"
                 >
-                  <span class="block truncate font-medium"
-                    >{candidate.name}</span
+                  Candidates
+                </div>
+                {#each candidateMatches as candidate, index}
+                  {@const itemIndex = raceMatches.length + index}
+                  <button
+                    id={`site-search-option-${itemIndex}`}
+                    type="button"
+                    tabindex="-1"
+                    on:click={() =>
+                      selectCandidate(candidate.raceId, candidate.name)}
+                    class:bg-surface-alt={itemIndex === activeIndex}
+                    class="block min-h-11 w-full px-3 py-2 text-left text-xs text-content hover:bg-surface-alt"
+                    role="option"
+                    aria-selected={itemIndex === activeIndex}
                   >
-                  <span class="block truncate text-content-subtle"
-                    >{candidate.party || ""} · {candidate.raceTitle}</span
-                  >
-                </button>
-              {/each}
+                    <span class="block truncate font-medium"
+                      >{candidate.name}</span
+                    >
+                    <span class="block truncate text-content-subtle"
+                      >{candidate.party || ""} · {candidate.raceTitle}</span
+                    >
+                  </button>
+                {/each}
+              </div>
             {/if}
           </div>
         {:else if open && searchLoading}
           <div
             class="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
-            role="status"
+            aria-hidden="true"
           >
             Loading search results&hellip;
           </div>
         {:else if open && searchLoaded && query.trim()}
           <div
             class="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-content-subtle shadow-2xl"
-            role="status"
+            aria-hidden="true"
           >
             No matching elections or candidates.
           </div>
         {:else if open && searchLoadError}
           <div
             class="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl border border-stroke bg-surface px-4 py-3 text-xs text-red-700 shadow-2xl dark:text-red-300"
-            role="alert"
+            aria-hidden="true"
           >
             Search is temporarily unavailable. Press Enter to browse elections.
           </div>

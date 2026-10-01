@@ -57,7 +57,7 @@
       class="h-6 rounded-full overflow-hidden bg-surface-alt flex border border-stroke/60"
     >
       <div
-        class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-white shadow-inner"
+        class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
         style={`width: ${Math.min(
           100,
           ((projectedSeats.Democratic ?? 0) / totalExpected) * 100,
@@ -70,7 +70,7 @@
       </div>
       {#if projectedSeats.Other}
         <div
-          class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-white shadow-inner"
+          class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner"
           style={`width: ${Math.min(
             100,
             ((projectedSeats.Other ?? 0) / totalExpected) * 100,
@@ -83,7 +83,7 @@
         </div>
       {/if}
       <div
-        class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-white shadow-inner ml-auto"
+        class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner ml-auto"
         style={`width: ${Math.min(
           100,
           ((projectedSeats.Republican ?? 0) / totalExpected) * 100,
@@ -96,7 +96,7 @@
       </div>
     </div>
 
-    <div class="flex justify-between text-[10px] text-content-subtle px-1">
+    <div class="flex justify-between text-xs text-content-subtle px-1">
       <span>Total: {totalExpected}</span>
       <span>Majority Line: {threshold}</span>
     </div>
@@ -109,7 +109,7 @@
             {probability(outcomeProbabilities.Democratic)}
           </div>
           <div
-            class="text-[10px] text-content-subtle font-semibold uppercase tracking-wider"
+            class="text-xs text-content-muted font-semibold uppercase tracking-wider"
           >
             Dem control
           </div>
@@ -121,7 +121,7 @@
             {probability(outcomeProbabilities.Republican)}
           </div>
           <div
-            class="text-[10px] text-content-subtle font-semibold uppercase tracking-wider"
+            class="text-xs text-content-muted font-semibold uppercase tracking-wider"
           >
             GOP control
           </div>
@@ -129,7 +129,7 @@
       </div>
     {/if}
     {#if expectedSeats}
-      <p class="mt-3 text-[10px] text-content-subtle">
+      <p class="mt-3 text-xs text-content-subtle">
         Expected seats: D {oneDecimal(expectedSeats.Democratic)}, R {oneDecimal(
           expectedSeats.Republican,
         )}
@@ -147,7 +147,7 @@
         class="bg-surface-alt/40 border border-stroke/40 rounded-xl px-2.5 py-2 text-center shadow-inner"
       >
         <div
-          class="text-[10px] text-content-subtle font-bold uppercase tracking-wider"
+          class="text-xs text-content-subtle font-bold uppercase tracking-wider"
         >
           {party.slice(0, 3)}
         </div>
@@ -155,7 +155,7 @@
           {projectedSeats[party] ?? 0}
         </div>
         <div
-          class="text-[10px] text-content-subtle font-semibold tabular-nums mt-0.5"
+          class="text-xs text-content-subtle font-semibold tabular-nums mt-0.5"
         >
           {formatNet(netChange[party] ?? 0)} net
         </div>

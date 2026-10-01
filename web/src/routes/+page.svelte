@@ -22,7 +22,14 @@
     content="Sourced, nonpartisan candidate research with uncertainty and original evidence kept visible."
   />
   <meta property="og:image" content="https://smarter.vote/og-image.png" />
+  <meta property="og:site_name" content="Smarter.Vote" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Smarter.Vote | Know your candidates" />
+  <meta
+    name="twitter:description"
+    content="Sourced, nonpartisan candidate research with uncertainty and original evidence kept visible."
+  />
+  <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
 </svelte:head>
 
 <div class="overflow-hidden">
@@ -70,7 +77,7 @@
                 ><UiIcon name="arrow-right" /></span
               ></span
             >
-            <span class="mt-1 block text-sm text-blue-100"
+            <span class="mt-1 block text-sm text-white"
               >Find the national races tied to your address</span
             >
           </a>
@@ -80,7 +87,7 @@
           >
             <span class="flex items-center justify-between font-extrabold"
               >Browse all elections <span
-                class="inline-flex text-blue-600 transition group-hover:translate-x-1"
+                class="inline-flex text-primary transition group-hover:translate-x-1"
                 ><UiIcon name="arrow-right" /></span
               ></span
             >
@@ -106,13 +113,13 @@
       aria-hidden="true"
     ></div>
     <div class="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
-      <p class="text-xs font-bold uppercase tracking-[0.24em] text-blue-100">
+      <p class="text-xs font-bold uppercase tracking-[0.24em] text-white">
         Your ballot deserves a closer look
       </p>
       <h2 class="mt-5 text-4xl font-extrabold tracking-tight sm:text-6xl">
         Know what you’re voting on.
       </h2>
-      <p class="mx-auto mt-5 max-w-xl text-lg leading-8 text-blue-100">
+      <p class="mx-auto mt-5 max-w-xl text-lg leading-8 text-blue-50">
         Start with your address. Continue with the evidence.
       </p>
       <a

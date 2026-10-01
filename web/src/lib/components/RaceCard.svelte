@@ -3,6 +3,7 @@
   import { partyAbbr, partyRing, partyInitialBg } from "$lib/utils/party";
   import { formatElectionDate } from "$lib/utils/electionDate";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
+  import { neutralCandidateOrder } from "$lib/utils/candidates";
 
   export let race: RaceSummary;
 
@@ -58,9 +59,21 @@
 
   $: badge = getOfficeBadge(race.office);
 
+  $: candidates = neutralCandidateOrder(race.candidates);
+
   let imageErrors: Set<string> = new Set();
   function handleImageError(name: string) {
     imageErrors = new Set([...imageErrors, name]);
+  }
+
+  /**
+   * Prerendered images can fail before hydration attaches `on:error`; catch
+   * that case on mount so a broken headshot still falls back to initials.
+   */
+  function detectBrokenImage(img: HTMLImageElement, name: string) {
+    if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) {
+      handleImageError(name);
+    }
   }
 </script>
 
@@ -90,7 +103,7 @@
   <!-- Race title -->
   <div class="px-4 pb-3">
     <h3
-      class="text-sm font-semibold text-content group-hover:text-blue-600 transition-colors leading-snug line-clamp-2 capitalize"
+      class="text-sm font-semibold text-content group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors leading-snug line-clamp-2 capitalize"
     >
       {raceDisplayTitle(race)}
     </h3>
@@ -99,18 +112,22 @@
   <!-- Candidate avatars + names -->
   <div class="px-4 pb-3">
     <div class="flex flex-wrap gap-3">
-      {#each race.candidates as candidate}
+      {#each candidates as candidate}
         <div class="flex items-center gap-2 min-w-0">
           <!-- Avatar -->
           <div class="relative flex-shrink-0">
             {#if candidate.image_url && !imageErrors.has(candidate.name)}
               <img
                 src={candidate.image_url}
-                alt={candidate.name}
+                alt=""
                 class="w-9 h-9 rounded-full object-cover ring-2 {partyRing(
                   candidate.party,
                 )}"
                 loading="lazy"
+                decoding="async"
+                width="36"
+                height="36"
+                use:detectBrokenImage={candidate.name}
                 on:error={() => handleImageError(candidate.name)}
               />
             {:else}
@@ -144,7 +161,7 @@
 
   <!-- View race footer -->
   <div
-    class="px-4 py-2.5 border-t border-stroke flex items-center justify-end gap-1 text-xs font-medium text-blue-500 dark:text-blue-400"
+    class="px-4 py-2.5 border-t border-stroke flex items-center justify-end gap-1 text-xs font-medium text-blue-700 dark:text-blue-400"
   >
     View race
     <svg

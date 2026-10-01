@@ -12,16 +12,39 @@
       chamberSummary?.opposing_party_path ||
       chamberSummary?.key_uncertainty,
   );
-  $: summary =
-    chamberSummary?.bottom_line ||
-    chamberNarrative ||
-    `Projections indicate a highly competitive cycle for the ${
-      activeTab === "governors"
-        ? "Governors"
-        : activeTab === "senate"
-          ? "Senate"
-          : "House"
-    }.`;
+  // Never invent an outlook: with no bottom line or narrative, say so.
+  $: summary = chamberSummary?.bottom_line || chamberNarrative || "";
+
+  const PARTY_TEXT_CLASS = {
+    Democratic: "text-blue-700 dark:text-blue-400",
+    Republican: "text-red-700 dark:text-red-400",
+    neutral: "text-content",
+  } as const;
+
+  let controlParty: "Democratic" | "Republican" | null = null;
+  $: controlParty =
+    chamberSummary?.control_party === "Democratic" ||
+    chamberSummary?.control_party === "Republican"
+      ? chamberSummary.control_party
+      : null;
+  let opposingParty: "Democratic" | "Republican" | null = null;
+  $: opposingParty =
+    controlParty === "Democratic"
+      ? "Republican"
+      : controlParty === "Republican"
+        ? "Democratic"
+        : null;
+  $: favoredHeading =
+    controlParty === "Democratic"
+      ? "Why Democrats Are Favored"
+      : controlParty === "Republican"
+        ? "Why Republicans Are Favored"
+        : "Why the Projected Leader Is Favored";
+  $: opposingHeading = opposingParty
+    ? `${opposingParty} Path to Control`
+    : "Trailing Side's Path to Control";
+  $: favoredClass = PARTY_TEXT_CLASS[controlParty ?? "neutral"];
+  $: opposingClass = PARTY_TEXT_CLASS[opposingParty ?? "neutral"];
   $: panelId = `forecast-outlook-${activeTab}`;
 </script>
 
@@ -49,7 +72,7 @@
         on:click={() => (expanded = !expanded)}
         aria-expanded={expanded}
         aria-controls={panelId}
-        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-stroke bg-surface-alt px-4 py-2 text-xs font-bold text-blue-600 hover:border-blue-400 dark:text-blue-400"
+        class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-stroke bg-surface-alt px-4 py-2 text-xs font-bold text-blue-700 hover:border-blue-400 dark:text-blue-400"
       >
         {expanded ? "Hide full analysis" : "Show full analysis"}
       </button>
@@ -57,7 +80,15 @@
   </div>
 
   <div class="px-5 py-4">
-    <p class="text-sm font-semibold leading-relaxed text-content">{summary}</p>
+    {#if summary}
+      <p class="text-sm font-semibold leading-relaxed text-content">
+        {summary}
+      </p>
+    {:else}
+      <p class="text-sm leading-relaxed text-content-muted">
+        No outlook analysis is available yet for this chamber.
+      </p>
+    {/if}
   </div>
 
   {#if hasAdditionalAnalysis}
@@ -69,11 +100,9 @@
       {#if chamberSummary?.why_party_favored}
         <article class="rounded-xl border border-stroke bg-surface p-4">
           <h4
-            class="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400"
+            class="text-xs font-black uppercase tracking-wider {favoredClass}"
           >
-            Why {chamberSummary.control_party === "Democratic"
-              ? "Democrats"
-              : "Republicans"} Are Favored
+            {favoredHeading}
           </h4>
           <p
             class="mt-2 text-xs font-semibold leading-relaxed text-content-muted"
@@ -86,11 +115,9 @@
       {#if chamberSummary?.opposing_party_path}
         <article class="rounded-xl border border-stroke bg-surface p-4">
           <h4
-            class="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400"
+            class="text-xs font-black uppercase tracking-wider {opposingClass}"
           >
-            {chamberSummary.control_party === "Democratic"
-              ? "Republican"
-              : "Democratic"} Path to Control
+            {opposingHeading}
           </h4>
           <p
             class="mt-2 text-xs font-semibold leading-relaxed text-content-muted"
@@ -103,7 +130,7 @@
       {#if chamberSummary?.key_uncertainty}
         <article class="rounded-xl border border-stroke bg-surface p-4">
           <h4
-            class="text-xs font-black uppercase tracking-wider text-yellow-600 dark:text-yellow-400"
+            class="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-yellow-400"
           >
             Key Risk & Uncertainty
           </h4>

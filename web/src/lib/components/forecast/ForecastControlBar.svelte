@@ -17,7 +17,7 @@
     >
     {#if activeTab === "senate" && outcomeProbabilities?.tie_50_50}
       <span
-        class="text-[10px] font-semibold text-content-subtle bg-surface-alt px-2 py-0.5 rounded-md border border-stroke/60"
+        class="text-xs font-semibold text-content-subtle bg-surface-alt px-2 py-0.5 rounded-md border border-stroke/60"
       >
         50-50 Tie: {probability(outcomeProbabilities.tie_50_50)}
       </span>

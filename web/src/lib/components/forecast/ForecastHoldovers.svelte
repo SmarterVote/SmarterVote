@@ -59,7 +59,7 @@
                 >{h.state}</span
               >
               <span
-                class={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md border ${
+                class={`text-xs font-extrabold uppercase px-1.5 py-0.5 rounded-md border ${
                   h.party === "Democratic"
                     ? "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400"
                     : "bg-red-500/10 text-red-600 border-red-500/20 dark:bg-red-500/20 dark:text-red-400"

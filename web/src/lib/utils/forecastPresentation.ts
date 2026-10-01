@@ -4,6 +4,7 @@ import {
   formatRating,
   getRaceState,
   isRaceInForecastTab,
+  forecastWinnerParty,
   normalizeForecastParty,
   parseSeatDistributionKey,
   type ForecastTab,
@@ -23,6 +24,65 @@ export function ratingClass(rating: ForecastRating): string {
   if (rating.endsWith("_r"))
     return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800/60";
   return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-200 dark:border-slate-700/60";
+}
+
+/** Map fill for an in-scope race with no published forecast (distinct from Toss-up). */
+export const NO_FORECAST_FILL = "url(#map-no-forecast)";
+/** Map fill for a state whose two holdover seats are split between parties. */
+export const SPLIT_HOLDOVER_FILL = "url(#map-split-holdover)";
+
+/** "Est. Margin" text that names who the margin favors, or "n/a". */
+export function forecastMarginText(forecast: {
+  margin_estimate?: number | null;
+  predicted_winner_name?: string | null;
+  predicted_winner_party?: string | null;
+  party_probabilities?: Record<string, number> | null;
+}): string {
+  const margin = forecast.margin_estimate;
+  if (margin === undefined || margin === null || !Number.isFinite(margin))
+    return "n/a";
+  const party = forecastWinnerParty(
+    forecast.predicted_winner_party,
+    forecast.party_probabilities,
+  );
+  const partyAbbr =
+    party === "Democratic" ? "D" : party === "Republican" ? "R" : null;
+  const name = forecast.predicted_winner_name?.trim();
+  const leader = name
+    ? partyAbbr
+      ? `${name} (${partyAbbr})`
+      : name
+    : party && party !== "Other"
+      ? party
+      : forecast.predicted_winner_party?.trim() || "Leader";
+  return `${leader} +${Math.abs(margin).toFixed(1)} pts`;
+}
+
+function forecastBadgeClass(rating: ForecastRating): string {
+  return rating.endsWith("_d")
+    ? "!bg-blue-600 !text-white"
+    : rating.endsWith("_r")
+      ? "!bg-red-600 !text-white"
+      : "!bg-slate-500 !text-white";
+}
+
+function forecastDetails(forecast: NonNullable<RaceSummary["forecast"]>) {
+  const winProbText = forecast.win_probability
+    ? ` (${Math.round(forecast.win_probability * 100)}% prob.)`
+    : "";
+  const projected =
+    forecast.predicted_winner_name ||
+    forecast.predicted_winner_party ||
+    "Not stated";
+  const rationale = forecast.rationale ?? "";
+  return {
+    lead: [
+      `Projected: ${projected}${winProbText}`,
+      `Est. Margin: ${forecastMarginText(forecast)}`,
+    ],
+    rationale:
+      rationale.length > 90 ? rationale.slice(0, 90) + "..." : rationale,
+  };
 }
 
 export function colorForRating(rating: ForecastRating): string {
@@ -243,7 +303,7 @@ export interface StateMapData {
 
 /**
  * Builds the per-state fill colors and hover tooltips for the electoral map,
- * for a given chamber tab. Handles holdover seats (no 2026 election) as well
+ * for a given chamber tab. Handles holdover seats (no election this cycle) as well
  * as active races with or without a published forecast.
  */
 export function buildStateMapData(
@@ -256,6 +316,7 @@ export function buildStateMapData(
   const noElection = cycleYear
     ? `No election in ${cycleYear}`
     : "No election this cycle";
+  const cyclePrefix = cycleYear ? `${cycleYear} ` : "";
 
   const activeRaces = races.filter((r) => isRaceInForecastTab(r, activeTab));
   const activeStates = new Set(
@@ -289,41 +350,20 @@ export function buildStateMapData(
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const winProbText = r.forecast.win_probability
-          ? ` (${Math.round(r.forecast.win_probability * 100)}% prob.)`
-          : "";
-        const marginText =
-          r.forecast.margin_estimate !== undefined &&
-          r.forecast.margin_estimate !== null
-            ? ` +${r.forecast.margin_estimate.toFixed(1)} pts`
-            : "";
-
+        const { lead, rationale } = forecastDetails(r.forecast);
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Governor Race",
+          subtitle: `${cyclePrefix}Governor Race`,
           badge: formatRating(rating),
-          badgeClass: rating.endsWith("_d")
-            ? "!bg-blue-600 !text-white"
-            : rating.endsWith("_r")
-              ? "!bg-red-600 !text-white"
-              : "!bg-slate-500 !text-white",
-          details: [
-            `Projected: ${
-              r.forecast.predicted_winner_name ||
-              r.forecast.predicted_winner_party
-            }${winProbText}`,
-            `Est. Margin: ${marginText || "n/a"}`,
-            r.forecast.rationale.length > 90
-              ? r.forecast.rationale.slice(0, 90) + "..."
-              : r.forecast.rationale,
-          ],
+          badgeClass: forecastBadgeClass(rating),
+          details: rationale ? [...lead, rationale] : lead,
         };
       } else {
-        colors[state] = "var(--color-tossup)";
+        colors[state] = NO_FORECAST_FILL;
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Governor Race",
-          badge: "Unforecasted",
+          subtitle: `${cyclePrefix}Governor Race`,
+          badge: "No forecast yet",
           badgeClass: "!bg-slate-500 !text-white",
           details: ["No published model forecasts yet"],
         };
@@ -345,7 +385,7 @@ export function buildStateMapData(
                 ? "var(--color-holdover-d)"
                 : "var(--color-holdover-r)";
           } else {
-            colors[state] = "var(--color-tossup)";
+            colors[state] = SPLIT_HOLDOVER_FILL;
           }
         } else {
           colors[state] =
@@ -377,63 +417,35 @@ export function buildStateMapData(
       const parties = SENATE_HOLDOVERS[state] || [];
       const holdoverSeat = parties.length > 0 ? parties[0] : null;
 
+      const holdoverDetail = holdoverSeat
+        ? `Holdover Seat: ${
+            holdoverSeat === "Democratic" ? "Democrat" : "Republican"
+          }`
+        : null;
+
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const winProbText = r.forecast.win_probability
-          ? ` (${Math.round(r.forecast.win_probability * 100)}% prob.)`
-          : "";
-        const marginText =
-          r.forecast.margin_estimate !== undefined &&
-          r.forecast.margin_estimate !== null
-            ? ` +${r.forecast.margin_estimate.toFixed(1)} pts`
-            : "";
-
-        const details = [
-          `Projected: ${
-            r.forecast.predicted_winner_name ||
-            r.forecast.predicted_winner_party
-          }${winProbText}`,
-          `Est. Margin: ${marginText || "n/a"}`,
-        ];
-        if (holdoverSeat) {
-          details.push(
-            `Holdover Seat: ${
-              holdoverSeat === "Democratic" ? "Democrat" : "Republican"
-            }`,
-          );
-        }
-        details.push(
-          r.forecast.rationale.length > 90
-            ? r.forecast.rationale.slice(0, 90) + "..."
-            : r.forecast.rationale,
-        );
+        const { lead, rationale } = forecastDetails(r.forecast);
+        const details = [...lead];
+        if (holdoverDetail) details.push(holdoverDetail);
+        if (rationale) details.push(rationale);
 
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Senate Election",
+          subtitle: `${cyclePrefix}Senate Election`,
           badge: formatRating(rating),
-          badgeClass: rating.endsWith("_d")
-            ? "!bg-blue-600 !text-white"
-            : rating.endsWith("_r")
-              ? "!bg-red-600 !text-white"
-              : "!bg-slate-500 !text-white",
+          badgeClass: forecastBadgeClass(rating),
           details,
         };
       } else {
-        colors[state] = "var(--color-tossup)";
+        colors[state] = NO_FORECAST_FILL;
         const details = ["No published model forecasts yet"];
-        if (holdoverSeat) {
-          details.push(
-            `Holdover Seat: ${
-              holdoverSeat === "Democratic" ? "Democrat" : "Republican"
-            }`,
-          );
-        }
+        if (holdoverDetail) details.push(holdoverDetail);
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Senate Election",
-          badge: "Unforecasted",
+          subtitle: `${cyclePrefix}Senate Election`,
+          badge: "No forecast yet",
           badgeClass: "!bg-slate-500 !text-white",
           details,
         };
@@ -453,7 +465,7 @@ export function buildStateMapData(
 
       colors[state] = summary.primary?.forecast
         ? colorForRating(summary.primary.forecast.rating)
-        : "var(--color-tossup)";
+        : NO_FORECAST_FILL;
 
       tooltips[state] = {
         title: state,
@@ -461,11 +473,9 @@ export function buildStateMapData(
         badge: summary.primary?.forecast
           ? `Closest race: ${formatRating(summary.primary.forecast.rating)}`
           : `${summary.forecastedCount}/${count} Forecasted`,
-        badgeClass: summary.primary?.forecast?.rating.endsWith("_d")
-          ? "!bg-blue-600 !text-white"
-          : summary.primary?.forecast?.rating.endsWith("_r")
-            ? "!bg-red-600 !text-white"
-            : "!bg-slate-500 !text-white",
+        badgeClass: summary.primary?.forecast
+          ? forecastBadgeClass(summary.primary.forecast.rating)
+          : "!bg-slate-500 !text-white",
         details:
           summary.details.length > 0
             ? [

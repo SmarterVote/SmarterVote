@@ -49,7 +49,7 @@
       {#if selectedState}
         <button
           on:click={onClearFilter}
-          class="flex min-h-11 items-center gap-1 rounded-lg border border-blue-200/50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-500 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:text-blue-300"
+          class="flex min-h-11 items-center gap-1 rounded-lg border border-blue-200/50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Clear map filter: {selectedState}
           <UiIcon name="close" size="sm" />
@@ -60,7 +60,7 @@
         on:click={() => (mobileMapOpen = !mobileMapOpen)}
         aria-expanded={mobileMapOpen}
         aria-controls={mapPanelId}
-        class="inline-flex min-h-11 items-center rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-bold text-blue-600 lg:hidden dark:text-blue-400"
+        class="inline-flex min-h-11 items-center rounded-lg border border-stroke bg-surface px-3 py-2 text-xs font-bold text-blue-700 lg:hidden dark:text-blue-400"
       >
         {mobileMapOpen ? "Hide interactive map" : "Show interactive map"}
       </button>
@@ -151,6 +151,20 @@
             class="w-3.5 h-3.5 rounded bg-red-700 block border border-red-950/10"
           ></span> Safe R
         </div>
+        <div class="flex items-center gap-1.5 text-xs text-content-muted">
+          <span
+            class="w-3.5 h-3.5 rounded block border border-slate-400/60"
+            style="background: repeating-linear-gradient(45deg, var(--color-no-forecast-bg, #f8fafc) 0 2px, var(--color-no-forecast-line, #cbd5e1) 2px 4px);"
+          ></span> No forecast yet
+        </div>
+        {#if activeTab === "senate"}
+          <div class="flex items-center gap-1.5 text-xs text-content-muted">
+            <span
+              class="w-3.5 h-3.5 rounded block border border-slate-400/60"
+              style="background: repeating-linear-gradient(45deg, var(--color-holdover-d-solid, #dbeafe) 0 3px, var(--color-holdover-r-solid, #fee2e2) 3px 6px);"
+            ></span> Split holdover
+          </div>
+        {/if}
         {#if activeTab !== "house"}
           <div class="flex items-center gap-1.5 text-xs text-content-muted">
             <span

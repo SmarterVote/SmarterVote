@@ -2,6 +2,7 @@
   import { browser } from "$app/environment";
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
+  import { onMount } from "svelte";
   import ForecastElectoralMap from "$lib/components/forecast/ForecastElectoralMap.svelte";
   import ForecastHoldovers from "$lib/components/forecast/ForecastHoldovers.svelte";
   import ForecastKeyRaces from "$lib/components/forecast/ForecastKeyRaces.svelte";
@@ -41,8 +42,16 @@
 
   let activeTab: ForecastTab = "house";
   let selectedState: string | null = null;
+  // Prerendered HTML cannot know `?tab=` / `?state=`, so tab-specific content
+  // waits for hydration instead of flashing the House view and then swapping.
+  let hydrated = false;
+  onMount(() => {
+    hydrated = true;
+  });
 
   $: races = ($page.data.races as RaceSummary[] | undefined) ?? [];
+  $: racesLoadError = Boolean($page.data.loadError);
+  $: forecastsLoadError = Boolean($page.data.forecastsLoadError);
   $: activeTab = browser
     ? parseForecastTab($page.url.searchParams.get("tab"))
     : "house";
@@ -51,7 +60,7 @@
     : null;
   $: aggregate = aggregateForecasts(races, activeTab);
 
-  $: chamberForecasts = $page.data.chamberForecasts as
+  $: chamberForecasts = ($page.data.chamberForecasts ?? undefined) as
     | ChamberForecasts
     | undefined;
   $: chamberSummary = chamberForecasts?.chambers?.[activeTab];
@@ -174,17 +183,15 @@
     content="Explore 2026 House, Senate, and governor forecasts with win probabilities, chamber-control projections, polling, and prediction-market signals."
   />
   <meta property="og:image" content="https://smarter.vote/og-image.png" />
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://smarter.vote/forecast/" />
+  <meta property="og:site_name" content="Smarter.Vote" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://smarter.vote/forecast/" />
+  <meta name="twitter:title" content="2026 Election Forecasts — Smarter.Vote" />
   <meta
-    property="twitter:title"
-    content="2026 Election Forecasts — Smarter.Vote"
-  />
-  <meta
-    property="twitter:description"
+    name="twitter:description"
     content="Explore 2026 House, Senate, and governor forecasts with win probabilities, chamber-control projections, polling, and prediction-market signals."
   />
-  <meta property="twitter:image" content="https://smarter.vote/og-image.png" />
+  <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
 </svelte:head>
 
 <div class="forecast-page max-w-7xl mx-auto px-4 py-8 sm:py-10 space-y-8">
@@ -206,7 +213,7 @@
         <div
           class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-content-subtle"
         >
-          <span
+          <span class:forecast-prerendered={!hydrated}
             >{aggregate.races.length}
             {activeTab === "house"
               ? "House"
@@ -225,7 +232,7 @@
           <span aria-hidden="true">·</span>
           <a
             href="/about/#forecast-methodology"
-            class="text-blue-600 hover:underline dark:text-blue-400"
+            class="text-blue-700 hover:underline dark:text-blue-400"
             >How the forecast works <UiIcon name="arrow-right" size="sm" /></a
           >
         </div>
@@ -234,94 +241,108 @@
   </header>
 
   {#if (!races || races.length === 0) && (!chamberForecasts || !chamberForecasts.chambers)}
-    <ForecastUnavailable />
+    <ForecastUnavailable loadError={racesLoadError || forecastsLoadError} />
   {:else}
-    <ForecastTabNav {tabs} {activeTab} onSelect={setActiveTab} />
+    <!-- Prerendered HTML is the House view (crawlers index it). A visit with a
+         different ?tab= hides it until hydration via the data-forecast-pending-tab
+         flag app.html sets, so the House view never flashes. -->
+    <div class:forecast-prerendered={!hydrated}>
+      <ForecastTabNav {tabs} {activeTab} onSelect={setActiveTab} />
 
-    <ForecastSummaryCard
-      {activeTab}
-      {controlParty}
-      controlProbability={chamberSummary?.control_probability}
-      vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
-      {mostLikelyOutcome}
-      tossupCount={chamberSummary?.tossup_count ?? 0}
-      competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
-      {cycleYear}
-      {outcomeProbabilities}
-      {projectedSeats}
-      {totalSeats}
-      {threshold}
-      narrative={chamberNarrative}
-      updatedAt={chamberForecasts?.updated_at}
-    />
-
-    <!-- Interactive Map & Statistics Dashboard Grid -->
-    <section
-      class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] gap-6 items-stretch"
-    >
-      <ForecastElectoralMap
+      <ForecastSummaryCard
         {activeTab}
-        {activeStates}
-        {selectedState}
-        {stateRaceCounts}
-        {stateColors}
-        {stateTooltips}
-        onStateClick={handleStateClick}
-        onClearFilter={clearStateFilter}
+        {controlParty}
+        controlProbability={chamberSummary?.control_probability}
+        vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
+        {mostLikelyOutcome}
+        tossupCount={chamberSummary?.tossup_count ?? 0}
+        competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
+        {cycleYear}
+        {outcomeProbabilities}
+        {projectedSeats}
+        {totalSeats}
+        {threshold}
+        narrative={chamberNarrative}
+        updatedAt={chamberForecasts?.updated_at}
       />
 
-      <!-- Stats Panel Column -->
-      <div class="space-y-6 h-full flex flex-col">
-        <ForecastProjectionSummary
-          label={aggregate.label}
-          {controlParty}
-          {threshold}
-          {projectedSeats}
-          totalExpected={aggregate.totalExpected}
-          {outcomeProbabilities}
-          {expectedSeats}
-          netChange={aggregate.netChange}
+      <!-- Interactive Map & Statistics Dashboard Grid -->
+      <section
+        class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] gap-6 items-stretch"
+      >
+        <ForecastElectoralMap
+          {activeTab}
+          {activeStates}
+          {selectedState}
+          {stateRaceCounts}
+          {stateColors}
+          {stateTooltips}
+          onStateClick={handleStateClick}
+          onClearFilter={clearStateFilter}
         />
 
-        {#if chamberSummary?.seat_distribution && Object.keys(chamberSummary.seat_distribution).length > 0}
-          <ForecastSeatOutcomeChart
-            {seatBuckets}
-            sortedOutcomes={seatOutcomeChart.outcomes}
-            maxProbability={seatOutcomeChart.maxProbability}
-            svgData={seatOutcomeChart.svgData}
+        <!-- Stats Panel Column -->
+        <div class="space-y-6 h-full flex flex-col">
+          <ForecastProjectionSummary
+            label={aggregate.label}
+            {controlParty}
+            {threshold}
+            {projectedSeats}
+            totalExpected={aggregate.totalExpected}
+            {outcomeProbabilities}
+            {expectedSeats}
+            netChange={aggregate.netChange}
           />
-        {/if}
-      </div>
-    </section>
 
-    <ForecastRatingsBreakdown
-      ratingOrder={ratingBreakdownOrder}
-      ratingCounts={aggregate.ratingCounts}
-    />
+          {#if chamberSummary?.seat_distribution && Object.keys(chamberSummary.seat_distribution).length > 0}
+            <ForecastSeatOutcomeChart
+              {seatBuckets}
+              sortedOutcomes={seatOutcomeChart.outcomes}
+              maxProbability={seatOutcomeChart.maxProbability}
+              svgData={seatOutcomeChart.svgData}
+            />
+          {/if}
+        </div>
+      </section>
 
-    <ForecastKeyRaces races={keyRacesList} />
+      <ForecastRatingsBreakdown
+        ratingOrder={ratingBreakdownOrder}
+        ratingCounts={aggregate.ratingCounts}
+      />
 
-    <ForecastOutlookAnalysis {activeTab} {chamberSummary} {chamberNarrative} />
+      <ForecastKeyRaces races={keyRacesList} />
 
-    <ForecastRaceList
-      races={aggregate.races}
-      {activeTab}
-      {selectedState}
-      {chamberSummary}
-      onClearStateFilter={clearStateFilter}
-    />
+      <ForecastOutlookAnalysis
+        {activeTab}
+        {chamberSummary}
+        {chamberNarrative}
+      />
 
-    <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />
+      <ForecastRaceList
+        races={aggregate.races}
+        {activeTab}
+        {selectedState}
+        {chamberSummary}
+        onClearStateFilter={clearStateFilter}
+      />
 
-    <ForecastHoldovers
-      {activeTab}
-      holdovers={aggregate.holdovers}
-      {cycleYear}
-    />
+      <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />
+
+      <ForecastHoldovers
+        {activeTab}
+        holdovers={aggregate.holdovers}
+        {cycleYear}
+      />
+    </div>
   {/if}
 </div>
 
 <style lang="postcss">
+  /* app.html flags a first load whose ?tab= is not the prerendered House view;
+     hide the prerendered House content until hydration renders the right tab. */
+  :global(html[data-forecast-pending-tab]) .forecast-prerendered {
+    visibility: hidden;
+  }
   /* :global() is required here: buttons/selects for this page now live inside
      child components (forecast/*.svelte), so a plain scoped selector would no
      longer match them. */

@@ -227,4 +227,40 @@ describe("RaceCard candidate avatars", () => {
       "https://example.test/ok.jpg",
     );
   });
+
+  it("falls back when the image already failed before hydration", async () => {
+    const proto = HTMLImageElement.prototype;
+    const complete = Object.getOwnPropertyDescriptor(proto, "complete");
+    const naturalWidth = Object.getOwnPropertyDescriptor(proto, "naturalWidth");
+    Object.defineProperty(proto, "complete", {
+      configurable: true,
+      get: () => true,
+    });
+    Object.defineProperty(proto, "naturalWidth", {
+      configurable: true,
+      get: () => 0,
+    });
+    try {
+      const { container } = render(RaceCard, {
+        race: makeRace({
+          candidates: [
+            {
+              name: "Jane Doe",
+              party: "Democratic",
+              incumbent: false,
+              image_url: "https://example.test/broken.jpg",
+            },
+          ],
+        } as Partial<RaceSummary>),
+      });
+      await Promise.resolve();
+      expect(container.querySelector("img")).toBeNull();
+    } finally {
+      if (complete) Object.defineProperty(proto, "complete", complete);
+      else delete (proto as unknown as Record<string, unknown>).complete;
+      if (naturalWidth)
+        Object.defineProperty(proto, "naturalWidth", naturalWidth);
+      else delete (proto as unknown as Record<string, unknown>).naturalWidth;
+    }
+  });
 });

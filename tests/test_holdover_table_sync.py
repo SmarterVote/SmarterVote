@@ -22,6 +22,11 @@ from shared.forecast_summary import ABBR_TO_STATE, GOVERNOR_HOLDOVERS, INCUMBENT
 
 HOLDOVERS_TS = Path(__file__).resolve().parents[1] / "web" / "src" / "lib" / "utils" / "holdovers.ts"
 FORECAST_TS = Path(__file__).resolve().parents[1] / "web" / "src" / "lib" / "utils" / "forecast.ts"
+STATES_TS = Path(__file__).resolve().parents[1] / "web" / "src" / "lib" / "utils" / "states.ts"
+
+
+def forecast_ts_source() -> str:
+    return FORECAST_TS.read_text(encoding="utf-8")
 
 
 def _table_body(source: str, name: str) -> str:
@@ -75,7 +80,10 @@ def test_governor_holdovers_match_python(ts_source):
 
 
 def _ts_abbr_to_state() -> dict[str, str]:
-    body = _table_body(FORECAST_TS.read_text(encoding="utf-8"), "ABBR_TO_STATE")
+    """The frontend's one state lookup table (states.ts). It is a lookup table
+    like ballotpedia's, so it carries DC; forecast.ts getRaceState drops DC
+    before any chamber math, matching `race_state` on the Python side."""
+    body = _table_body(STATES_TS.read_text(encoding="utf-8"), "STATE_NAMES_BY_CODE")
     return dict(re.findall(r'(\w+)\s*:\s*"([^"]+)"', body))
 
 
@@ -112,7 +120,7 @@ def _all_state_tables() -> dict[str, dict[str, str]]:
         "shared.forecast_summary.ABBR_TO_STATE": {k.lower(): v for k, v in ABBR_TO_STATE.items()},
         "ballotpedia._STATE_NAMES": {k.lower(): v for k, v in _STATE_NAMES.items()},
         "smartervote_mcp.server._US_STATES": {k.lower(): v for k, v in _mcp_us_states().items()},
-        "web/.../forecast.ts ABBR_TO_STATE": {k.lower(): v for k, v in _ts_abbr_to_state().items()},
+        "web/.../states.ts STATE_NAMES_BY_CODE": {k.lower(): v for k, v in _ts_abbr_to_state().items()},
     }
 
 
@@ -124,8 +132,8 @@ def test_state_abbreviation_tables_match():
     from the Python copy, so every Indiana race without an explicit `state`
     field resolved to None.
     """
-    ts_table = _ts_abbr_to_state()
-    assert len(ts_table) == 50, f"TypeScript ABBR_TO_STATE has {len(ts_table)} states"
+    ts_table = {abbr: name for abbr, name in _ts_abbr_to_state().items() if abbr != "dc"}
+    assert len(ts_table) == 50, f"TypeScript STATE_NAMES_BY_CODE has {len(ts_table)} states besides DC"
     assert ts_table == ABBR_TO_STATE
 
 
@@ -153,8 +161,10 @@ def test_only_the_lookup_tables_carry_dc():
     tables = _all_state_tables()
     assert "dc" in tables["ballotpedia._STATE_NAMES"]
     assert "dc" in tables["smartervote_mcp.server._US_STATES"]
+    assert "dc" in tables["web/.../states.ts STATE_NAMES_BY_CODE"]
     assert "dc" not in tables["shared.forecast_summary.ABBR_TO_STATE"]
-    assert "dc" not in tables["web/.../forecast.ts ABBR_TO_STATE"]
+    # The TS lookup table carries DC, so the forecast code must drop it itself.
+    assert "DISTRICT_OF_COLUMBIA" in forecast_ts_source()
 
 
 def test_incumbent_fallbacks_match_python():

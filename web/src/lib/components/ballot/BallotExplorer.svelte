@@ -5,6 +5,7 @@
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Candidate, Race, RaceSummary } from "$lib/types";
+  import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { formatElectionDate } from "$lib/utils/electionDate";
 
   export let races: RaceSummary[] = [];
@@ -27,15 +28,46 @@
     return office;
   }
 
+  /** A side-by-side comparison needs at least this many candidates. */
+  const MIN_COMPARED = 2;
+
   function activeCandidates(race: Race): Candidate[] {
-    return race.candidates.filter((candidate) => !candidate.withdrawn);
+    return neutralCandidateOrder(
+      race.candidates.filter((candidate) => !candidate.withdrawn),
+    );
   }
 
   function candidatesFor(
     race: Race,
     selections: Record<string, Candidate[]>,
   ): Candidate[] {
-    return selections[race.id] ?? activeCandidates(race);
+    const active = activeCandidates(race);
+    const selected = selections[race.id];
+    if (!selected) return active;
+    // Recover from a stale or invalid selection (e.g. a candidate withdrew or
+    // the selection dropped below the comparison minimum) instead of leaving
+    // the voter stuck on a "not enough candidates" message.
+    const valid = active.filter((candidate) =>
+      selected.some((picked) => picked.name === candidate.name),
+    );
+    return valid.length >= Math.min(MIN_COMPARED, active.length)
+      ? valid
+      : active;
+  }
+
+  /**
+   * The comparison's native checkbox flips before we refuse the change; put
+   * it back so the control matches the (unchanged) selection.
+   */
+  async function restoreCheckbox(candidateName: string) {
+    await tick();
+    const panel = document.getElementById("ballot-race-panel");
+    panel
+      ?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+      .forEach((input) => {
+        const label = input.closest("label")?.textContent ?? "";
+        if (label.includes(candidateName)) input.checked = true;
+      });
   }
 
   function toggleCandidate(race: Race, candidateName: string) {
@@ -43,19 +75,24 @@
     const isSelected = current.some(
       (candidate) => candidate.name === candidateName,
     );
-    if (isSelected && current.length === 1) return;
+    // Keep at least two candidates selected so the comparison (and its
+    // candidate toggles) always stays rendered.
+    if (isSelected && current.length <= MIN_COMPARED) {
+      void restoreCheckbox(candidateName);
+      return;
+    }
+    const nextNames = new Set(
+      isSelected
+        ? current
+            .filter((candidate) => candidate.name !== candidateName)
+            .map((candidate) => candidate.name)
+        : [...current.map((candidate) => candidate.name), candidateName],
+    );
     selectedCandidates = {
       ...selectedCandidates,
-      [race.id]: isSelected
-        ? current.filter((candidate) => candidate.name !== candidateName)
-        : [
-            ...current,
-            ...activeCandidates(race).filter(
-              (candidate) =>
-                candidate.name === candidateName &&
-                !current.some((selected) => selected.name === candidate.name),
-            ),
-          ],
+      [race.id]: activeCandidates(race).filter((candidate) =>
+        nextNames.has(candidate.name),
+      ),
     };
   }
 
@@ -224,6 +261,7 @@
             race={selectedRace}
             {candidates}
             compact
+            minSelected={2}
             onToggle={(candidateName) =>
               toggleCandidate(selectedRace, candidateName)}
           />

@@ -1,3 +1,8 @@
+<script lang="ts">
+  /** True when the forecast data could not be loaded (vs. none published). */
+  export let loadError = false;
+</script>
+
 <!--
   Empty-state card shown when there are no races and no chamber forecast data
   available at all (as opposed to simply having no forecasts for the active
@@ -7,7 +12,8 @@
   class="max-w-2xl mx-auto my-16 p-8 bg-surface-alt border border-stroke/80 rounded-2xl text-center space-y-4"
 >
   <div
-    class="w-12 h-12 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded-full flex items-center justify-center mx-auto animate-pulse"
+    class="w-12 h-12 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 rounded-full flex items-center justify-center mx-auto motion-safe:animate-pulse"
+    aria-hidden="true"
   >
     <svg
       class="w-6 h-6"
@@ -23,13 +29,30 @@
       />
     </svg>
   </div>
-  <h2 class="text-lg font-black text-content text-center">
-    Forecast Data Unavailable
-  </h2>
-  <p
-    class="text-xs text-content-muted leading-relaxed font-semibold max-w-sm mx-auto text-center"
-  >
-    We are currently updating our election models. Please check back shortly for
-    the latest projections.
-  </p>
+  {#if loadError}
+    <h2 class="text-lg font-black text-content text-center">
+      Forecast data could not be loaded
+    </h2>
+    <p
+      class="text-sm text-content-muted leading-relaxed font-semibold max-w-sm mx-auto text-center"
+      role="alert"
+    >
+      Something went wrong while loading the forecast. Please check your
+      connection and <a
+        href="/forecast/"
+        class="text-blue-700 underline dark:text-blue-300"
+        data-sveltekit-reload>try again</a
+      >.
+    </p>
+  {:else}
+    <h2 class="text-lg font-black text-content text-center">
+      Forecast Data Unavailable
+    </h2>
+    <p
+      class="text-sm text-content-muted leading-relaxed font-semibold max-w-sm mx-auto text-center"
+    >
+      We are currently updating our election models. Please check back shortly
+      for the latest projections.
+    </p>
+  {/if}
 </div>

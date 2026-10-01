@@ -11,8 +11,11 @@
     prepareSearchDoc,
     type SearchDoc,
   } from "$lib/utils/search";
-  export let races: RaceSummary[] = [];
   import { debounce } from "$lib/utils/debounce";
+
+  export let races: RaceSummary[] = [];
+  /** True when the published race list could not be loaded at all. */
+  export let loadError = false;
 
   const PAGE_SIZE = 24;
   let loading = false;
@@ -28,21 +31,47 @@
   let debouncedSearchQuery = "";
   let mapExpanded = false;
 
-  // Adopt `?q=` only on real navigations (load, back/forward, header search).
-  // Typing writes the URL shallowly, so it can never echo back into the box
-  // and overwrite characters typed while an older write was in flight.
+  // Adopt `?q=`, `?state=`, and `?office=` only on real navigations (load,
+  // back/forward, header search). Typing writes the URL shallowly, so it can
+  // never echo back into the box and overwrite characters typed while an older
+  // write was in flight.
   afterNavigate(({ to }) => {
-    const q = to?.url.searchParams.get("q") || "";
+    const params = to?.url.searchParams;
+    selectedState = params?.get("state") || null;
+    selectedOffice = params?.get("office") || null;
+    const q = params?.get("q") || "";
     if (q === debouncedSearchQuery) return;
     applySearch.cancel();
     searchQuery = q;
     debouncedSearchQuery = q;
   });
 
+  function setParam(url: URL, key: string, value: string | null) {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  }
+
   function writeQueryToUrl(q: string) {
     const url = new URL(window.location.href);
-    q ? url.searchParams.set("q", q) : url.searchParams.delete("q");
+    setParam(url, "q", q);
     replaceState(url, $page.state);
+  }
+
+  function writeFiltersToUrl() {
+    const url = new URL(window.location.href);
+    setParam(url, "state", selectedState);
+    setParam(url, "office", selectedOffice);
+    replaceState(url, $page.state);
+  }
+
+  function setStateFilter(state: string | null) {
+    selectedState = state;
+    writeFiltersToUrl();
+  }
+
+  function setOfficeFilter(office: string | null) {
+    selectedOffice = office;
+    writeFiltersToUrl();
   }
 
   const applySearch = debounce((q: string) => {
@@ -177,8 +206,8 @@
 
   function handleStateClick(e: CustomEvent<string>) {
     const state = e.detail;
-    selectedState = selectedState === state ? null : state;
-    selectedOffice = null;
+    // Toggle the state only; the office filter is independent.
+    setStateFilter(selectedState === state ? null : state);
   }
 
   $: hasActiveFilters =
@@ -187,8 +216,21 @@
   function clearFilters() {
     selectedState = null;
     selectedOffice = null;
+    writeFiltersToUrl();
     clearHeroSearch();
   }
+
+  // Keep the currently selected state as an option even when the search no
+  // longer matches it, so the <select> never silently desyncs.
+  $: stateOptions = [
+    ...new Set([...activeStates, ...(selectedState ? [selectedState] : [])]),
+  ].sort();
+
+  $: resultAnnouncement = loadError
+    ? ""
+    : hasActiveFilters
+      ? `${filteredRaces.length} ${filteredRaces.length === 1 ? "race" : "races"} found`
+      : `Showing ${visibleRaces.length} of ${races.length} races`;
 </script>
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:py-10">
@@ -263,15 +305,13 @@
   <!-- Primary filters stay ahead of the optional map so results are reachable quickly. -->
   <div
     class="mb-6 flex flex-wrap items-center gap-2"
+    role="group"
     aria-label="Filter elections by office"
   >
     {#if selectedState}
       <button
         type="button"
-        on:click={() => {
-          selectedState = null;
-          selectedOffice = null;
-        }}
+        on:click={() => setStateFilter(null)}
         class="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-blue-600 pl-3 pr-2 text-sm font-medium text-white shadow-sm"
         aria-label="Clear state filter: {selectedState}"
       >
@@ -295,9 +335,8 @@
     {#each officeTypes as office}
       <button
         type="button"
-        on:click={() => {
-          selectedOffice = selectedOffice === office ? null : office;
-        }}
+        on:click={() =>
+          setOfficeFilter(selectedOffice === office ? null : office)}
         aria-pressed={selectedOffice === office}
         class="min-h-11 rounded-full border px-4 py-2 text-sm font-medium transition-colors
           {selectedOffice === office
@@ -323,11 +362,9 @@
       </h2>
       {#if selectedState}
         <button
-          on:click={() => {
-            selectedState = null;
-            selectedOffice = null;
-          }}
-          class="text-xs text-content-subtle hover:text-content underline underline-offset-2 transition-colors"
+          type="button"
+          on:click={() => setStateFilter(null)}
+          class="min-h-11 text-xs text-content-subtle hover:text-content underline underline-offset-2 transition-colors"
         >
           Clear selection
         </button>
@@ -345,15 +382,11 @@
       <select
         id="mobile-state-select"
         value={selectedState || ""}
-        on:change={(e) => {
-          const val = e.currentTarget.value;
-          selectedState = val ? val : null;
-          selectedOffice = null;
-        }}
+        on:change={(e) => setStateFilter(e.currentTarget.value || null)}
         class="block w-full px-3 py-2 border border-stroke rounded-lg text-sm bg-surface text-content focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
       >
         <option value="">All States</option>
-        {#each [...activeStates].sort() as state}
+        {#each stateOptions as state}
           <option value={state}>
             {state} ({filteredRaceCounts[state] ?? 0} race{(filteredRaceCounts[
               state
@@ -394,6 +427,7 @@
           <span class="font-medium text-content">{filteredRaces.length}</span>
           {filteredRaces.length === 1 ? "race" : "races"} found
           <button
+            type="button"
             on:click={clearFilters}
             class="ml-2 underline underline-offset-2 hover:text-content transition-colors"
             >clear filters</button
@@ -408,11 +442,15 @@
       </p>
     </div>
 
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {resultAnnouncement}
+    </p>
     {#if loading}
       <!-- Loading spinner + skeleton grid -->
       <div class="flex justify-center items-center py-6">
         <svg
           class="animate-spin h-10 w-10 text-blue-500"
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -440,6 +478,24 @@
           ></div>
         {/each}
       </div>
+    {:else if loadError && races.length === 0}
+      <div
+        class="text-center py-16 text-content-subtle"
+        role="alert"
+        data-testid="races-load-error"
+      >
+        <p class="text-lg font-medium text-content">
+          We couldn’t load the election guides
+        </p>
+        <p class="mt-1 text-sm">
+          Please check your connection and
+          <a
+            href="/elections/"
+            class="text-primary underline underline-offset-2"
+            data-sveltekit-reload>try again</a
+          >.
+        </p>
+      </div>
     {:else if filteredRaces.length === 0}
       <div class="text-center py-16 text-content-subtle">
         <svg
@@ -463,8 +519,9 @@
         </p>
         {#if hasActiveFilters}
           <button
+            type="button"
             on:click={clearFilters}
-            class="mt-3 text-blue-600 hover:text-blue-700 text-sm underline underline-offset-2"
+            class="mt-3 min-h-11 text-primary hover:text-blue-700 dark:hover:text-blue-300 text-sm underline underline-offset-2"
           >
             Clear all filters
           </button>
@@ -483,7 +540,7 @@
         <div class="mt-8 flex justify-center">
           <button
             type="button"
-            class="min-h-11 rounded-lg border border-stroke bg-surface px-5 py-2.5 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            class="min-h-11 rounded-lg border border-stroke bg-surface px-5 py-2.5 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             aria-controls="election-results-grid"
             on:click={() => (visibleRaceCount += PAGE_SIZE)}
           >

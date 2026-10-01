@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Literal
+from typing import Any, Dict, Iterable, Literal, Optional
 
 from shared.forecast_math import NATIONAL_SWING_LOGIT_SD, correlated_seat_distribution
 
@@ -389,6 +389,38 @@ def _race_party_probabilities(forecast: Dict[str, Any]) -> Dict[Party, float]:
     return _default_probability_for_rating(str(forecast.get("rating") or ""), party)
 
 
+UNSPECIFIED_WINNER_LABELS = frozenset(
+    {"", "other", "unknown", "none", "n/a", "na", "null", "tbd", "undecided", "tossup", "toss-up"}
+)
+
+
+def _probable_party(forecast: Dict[str, Any]) -> Optional[Party]:
+    """The single most likely party from explicit probabilities, or None on a tie/no data."""
+    raw = forecast.get("party_probabilities")
+    if not isinstance(raw, dict):
+        return None
+    totals: Dict[Party, float] = {}
+    for key, value in raw.items():
+        try:
+            prob = float(value)
+        except (TypeError, ValueError):
+            continue
+        label = str(key).strip().lower()
+        if label in ("d", "dem"):
+            party: Party = "Democratic"
+        elif label in ("r", "gop"):
+            party = "Republican"
+        else:
+            party = normalize_party(label)
+        totals[party] = totals.get(party, 0.0) + prob
+    if not totals:
+        return None
+    ranked = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    if ranked[0][1] <= 0 or (len(ranked) > 1 and ranked[0][1] == ranked[1][1]):
+        return None
+    return ranked[0][0]
+
+
 def _chamber_races(summaries: Iterable[Dict[str, Any]], chamber: Chamber) -> list[Dict[str, Any]]:
     return [race for race in summaries if is_chamber_control_race(race, chamber)]
 
@@ -494,15 +526,15 @@ def summarize_chamber(
             projected[fallback_party] += 1
             expected[fallback_party] += 1
             continue
-        party = normalize_party(forecast.get("predicted_winner_party"))
-        if party == "Other":
-            probs = _race_party_probabilities(forecast)
-            if probs.get("Democratic", 0.0) > probs.get("Republican", 0.0):
-                party = "Democratic"
-            elif probs.get("Republican", 0.0) > probs.get("Democratic", 0.0):
-                party = "Republican"
-            else:
-                party = fallback_party_for_race(race)
+        # A named non-major favorite (e.g. an Independent) is an "Other" seat and is
+        # never folded into a major party. Only an unspecified label ("", "Other",
+        # "Unknown", ...) resolves from the probabilities, then the current holder.
+        # Mirrors forecastWinnerParty in web/src/lib/utils/forecast.ts.
+        raw_winner_party = str(forecast.get("predicted_winner_party") or "").strip().lower()
+        if raw_winner_party in UNSPECIFIED_WINNER_LABELS:
+            party = _probable_party(forecast) or fallback_party_for_race(race)
+        else:
+            party = normalize_party(raw_winner_party)
         projected[party] += 1
         for key, value in _race_party_probabilities(forecast).items():
             expected[key] += value

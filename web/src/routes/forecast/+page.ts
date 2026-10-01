@@ -1,31 +1,24 @@
+import { browser } from "$app/environment";
 import type { PageLoad } from "./$types";
 import {
   loadPrerenderChamberForecasts,
-  loadPrerenderSummaries,
+  refreshPrerenderedRaces,
 } from "$lib/prerenderData";
-import type { ChamberForecasts, RaceSummary } from "$lib/types";
 import { toForecastRaceSummaries } from "$lib/utils/publicRaceSummaries";
 
-const EMPTY_CHAMBER_FORECASTS: ChamberForecasts = {
-  house: "",
-  senate: "",
-  governors: "",
-};
-
-export const load: PageLoad = async ({ fetch }) => {
-  const [racesResult, forecastsResult] = await Promise.allSettled([
-    loadPrerenderSummaries(fetch),
-    loadPrerenderChamberForecasts(fetch),
+export const load: PageLoad = async ({ data, fetch }) => {
+  // Prerendering already has the build-time data. In the browser, pick up a
+  // fresher copy when one is available, but never replace good prerendered
+  // content with an empty or failed refresh.
+  if (!browser) return data;
+  const [races, chamberForecasts] = await Promise.all([
+    refreshPrerenderedRaces(data, toForecastRaceSummaries, fetch),
+    loadPrerenderChamberForecasts(fetch).catch(() => null),
   ]);
-
   return {
-    races:
-      racesResult.status === "fulfilled"
-        ? toForecastRaceSummaries(racesResult.value)
-        : ([] as RaceSummary[]),
-    chamberForecasts:
-      forecastsResult.status === "fulfilled"
-        ? forecastsResult.value
-        : EMPTY_CHAMBER_FORECASTS,
+    ...data,
+    ...races,
+    chamberForecasts: chamberForecasts ?? data.chamberForecasts,
+    forecastsLoadError: chamberForecasts ? false : data.forecastsLoadError,
   };
 };

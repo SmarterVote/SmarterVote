@@ -48,7 +48,7 @@
         </a>
         <a
           href={browser ? raceHref(race.id) : undefined}
-          class="inline-flex min-h-11 items-center gap-1.5 text-[10px] text-content-subtle hover:text-blue-600 dark:hover:text-blue-400 font-extrabold bg-surface border border-stroke/60 px-3 py-1 rounded-md transition-all whitespace-nowrap self-start"
+          class="inline-flex min-h-11 items-center gap-1.5 text-xs text-content-subtle hover:text-blue-600 dark:hover:text-blue-400 font-extrabold bg-surface border border-stroke/60 px-3 py-1 rounded-md transition-all whitespace-nowrap self-start"
         >
           View race <UiIcon name="arrow-right" size="sm" />
         </a>
@@ -59,7 +59,7 @@
         </span>
         <span class="w-1 h-1 rounded-full bg-stroke/60"></span>
         <span
-          class={`inline-flex border rounded-full px-2 py-0.5 text-[10px] font-black leading-none ${ratingClass(
+          class={`inline-flex border rounded-full px-2 py-0.5 text-xs font-black leading-none ${ratingClass(
             rating,
           )}`}
         >
@@ -76,7 +76,7 @@
         class="flex flex-col justify-center border-r border-stroke/30 min-w-0 pr-1"
       >
         <span
-          class="text-[9px] font-bold text-content-subtle uppercase tracking-wider"
+          class="text-xs font-bold text-content-subtle uppercase tracking-wider"
           >Projected</span
         >
         <span
@@ -90,7 +90,7 @@
       </div>
       <div class="flex flex-col justify-center border-r border-stroke/30">
         <span
-          class="text-[9px] font-bold text-content-subtle uppercase tracking-wider"
+          class="text-xs font-bold text-content-subtle uppercase tracking-wider"
           >Win probability</span
         >
         <span class="text-xs font-black mt-0.5 text-content tabular-nums">
@@ -99,7 +99,7 @@
       </div>
       <div class="flex flex-col justify-center pl-1">
         <span
-          class="text-[9px] font-bold text-content-subtle uppercase tracking-wider"
+          class="text-xs font-bold text-content-subtle uppercase tracking-wider"
           >Estimated margin</span
         >
         <span class="text-xs font-black mt-0.5 text-content tabular-nums">
@@ -116,7 +116,7 @@
     <!-- D vs R Split details -->
     {#if race.forecast.party_probabilities}
       <div
-        class="text-[10px] text-content-subtle flex justify-between font-bold px-1.5"
+        class="text-xs text-content-subtle flex justify-between font-bold px-1.5"
       >
         <span class="text-blue-600 dark:text-blue-400"
           >Dem: {probability(
@@ -134,7 +134,7 @@
     <!-- Takeaway Text -->
     <div class="flex flex-col justify-center border-t border-stroke/20 pt-2.5">
       <span
-        class="text-[9px] font-bold text-content-subtle uppercase tracking-wider mb-1"
+        class="text-xs font-bold text-content-subtle uppercase tracking-wider mb-1"
         >Key takeaway</span
       >
       <p class="text-xs text-content-muted leading-relaxed font-medium">
@@ -154,7 +154,7 @@
       <button
         type="button"
         on:click={onToggleExpand}
-        class="flex min-h-11 items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-500 focus:outline-none dark:text-blue-400 dark:hover:text-blue-300"
+        class="flex min-h-11 items-center gap-1 rounded text-xs font-bold text-blue-700 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:text-blue-400 dark:hover:text-blue-300 dark:focus-visible:ring-offset-slate-900"
         aria-expanded={isExpanded}
       >
         <span
@@ -166,7 +166,7 @@
         {isExpanded ? "Hide analysis" : "Show analysis"}
       </button>
 
-      <span class="text-[10px] text-content-subtle font-medium">
+      <span class="text-xs text-content-subtle font-medium">
         {race.forecast.based_on_poll_count} poll{race.forecast
           .based_on_poll_count === 1
           ? ""
@@ -182,7 +182,7 @@
         <!-- Full Rationale -->
         <div>
           <span
-            class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
+            class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
             >Full assessment</span
           >
           <p
@@ -196,7 +196,7 @@
         {#if race.forecast.key_reasons && race.forecast.key_reasons.length > 0}
           <div class="pt-2 border-t border-stroke/20">
             <span
-              class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
+              class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
               >Key drivers</span
             >
             <ul
@@ -213,7 +213,7 @@
         {#if race.forecast.uncertainty}
           <div class="pt-2 border-t border-stroke/20">
             <span
-              class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
+              class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
               >Uncertainty</span
             >
             <p class="text-content-muted font-medium leading-relaxed">
@@ -226,10 +226,10 @@
           <div class="pt-2 border-t border-stroke/20">
             <div class="flex items-center justify-between gap-2 mb-2">
               <span
-                class="font-bold text-content uppercase tracking-wider text-[9px] block"
+                class="font-bold text-content uppercase tracking-wider text-xs block"
                 >Kalshi market signals</span
               >
-              <span class="text-[9px] text-content-subtle font-bold"
+              <span class="text-xs text-content-subtle font-bold"
                 >{race.forecast.market_signals.length} market{race.forecast
                   .market_signals.length === 1
                   ? ""
@@ -249,12 +249,12 @@
                         >{marketSignalTarget(signal)}</span
                       >
                       <span
-                        class="block text-[10px] text-content-subtle leading-snug"
+                        class="block text-xs text-content-subtle leading-snug"
                         >{signal.title}</span
                       >
                     </div>
                     <div
-                      class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-content-subtle sm:justify-end"
+                      class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-content-subtle sm:justify-end"
                     >
                       <span class="font-bold text-content"
                         >{probabilityOneDecimal(
@@ -294,7 +294,7 @@
         {#if race.forecast.source_urls && race.forecast.source_urls.length > 0}
           <div class="pt-2 border-t border-stroke/20">
             <span
-              class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
+              class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
               >Forecast sources</span
             >
             <div class="flex flex-wrap gap-1.5">
@@ -303,7 +303,7 @@
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
+                  class="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
                 >
                   {getHostname(url)}
                   <UiIcon name="external" size="sm" />
@@ -315,7 +315,7 @@
 
         <!-- Metadata -->
         <div
-          class="pt-2 border-t border-stroke/20 flex flex-wrap items-center justify-between gap-2 text-[9px] text-content-subtle font-bold"
+          class="pt-2 border-t border-stroke/20 flex flex-wrap items-center justify-between gap-2 text-xs text-content-subtle font-bold"
         >
           {#if race.forecast.panel && race.forecast.panel.length > 1}
             <span

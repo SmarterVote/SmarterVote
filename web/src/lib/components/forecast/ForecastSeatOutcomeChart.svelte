@@ -23,7 +23,7 @@
       >
         Seat Outcome Distribution
       </h3>
-      <p class="text-[10px] text-content-subtle font-medium mt-0.5">
+      <p class="text-xs text-content-subtle font-medium mt-0.5">
         Probability of final Republican/Democratic seat splits
       </p>
     </div>
@@ -35,7 +35,7 @@
   >
     <button
       on:click={() => (activeChartType = "buckets")}
-      class={`flex-1 text-center py-1 text-[11px] font-bold rounded-md transition-all ${
+      class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "buckets"
           ? "bg-surface text-content shadow-sm border border-stroke/20"
           : "text-content-subtle hover:text-content"
@@ -45,7 +45,7 @@
     </button>
     <button
       on:click={() => (activeChartType = "histogram")}
-      class={`flex-1 text-center py-1 text-[11px] font-bold rounded-md transition-all ${
+      class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "histogram"
           ? "bg-surface text-content shadow-sm border border-stroke/20"
           : "text-content-subtle hover:text-content"
@@ -55,7 +55,7 @@
     </button>
     <button
       on:click={() => (activeChartType = "curve")}
-      class={`flex-1 text-center py-1 text-[11px] font-bold rounded-md transition-all ${
+      class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "curve"
           ? "bg-surface text-content shadow-sm border border-stroke/20"
           : "text-content-subtle hover:text-content"
@@ -76,7 +76,7 @@
           {#each seatBuckets as bucket}
             {#if bucket.probability > 0}
               <div
-                class={`${bucket.colorClass} transition-all duration-500 flex items-center justify-center text-[10px] font-bold text-white shadow-inner relative group cursor-pointer`}
+                class={`${bucket.colorClass} transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner relative group cursor-pointer`}
                 style={`width: ${bucket.probability * 100}%`}
               >
                 <!-- Tooltip -->
@@ -124,7 +124,7 @@
           <div class="flex items-center gap-3 text-xs">
             <!-- Label e.g. "52D - 48R" -->
             <span
-              class="w-20 font-mono font-bold text-[10px] text-content-subtle shrink-0"
+              class="w-20 font-mono font-bold text-xs text-content-subtle shrink-0"
             >
               {outcome.dSeats}D - {outcome.rSeats}R
             </span>
@@ -145,7 +145,7 @@
             </div>
             <!-- Value -->
             <span
-              class="w-10 text-right font-black font-mono text-[10px] text-content-muted shrink-0"
+              class="w-10 text-right font-black font-mono text-xs text-content-muted shrink-0"
             >
               {(outcome.probability * 100).toFixed(1)}%
             </span>
@@ -230,16 +230,16 @@
               <circle cx={pt.x} cy={pt.y} r="7" fill="transparent" />
               <foreignObject
                 x={Math.max(10, pt.x - 55)}
-                y={Math.max(0, pt.y - 38)}
+                y={Math.max(0, pt.y - 46)}
                 width="110"
-                height="35"
+                height="44"
                 class="pointer-events-none hidden group-hover/point:block overflow-visible z-50"
               >
                 <div
-                  class="bg-surface border border-stroke p-1 rounded shadow-md text-[8px] font-black text-center leading-tight"
+                  class="bg-surface border border-stroke p-1 rounded shadow-md text-xs font-black text-center leading-tight"
                 >
                   <div>{pt.dSeats}D - {pt.rSeats}R</div>
-                  <div class="text-blue-500 mt-0.5">
+                  <div class="text-blue-700 dark:text-blue-400 mt-0.5">
                     {(pt.prob * 100).toFixed(1)}% prob
                   </div>
                 </div>
@@ -250,12 +250,10 @@
 
         <!-- X-axis Labels -->
         <div
-          class="flex justify-between text-[9px] font-bold text-content-subtle px-2 border-t border-stroke/20 pt-1.5 mt-1"
+          class="flex justify-between text-xs font-bold text-content-subtle px-2 border-t border-stroke/20 pt-1.5 mt-1"
         >
           <span>{svgData.minD}D (Min)</span>
-          <span class="text-slate-400 dark:text-slate-500"
-            >50-50 Tie Threshold</span
-          >
+          <span class="text-content-muted">50-50 Tie Threshold</span>
           <span>{svgData.maxD}D (Max)</span>
         </div>
       </div>

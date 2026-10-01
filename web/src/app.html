@@ -28,6 +28,22 @@
             document.documentElement.classList.remove("dark");
           }
         } catch (e) {}
+        // The forecast page is prerendered as the House tab; flag a first load
+        // that asks for another tab so that page can hide the House content
+        // until hydration instead of flashing it.
+        try {
+          var tab = new URLSearchParams(window.location.search).get("tab");
+          if (
+            window.location.pathname.indexOf("/forecast") === 0 &&
+            tab &&
+            tab !== "house"
+          ) {
+            document.documentElement.setAttribute(
+              "data-forecast-pending-tab",
+              tab,
+            );
+          }
+        } catch (e) {}
       })();
     </script>
 

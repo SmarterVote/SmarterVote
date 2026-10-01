@@ -21,6 +21,8 @@
   export let collapseText = false;
   export let isDraftPreview = false;
   export let showQuality = false;
+  /** Fewest candidates the toggles may leave selected; checked boxes lock at this floor. */
+  export let minSelected = 1;
   export let onToggle: ((candidateName: string) => void) | undefined =
     undefined;
 
@@ -138,6 +140,10 @@
           <input
             type="checkbox"
             {checked}
+            disabled={checked && candidates.length <= minSelected}
+            title={checked && candidates.length <= minSelected
+              ? `At least ${minSelected} candidate${minSelected === 1 ? "" : "s"} must stay in the comparison`
+              : undefined}
             on:change={() => onToggle?.(candidate.name)}
             class="h-5 w-5 cursor-pointer rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
           />

@@ -499,3 +499,73 @@ describe("ElectionDirectory state filtering", () => {
     expect(labels).not.toContain("Utah's 4th Congressional District (1 race)");
   });
 });
+
+describe("ElectionDirectory filter persistence", () => {
+  const mixed = [
+    race({ id: "mo", title: "Missouri Senate", state: "Missouri" }),
+    race({
+      id: "mo-gov",
+      title: "Missouri Governor",
+      office: "Governor",
+      state: "Missouri",
+    }),
+    race({ id: "ks", title: "Kansas Senate", state: "Kansas" }),
+  ];
+
+  it("keeps the office filter when a state is chosen", async () => {
+    const { container } = renderDirectory(mixed);
+    await fireEvent.click(officeChip(container, "Senate")!);
+    await waitFor(() => expect(cards(container)).toHaveLength(2));
+
+    const select = container.querySelector(
+      "#mobile-state-select",
+    ) as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: "Missouri" } });
+
+    await waitFor(() => expect(cards(container)).toHaveLength(1));
+    expect(cards(container)[0].getAttribute("href")).toBe("/races/mo/");
+    expect(officeChip(container, "Senate")?.getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("writes state and office to the url and reads them back", async () => {
+    const { container } = renderDirectory(mixed);
+    await fireEvent.click(officeChip(container, "Governor")!);
+    const lastUrl = replaceState.mock.calls.at(-1)?.[0] as URL;
+    expect(lastUrl.searchParams.get("office")).toBe("Governor");
+
+    navigateTo(`${ROUTE}?state=Kansas&office=Senate`);
+    await waitFor(() => expect(cards(container)).toHaveLength(1));
+    expect(cards(container)[0].getAttribute("href")).toBe("/races/ks/");
+  });
+
+  it("keeps the selected state in the picker when search no longer matches it", async () => {
+    const { container } = renderDirectory(mixed);
+    navigateTo(`${ROUTE}?state=Kansas&q=Missouri`);
+    await waitFor(() => {
+      const select = container.querySelector(
+        "#mobile-state-select",
+      ) as HTMLSelectElement;
+      expect(
+        Array.from(select.options).map((option) => option.value),
+      ).toContain("Kansas");
+      expect(select.value).toBe("Kansas");
+    });
+  });
+
+  it("shows an error state instead of 'nothing published' when loading failed", async () => {
+    const { container } = render(ElectionDirectory, {
+      races: [],
+      loadError: true,
+    });
+    await waitFor(() =>
+      expect(container.textContent).toContain(
+        "We couldn’t load the election guides",
+      ),
+    );
+    expect(container.textContent).not.toContain(
+      "No races have been published yet",
+    );
+  });
+});

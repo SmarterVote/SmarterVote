@@ -3,12 +3,16 @@
   import type { RaceSummary } from "$lib/types";
   import { formatRating, getRaceState, raceHref } from "$lib/utils/forecast";
   import { probability, ratingClass } from "$lib/utils/forecastPresentation";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[];
 
   let keyRacesContainer: HTMLDivElement;
   function scrollKeyRaces(dir: number) {
-    keyRacesContainer?.scrollBy({ left: dir * 320, behavior: "smooth" });
+    keyRacesContainer?.scrollBy({
+      left: dir * 320,
+      behavior: scrollBehavior(),
+    });
   }
 </script>
 
@@ -70,7 +74,7 @@
 
     <div
       bind:this={keyRacesContainer}
-      class="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory hide-scrollbar"
+      class="flex gap-4 overflow-x-auto pb-3 motion-safe:scroll-smooth snap-x snap-mandatory hide-scrollbar"
       style="-ms-overflow-style: none; scrollbar-width: none;"
     >
       {#each races as race}
@@ -94,7 +98,7 @@
             </a>
             {#if rating}
               <span
-                class={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
+                class={`text-xs font-extrabold uppercase px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
                   rating,
                 )}`}
               >
@@ -110,7 +114,7 @@
               </span>
               {#if race.forecast.margin_estimate !== undefined && race.forecast.margin_estimate !== null}
                 <span
-                  class="text-[10px] text-content-subtle font-semibold tabular-nums"
+                  class="text-xs text-content-subtle font-semibold tabular-nums"
                 >
                   {race.forecast.margin_estimate > 0
                     ? "+"
@@ -121,7 +125,7 @@
           {/if}
 
           <p
-            class="text-[11px] text-content-muted leading-relaxed font-medium line-clamp-2"
+            class="text-xs text-content-muted leading-relaxed font-medium line-clamp-2"
           >
             {race.forecast?.takeaway ||
               race.forecast?.rationale?.split(/[.!?]/)[0] + "." ||

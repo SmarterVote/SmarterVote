@@ -62,7 +62,7 @@
       <!-- VP Tie-break Note -->
       {#if activeTab === "senate" && vpTiebreakParty}
         <span
-          class="text-[10px] text-content-subtle font-semibold bg-surface-alt px-2.5 py-0.5 rounded-full border border-stroke/60 italic"
+          class="text-xs text-content-subtle font-semibold bg-surface-alt px-2.5 py-0.5 rounded-full border border-stroke/60 italic"
         >
           Includes 50-50 tie-break via VP
         </span>
@@ -77,7 +77,7 @@
       class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
     >
       <div
-        class="text-[9px] font-bold uppercase text-content-subtle tracking-wider mb-1"
+        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
       >
         Control Prob.
       </div>
@@ -92,7 +92,7 @@
       >
         {probability(controlProbability)}
       </div>
-      <div class="text-[10px] font-semibold text-content-muted mt-0.5">
+      <div class="text-xs font-semibold text-content-muted mt-0.5">
         {controlParty}
       </div>
     </div>
@@ -102,14 +102,14 @@
       class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
     >
       <div
-        class="text-[9px] font-bold uppercase text-content-subtle tracking-wider mb-1"
+        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
       >
         Most Likely Exact Split
       </div>
       <div class="text-xl font-black text-content tabular-nums">
         {mostLikelyOutcome.key || "—"}
       </div>
-      <div class="text-[10px] font-semibold text-content-muted mt-0.5">
+      <div class="text-xs font-semibold text-content-muted mt-0.5">
         {mostLikelyOutcome.probability
           ? `${(mostLikelyOutcome.probability * 100).toFixed(1)}% chance of this split`
           : ""}
@@ -121,7 +121,7 @@
       class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
     >
       <div
-        class="text-[9px] font-bold uppercase text-content-subtle tracking-wider mb-1"
+        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
       >
         Battlegrounds
       </div>
@@ -130,7 +130,7 @@
       >
         {tossupCount}
       </div>
-      <div class="text-[10px] font-semibold text-content-muted mt-0.5">
+      <div class="text-xs font-semibold text-content-muted mt-0.5">
         toss-ups / {competitiveRaceCount} competitive
       </div>
     </div>

@@ -13,6 +13,23 @@
     content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
   />
   <link rel="canonical" href="https://smarter.vote/my-ballot/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Smarter.Vote" />
+  <meta property="og:url" content="https://smarter.vote/my-ballot/" />
+  <meta property="og:title" content="Find My Elections | Smarter.Vote" />
+  <meta
+    property="og:description"
+    content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
+  />
+  <meta property="og:image" content="https://smarter.vote/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://smarter.vote/my-ballot/" />
+  <meta name="twitter:title" content="Find My Elections | Smarter.Vote" />
+  <meta
+    name="twitter:description"
+    content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
+  />
+  <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
 </svelte:head>
 
 <div class="relative isolate min-h-[calc(100svh-4rem)] overflow-hidden bg-page">
@@ -53,7 +70,7 @@
           ><UiIcon name="arrow-left" size="sm" /> Back to Smarter.Vote</a
         >
         <p
-          class="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-blue-600 sm:mt-12 dark:text-blue-400"
+          class="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-blue-700 sm:mt-12 dark:text-blue-400"
         >
           Your election guide
         </p>
@@ -80,6 +97,7 @@
     {/if}
     <ElectionLookup
       races={data.races ?? []}
+      loadError={data.loadError}
       on:exploring={(event) => (exploring = event.detail)}
     />
   </div>

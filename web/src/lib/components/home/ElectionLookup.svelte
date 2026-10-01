@@ -1,6 +1,6 @@
 <script lang="ts">
   import { replaceState } from "$app/navigation";
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onMount, tick } from "svelte";
   import BallotExplorer from "$lib/components/ballot/BallotExplorer.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { RaceSummary } from "$lib/types";
@@ -16,6 +16,8 @@
   import { debounce } from "$lib/utils/debounce";
 
   export let races: RaceSummary[] = [];
+  /** True when the published race list could not be loaded at all. */
+  export let loadError = false;
   const dispatch = createEventDispatcher<{ exploring: boolean }>();
 
   let address = "";
@@ -31,6 +33,46 @@
   let suggestionRequest = 0;
 
   const SESSION_KEY = "smarterVote.ballot";
+
+  let addressInput: HTMLInputElement | undefined;
+  let resultsHeading: HTMLHeadingElement | undefined;
+  // Persistent polite live region: its text changes, the element never does,
+  // so screen readers reliably announce lookup outcomes.
+  let announcement = "";
+
+  // sessionStorage can throw (privacy modes, blocked site data); the ballot
+  // must keep working without it.
+  function readSession(): string | null {
+    try {
+      return sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeSession(value: string) {
+    try {
+      sessionStorage.setItem(SESSION_KEY, value);
+    } catch {
+      // Ignore: restoring the ballot on reload is a convenience.
+    }
+  }
+
+  function clearSession() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Ignore.
+    }
+  }
+
+  function resultsAnnouncement(count: number): string {
+    if (loadError && races.length === 0)
+      return "We couldn’t load the published election guides.";
+    return count === 0
+      ? "No matching Smarter.Vote guides are available yet for your district."
+      : `Found ${count} ${count === 1 ? "race" : "races"} for your district.`;
+  }
 
   const updateSuggestions = debounce(async (query: string, request: number) => {
     try {
@@ -138,9 +180,7 @@
       return;
 
     try {
-      const saved = JSON.parse(
-        sessionStorage.getItem(SESSION_KEY) ?? "null",
-      ) as {
+      const saved = JSON.parse(readSession() ?? "null") as {
         state?: string;
         district?: string;
         raceIds?: string[];
@@ -159,7 +199,7 @@
       // SvelteKit initializes its router immediately after component mount.
       window.setTimeout(updateShareableUrl);
     } catch {
-      sessionStorage.removeItem(SESSION_KEY);
+      clearSession();
     }
   });
 
@@ -167,11 +207,19 @@
     const query = address.trim();
     if (!query || loading) return;
     loading = true;
+    // Drop any pending or in-flight suggestion lookup so it cannot reopen the
+    // listbox after the voter has submitted.
+    updateSuggestions.cancel();
+    suggestionRequest += 1;
+    suggestions = [];
     suggestionsOpen = false;
+    activeSuggestionIndex = -1;
     abandonAddressSession();
     submitted = false;
     error = "";
     results = [];
+    announcement = "Looking up your district…";
+    let found = false;
     try {
       const geography = await lookupElectionGeography(query);
       state = geography.state;
@@ -179,8 +227,7 @@
       results = matchingNationalRaces(races, geography);
       submitted = true;
       dispatch("exploring", true);
-      sessionStorage.setItem(
-        SESSION_KEY,
+      writeSession(
         JSON.stringify({
           state,
           district,
@@ -189,33 +236,48 @@
       );
       updateShareableUrl();
       address = "";
+      announcement = resultsAnnouncement(results.length);
+      found = true;
     } catch (caught) {
       error =
         caught instanceof Error
           ? caught.message
           : "We could not look up that address.";
+      announcement = "";
     } finally {
       loading = false;
     }
+    if (found) {
+      // Move focus to the new results so keyboard and screen-reader users are
+      // not left on <body> after the form disappears.
+      await tick();
+      resultsHeading?.focus();
+    }
   }
 
-  function searchAnotherAddress() {
+  async function searchAnotherAddress() {
     submitted = false;
     results = [];
     state = "";
     district = "";
     error = "";
-    sessionStorage.removeItem(SESSION_KEY);
+    announcement = "";
+    clearSession();
     const url = new URL(window.location.href);
     url.searchParams.delete("state");
     url.searchParams.delete("district");
     url.searchParams.delete("race");
     replaceState(url, {});
     dispatch("exploring", false);
+    await tick();
+    addressInput?.focus();
   }
 </script>
 
 <div class="min-w-0">
+  <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+    {announcement}
+  </p>
   {#if !submitted}
     <div
       data-address-search-card
@@ -254,6 +316,7 @@
         <div class="relative">
           <input
             id="home-address"
+            bind:this={addressInput}
             bind:value={address}
             on:input={handleAddressInput}
             on:keydown={handleAddressKeydown}
@@ -290,7 +353,7 @@
                 >
               {/each}
               <p
-                class="border-t border-stroke px-4 py-1.5 text-right text-[10px] font-semibold text-content-subtle"
+                class="border-t border-stroke px-4 py-1.5 text-right text-xs font-semibold text-content-subtle"
               >
                 Powered by Google
               </p>
@@ -323,6 +386,25 @@
         >
       </div>
 
+      {#if loadError && races.length === 0}
+        <div
+          role="alert"
+          class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+        >
+          <p class="font-semibold">
+            We couldn’t load the published election guides.
+          </p>
+          <p class="mt-1">
+            Address matching needs them. Please check your connection and
+            <a
+              href="/my-ballot/"
+              class="font-semibold underline"
+              data-sveltekit-reload>try again</a
+            >.
+          </p>
+        </div>
+      {/if}
+
       {#if error}
         <div
           role="alert"
@@ -338,7 +420,7 @@
   {/if}
 
   {#if submitted}
-    <section class="py-2 sm:py-4" aria-live="polite">
+    <section class="py-2 sm:py-4" aria-labelledby="ballot-results-heading">
       <div
         class="flex flex-col gap-5 border-b border-stroke pb-6 sm:flex-row sm:items-end sm:justify-between"
       >
@@ -349,7 +431,10 @@
             {state} · {districtLabel(district)}
           </p>
           <h1
-            class="mt-2 text-3xl font-extrabold tracking-tight text-content sm:text-4xl"
+            id="ballot-results-heading"
+            bind:this={resultsHeading}
+            tabindex="-1"
+            class="mt-2 text-3xl font-extrabold tracking-tight text-content focus:outline-none sm:text-4xl"
           >
             Your election guide
           </h1>
@@ -386,8 +471,13 @@
         <div
           class="mt-5 rounded-xl bg-surface-alt p-4 text-sm text-content-muted"
         >
-          We identified your district, but no matching Smarter.Vote guide is
-          available yet. This does not mean you have no elections.
+          {#if loadError && races.length === 0}
+            We identified your district, but the published election guides
+            couldn’t be loaded. Please try again shortly.
+          {:else}
+            We identified your district, but no matching Smarter.Vote guide is
+            available yet. This does not mean you have no elections.
+          {/if}
         </div>
       {/if}
     </section>

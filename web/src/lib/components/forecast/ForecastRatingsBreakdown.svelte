@@ -24,7 +24,7 @@
           rating,
         )}`}
       >
-        <div class="text-[10px] font-bold leading-tight truncate">
+        <div class="text-xs font-bold leading-tight truncate">
           {formatRating(rating)}
         </div>
         <div class="text-lg font-black mt-1 tabular-nums">
