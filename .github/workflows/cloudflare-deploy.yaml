@@ -107,6 +107,21 @@ jobs:
           BUCKET_NAME="${{ vars.GCP_PROJECT_ID }}-sv-data-${ENVIRONMENT}"
           echo "Syncing published static files from gs://${BUCKET_NAME}/races/..."
           gcloud storage cp "gs://${BUCKET_NAME}/races/*.json" web/static/
+          # Published race files keep pipeline_state (the pipeline builds on it
+          # with baseline_source="published"), but the public site never reads
+          # it, agent_metrics or run_audit; drop them from the served copies.
+          node -e '
+            const fs = require("fs");
+            const skip = new Set(["summaries.json", "chamber_forecasts.json", "states-10m.json"]);
+            for (const f of fs.readdirSync("web/static")) {
+              if (!f.endsWith(".json") || skip.has(f)) continue;
+              const p = "web/static/" + f;
+              const d = JSON.parse(fs.readFileSync(p, "utf8"));
+              if (!d || typeof d !== "object" || Array.isArray(d)) continue;
+              for (const k of ["pipeline_state", "agent_metrics", "run_audit"]) delete d[k];
+              fs.writeFileSync(p, JSON.stringify(d));
+            }
+          '
 
       - name: Generate SvelteKit files
         run: npx svelte-kit sync

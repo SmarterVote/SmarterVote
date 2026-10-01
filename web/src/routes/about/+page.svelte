@@ -62,9 +62,9 @@
     </p>
     <p>
       Most of what's wrong with it is firmly outside the scope of what one 27
-      year old software engineer can fix. But in 2024 I went to vote and
-      couldn't find hardly any issue stances or positions for many of the
-      candidates on my ballot.
+      year old software engineer can fix. But in 2024 I went to vote and could
+      hardly find any issue stances or positions for many of the candidates on
+      my ballot.
     </p>
     <p>
       So I built this. Smarter.Vote runs an AI pipeline that researches issue
@@ -141,6 +141,11 @@
         evidence directly. A source is not treated as neutral merely because it
         is linked: campaign material represents the candidate's own account,
         while records and reporting provide additional context.
+      </p>
+      <p>
+        Candidates are listed with Democratic and Republican candidates first;
+        within each group, incumbents come first, then alphabetical by last
+        name. The order is not a ranking or an endorsement.
       </p>
     </PolicySection>
 

@@ -97,7 +97,7 @@ The public race read endpoints (`/races`, `/races/summaries`, `/races/chamber_fo
 ### Unprotected Endpoints
 
 - `/health` - Health checks
-- `/docs`, `/redoc` - API documentation
+- `/docs`, `/redoc`, `/openapi.json` - API documentation (dev only; disabled on Cloud Run unless `API_DOCS_ENABLED=true`)
 
 ## Development vs Production
 

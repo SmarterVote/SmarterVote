@@ -1,5 +1,18 @@
+# Site-wide header CSP. Every prerendered page also carries SvelteKit's
+# hash-based <meta> CSP (svelte.config.js kit.csp), and browsers enforce both,
+# so pages run only hashed inline scripts. The header itself must still allow
+# 'unsafe-inline' for script-src: SvelteKit's inline bootstrap script differs
+# on every page and its hash cannot be listed here (a hash in this header would
+# also make browsers ignore 'unsafe-inline' and block every bootstrap). The one
+# HTML file without SvelteKit's meta CSP, 404.html, has no inline script and
+# ships its own strict meta policy.
+#
+# connect-src: the races API host must match VITE_RACES_API_URL /
+# vars.RACES_API_URL in cloudflare-deploy.yaml; update both together.
+# img-src stays https: because candidate headshots are hotlinked from many
+# campaign, government and Wikimedia hosts.
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https:; script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://geocoding.geo.census.gov https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://*.auth0.com; worker-src 'self' blob:; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://races-api-dev-ddsvfazica-uc.a.run.app https://places.googleapis.com https://maps.googleapis.com https://cloudflareinsights.com https://*.auth0.com; frame-src 'self' https://*.auth0.com; worker-src 'self' blob:; upgrade-insecure-requests
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
@@ -20,4 +33,17 @@
   X-Robots-Tag: noindex
 
 /support/cancel/*
+  X-Robots-Tag: noindex
+
+# Raw race/forecast data files are for the app, not search results.
+/*.json
+  X-Robots-Tag: noindex
+
+/summaries.json
+  X-Robots-Tag: noindex
+
+/chamber_forecasts.json
+  X-Robots-Tag: noindex
+
+/states-10m.json
   X-Robots-Tag: noindex

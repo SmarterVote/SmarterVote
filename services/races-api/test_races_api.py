@@ -165,6 +165,30 @@ def test_get_race_by_id(client):
     assert len(race["candidates"]) == 1
 
 
+def test_get_race_strips_internal_pipeline_fields(data_dir, sample_race, monkeypatch):
+    """Public GET /races/{id} omits pipeline bookkeeping; the stored record keeps it."""
+    race = {
+        **sample_race,
+        "pipeline_state": {"complete": True, "removed_source_urls": ["https://x.test"]},
+        "agent_metrics": {"cost_usd": 1.23},
+        "run_audit": {"changed": []},
+    }
+    with open(os.path.join(data_dir, "mo-senate-2024.json"), "w") as f:
+        json.dump(race, f)
+    main_mod = _load_main_module(data_dir, monkeypatch)
+    from auth import verify_token
+
+    main_mod.app.dependency_overrides[verify_token] = lambda: {"auth": "test"}
+    with TestClient(main_mod.app) as c:
+        body = c.get("/races/mo-senate-2024").json()
+    for field in ("pipeline_state", "agent_metrics", "run_audit"):
+        assert field not in body
+    assert body["generator"] == ["pipeline-agent"]
+    # The cached/stored record is untouched (pipeline baselines read it back).
+    stored = main_mod.publish_service.get_race_data("mo-senate-2024")
+    assert stored["pipeline_state"]["removed_source_urls"] == ["https://x.test"]
+
+
 def test_get_race_not_found(client):
     """GET /races/{race_id} returns 404 for missing race."""
     resp = client.get("/races/nonexistent-race-9999")
@@ -1120,3 +1144,10 @@ def test_gcs_client_is_created_on_first_use(tmp_path, monkeypatch):
     assert service._get_gcs_client() is sentinel
     assert service.gcs_client is sentinel
     assert service.cloud_enabled is True
+
+
+def test_rate_limit_headers_are_emitted(client):
+    resp = client.get("/races")
+    assert resp.status_code == 200
+    assert resp.headers["X-RateLimit-Limit"] == "60"
+    assert "X-RateLimit-Remaining" in resp.headers

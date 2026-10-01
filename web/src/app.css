@@ -59,6 +59,9 @@
       "Segoe UI",
       sans-serif;
     scroll-behavior: smooth;
+    /* Keep anchor targets and keyboard-focused elements clear of the sticky
+       site header (WCAG 2.4.11 Focus Not Obscured). */
+    scroll-padding-top: calc(var(--site-header-height, 68px) + 1rem);
   }
 
   body {

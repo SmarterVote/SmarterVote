@@ -98,7 +98,9 @@ const config = {
           "sha256-7dQwUgLau1NFCCGjfn9FsYptB6ZtWxJin6VohGIu20I=",
           "https://maps.googleapis.com",
           "https://maps.gstatic.com",
-          "https://geocoding.geo.census.gov",
+          // The Census geocoder is called through the races API
+          // (POST /geocode/census) with fetch, never as JSONP: its JSONP
+          // endpoint runs any callback= and would defeat this hash policy.
           "https://static.cloudflareinsights.com",
         ],
       },

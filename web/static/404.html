@@ -9,24 +9,14 @@
       content="This Smarter.Vote page could not be found. Browse published U.S. House, Senate, and governor election research instead."
     />
     <title>Page not found | Smarter.Vote</title>
-    <script>
-      // Mirror app.html: honor the saved darkMode choice, else the OS setting.
-      (function () {
-        var dark = false;
-        try {
-          var saved = localStorage.getItem("darkMode");
-          dark =
-            saved !== null
-              ? saved === "true"
-              : window.matchMedia("(prefers-color-scheme: dark)").matches;
-        } catch (e) {
-          try {
-            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          } catch (err) {}
-        }
-        document.documentElement.classList.add(dark ? "dark" : "light");
-      })();
-    </script>
+    <!-- No inline script: this page is served for every unknown URL and is the
+         only HTML without SvelteKit's hash-based meta CSP, so it carries its own
+         strict script policy. -->
+    <meta
+      http-equiv="content-security-policy"
+      content="script-src 'self'; object-src 'none'; base-uri 'self'"
+    />
+    <script src="/404-theme.js"></script>
     <style>
       /* Mirrors the app's semantic tokens (src/app.css) and EmptyState. */
       :root {
@@ -105,10 +95,34 @@
       .site-header,
       .site-footer {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         min-height: 4.25rem;
-        gap: 1rem;
+        gap: 0.5rem 1rem;
+      }
+      .site-header {
+        padding-block: 0.5rem;
+      }
+      .site-nav ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .site-nav a {
+        display: inline-flex;
+        min-height: 2.75rem;
+        align-items: center;
+        color: var(--text);
+        font-size: 0.9375rem;
+        text-decoration: none;
+      }
+      .site-nav a:hover {
+        color: var(--link);
+        text-decoration: underline;
       }
       .brand {
         color: var(--link);
@@ -223,20 +237,27 @@
     <header>
       <div class="shell site-header">
         <a class="brand" href="/">Smarter.Vote</a>
-        <a href="/elections/">Browse elections</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <ul>
+            <li><a href="/my-ballot/">My Ballot</a></li>
+            <li><a href="/elections/">Elections</a></li>
+            <li><a href="/forecast/">Forecast</a></li>
+            <li><a href="/about/">About</a></li>
+          </ul>
+        </nav>
       </div>
     </header>
     <main>
       <section class="card" aria-labelledby="not-found-heading">
         <h1 id="not-found-heading">Page not found</h1>
         <p class="message">
-          The page may have moved or the address may be incorrect. You can
-          return home or continue to the election directory.
+          The page may have moved or the address may be incorrect. Search the
+          election directory for a race or candidate, or return home.
         </p>
         <p class="meta">Error 404</p>
         <div class="actions">
-          <a class="btn btn-primary" href="/">Go home</a>
-          <a class="btn btn-secondary" href="/elections/">Browse elections</a>
+          <a class="btn btn-primary" href="/elections/">Search elections</a>
+          <a class="btn btn-secondary" href="/">Go home</a>
         </div>
       </section>
     </main>
