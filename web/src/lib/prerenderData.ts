@@ -1,4 +1,4 @@
-import { candidateSlug } from "$lib/utils/format";
+import { candidateSlug, legacyCandidateSlug } from "$lib/utils/format";
 import type { ChamberForecasts, Race, RaceSummary } from "$lib/types";
 import { publicDataBase as configuredPublicDataBase } from "$lib/config/api";
 
@@ -109,7 +109,13 @@ export async function candidateEntries(): Promise<
   const entries: Array<{ slug: string; candidate: string }> = [];
   for (const race of summaries) {
     for (const candidate of race.candidates ?? []) {
-      entries.push({ slug: race.id, candidate: candidateSlug(candidate.name) });
+      const slug = candidateSlug(candidate.name);
+      entries.push({ slug: race.id, candidate: slug });
+      // Keep pre-accent-folding URLs ("linda-s-nchez") resolving; that page
+      // canonicalises and redirects to the folded slug.
+      const legacy = legacyCandidateSlug(candidate.name);
+      if (legacy && legacy !== slug)
+        entries.push({ slug: race.id, candidate: legacy });
     }
   }
   return entries;

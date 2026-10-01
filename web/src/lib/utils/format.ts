@@ -34,11 +34,38 @@ export function formatModelName(raw: string): string {
   return raw;
 }
 
-/** Turn a candidate name into a URL-safe slug. */
-export function candidateSlug(name: string): string {
-  return name
+function slugify(value: string): string {
+  return value
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+/**
+ * Turn a candidate name into a URL-safe slug. Accents are folded first
+ * ("José Peña" -> "jose-pena"); names with no Latin letters fall back to a
+ * stable hex encoding so the URL is never empty. Keep in sync with
+ * scripts/generate-sitemap.mjs.
+ */
+export function candidateSlug(name: string): string {
+  const folded = slugify(name.normalize("NFD").replace(/\p{M}/gu, ""));
+  if (folded) return folded;
+  const hex = Array.from(name.trim())
+    .map((ch) => ch.codePointAt(0)!.toString(16))
+    .join("");
+  return hex ? `c-${hex}` : "candidate";
+}
+
+/**
+ * The pre-accent-folding slug ("José Peña" -> "jos-pe-a"). Published URLs
+ * used it, so pages still accept it and redirect/canonicalise to candidateSlug.
+ */
+export function legacyCandidateSlug(name: string): string {
+  return slugify(name);
+}
+
+/** True when `slug` addresses this candidate under the current or legacy scheme. */
+export function matchesCandidateSlug(name: string, slug: string): boolean {
+  return candidateSlug(name) === slug || legacyCandidateSlug(name) === slug;
 }

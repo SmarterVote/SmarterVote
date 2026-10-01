@@ -5,12 +5,20 @@ const SITE_URL = "https://smarter.vote";
 const API_BASE = process.env.VITE_RACES_API_URL;
 const PUBLIC_DATA_URL = process.env.VITE_PUBLIC_DATA_URL;
 
+// Keep in sync with candidateSlug in src/lib/utils/format.ts.
 function candidateSlug(name) {
-  return String(name)
+  const folded = String(name)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+  if (folded) return folded;
+  const hex = Array.from(String(name).trim())
+    .map((ch) => ch.codePointAt(0).toString(16))
+    .join("");
+  return hex ? `c-${hex}` : "candidate";
 }
 
 function escapeXml(value) {
