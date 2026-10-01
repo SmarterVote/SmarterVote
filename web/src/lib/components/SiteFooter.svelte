@@ -24,7 +24,7 @@
       class="flex flex-col gap-6 md:flex-row md:items-start md:justify-between"
     >
       <div class="max-w-xl">
-        <a href="/" class="font-bold text-blue-600">Smarter.Vote</a>
+        <a href="/" class="font-bold text-primary">Smarter.Vote</a>
         <p class="mt-2 text-sm text-content-muted">
           Independent, sourced election research for informational purposes.
           Always confirm voting information with official election authorities.

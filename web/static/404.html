@@ -9,9 +9,36 @@
       content="This Smarter.Vote page could not be found. Browse published U.S. House, Senate, and governor election research instead."
     />
     <title>Page not found | Smarter.Vote</title>
+    <script>
+      // Mirror app.html: honor the saved darkMode choice, else the OS setting.
+      (function () {
+        var dark = false;
+        try {
+          var saved = localStorage.getItem("darkMode");
+          dark =
+            saved !== null
+              ? saved === "true"
+              : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        } catch (e) {
+          try {
+            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          } catch (err) {}
+        }
+        document.documentElement.classList.add(dark ? "dark" : "light");
+      })();
+    </script>
     <style>
       :root {
-        color-scheme: light dark;
+        color-scheme: light;
+        --bg: #f8fafc;
+        --text: #172033;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --action-border: #d1d5db;
+        --muted: #4b5563;
+        --footer: #5f6673;
+        --link: #1d4ed8;
+        --brand: #2563eb;
         font-family:
           Inter,
           ui-sans-serif,
@@ -21,16 +48,43 @@
           "Segoe UI",
           sans-serif;
       }
+      /* Dark: explicit saved choice, or OS preference when no class/JS. */
+      :root.dark {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --text: #e2e8f0;
+        --surface: #111827;
+        --border: #374151;
+        --action-border: #374151;
+        --muted: #d1d5db;
+        --footer: #d1d5db;
+        --link: #93c5fd;
+        --brand: #60a5fa;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not(.light) {
+          color-scheme: dark;
+          --bg: #0f172a;
+          --text: #e2e8f0;
+          --surface: #111827;
+          --border: #374151;
+          --action-border: #374151;
+          --muted: #d1d5db;
+          --footer: #d1d5db;
+          --link: #93c5fd;
+          --brand: #60a5fa;
+        }
+      }
       body {
         min-height: 100vh;
         margin: 0;
-        background: #f8fafc;
-        color: #172033;
+        background: var(--bg);
+        color: var(--text);
       }
       header,
       footer {
-        background: #ffffff;
-        border-color: #e5e7eb;
+        background: var(--surface);
+        border-color: var(--border);
         border-style: solid;
         border-width: 0;
       }
@@ -53,7 +107,7 @@
         gap: 1rem;
       }
       .brand {
-        color: #2563eb;
+        color: var(--brand);
         font-size: 1.1rem;
         font-weight: 850;
         text-decoration: none;
@@ -69,15 +123,15 @@
         width: min(100% - 2rem, 34rem);
         box-sizing: border-box;
         padding: clamp(2rem, 7vw, 4rem);
-        border: 1px solid #e5e7eb;
+        border: 1px solid var(--border);
         border-radius: 1.5rem;
-        background: #ffffff;
+        background: var(--surface);
         box-shadow: 0 12px 36px rgb(15 23 42 / 8%);
         text-align: center;
       }
       .eyebrow {
         margin: 0 0 0.75rem;
-        color: #2563eb;
+        color: var(--brand);
         font-size: 0.75rem;
         font-weight: 800;
         letter-spacing: 0.16em;
@@ -90,7 +144,7 @@
       }
       .message {
         margin: 1rem auto 0;
-        color: #4b5563;
+        color: var(--muted);
         line-height: 1.65;
       }
       .actions {
@@ -101,8 +155,12 @@
         margin-top: 2rem;
       }
       a {
-        color: #1d4ed8;
+        color: var(--link);
         font-weight: 700;
+      }
+      a:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
       }
       .action {
         display: inline-flex;
@@ -110,9 +168,9 @@
         box-sizing: border-box;
         align-items: center;
         padding: 0.65rem 1rem;
-        border: 1px solid #d1d5db;
+        border: 1px solid var(--action-border);
         border-radius: 0.75rem;
-        background: #ffffff;
+        background: var(--surface);
         text-decoration: none;
       }
       .action-primary {
@@ -121,33 +179,8 @@
         color: #ffffff;
       }
       .site-footer {
-        color: #6b7280;
+        color: var(--footer);
         font-size: 0.75rem;
-      }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #0f172a;
-          color: #e2e8f0;
-        }
-        header,
-        footer,
-        .card,
-        .action {
-          border-color: #374151;
-          background: #111827;
-        }
-        .message,
-        .site-footer {
-          color: #d1d5db;
-        }
-        a {
-          color: #93c5fd;
-        }
-        .action-primary {
-          border-color: #2563eb;
-          background: #2563eb;
-          color: #ffffff;
-        }
       }
     </style>
   </head>

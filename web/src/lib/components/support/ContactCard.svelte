@@ -8,13 +8,12 @@
 </script>
 
 <div
-  class="rounded-xl border border-primary-500/30 bg-primary-50 p-5 dark:bg-blue-950/20"
+  class="rounded-xl border border-primary-500/30 bg-primary-50 p-5 dark:bg-primary-950/20"
 >
   <p class="text-content">
     {intro}
-    <a
-      class="font-medium text-primary-600 underline hover:no-underline dark:text-primary-500"
-      {href}>{email}</a
+    <a class="font-medium text-primary underline hover:no-underline" {href}
+      >{email}</a
     >.
   </p>
   <a

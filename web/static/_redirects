@@ -5,6 +5,11 @@
 /200/ / 301
 /200.html / 301
 
+# Methodology lives on the About page; the prerendered /methodology/ route
+# remains as a meta-refresh fallback if these rules are ever bypassed.
+/methodology /about/#methodology 301
+/methodology/ /about/#methodology 301
+
 # Candidates removed from the published ballot redirect to their race overview.
 /races/md-governor-2026/ronald-w-abend /races/md-governor-2026/ 301
 /races/md-governor-2026/ronald-w-abend/ /races/md-governor-2026/ 301

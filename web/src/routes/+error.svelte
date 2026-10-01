@@ -13,6 +13,7 @@
 <svelte:head>
   <title>{title} | Smarter.Vote</title>
   <meta name="description" content={message} />
+  <meta name="robots" content="noindex" />
 </svelte:head>
 
 <div class="container mx-auto px-4 py-12 max-w-4xl text-center">
@@ -22,6 +23,8 @@
     <div class="mb-8">
       <svg
         class="w-20 h-20 mx-auto mb-4 text-content-subtle opacity-75"
+        aria-hidden="true"
+        focusable="false"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -46,10 +49,12 @@
     <div class="flex flex-wrap items-center justify-center gap-3">
       <a
         href="/"
-        class="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors shadow-sm"
+        class="inline-flex items-center gap-2 bg-primary-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors shadow-sm"
       >
         <svg
           class="w-4 h-4"
+          aria-hidden="true"
+          focusable="false"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -73,8 +78,10 @@
 
     <div class="mt-8 text-xs text-content-subtle">
       <p>
-        If you think this is an error, please check the URL or search for
-        elections using the search bar above.
+        If you think this is an error, please check the URL or
+        <a href="/elections/" class="text-primary underline hover:no-underline"
+          >search the election directory</a
+        >.
       </p>
     </div>
   </div>

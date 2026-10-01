@@ -34,10 +34,10 @@
     </p>
     <p>
       So I built this. Smarter.Vote runs an AI pipeline that researches issue
-      stances for every candidate in every federal race in America and publishes
-      the sources next to the answers, so you can check the work instead of
-      taking my word for it. Ballot initiatives and local races are hopefully
-      next.
+      stances for candidates in national races (U.S. House, U.S. Senate, and
+      governor) and publishes the sources next to the answers, so you can check
+      the work instead of taking my word for it. Ballot initiatives and local
+      races are hopefully next.
     </p>
     <p class="text-sm">Jacob Loukota, Smarter.Vote LLC</p>
   </PolicySection>
@@ -60,7 +60,7 @@
         Smarter.Vote LLC chooses what systems to use and is responsible for what
         it publishes. Readers should inspect the cited evidence, compare it with
         official records and candidate statements, and report errors through the <a
-          class="text-primary-600 underline dark:text-primary-500"
+          class="text-primary underline hover:no-underline"
           href="/corrections/">corrections process</a
         >.
       </p>
@@ -83,9 +83,7 @@
 
   <div id="methodology" class="scroll-mt-24 space-y-6">
     <div class="pt-2">
-      <p
-        class="text-sm font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-500"
-      >
+      <p class="text-sm font-semibold uppercase tracking-wider text-primary">
         Our methodology
       </p>
       <p class="mt-2 leading-7">
@@ -211,16 +209,14 @@
       Smarter.Vote LLC is responsible for the site, its editorial decisions,
       privacy inquiries, corrections, partnerships, and any future refunds.
       Learn more about our
-      <a
-        class="text-primary-600 underline dark:text-primary-500"
-        href="#methodology">methodology</a
+      <a class="text-primary underline hover:no-underline" href="#methodology"
+        >methodology</a
       >,
-      <a
-        class="text-primary-600 underline dark:text-primary-500"
-        href="/corrections/">corrections policy</a
+      <a class="text-primary underline hover:no-underline" href="/corrections/"
+        >corrections policy</a
       >, and
       <a
-        class="text-primary-600 underline dark:text-primary-500"
+        class="text-primary underline hover:no-underline"
         href="/funding-and-editorial-independence/"
         >funding and editorial independence policy</a
       >.
@@ -232,20 +228,18 @@
   <p class="text-center text-sm">
     {#if paymentsEnabled}
       Smarter.Vote LLC accepts support through the
-      <a
-        class="text-primary-600 underline dark:text-primary-500"
-        href="/support/">secure support page</a
-      >. You can also support the individual developer separately through GitHub
-      Sponsors.
+      <a class="text-primary underline hover:no-underline" href="/support/"
+        >secure support page</a
+      >. You can also support the individual developer separately through
     {:else}
-      Smarter.Vote LLC support is not yet accepting payments. If you want to
-      support the individual developer separately, visit
+      Smarter.Vote LLC is not yet accepting support payments. You can support
+      the individual developer separately through
     {/if}
     <a
-      class="text-primary-600 underline dark:text-primary-500"
+      class="text-primary underline hover:no-underline"
       href="https://github.com/sponsors/loukotaj"
       target="_blank"
-      rel="noopener noreferrer">Support the developer on GitHub</a
+      rel="noopener noreferrer">GitHub Sponsors</a
     >. GitHub Sponsors is personal support, not a contribution to Smarter.Vote
     LLC.
   </p>

@@ -18,10 +18,16 @@
   .tab-button {
     @apply min-h-11 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-content-subtle;
     @apply hover:text-content-muted hover:border-stroke transition-colors duration-200;
+    @apply rounded-t-md;
+  }
+
+  .tab-button:focus-visible {
+    outline: 2px solid rgb(var(--sv-primary));
+    outline-offset: -2px;
   }
 
   .tab-button.active {
-    @apply text-blue-600 border-blue-600;
+    @apply text-primary border-primary;
   }
 
   .tab-button:disabled,

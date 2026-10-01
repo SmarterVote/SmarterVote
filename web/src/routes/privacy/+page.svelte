@@ -6,7 +6,7 @@
 
 <TrustPage
   title="Privacy"
-  description="A plain-language description of how Smarter.Vote handles visitor and inquiry data."
+  description="A plain-language description of how Smarter.Vote handles visitor, inquiry, and payment data."
   path="/privacy/"
 >
   <PolicySection title="Data we handle">
@@ -29,6 +29,26 @@
       session storage so results survive a refresh. Google and the Census Bureau
       handle their parts of the lookup under their own policies. The derived
       values are cleared when you search another address or close the tab.
+    </p>
+  </PolicySection>
+  <PolicySection title="Support payments">
+    <p>
+      When online support payments are enabled, checkout is handled by Stripe on
+      Stripe's own pages. Stripe collects your card details, email address, and
+      billing information and processes them under its own privacy policy.
+      Smarter.Vote never receives your card number. Payment records, including
+      the amount and the contact details you give Stripe, are kept in
+      Smarter.Vote LLC's Stripe account for receipts, bookkeeping, refunds, and
+      managing monthly support. Our own server logs only the checkout session
+      ID, amount, and payment status.
+    </p>
+  </PolicySection>
+  <PolicySection title="Administrator sign-in">
+    <p>
+      Visitors do not need to sign in. Auth0 is used only for Smarter.Vote
+      administrators to sign in to the site's admin tools, and processes their
+      account and login data under its own policies. No visitor account data is
+      collected.
     </p>
   </PolicySection>
   <PolicySection title="Retention and access">

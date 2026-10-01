@@ -97,8 +97,8 @@
           aria-pressed={selectedAmount === amount}
           class="rounded-lg border py-3 text-sm font-semibold transition-colors {selectedAmount ===
           amount
-            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-950 dark:text-primary-300'
-            : 'border-stroke bg-surface text-content hover:border-primary-400 hover:bg-surface-alt'}"
+            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-950 dark:text-primary-300'
+            : 'border-stroke bg-surface text-content hover:border-primary-400 hover:bg-surface-alt'} focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
           on:click={() => selectPreset(amount)}
         >
           ${amount}
@@ -122,7 +122,7 @@
       max="1000"
       step="1"
       placeholder="Custom amount"
-      class="min-h-11 w-full rounded-lg border border-stroke bg-surface py-2.5 pl-7 pr-3 text-sm text-content placeholder:text-content-muted focus:border-primary-500 focus:outline-none {selectedAmount ===
+      class="min-h-11 w-full rounded-lg border border-stroke bg-surface py-2.5 pl-7 pr-3 text-sm text-content placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page {selectedAmount ===
         null && customAmount
         ? 'border-primary-500'
         : ''}"
@@ -143,7 +143,7 @@
   <!-- CTA -->
   <button
     type="submit"
-    class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 font-semibold text-white transition hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page disabled:opacity-50 disabled:cursor-not-allowed"
     disabled={!canSubmit}
   >
     {#if loading}

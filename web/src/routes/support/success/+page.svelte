@@ -28,12 +28,14 @@
   title="Checkout status"
   description="Confirm the status of your Smarter.Vote support payment."
   path="/support/success/"
+  noindex
 >
-  <div aria-live="polite" aria-busy={status === "checking"}>
+  <!-- Single persistent live region: the inner panels intentionally carry no
+       role=status/alert so each state change is announced exactly once. -->
+  <div role="status" aria-live="polite" aria-busy={status === "checking"}>
     {#if status === "confirmed"}
       <div
         class="rounded-xl border border-green-300 bg-green-50 p-6 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100"
-        role="status"
       >
         <h2 class="mb-2 text-lg font-semibold">Payment confirmed</h2>
         <p>
@@ -45,7 +47,6 @@
     {:else if status === "pending"}
       <div
         class="rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        role="status"
       >
         <h2 class="mb-2 text-lg font-semibold">Payment processing</h2>
         <p>
@@ -56,7 +57,6 @@
     {:else if status === "error"}
       <div
         class="rounded-xl border border-stroke bg-surface-alt p-6 text-content"
-        role="alert"
       >
         <h2 class="mb-2 text-lg font-semibold">
           We could not verify this payment
@@ -69,7 +69,6 @@
     {:else}
       <p
         class="rounded-xl border border-stroke bg-surface-alt p-6 text-content"
-        role="status"
       >
         Confirming your payment with Stripe…
       </p>
@@ -78,8 +77,7 @@
   <p class="text-content-muted">
     If you have any questions about your support payment, <a
       href="/support/"
-      class="text-primary-600 underline hover:text-primary-700 dark:text-primary-400"
-      >contact us</a
+      class="text-primary underline hover:no-underline">contact us</a
     >.
   </p>
 </TrustPage>

@@ -25,9 +25,12 @@
   --sv-border: 229 231 235; /* gray-200 — borders            */
   --sv-text: 17 24 39; /* gray-900 — primary text       */
   --sv-text-muted: 75 85 99; /* gray-600 — secondary text     */
-  --sv-text-subtle: 107 114 128; /* gray-500 — tertiary text      */
-  --sv-text-faint: 156 163 175; /* gray-400 — placeholder / meta */
+  /* subtle/faint are tuned to stay >= 4.5:1 (WCAG AA) on page, surface and
+     surface-alt — faint is meaningful meta text, not decoration. */
+  --sv-text-subtle: 95 102 115; /* #5f6673 — tertiary text (5.25:1 on alt) */
+  --sv-text-faint: 104 111 124; /* #686f7c — meta text (4.59:1 on alt)    */
   --sv-primary: 37 99 235; /* blue-600 — accent / links     */
+  color-scheme: light;
 }
 
 /* Dark mode — toggled by adding .dark to <html> */
@@ -39,8 +42,9 @@
   --sv-text: 249 250 251; /* gray-50  — primary text       */
   --sv-text-muted: 209 213 219; /* gray-300 — secondary text     */
   --sv-text-subtle: 156 163 175; /* gray-400 — tertiary text      */
-  --sv-text-faint: 107 114 128; /* gray-500 — placeholder / meta */
+  --sv-text-faint: 143 150 163; /* #8f96a3 — meta text (4.93:1 on alt)    */
   --sv-primary: 96 165 250; /* blue-400 — accent / links     */
+  color-scheme: dark;
 }
 
 /* ─── Global base ───────────────────────────────────────────── */
@@ -108,6 +112,17 @@
   .mobile-heading {
     @apply text-lg sm:text-xl lg:text-2xl;
   }
+}
+
+/* Fallback focus indicator for keyboard users. Many controls strip the UA
+   outline (focus:outline-none) without supplying their own ring; this rule is
+   unlayered, ties Tailwind's focus:outline-none on specificity (0,2,0) and
+   comes later, so focus stays visible; component-scoped styles still win.
+   Elements with a `focus:ring-*` / `focus-visible:ring-*` utility, or their
+   own `focus-visible:outline*`, are excluded so they keep their indicator. */
+:focus-visible:not([class*=":ring"], [class*="focus-visible:outline"]) {
+  outline: 2px solid rgb(var(--sv-primary));
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
