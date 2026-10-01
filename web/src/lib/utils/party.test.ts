@@ -44,9 +44,13 @@ describe("party utilities", () => {
       expect(partyAbbr("l")).toBe("L");
     });
 
-    it("falls back to first letter capitalized for other parties", () => {
-      expect(partyAbbr("Constitution")).toBe("C");
-      expect(partyAbbr("Reform")).toBe("R");
+    // A single letter would read as a known party ("Reform" -> "R" looks
+    // Republican, "Legal Marijuana Now" -> "L" looks Libertarian).
+    it("never collapses other parties to a known party's letter", () => {
+      expect(partyAbbr("Constitution")).toBe("Con");
+      expect(partyAbbr("Reform")).toBe("Ref");
+      expect(partyAbbr("Legal Marijuana Now")).toBe("LMN");
+      expect(partyAbbr("Party for Socialism and Liberation")).toBe("PSL");
     });
   });
 

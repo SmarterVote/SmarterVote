@@ -18,10 +18,13 @@ describe("support success page", () => {
   it("does not claim success without a checkout session", async () => {
     render(Page);
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain(
+      expect(screen.getByRole("status").textContent).toContain(
         "could not verify",
       ),
     );
+    // Exactly one live region, so the state change is announced once.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("Payment confirmed")).toBeNull();
     expect(getCheckoutStatus).not.toHaveBeenCalled();
   });

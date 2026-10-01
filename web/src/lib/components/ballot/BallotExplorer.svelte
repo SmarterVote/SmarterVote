@@ -5,6 +5,7 @@
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { Candidate, Race, RaceSummary } from "$lib/types";
+  import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { formatElectionDate } from "$lib/utils/electionDate";
 
   export let races: RaceSummary[] = [];
@@ -27,15 +28,46 @@
     return office;
   }
 
+  /** A side-by-side comparison needs at least this many candidates. */
+  const MIN_COMPARED = 2;
+
   function activeCandidates(race: Race): Candidate[] {
-    return race.candidates.filter((candidate) => !candidate.withdrawn);
+    return neutralCandidateOrder(
+      race.candidates.filter((candidate) => !candidate.withdrawn),
+    );
   }
 
   function candidatesFor(
     race: Race,
     selections: Record<string, Candidate[]>,
   ): Candidate[] {
-    return selections[race.id] ?? activeCandidates(race);
+    const active = activeCandidates(race);
+    const selected = selections[race.id];
+    if (!selected) return active;
+    // Recover from a stale or invalid selection (e.g. a candidate withdrew or
+    // the selection dropped below the comparison minimum) instead of leaving
+    // the voter stuck on a "not enough candidates" message.
+    const valid = active.filter((candidate) =>
+      selected.some((picked) => picked.name === candidate.name),
+    );
+    return valid.length >= Math.min(MIN_COMPARED, active.length)
+      ? valid
+      : active;
+  }
+
+  /**
+   * The comparison's native checkbox flips before we refuse the change; put
+   * it back so the control matches the (unchanged) selection.
+   */
+  async function restoreCheckbox(candidateName: string) {
+    await tick();
+    const panel = document.getElementById("ballot-race-panel");
+    panel
+      ?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+      .forEach((input) => {
+        const label = input.closest("label")?.textContent ?? "";
+        if (label.includes(candidateName)) input.checked = true;
+      });
   }
 
   function toggleCandidate(race: Race, candidateName: string) {
@@ -43,19 +75,24 @@
     const isSelected = current.some(
       (candidate) => candidate.name === candidateName,
     );
-    if (isSelected && current.length === 1) return;
+    // Keep at least two candidates selected so the comparison (and its
+    // candidate toggles) always stays rendered.
+    if (isSelected && current.length <= MIN_COMPARED) {
+      void restoreCheckbox(candidateName);
+      return;
+    }
+    const nextNames = new Set(
+      isSelected
+        ? current
+            .filter((candidate) => candidate.name !== candidateName)
+            .map((candidate) => candidate.name)
+        : [...current.map((candidate) => candidate.name), candidateName],
+    );
     selectedCandidates = {
       ...selectedCandidates,
-      [race.id]: isSelected
-        ? current.filter((candidate) => candidate.name !== candidateName)
-        : [
-            ...current,
-            ...activeCandidates(race).filter(
-              (candidate) =>
-                candidate.name === candidateName &&
-                !current.some((selected) => selected.name === candidate.name),
-            ),
-          ],
+      [race.id]: activeCandidates(race).filter((candidate) =>
+        nextNames.has(candidate.name),
+      ),
     };
   }
 
@@ -120,15 +157,9 @@
 </script>
 
 {#if races.length}
-  <div
-    class="mt-7 overflow-hidden rounded-3xl border border-stroke bg-surface shadow-lg"
-  >
+  <div class="card mt-7 overflow-hidden">
     <div class="border-b border-stroke bg-surface-alt/50 px-5 py-5 sm:px-7">
-      <p
-        class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-      >
-        Explore your races
-      </p>
+      <p class="eyebrow">Explore your races</p>
       <h3 class="mt-1 text-xl font-bold text-content">Your matched races</h3>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-content-muted">
         Choose a race to compare candidates and sourced positions without
@@ -154,8 +185,8 @@
             on:keydown={(event) => handleTabKeydown(event, index)}
             class="min-h-11 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition {selectedId ===
             race.id
-              ? 'border-blue-700 bg-blue-700 text-white shadow-md shadow-blue-700/20'
-              : 'border-stroke bg-surface text-content-muted hover:border-blue-400 hover:text-blue-700'}"
+              ? 'border-content bg-content text-surface'
+              : 'border-stroke bg-surface text-content-muted hover:border-content-subtle hover:text-content'}"
           >
             {officeLabel(race)}
           </button>
@@ -177,15 +208,12 @@
           Loading this race comparison…
         </div>
       {:else if loadError && !selectedRace}
-        <div
-          role="alert"
-          class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        >
+        <div role="alert" class="alert-warn">
           <p class="font-bold">This comparison could not be loaded.</p>
           <p class="mt-1">{loadError}</p>
           <button
             type="button"
-            class="mt-3 font-bold text-blue-700 hover:underline dark:text-blue-300"
+            class="mt-3 font-bold text-primary-700 hover:underline dark:text-primary-300"
             on:click={() => selectedId && selectRace(selectedId)}
           >
             Try again
@@ -201,9 +229,7 @@
             >
               {officeLabel(selectedSummary)}
             </p>
-            <h3
-              class="mt-1 text-2xl font-extrabold tracking-tight text-content"
-            >
+            <h3 class="mt-1 text-2xl font-bold tracking-tight text-content">
               {selectedRace.title}
             </h3>
             <p class="mt-1 text-sm text-content-muted">
@@ -211,9 +237,7 @@
             </p>
           </div>
           <div class="shrink-0 text-sm font-bold">
-            <a
-              href="/races/{selectedRace.id}/"
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 py-2.5 text-white shadow-md shadow-blue-900/10 transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            <a href="/races/{selectedRace.id}/" class="btn-primary"
               >View full race guide <UiIcon name="arrow-right" size="sm" /></a
             >
           </div>
@@ -224,6 +248,7 @@
             race={selectedRace}
             {candidates}
             compact
+            minSelected={2}
             onToggle={(candidateName) =>
               toggleCandidate(selectedRace, candidateName)}
           />

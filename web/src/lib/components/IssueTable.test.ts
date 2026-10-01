@@ -96,9 +96,7 @@ describe("IssueTable content", () => {
       Economy: stance({ stance: "Economy position." }),
     } as Partial<Record<IssueKey, IssueStance>>);
     const mobileView = mobile(container);
-    const select = mobileView.querySelector(
-      "#candidate-issue-select",
-    ) as HTMLSelectElement;
+    const select = mobileView.querySelector("select") as HTMLSelectElement;
 
     expect(mobileView.textContent).toContain("Healthcare position.");
     expect(mobileView.textContent).not.toContain("Economy position.");
@@ -187,6 +185,35 @@ describe("IssueTable source expansion", () => {
   });
 });
 
+describe("IssueTable ids", () => {
+  // Every candidate card on a race page renders its own IssueTable, so a fixed
+  // id would collide and break the <label for> association.
+  it("namespaces the mobile issue select by race and candidate", () => {
+    const issues = {
+      Healthcare: stance(),
+    } as Partial<Record<IssueKey, IssueStance>>;
+    const first = renderTable(issues, { candidateName: "Jane Doe" });
+    const second = renderTable(issues, { candidateName: "John Roe" });
+    const a = first.container.querySelector("select")!;
+    const b = second.container.querySelector("select")!;
+
+    expect(a.id).not.toBe(b.id);
+    expect(a.id).toContain("mo-senate-2024");
+    expect(
+      first.container.querySelector(`label[for="${a.id}"]`),
+    ).not.toBeNull();
+  });
+
+  it("skips whitespace-only stances", () => {
+    const { container } = renderTable({
+      Healthcare: stance({ stance: "   " }),
+      Economy: stance({ stance: "Economy position." }),
+    } as Partial<Record<IssueKey, IssueStance>>);
+
+    expect(desktop(container).querySelectorAll("tbody tr")).toHaveLength(1);
+  });
+});
+
 describe("IssueTable renamed-issue tooltip", () => {
   const renamed = {
     "Reproductive Rights": stance(),
@@ -240,6 +267,22 @@ describe("IssueTable renamed-issue tooltip", () => {
 
     await fireEvent.click(info);
     expect(desktop(container).querySelector('[role="tooltip"]')).toBeNull();
+  });
+
+  it("ties the open note to its button for assistive tech", async () => {
+    const { container } = renderTable(renamed);
+    const info = desktop(container).querySelector(
+      '[aria-label="About this issue name"]',
+    )!;
+
+    expect(info.getAttribute("aria-expanded")).toBe("false");
+    expect(info.hasAttribute("aria-describedby")).toBe(false);
+
+    await fireEvent.click(info);
+    const tooltip = desktop(container).querySelector('[role="tooltip"]')!;
+    expect(info.getAttribute("aria-expanded")).toBe("true");
+    expect(tooltip.id).toBeTruthy();
+    expect(info.getAttribute("aria-describedby")).toBe(tooltip.id);
   });
 
   it("keeps the desktop and mobile tooltips independent", async () => {

@@ -25,10 +25,10 @@
       dot: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]",
     },
     unknown: {
-      bg: "bg-gray-50/70 dark:bg-gray-800/20",
-      border: "border-gray-200/60 dark:border-gray-700/40",
-      text: "text-gray-500 dark:text-gray-400",
-      dot: "bg-gray-400",
+      bg: "bg-surface-alt",
+      border: "border-stroke",
+      text: "text-content-subtle",
+      dot: "bg-content-faint",
     },
   };
 

@@ -8,17 +8,13 @@
 </script>
 
 <div
-  class="rounded-xl border border-primary-500/30 bg-primary-50 p-5 dark:bg-blue-950/20"
+  class="card border-l-4 border-l-primary-600 p-4 sm:p-6 dark:border-l-primary-400"
 >
   <p class="text-content">
     {intro}
-    <a
-      class="font-medium text-primary-600 underline hover:no-underline dark:text-primary-500"
-      {href}>{email}</a
+    <a class="font-medium text-primary underline hover:no-underline" {href}
+      >{email}</a
     >.
   </p>
-  <a
-    class="mt-4 inline-flex rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition hover:bg-primary-700"
-    {href}>{label}</a
-  >
+  <a class="btn-primary mt-4" {href}>{label}</a>
 </div>

@@ -108,17 +108,33 @@ describe("RaceCard content", () => {
     expect(container.textContent).toContain("Missouri");
   });
 
-  it("omits the jurisdiction chip when absent", () => {
-    const withChip = render(RaceCard, { race: makeRace() });
-    const chip = withChip.container.querySelector(".bg-green-100");
-    expect(chip?.textContent?.trim()).toBe("Missouri");
+  it("shows a compact location chip derived from the race id", () => {
+    const senate = render(RaceCard, { race: makeRace() });
+    expect(
+      senate.container
+        .querySelector("[data-testid=race-location]")
+        ?.textContent?.trim(),
+    ).toBe("MO");
+    cleanup();
+
+    const house = render(RaceCard, {
+      race: makeRace({
+        id: "al-house-03-2026",
+        office: "U.S. House",
+        jurisdiction: "Alabama's 3rd Congressional District",
+      }),
+    });
+    expect(
+      house.container
+        .querySelector("[data-testid=race-location]")
+        ?.textContent?.trim(),
+    ).toBe("AL-03");
     cleanup();
 
     const { container } = render(RaceCard, {
-      race: makeRace({ jurisdiction: undefined }),
+      race: makeRace({ id: "custom-race", jurisdiction: undefined }),
     });
-
-    expect(container.querySelector(".bg-green-100")).toBeNull();
+    expect(container.querySelector("[data-testid=race-location]")).toBeNull();
   });
 
   it("renders every candidate name", () => {
@@ -226,5 +242,41 @@ describe("RaceCard candidate avatars", () => {
     expect(remaining[0].getAttribute("src")).toBe(
       "https://example.test/ok.jpg",
     );
+  });
+
+  it("falls back when the image already failed before hydration", async () => {
+    const proto = HTMLImageElement.prototype;
+    const complete = Object.getOwnPropertyDescriptor(proto, "complete");
+    const naturalWidth = Object.getOwnPropertyDescriptor(proto, "naturalWidth");
+    Object.defineProperty(proto, "complete", {
+      configurable: true,
+      get: () => true,
+    });
+    Object.defineProperty(proto, "naturalWidth", {
+      configurable: true,
+      get: () => 0,
+    });
+    try {
+      const { container } = render(RaceCard, {
+        race: makeRace({
+          candidates: [
+            {
+              name: "Jane Doe",
+              party: "Democratic",
+              incumbent: false,
+              image_url: "https://example.test/broken.jpg",
+            },
+          ],
+        } as Partial<RaceSummary>),
+      });
+      await Promise.resolve();
+      expect(container.querySelector("img")).toBeNull();
+    } finally {
+      if (complete) Object.defineProperty(proto, "complete", complete);
+      else delete (proto as unknown as Record<string, unknown>).complete;
+      if (naturalWidth)
+        Object.defineProperty(proto, "naturalWidth", naturalWidth);
+      else delete (proto as unknown as Record<string, unknown>).naturalWidth;
+    }
   });
 });

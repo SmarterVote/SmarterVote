@@ -295,3 +295,38 @@ describe("ReviewPanel review date", () => {
     expect(text).not.toContain("Invalid Date");
   });
 });
+
+describe("ReviewPanel stale reviews", () => {
+  it("does not present a stale approval as a current verdict", async () => {
+    const { container } = await renderExpanded([
+      makeReview({
+        model: "stale-model",
+        stale: true,
+        stale_reason: "Roster changed after review",
+      }),
+    ]);
+
+    const verdict = container.querySelector(".review-verdict");
+    expect(verdict?.textContent).toContain("Stale");
+    expect(verdict?.className).not.toContain("bg-green-100");
+    expect(container.textContent).toContain("Roster changed after review");
+    expect(container.textContent).not.toContain(
+      "No issues flagged in this review.",
+    );
+  });
+
+  it("lists current reviews before stale ones and counts the stale ones", async () => {
+    const { container } = await renderExpanded([
+      makeReview({ model: "old-model", stale: true }),
+      makeReview({ model: "new-model", stale: false }),
+    ]);
+
+    const models = Array.from(container.querySelectorAll(".review-model")).map(
+      (el) => el.textContent,
+    );
+    expect(models).toEqual(["new-model", "old-model"]);
+    expect(container.querySelector(".review-count")?.textContent).toContain(
+      "1 stale",
+    );
+  });
+});

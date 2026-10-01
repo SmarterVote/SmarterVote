@@ -76,7 +76,8 @@ The admin dashboard should target `services/races-api`.
 | GET    | `/runs/{run_id}/logs`                                       | Get run logs                                     |
 | GET    | `/runs/{run_id}/diagnostics`                                | Export sanitized run diagnostics                  |
 | DELETE | `/runs`                                                     | Prune terminal pipeline runs                     |
-| DELETE | `/runs/{run_id}`                                            | Cancel or delete a run                           |
+| POST   | `/runs/{run_id}/cancel`                                     | Cancel an active run (409 if already finished)   |
+| DELETE | `/runs/{run_id}`                                            | Cancel or delete a run (`?cancel_only=true` never deletes) |
 | GET    | `/api/queue`                                                | List queue items                                 |
 | POST   | `/api/queue/reconcile`                                      | Persist queue state from authoritative runs      |
 | DELETE | `/api/queue/{item_id}`                                      | Cancel/remove a queue item                       |

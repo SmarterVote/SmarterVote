@@ -2,34 +2,56 @@
   import { browser } from "$app/environment";
   import type { RaceSummary } from "$lib/types";
   import { formatRating, getRaceState, raceHref } from "$lib/utils/forecast";
-  import { probability, ratingClass } from "$lib/utils/forecastPresentation";
+  import UiIcon from "$lib/components/UiIcon.svelte";
+  import {
+    cleanDisplayText,
+    probability,
+    raceShortLabel,
+    ratingClass,
+  } from "$lib/utils/forecastPresentation";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[];
 
+  /**
+   * Card label: a House seat needs its district ("AZ-01 · Arizona"), or two
+   * cards in one state read as duplicates; statewide races keep the state.
+   */
+  function keyRaceLabel(race: RaceSummary): string {
+    const state = getRaceState(race);
+    const short = raceShortLabel(race);
+    if (short && short.includes("-")) {
+      return state ? `${short} · ${state}` : short;
+    }
+    return state || race.title || race.id;
+  }
+
   let keyRacesContainer: HTMLDivElement;
   function scrollKeyRaces(dir: number) {
-    keyRacesContainer?.scrollBy({ left: dir * 320, behavior: "smooth" });
+    keyRacesContainer?.scrollBy({
+      left: dir * 320,
+      behavior: scrollBehavior(),
+    });
   }
 </script>
 
 {#if races.length > 0}
   <section class="space-y-4">
     <div
-      class="flex items-center justify-between border-b border-stroke/20 pb-2"
+      class="flex items-end justify-between gap-4 border-b border-stroke pb-3"
     >
-      <h3 class="text-base font-bold uppercase text-content tracking-wider">
-        Races That Matter Most
-      </h3>
-      <div class="flex items-center gap-2">
-        <span
-          class="text-xs text-content-subtle font-semibold hidden sm:inline"
-        >
+      <div>
+        <h3 class="h-section">Races That Matter Most</h3>
+        <p class="mt-1 hidden text-sm text-content-subtle sm:block">
           Competitive races with the greatest modeled implications for chamber
           control
-        </span>
+        </p>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
         <button
           on:click={() => scrollKeyRaces(-1)}
-          class="h-11 w-11 rounded-lg border border-stroke/60 bg-surface hover:bg-surface-alt flex items-center justify-center text-content-subtle hover:text-content transition-colors"
+          type="button"
+          class="h-11 w-11 rounded-lg border border-stroke bg-surface hover:bg-surface-alt flex items-center justify-center text-content-subtle hover:text-content transition-colors"
           aria-label="Scroll left"
         >
           <svg
@@ -48,7 +70,8 @@
         </button>
         <button
           on:click={() => scrollKeyRaces(1)}
-          class="h-11 w-11 rounded-lg border border-stroke/60 bg-surface hover:bg-surface-alt flex items-center justify-center text-content-subtle hover:text-content transition-colors"
+          type="button"
+          class="h-11 w-11 rounded-lg border border-stroke bg-surface hover:bg-surface-alt flex items-center justify-center text-content-subtle hover:text-content transition-colors"
           aria-label="Scroll right"
         >
           <svg
@@ -70,7 +93,7 @@
 
     <div
       bind:this={keyRacesContainer}
-      class="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory hide-scrollbar"
+      class="flex gap-4 overflow-x-auto pb-3 motion-safe:scroll-smooth snap-x snap-mandatory hide-scrollbar"
       style="-ms-overflow-style: none; scrollbar-width: none;"
     >
       {#each races as race}
@@ -83,18 +106,18 @@
               : "border-l-yellow-500"
           : "border-l-slate-400"}
         <div
-          class={`snap-start shrink-0 w-[300px] bg-surface border border-stroke rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-[3px] ${ratingBorderColor}`}
+          class={`card snap-start shrink-0 w-[min(300px,85vw)] flex flex-col p-4 hover:shadow-md transition-all border-l-[3px] ${ratingBorderColor}`}
         >
           <div class="flex items-center justify-between mb-2">
             <a
               href={browser ? raceHref(race.id) : undefined}
-              class="inline-flex min-h-11 items-center font-black text-sm text-content hover:text-blue-600 dark:hover:text-blue-400 truncate"
+              class="inline-flex min-h-11 min-w-0 items-center font-bold text-sm text-content hover:text-primary-700 dark:hover:text-primary-300"
             >
-              {getRaceState(race) || race.title}
+              <span class="truncate">{keyRaceLabel(race)}</span>
             </a>
             {#if rating}
               <span
-                class={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
+                class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
                   rating,
                 )}`}
               >
@@ -110,7 +133,7 @@
               </span>
               {#if race.forecast.margin_estimate !== undefined && race.forecast.margin_estimate !== null}
                 <span
-                  class="text-[10px] text-content-subtle font-semibold tabular-nums"
+                  class="text-xs text-content-subtle font-semibold tabular-nums"
                 >
                   {race.forecast.margin_estimate > 0
                     ? "+"
@@ -120,20 +143,21 @@
             </div>
           {/if}
 
-          <p
-            class="text-[11px] text-content-muted leading-relaxed font-medium line-clamp-2"
-          >
-            {race.forecast?.takeaway ||
-              race.forecast?.rationale?.split(/[.!?]/)[0] + "." ||
-              "No takeaway available."}
+          <p class="mb-3 text-sm text-content-muted leading-6 line-clamp-2">
+            {cleanDisplayText(
+              race.forecast?.takeaway ||
+                (race.forecast?.rationale
+                  ? race.forecast.rationale.split(/[.!?]/)[0] + "."
+                  : "No takeaway available."),
+            )}
           </p>
 
-          <div class="mt-3 pt-2 border-t border-stroke/30">
+          <div class="mt-auto pt-2 border-t border-stroke">
             <a
               href={browser ? raceHref(race.id) : undefined}
-              class="inline-flex min-h-11 items-center text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline"
+              class="inline-flex min-h-11 items-center gap-1.5 text-xs text-primary-700 dark:text-primary-300 font-bold hover:underline"
             >
-              View Details &rarr;
+              View details <UiIcon name="arrow-right" size="sm" />
             </a>
           </div>
         </div>

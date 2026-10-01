@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { RaceSummary } from "$lib/types";
-  import { partyAbbr, partyRing, partyInitialBg } from "$lib/utils/party";
+  import { partyAbbr, partyRing } from "$lib/utils/party";
+  import { raceShortLabel } from "$lib/utils/forecastPresentation";
   import { formatElectionDate } from "$lib/utils/electionDate";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
+  import { neutralCandidateOrder } from "$lib/utils/candidates";
 
   export let race: RaceSummary;
 
@@ -14,112 +16,98 @@
     });
   }
 
-  function getOfficeBadge(office: string | undefined): {
-    label: string;
-    cls: string;
-  } {
-    if (!office)
-      return {
-        label: "Race",
-        cls: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-      };
+  /** Office badge text; one calm neutral style for every office. */
+  function getOfficeBadge(office: string | undefined): string {
+    if (!office) return "Race";
     const o = office.toLowerCase();
-    if (o.includes("senate"))
-      return {
-        label: "Senate",
-        cls: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-      };
+    if (o.includes("senate")) return "Senate";
     if (o.includes("governor") || o.includes("gubernatorial"))
-      return {
-        label: "Governor",
-        cls: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-      };
-    if (o.includes("house") || o.includes("representative"))
-      return {
-        label: "House",
-        cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-      };
-    if (o.includes("secretary"))
-      return {
-        label: "Sec. of State",
-        cls: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
-      };
-    if (o.includes("attorney"))
-      return {
-        label: "Atty. General",
-        cls: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-      };
+      return "Governor";
+    if (o.includes("house") || o.includes("representative")) return "House";
+    if (o.includes("secretary")) return "Sec. of State";
+    if (o.includes("attorney")) return "Atty. General";
     // Truncate long office names
-    return {
-      label: office.length > 22 ? office.slice(0, 22) + "…" : office,
-      cls: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-    };
+    return office.length > 22 ? office.slice(0, 22) + "…" : office;
   }
 
   $: badge = getOfficeBadge(race.office);
+  $: location = raceShortLabel(race);
+
+  $: candidates = neutralCandidateOrder(race.candidates);
 
   let imageErrors: Set<string> = new Set();
   function handleImageError(name: string) {
     imageErrors = new Set([...imageErrors, name]);
   }
+
+  /**
+   * Prerendered images can fail before hydration attaches `on:error`; catch
+   * that case on mount so a broken headshot still falls back to initials.
+   */
+  function detectBrokenImage(img: HTMLImageElement, name: string) {
+    if (img.complete && img.naturalWidth === 0 && img.getAttribute("src")) {
+      handleImageError(name);
+    }
+  }
 </script>
 
 <a
   href="/races/{race.id}/"
-  class="group block bg-surface rounded-xl border border-stroke hover:border-blue-400 hover:shadow-md transition-all duration-200 overflow-hidden"
+  class="card group flex h-full flex-col overflow-hidden transition-all duration-200 hover:border-primary-400 hover:shadow-md dark:hover:border-primary-500"
 >
-  <!-- Card header: badges + date -->
-  <div class="px-4 pt-4 pb-3 flex flex-wrap items-center gap-2">
+  <!-- Card header: office + compact location (one row, even for House) -->
+  <div class="flex items-center gap-2 px-4 pb-3 pt-4">
     <span
-      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {badge.cls}"
+      class="inline-flex items-center rounded-full bg-surface-alt px-2.5 py-0.5 text-xs font-semibold text-content-muted"
     >
-      {badge.label}
+      {badge}
     </span>
-    {#if race.jurisdiction}
+    {#if location}
       <span
-        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+        class="inline-flex items-center rounded-full border border-stroke px-2.5 py-0.5 text-xs font-medium tabular-nums text-content-muted"
+        data-testid="race-location"
+        title={race.jurisdiction || undefined}
       >
-        {race.jurisdiction}
+        {location}
       </span>
     {/if}
-    <span class="ml-auto text-xs text-content-subtle whitespace-nowrap">
-      {formatDate(race.election_date)}
-    </span>
   </div>
 
   <!-- Race title -->
   <div class="px-4 pb-3">
     <h3
-      class="text-sm font-semibold text-content group-hover:text-blue-600 transition-colors leading-snug line-clamp-2 capitalize"
+      class="text-sm font-semibold leading-snug text-content transition-colors line-clamp-2 group-hover:text-primary-700 dark:group-hover:text-primary-300"
     >
       {raceDisplayTitle(race)}
     </h3>
   </div>
 
   <!-- Candidate avatars + names -->
-  <div class="px-4 pb-3">
-    <div class="flex flex-wrap gap-3">
-      {#each race.candidates as candidate}
-        <div class="flex items-center gap-2 min-w-0">
+  <div class="px-4 pb-4">
+    <ul class="grid grid-cols-2 gap-3">
+      {#each candidates as candidate}
+        <li class="flex min-w-0 items-center gap-2">
           <!-- Avatar -->
           <div class="relative flex-shrink-0">
             {#if candidate.image_url && !imageErrors.has(candidate.name)}
               <img
                 src={candidate.image_url}
-                alt={candidate.name}
-                class="w-9 h-9 rounded-full object-cover ring-2 {partyRing(
+                alt=""
+                class="h-9 w-9 rounded-full object-cover ring-2 {partyRing(
                   candidate.party,
                 )}"
                 loading="lazy"
+                decoding="async"
+                width="36"
+                height="36"
+                use:detectBrokenImage={candidate.name}
                 on:error={() => handleImageError(candidate.name)}
               />
             {:else}
               <div
-                class="w-9 h-9 rounded-full ring-2 {partyRing(
+                class="flex h-9 w-9 items-center justify-center rounded-full bg-surface-alt text-sm font-semibold text-content-muted ring-2 {partyRing(
                   candidate.party,
-                )} {partyInitialBg(
-                  candidate.party,
-                )} flex items-center justify-center text-white text-sm font-bold"
+                )}"
                 aria-hidden="true"
               >
                 {candidate.name ? candidate.name[0].toUpperCase() : "?"}
@@ -128,7 +116,7 @@
           </div>
           <!-- Name + party -->
           <div class="min-w-0">
-            <p class="text-xs font-medium text-content truncate max-w-[110px]">
+            <p class="text-xs font-medium leading-4 text-content line-clamp-2">
               {candidate.name}
             </p>
             {#if candidate.party}
@@ -137,28 +125,34 @@
               </p>
             {/if}
           </div>
-        </div>
+        </li>
       {/each}
-    </div>
+    </ul>
   </div>
 
-  <!-- View race footer -->
+  <!-- Footer: date + view race, pinned to the bottom so rows align -->
   <div
-    class="px-4 py-2.5 border-t border-stroke flex items-center justify-end gap-1 text-xs font-medium text-blue-500 dark:text-blue-400"
+    class="mt-auto flex items-center justify-between gap-2 border-t border-stroke px-4 py-2.5 text-xs"
   >
-    View race
-    <svg
-      class="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-0.5"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
+    <span class="text-content-subtle">{formatDate(race.election_date)}</span>
+    <span
+      class="inline-flex items-center gap-1 font-medium text-primary-700 dark:text-primary-300"
     >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2.5"
-        d="M9 5l7 7-7 7"
-      />
-    </svg>
+      View race
+      <svg
+        class="h-3.5 w-3.5 transition-transform duration-150 group-hover:translate-x-0.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2.5"
+          d="M9 5l7 7-7 7"
+        />
+      </svg>
+    </span>
   </div>
 </a>

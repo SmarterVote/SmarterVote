@@ -96,10 +96,13 @@ describe("raceDisplayTitle", () => {
       office: "U.S. Senate",
       state: "Georgia",
       election_date: "2026-11-03",
+      // The independent is first in the roster, but the description names
+      // candidates in display order: major-party candidates first, then the
+      // roster's own order.
       candidates: [
-        { name: "Jane Doe" },
-        { name: "John Smith" },
-        { name: "Alex Taylor" },
+        { name: "Alex Taylor", party: "Independent" },
+        { name: "Jane Doe", party: "Democratic" },
+        { name: "John Smith", party: "Republican" },
       ],
     };
     expect(racePageTitle(race)).toBe(

@@ -44,7 +44,7 @@ function pills(container: HTMLElement) {
 }
 
 /**
- * Pills are labelled "01 <jurisdiction> · <office>", not by race id, so the
+ * Pills are labelled "01 MO Senate" (short state + office), not by race id, so the
  * selected race must be identified by *position*. Asserting on pill text is a
  * trap: with a shared office every label contains most letters, so an id-based
  * assertion passes whatever is selected.
@@ -141,6 +141,26 @@ describe("InteractiveRaceCompare visibility", () => {
     });
 
     expect(container.textContent?.trim()).toBe("");
+  });
+});
+
+describe("InteractiveRaceCompare display text", () => {
+  it("labels race chips with a short state and office", () => {
+    const { container } = render(InteractiveRaceCompare, {
+      races: [race("mo-senate-2026")],
+    });
+
+    expect(pills(container)[0].textContent).toMatch(/01\s*MO Senate/);
+  });
+
+  it("strips stray JSON escapes from featured text", () => {
+    const escaped = candidate("Jane Doe");
+    escaped.summary = 'Backs \\"Medicare for Y\'all\\" in ads.';
+    const { container } = render(InteractiveRaceCompare, {
+      races: [race("a", [escaped, candidate("John Roe")])],
+    });
+
+    expect(container.textContent).not.toContain('\\"');
   });
 });
 

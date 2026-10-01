@@ -8,6 +8,8 @@
   title="Funding and editorial independence"
   description="The rules separating Smarter.Vote funding from its election research and publication decisions."
   path="/funding-and-editorial-independence/"
+  eyebrow="Accountability"
+  updated="2026-08-30"
 >
   <PolicySection title="Editorial control">
     <p>

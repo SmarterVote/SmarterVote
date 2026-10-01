@@ -9,9 +9,38 @@
       content="This Smarter.Vote page could not be found. Browse published U.S. House, Senate, and governor election research instead."
     />
     <title>Page not found | Smarter.Vote</title>
+    <script>
+      // Mirror app.html: honor the saved darkMode choice, else the OS setting.
+      (function () {
+        var dark = false;
+        try {
+          var saved = localStorage.getItem("darkMode");
+          dark =
+            saved !== null
+              ? saved === "true"
+              : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        } catch (e) {
+          try {
+            dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          } catch (err) {}
+        }
+        document.documentElement.classList.add(dark ? "dark" : "light");
+      })();
+    </script>
     <style>
+      /* Mirrors the app's semantic tokens (src/app.css) and EmptyState. */
       :root {
-        color-scheme: light dark;
+        color-scheme: light;
+        --page: #f9fafb;
+        --surface: #ffffff;
+        --surface-alt: #f3f4f6;
+        --border: #e5e7eb;
+        --text: #111827;
+        --muted: #4b5563;
+        --subtle: #5f6673;
+        --link: #2563eb;
+        --btn: #1d4ed8;
+        --btn-hover: #1e40af;
         font-family:
           Inter,
           ui-sans-serif,
@@ -21,16 +50,45 @@
           "Segoe UI",
           sans-serif;
       }
+      /* Dark: explicit saved choice, or OS preference when no class/JS. */
+      :root.dark {
+        color-scheme: dark;
+        --page: #030712;
+        --surface: #111827;
+        --surface-alt: #1f2937;
+        --border: #374151;
+        --text: #f9fafb;
+        --muted: #d1d5db;
+        --subtle: #9ca3af;
+        --link: #60a5fa;
+        --btn: #2563eb;
+        --btn-hover: #3b82f6;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not(.light) {
+          color-scheme: dark;
+          --page: #030712;
+          --surface: #111827;
+          --surface-alt: #1f2937;
+          --border: #374151;
+          --text: #f9fafb;
+          --muted: #d1d5db;
+          --subtle: #9ca3af;
+          --link: #60a5fa;
+          --btn: #2563eb;
+          --btn-hover: #3b82f6;
+        }
+      }
       body {
         min-height: 100vh;
         margin: 0;
-        background: #f8fafc;
-        color: #172033;
+        background: var(--page);
+        color: var(--text);
       }
       header,
       footer {
-        background: #ffffff;
-        border-color: #e5e7eb;
+        background: var(--surface);
+        border-color: var(--border);
         border-style: solid;
         border-width: 0;
       }
@@ -41,7 +99,7 @@
         border-top-width: 1px;
       }
       .shell {
-        width: min(100% - 2rem, 72rem);
+        width: min(100% - 2rem, 80rem);
         margin: 0 auto;
       }
       .site-header,
@@ -53,101 +111,111 @@
         gap: 1rem;
       }
       .brand {
-        color: #2563eb;
-        font-size: 1.1rem;
-        font-weight: 850;
+        color: var(--link);
+        font-size: 1.125rem;
+        font-weight: 800;
         text-decoration: none;
       }
       main {
-        display: grid;
         box-sizing: border-box;
         min-height: calc(100vh - 8.5rem);
-        padding-block: 3rem;
-        place-items: center;
+        padding: 3rem 1rem;
+      }
+      @media (min-width: 640px) {
+        main {
+          padding-block: 4rem;
+        }
       }
       .card {
-        width: min(100% - 2rem, 34rem);
         box-sizing: border-box;
-        padding: clamp(2rem, 7vw, 4rem);
-        border: 1px solid #e5e7eb;
-        border-radius: 1.5rem;
-        background: #ffffff;
-        box-shadow: 0 12px 36px rgb(15 23 42 / 8%);
+        max-width: 36rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        background: var(--surface);
+        box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
         text-align: center;
-      }
-      .eyebrow {
-        margin: 0 0 0.75rem;
-        color: #2563eb;
-        font-size: 0.75rem;
-        font-weight: 800;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
       }
       h1 {
         margin: 0;
-        font-size: clamp(2rem, 8vw, 3rem);
-        letter-spacing: -0.04em;
+        font-size: 1.25rem;
+        font-weight: 600;
+        line-height: 1.75rem;
       }
       .message {
-        margin: 1rem auto 0;
-        color: #4b5563;
-        line-height: 1.65;
+        max-width: 65ch;
+        margin: 0.75rem auto 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.75rem;
+      }
+      .meta {
+        margin: 0.75rem 0 0;
+        color: var(--subtle);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
       }
       .actions {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         justify-content: center;
         gap: 0.75rem;
-        margin-top: 2rem;
+        margin-top: 1.5rem;
+      }
+      @media (min-width: 640px) {
+        .card {
+          padding-inline: 2.5rem;
+        }
+        h1 {
+          font-size: 1.5rem;
+          line-height: 2rem;
+        }
+        .actions {
+          flex-direction: row;
+        }
       }
       a {
-        color: #1d4ed8;
-        font-weight: 700;
+        color: var(--link);
+        font-weight: 600;
       }
-      .action {
+      a:focus-visible {
+        outline: 2px solid var(--link);
+        outline-offset: 2px;
+      }
+      .btn {
         display: inline-flex;
         min-height: 2.75rem;
         box-sizing: border-box;
         align-items: center;
-        padding: 0.65rem 1rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.75rem;
-        background: #ffffff;
+        justify-content: center;
+        padding: 0.5rem 1rem;
+        border: 1px solid transparent;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.25rem;
         text-decoration: none;
+        transition: background-color 0.15s;
       }
-      .action-primary {
-        border-color: #2563eb;
-        background: #2563eb;
+      .btn-primary {
+        background: var(--btn);
         color: #ffffff;
       }
-      .site-footer {
-        color: #6b7280;
-        font-size: 0.75rem;
+      .btn-primary:hover {
+        background: var(--btn-hover);
       }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #0f172a;
-          color: #e2e8f0;
-        }
-        header,
-        footer,
-        .card,
-        .action {
-          border-color: #374151;
-          background: #111827;
-        }
-        .message,
-        .site-footer {
-          color: #d1d5db;
-        }
-        a {
-          color: #93c5fd;
-        }
-        .action-primary {
-          border-color: #2563eb;
-          background: #2563eb;
-          color: #ffffff;
-        }
+      .btn-secondary {
+        border-color: var(--border);
+        background: var(--surface);
+        color: var(--text);
+      }
+      .btn-secondary:hover {
+        background: var(--surface-alt);
+      }
+      .site-footer {
+        color: var(--subtle);
+        font-size: 0.75rem;
       }
     </style>
   </head>
@@ -160,15 +228,15 @@
     </header>
     <main>
       <section class="card" aria-labelledby="not-found-heading">
-        <p class="eyebrow">Error 404</p>
         <h1 id="not-found-heading">Page not found</h1>
         <p class="message">
           The page may have moved or the address may be incorrect. You can
           return home or continue to the election directory.
         </p>
+        <p class="meta">Error 404</p>
         <div class="actions">
-          <a class="action action-primary" href="/">Return home</a>
-          <a class="action" href="/elections/">Browse elections</a>
+          <a class="btn btn-primary" href="/">Go home</a>
+          <a class="btn btn-secondary" href="/elections/">Browse elections</a>
         </div>
       </section>
     </main>

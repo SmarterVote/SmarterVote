@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ValidationGrade } from "$lib/types";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let grade: ValidationGrade;
 
@@ -10,7 +11,7 @@
       case "A":
         return "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
       case "B":
-        return "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+        return "bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700";
       case "C":
         return "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700";
       case "D":
@@ -25,7 +26,7 @@
   function scrollToReview() {
     showPopover = false;
     const el = document.getElementById("ai-review");
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+    if (el) el.scrollIntoView({ behavior: scrollBehavior() });
   }
 </script>
 
@@ -34,7 +35,9 @@
     class="grade-badge {gradeColor(grade.grade)}"
     on:click={() => (showPopover = !showPopover)}
     on:keydown={(e) => e.key === "Escape" && (showPopover = false)}
-    aria-label="Automated Research Score: {grade.grade}"
+    aria-label="Automated research score: {grade.grade}"
+    aria-expanded={showPopover}
+    aria-controls={showPopover ? "validation-grade-popover" : undefined}
   >
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
@@ -52,9 +55,14 @@
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="popover-backdrop" on:click={() => (showPopover = false)}></div>
-    <div class="popover" role="tooltip">
+    <div
+      class="popover"
+      id="validation-grade-popover"
+      role="dialog"
+      aria-label="Automated research score details"
+    >
       <div class="popover-header">
-        <span class="popover-title">Automated Research Score</span>
+        <span class="popover-title">Automated research score</span>
         <span class="popover-grade {gradeColor(grade.grade)}"
           >{grade.grade}</span
         >
@@ -101,8 +109,10 @@
     @apply text-base font-bold leading-none;
   }
 
+  /* Full-opacity text: the old 75% opacity dropped green-800 on green-100
+     below 4.5:1. */
   .grade-label {
-    @apply text-xs font-medium opacity-75;
+    @apply text-xs font-medium;
   }
 
   .popover-backdrop {
@@ -110,8 +120,9 @@
   }
 
   .popover {
-    @apply absolute top-full left-0 mt-2 z-50 w-72
-           bg-surface border border-stroke rounded-lg shadow-lg p-4;
+    @apply absolute top-full left-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)]
+           bg-surface border border-stroke rounded-xl shadow-lg p-4
+           sm:left-auto sm:right-0;
   }
 
   .popover-header {
@@ -139,8 +150,8 @@
   }
 
   .popover-link {
-    @apply inline-flex items-center gap-1 text-sm font-medium
-           text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300
+    @apply inline-flex min-h-10 items-center gap-1 text-sm font-medium
+           text-primary hover:underline
            cursor-pointer transition-colors duration-150;
   }
 </style>

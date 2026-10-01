@@ -187,4 +187,82 @@ describe("ElectionLookup", () => {
     expect(input.getAttribute("aria-controls")).toBeNull();
     expect(document.getElementById("address-suggestions")).toBeNull();
   });
+
+  it("moves focus to the results and announces them, then back to the input", async () => {
+    lookupElectionGeography.mockResolvedValue({
+      state: "Maryland",
+      congressionalDistrict: "04",
+    });
+    render(ElectionLookup, { races });
+
+    const status = screen.getByRole("status");
+    const input = screen.getByLabelText("Home address") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "A complete address" } });
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Show my elections" }),
+    );
+
+    const heading = await screen.findByRole("heading", {
+      name: "Your election guide",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    // The same live-region node persists and only its text changes.
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status.textContent).toContain("Found 1 race");
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Search another address" }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("Home address"),
+      ),
+    );
+  });
+
+  it("does not reopen suggestions from a lookup pending at submit", async () => {
+    suggestUsAddresses.mockResolvedValue([
+      { id: "x", text: "Late suggestion", resolveAddress: vi.fn() },
+    ]);
+    lookupElectionGeography.mockRejectedValue(new Error("No match."));
+    vi.useFakeTimers();
+    render(ElectionLookup, { races });
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "1600 Pennsylvania" } });
+    await fireEvent.submit(input.closest("form")!);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(suggestUsAddresses).not.toHaveBeenCalled();
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("keeps working when sessionStorage throws", async () => {
+    const getItem = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    try {
+      lookupElectionGeography.mockResolvedValue({
+        state: "Maryland",
+        congressionalDistrict: "04",
+      });
+      render(ElectionLookup, { races });
+      const input = screen.getByLabelText("Home address") as HTMLInputElement;
+      await fireEvent.input(input, { target: { value: "A complete address" } });
+      await fireEvent.click(
+        screen.getByRole("button", { name: "Show my elections" }),
+      );
+      expect(
+        await screen.findByRole("heading", { name: "Your election guide" }),
+      ).toBeTruthy();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
 });

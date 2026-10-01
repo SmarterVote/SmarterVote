@@ -31,7 +31,7 @@ test.describe("race detail page", () => {
 
     // Validation grade badge
     await expect(
-      page.getByRole("button", { name: "Automated Research Score: A" }),
+      page.getByRole("button", { name: "Automated research score: A" }),
     ).toBeVisible();
 
     // Forecast section (rating is "tossup" -> renders as "Toss-up" heading)
@@ -116,15 +116,26 @@ test.describe("race detail page", () => {
     await expect(page.getByRole("checkbox")).toHaveCount(0);
   });
 
-  test("renders an error state gracefully when the race cannot be found", async ({
+  test("shows a friendly not-found state when the race cannot be found", async ({
     page,
   }) => {
     await mockRaceNotFound(page, "e2e-does-not-exist");
     await page.goto("/races/e2e-does-not-exist/");
 
     await expect(
-      page.getByRole("heading", { name: "Error loading race" }),
+      page.getByRole("heading", { name: "Race not found" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Browse elections" }),
+    ).toBeVisible();
+    // A 404 is not a transient failure, so there is nothing to retry, and the
+    // page must not be indexed.
+    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(
+      0,
+    );
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
   });
 });

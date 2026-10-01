@@ -119,4 +119,21 @@ describe("MobileCandidateComparison", () => {
     expect(screen.getByText(longStance)).toBeTruthy();
     expect(screen.getByRole("link", { name: /First source/ })).toBeTruthy();
   });
+
+  it("shows each candidate's forecast win probability", () => {
+    const forecastRace = {
+      ...race,
+      forecast: {
+        rating: "tilt_d",
+        win_probability: 0.57,
+        predicted_winner_name: "Alex Example",
+        party_probabilities: {},
+      },
+    } as unknown as Race;
+    render(MobileCandidateComparison, {
+      race: forecastRace,
+      candidates: [candidate],
+    });
+    expect(screen.getByText("57%")).toBeTruthy();
+  });
 });

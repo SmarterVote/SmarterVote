@@ -42,8 +42,8 @@ describe("ForecastElectoralMap", () => {
     expect(screen.getByText("Electoral map")).toBeTruthy();
     expect(screen.getByText("Safe D")).toBeTruthy();
     expect(screen.getByText("Safe R")).toBeTruthy();
-    expect(screen.getByText("Dem Holdover")).toBeTruthy();
-    expect(screen.getByText("GOP Holdover")).toBeTruthy();
+    expect(screen.getByText("Democratic holdover")).toBeTruthy();
+    expect(screen.getByText("Republican holdover")).toBeTruthy();
     expect(screen.queryByText(/Clear Map Filter/)).toBeNull();
   });
 
@@ -65,8 +65,12 @@ describe("ForecastElectoralMap", () => {
   it("omits holdover legend entries for the house tab", () => {
     render(ForecastElectoralMap, { activeTab: "house", ...baseProps() });
 
-    expect(screen.queryByText("Dem Holdover")).toBeNull();
-    expect(screen.queryByText("GOP Holdover")).toBeNull();
+    // A state choropleth is not a district result map; the House view says so.
+    expect(screen.getByText("House races by state")).toBeTruthy();
+    expect(screen.getByText(/not a state result map/)).toBeTruthy();
+
+    expect(screen.queryByText("Democratic holdover")).toBeNull();
+    expect(screen.queryByText("Republican holdover")).toBeNull();
   });
 
   it("shows a clear-filter button for the selected state and calls onClearFilter", async () => {

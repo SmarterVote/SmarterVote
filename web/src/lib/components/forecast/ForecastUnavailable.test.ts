@@ -13,4 +13,10 @@ describe("ForecastUnavailable", () => {
       screen.getByText(/currently updating our election models/),
     ).toBeTruthy();
   });
+
+  it("renders an error state when the data failed to load", () => {
+    render(ForecastUnavailable, { loadError: true });
+    expect(screen.getByText("Forecast data could not be loaded")).toBeTruthy();
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
 });

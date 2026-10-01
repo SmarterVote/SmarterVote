@@ -159,4 +159,38 @@ describe("BallotExplorer", () => {
       ),
     ).toHaveLength(0);
   });
+
+  it("keeps at least two candidates selected so the comparison stays usable", async () => {
+    render(BallotExplorer, { races: [summary] });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("checkbox", { name: /Libby Libertarian/ }),
+      ).toBeTruthy(),
+    );
+
+    await fireEvent.click(
+      screen.getByRole("checkbox", { name: /Libby Libertarian/ }),
+    );
+    await fireEvent.click(
+      screen.getByRole("checkbox", { name: /Riley Republican/ }),
+    );
+
+    expect(
+      screen.queryByText(/does not yet have enough active candidates/),
+    ).toBeNull();
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: /Riley Republican/,
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: /Dana Democrat/,
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(true);
+  });
 });

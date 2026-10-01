@@ -1,6 +1,5 @@
 <script lang="ts">
   import ElectionLookup from "$lib/components/home/ElectionLookup.svelte";
-  import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PageData } from "./$types";
   export let data: PageData;
   let exploring = false;
@@ -13,21 +12,38 @@
     content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
   />
   <link rel="canonical" href="https://smarter.vote/my-ballot/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Smarter.Vote" />
+  <meta property="og:url" content="https://smarter.vote/my-ballot/" />
+  <meta property="og:title" content="Find My Elections | Smarter.Vote" />
+  <meta
+    property="og:description"
+    content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
+  />
+  <meta property="og:image" content="https://smarter.vote/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://smarter.vote/my-ballot/" />
+  <meta name="twitter:title" content="Find My Elections | Smarter.Vote" />
+  <meta
+    name="twitter:description"
+    content="Use your address to find the national election guides that apply to you. Smarter.Vote does not store your address."
+  />
+  <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
 </svelte:head>
 
-<div class="relative isolate min-h-[calc(100svh-4rem)] overflow-hidden bg-page">
+<div class="relative isolate overflow-hidden bg-page">
   <div
     class="pointer-events-none absolute inset-0 -z-10 opacity-70 dark:opacity-30"
     aria-hidden="true"
   >
     <div
-      class="absolute -left-40 top-8 h-96 w-96 rounded-full bg-blue-100 blur-3xl dark:bg-blue-950"
+      class="absolute -left-40 top-8 h-96 w-96 rounded-full bg-primary-100 blur-3xl dark:bg-primary-950"
     ></div>
     <div
-      class="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-sky-100 blur-3xl dark:bg-sky-950"
+      class="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-primary-50 blur-3xl dark:bg-primary-950"
     ></div>
     <svg
-      class="absolute inset-0 h-full w-full text-blue-900/[0.035] dark:text-blue-100/[0.035]"
+      class="absolute inset-0 h-full w-full text-primary-900/[0.035] dark:text-primary-100/[0.035]"
       viewBox="0 0 1200 800"
       preserveAspectRatio="xMidYMid slice"
     >
@@ -41,25 +57,14 @@
   </div>
 
   <div
-    class="mx-auto grid min-h-[calc(100svh-4rem)] w-full items-center gap-8 px-5 py-8 transition-all sm:px-8 sm:py-12 lg:px-12 {exploring
-      ? 'max-w-[96rem]'
-      : 'max-w-7xl sm:gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:py-20'}"
+    class="page-container grid items-start gap-8 py-8 sm:py-12 {exploring
+      ? ''
+      : 'sm:gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:py-16'}"
   >
     {#if !exploring}
       <header class="max-w-xl">
-        <a
-          href="/"
-          class="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 transition hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100"
-          ><UiIcon name="arrow-left" size="sm" /> Back to Smarter.Vote</a
-        >
-        <p
-          class="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-blue-600 sm:mt-12 dark:text-blue-400"
-        >
-          Your election guide
-        </p>
-        <h1
-          class="mt-4 text-4xl font-bold tracking-tight text-content sm:text-5xl lg:text-6xl"
-        >
+        <p class="eyebrow lg:mt-6">Your election guide</p>
+        <h1 class="h-page mt-4 lg:text-5xl">
           Find the races that apply to you.
         </h1>
         <p class="mt-6 max-w-lg text-lg leading-8 text-content-muted">
@@ -67,7 +72,7 @@
           match it with our published House, Senate, and governor research.
         </p>
         <div
-          class="mt-10 hidden border-l-2 border-blue-200 pl-5 sm:block dark:border-blue-800"
+          class="mt-10 hidden border-l-2 border-primary-200 pl-5 sm:block dark:border-primary-800"
         >
           <p class="font-semibold text-content">Private by design</p>
           <p class="mt-1 text-sm leading-6 text-content-muted">
@@ -80,6 +85,7 @@
     {/if}
     <ElectionLookup
       races={data.races ?? []}
+      loadError={data.loadError}
       on:exploring={(event) => (exploring = event.detail)}
     />
   </div>

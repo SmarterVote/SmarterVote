@@ -15,7 +15,7 @@ describe("ForecastSeatsBar", () => {
 
     expect(screen.getByText("Majority (51)")).toBeTruthy();
     expect(screen.getByText("50-50 Split")).toBeTruthy();
-    expect(screen.getByText("R: 52")).toBeTruthy();
+    expect(screen.getByText("R 52")).toBeTruthy();
   });
 
   it("omits the Senate marker for other chambers", () => {

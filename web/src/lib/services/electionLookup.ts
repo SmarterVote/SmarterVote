@@ -1,4 +1,6 @@
 import type { RaceSummary } from "$lib/types";
+import { daysUntilElection } from "$lib/utils/electionDate";
+import { canonicalRaceState } from "$lib/utils/states";
 
 export interface ElectionGeography {
   state: string;
@@ -84,25 +86,67 @@ export function lookupElectionGeography(
   });
 }
 
-function raceMatchesState(race: RaceSummary, state: string): boolean {
-  const normalizedState = state.toLocaleLowerCase();
-  if (race.state) {
-    return race.state.toLocaleLowerCase() === normalizedState;
-  }
-
-  const jurisdiction = (race.jurisdiction || "").toLocaleLowerCase();
+function labelMatchesState(label: string, normalizedState: string): boolean {
+  const value = label.trim().toLocaleLowerCase();
   return (
-    jurisdiction === normalizedState ||
-    jurisdiction.startsWith(`${normalizedState}'s `) ||
-    jurisdiction.startsWith(`${normalizedState} `)
+    value === normalizedState ||
+    value.startsWith(`${normalizedState}'s `) ||
+    value.startsWith(`${normalizedState}’s `) ||
+    value.startsWith(`${normalizedState} `) ||
+    value.startsWith(`${normalizedState},`)
   );
 }
 
-function districtFromRace(race: RaceSummary): string | null {
+function raceMatchesState(race: RaceSummary, state: string): boolean {
+  const normalizedState = state.trim().toLocaleLowerCase();
+  // canonicalRaceState understands abbreviations ("TX"), full names in any
+  // case, and falls back to the race id's state prefix ("tx-senate-2026").
+  const canonical = canonicalRaceState(race);
+  if (canonical && canonical.toLocaleLowerCase() === normalizedState) {
+    return true;
+  }
+  // Older summaries put district labels in `state`/`jurisdiction`
+  // ("Texas's 8th Congressional District"); match on their state prefix.
+  return [race.state, race.jurisdiction].some(
+    (label) =>
+      typeof label === "string" && labelMatchesState(label, normalizedState),
+  );
+}
+
+// House race ids come in three shapes; the district must be followed by the
+// cycle year (or the end), so the year in an at-large id like "ak-house-2026"
+// is never read as district 2026.
+const ID_DISTRICT_PATTERNS = [
+  /^[a-z]{2}-house-(\d{1,2}|al)(?=-\d{4}\b|$)/i, // ca-house-12-2026
+  /^[a-z]{2}-(\d{1,2}|al)-house(?=-\d{4}\b|$)/i, // az-01-house-2026
+];
+// No district number at all ("ak-house-2026"): the state's single at-large seat.
+const ID_AT_LARGE = /^[a-z]{2}-house(?:-\d{4})?$/i;
+const TEXT_DISTRICT_PATTERNS = [
+  /(\d+)(?:st|nd|rd|th)?\s+congressional\s+district/i,
+  /\bcongressional\s+district\s+(?:no\.?\s*)?(\d+)\b/i,
+  /\bdistrict\s+(?:no\.?\s*)?(\d+)\b/i,
+  /\bCD[- ]?(\d+)\b/i,
+  /\b[A-Z]{2}-(\d{1,2})\b/,
+];
+
+export function districtFromRace(race: RaceSummary): string | null {
+  for (const pattern of ID_DISTRICT_PATTERNS) {
+    const idMatch = race.id?.match(pattern);
+    if (idMatch) {
+      const value = idMatch[1].toLocaleLowerCase();
+      return value === "al" ? "00" : String(Number(value)).padStart(2, "0");
+    }
+  }
+  if (race.id && ID_AT_LARGE.test(race.id)) return "00";
+
   const text = `${race.jurisdiction ?? ""} ${race.title ?? ""}`;
   if (/\bat[- ]large\b/i.test(text)) return "00";
-  const match = text.match(/(\d+)(?:st|nd|rd|th)? congressional district/i);
-  return match ? match[1].padStart(2, "0") : null;
+  for (const pattern of TEXT_DISTRICT_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) return String(Number(match[1])).padStart(2, "0");
+  }
+  return null;
 }
 
 export function matchingNationalRaces(
@@ -110,9 +154,14 @@ export function matchingNationalRaces(
   geography: ElectionGeography,
   now = new Date(),
 ): RaceSummary[] {
-  const state = geography.state.toLocaleLowerCase();
+  const state = geography.state;
+  const district = geography.congressionalDistrict.padStart(2, "0");
   return races.filter((race) => {
-    if (Date.parse(race.election_date) < now.getTime()) return false;
+    // Compare calendar dates, not instants: "2026-11-03" parsed as UTC
+    // midnight would drop the race on the evening before Election Day in US
+    // time zones. A race stays listed through its election day locally.
+    const daysLeft = daysUntilElection(race.election_date, now);
+    if (daysLeft !== null && daysLeft < 0) return false;
     const office = race.office?.toLocaleLowerCase() ?? "";
     const sameState = raceMatchesState(race, state);
     if (office.includes("president")) return true;
@@ -120,9 +169,7 @@ export function matchingNationalRaces(
     if (office.includes("governor") || office.includes("gubernatorial"))
       return sameState;
     if (office.includes("house") || office.includes("representative")) {
-      return (
-        sameState && districtFromRace(race) === geography.congressionalDistrict
-      );
+      return sameState && districtFromRace(race) === district;
     }
     return false;
   });

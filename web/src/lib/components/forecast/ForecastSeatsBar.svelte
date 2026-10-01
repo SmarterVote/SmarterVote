@@ -9,10 +9,7 @@
 
 <div class="space-y-3">
   <div class="flex items-center justify-between">
-    <span
-      class="text-xs font-bold uppercase text-content-subtle tracking-wider font-semibold"
-      >Projected Seats</span
-    >
+    <span class="eyebrow text-content-subtle">Projected seats</span>
   </div>
 
   <div class="space-y-2">
@@ -25,9 +22,10 @@
           class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
           style="width: {((projectedSeats.Democratic ?? 0) / totalSeats) *
             100}%"
+          title="Democratic projected seats: {projectedSeats.Democratic ?? 0}"
         >
           {#if (projectedSeats.Democratic ?? 0) > totalSeats * 0.12}
-            D: {projectedSeats.Democratic}
+            D {projectedSeats.Democratic}
           {/if}
         </div>
         <!-- Other segment -->
@@ -35,6 +33,7 @@
           <div
             class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
             style="width: {((projectedSeats.Other ?? 0) / totalSeats) * 100}%"
+            title="Other (independents and third parties) projected seats: {projectedSeats.Other}"
           >
             {#if (projectedSeats.Other ?? 0) > totalSeats * 0.05}
               {projectedSeats.Other}
@@ -46,9 +45,10 @@
           class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white ml-auto"
           style="width: {((projectedSeats.Republican ?? 0) / totalSeats) *
             100}%"
+          title="Republican projected seats: {projectedSeats.Republican ?? 0}"
         >
           {#if (projectedSeats.Republican ?? 0) > totalSeats * 0.12}
-            R: {projectedSeats.Republican}
+            R {projectedSeats.Republican}
           {/if}
         </div>
       </div>
@@ -59,7 +59,7 @@
         style="left: {(threshold / totalSeats) * 100}%"
       >
         <span
-          class="absolute bottom-full left-0 ml-0.5 bg-yellow-500 dark:bg-yellow-400 text-[8px] font-black text-slate-950 dark:text-slate-950 px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
+          class="absolute bottom-full left-0 ml-0.5 bg-yellow-500 dark:bg-yellow-400 text-xs font-black text-slate-950 dark:text-slate-950 px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
         >
           Majority ({threshold})
         </span>
@@ -72,7 +72,7 @@
           style="left: 50%"
         >
           <span
-            class="absolute top-full right-0 mr-0.5 bg-slate-500 text-[8px] font-black text-white px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
+            class="absolute top-full right-0 mr-0.5 bg-slate-500 text-xs font-black text-white px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
           >
             50-50 Split
           </span>

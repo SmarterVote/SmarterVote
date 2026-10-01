@@ -8,6 +8,8 @@
   title="Corrections"
   description="How to report an error and how Smarter.Vote LLC reviews corrections."
   path="/corrections/"
+  eyebrow="Accountability"
+  updated="2026-10-01"
 >
   <PolicySection title="Report a possible error">
     <p>
@@ -20,10 +22,10 @@
       resolution can be reviewed openly. A GitHub account is required.
     </p>
     <a
-      href="https://github.com/SmarterVote/SmarterVote/issues/new/choose"
+      href="https://github.com/SmarterVote/SmarterVote/issues/new?template=correction.yml"
       target="_blank"
       rel="noopener noreferrer"
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      class="btn-primary w-full sm:w-auto"
     >
       Report a correction on GitHub <UiIcon name="external" size="sm" />
     </a>

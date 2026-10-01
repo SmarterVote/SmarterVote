@@ -16,9 +16,9 @@ describe("ForecastControlBar", () => {
       projectedSeats: { Democratic: 47, Republican: 53, Other: 0 },
     });
 
-    expect(screen.getByText("50-50 Tie: 10%")).toBeTruthy();
-    expect(screen.getByText(/Democratic 30%/)).toBeTruthy();
-    expect(screen.getByText(/Republican 60%/)).toBeTruthy();
+    expect(screen.getByText("50-50 tie: 10.0%")).toBeTruthy();
+    expect(screen.getByText(/Democratic 30.0%/)).toBeTruthy();
+    expect(screen.getByText(/Republican 60.0%/)).toBeTruthy();
     expect(
       screen.getByText(/counted as Republican control via VP tie-break/),
     ).toBeTruthy();
@@ -48,6 +48,6 @@ describe("ForecastControlBar", () => {
     });
 
     expect(screen.getByText("Control Probabilities")).toBeTruthy();
-    expect(container.querySelector(".h-8")).toBeNull();
+    expect(container.querySelector("[role=img]")).toBeNull();
   });
 });

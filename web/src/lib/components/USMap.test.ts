@@ -75,13 +75,8 @@ async function renderMap(props: Record<string, unknown> = {}) {
   return result;
 }
 
-function pathFor(container: HTMLElement, label: string): SVGPathElement | null {
-  const match = Array.from(container.querySelectorAll("path")).find((p) =>
-    p.getAttribute("aria-label")?.startsWith(label),
-  );
-  // Normalise Array.find's `undefined` to `null` so absence assertions read
-  // consistently against the querySelector-based lookups elsewhere.
-  return (match as SVGPathElement) ?? null;
+function pathFor(container: HTMLElement, state: string): SVGPathElement | null {
+  return container.querySelector<SVGPathElement>(`path[data-state="${state}"]`);
 }
 
 beforeEach(() => stubFetch());
@@ -97,6 +92,18 @@ describe("USMap loading", () => {
 
     expect(container.querySelector(".skeleton")).not.toBeNull();
     expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("shows an error state instead of an endless skeleton when the map fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: vi.fn() }),
+    );
+    const { container, findByRole } = render(USMap, {
+      activeStates: new Set<string>(),
+    });
+    expect(await findByRole("alert")).toBeTruthy();
+    expect(container.querySelector(".skeleton")).toBeNull();
   });
 
   it("renders one path per projected state once loaded", async () => {
@@ -185,6 +192,21 @@ describe("USMap fill precedence", () => {
     );
   });
 
+  it("shades active states by race count when shadeByCount is set", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas"]),
+      raceCounts: { Missouri: 12, Kansas: 1 },
+      shadeByCount: true,
+    });
+
+    expect(pathFor(container, "Missouri")?.getAttribute("fill")).toBe(
+      "var(--map-count-4)",
+    );
+    expect(pathFor(container, "Kansas")?.getAttribute("fill")).toBe(
+      "var(--map-count-1)",
+    );
+  });
+
   // An explicit per-state colour outranks everything, including selection —
   // that is what lets a forecast tab paint the map by party.
   it("lets an explicit state colour win over selection", async () => {
@@ -208,10 +230,27 @@ describe("USMap selection rendering", () => {
     });
 
     const paths = Array.from(container.querySelectorAll("path"));
-    expect(paths.at(-1)?.getAttribute("aria-label")).toContain("Missouri");
-    expect(paths.at(-1)?.getAttribute("stroke")).toBe(
-      "var(--map-selected-stroke)",
+    const outline = paths.at(-1)!;
+    expect(outline.getAttribute("data-selected-outline")).toBe("Missouri");
+    expect(outline.getAttribute("d")).toBe(
+      pathFor(container, "Missouri")?.getAttribute("d"),
     );
+    expect(outline.getAttribute("stroke")).toBe("var(--map-selected-stroke)");
+    // The overlay is decorative and never steals focus or clicks.
+    expect(outline.getAttribute("aria-hidden")).toBe("true");
+    expect(outline.getAttribute("pointer-events")).toBe("none");
+  });
+
+  it("keeps the same focusable element when the selection changes", async () => {
+    const { container, rerender } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas"]),
+      selectedState: null,
+    });
+    const before = pathFor(container, "Missouri");
+    before?.focus();
+    await rerender({ selectedState: "Missouri" });
+    expect(pathFor(container, "Missouri")).toBe(before);
+    expect(document.activeElement).toBe(before);
   });
 
   it("labels the selected state as selected", async () => {
@@ -221,9 +260,9 @@ describe("USMap selection rendering", () => {
       raceCounts: { Missouri: 3 },
     });
 
-    expect(pathFor(container, "Missouri")?.getAttribute("aria-label")).toBe(
-      "Missouri, 3 races, selected",
-    );
+    const path = pathFor(container, "Missouri");
+    expect(path?.getAttribute("aria-label")).toBe("Missouri, 3 races");
+    expect(path?.getAttribute("aria-pressed")).toBe("true");
   });
 });
 
@@ -253,23 +292,48 @@ describe("USMap accessibility labelling", () => {
     expect(path.getAttribute("tabindex")).toBe("0");
   });
 
-  it("keeps an inactive state out of the tab order", async () => {
+  it("hides an inactive state from assistive tech and the tab order", async () => {
     const { container } = await renderMap();
 
     const path = pathFor(container, "Missouri")!;
-    expect(path.getAttribute("role")).toBe("presentation");
-    expect(path.getAttribute("tabindex")).toBe("-1");
+    expect(path.getAttribute("role")).toBeNull();
+    expect(path.getAttribute("tabindex")).toBeNull();
+    expect(path.getAttribute("aria-label")).toBeNull();
+    expect(path.getAttribute("aria-hidden")).toBe("true");
   });
 
   // A state with a tooltip but no races is readable but not clickable.
-  it("marks a tooltip-only state as an image rather than a button", async () => {
+  it("makes a tooltip-only state a focusable image carrying the tooltip text", async () => {
     const { container } = await renderMap({
-      stateTooltips: { Missouri: { title: "No races yet" } },
+      stateTooltips: {
+        Missouri: {
+          title: "Missouri",
+          subtitle: "No election in 2026",
+          badge: "2 Holdover Seats",
+          details: ["Seat 1: Republican"],
+        },
+      },
     });
 
     const path = pathFor(container, "Missouri")!;
     expect(path.getAttribute("role")).toBe("img");
-    expect(path.getAttribute("tabindex")).toBe("-1");
+    expect(path.getAttribute("tabindex")).toBe("0");
+    expect(path.getAttribute("aria-label")).toBe(
+      "Missouri, No election in 2026, 2 Holdover Seats, Seat 1: Republican",
+    );
+  });
+
+  it("includes the forecast rating in an active state's label", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri"]),
+      raceCounts: { Missouri: 1 },
+      stateTooltips: {
+        Missouri: { title: "Missouri", badge: "Lean R", details: [] },
+      },
+    });
+    expect(pathFor(container, "Missouri")?.getAttribute("aria-label")).toBe(
+      "Missouri, 1 race, Lean R",
+    );
   });
 });
 

@@ -667,3 +667,28 @@ def test_narrative_review_prompt_carries_an_optional_goal():
     assert "lead with the tipping-point races" in with_goal
     # An editorial steer must never be able to override a factual correction.
     assert "which always win" in with_goal
+
+
+def test_named_independent_favorite_is_an_other_seat_not_a_major_party():
+    forecast = build_chamber_forecasts(
+        [
+            {
+                "id": "ne-senate-2026",
+                "title": "Nebraska Senate",
+                "office": "U.S. Senate",
+                "state": "Nebraska",
+                "candidates": [{"name": "Inc", "party": "Republican", "incumbent": True}],
+                "forecast": {
+                    "predicted_winner_party": "Independent",
+                    "win_probability": 0.52,
+                    "rating": "tossup",
+                    "party_probabilities": {"Independent": 0.52, "Republican": 0.48},
+                },
+            }
+        ]
+    )
+    baseline = build_chamber_forecasts([])["chambers"]["senate"]["projected_seats"]
+    senate = forecast["chambers"]["senate"]["projected_seats"]
+
+    assert senate["Other"] == baseline["Other"] + 1
+    assert senate["Republican"] == baseline["Republican"]

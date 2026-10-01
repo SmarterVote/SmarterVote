@@ -4,6 +4,7 @@ import {
   type Race,
   type RaceSummary,
 } from "$lib/types";
+import { neutralCandidateOrder } from "$lib/utils/candidates";
 import { formatElectionDate } from "$lib/utils/electionDate";
 import { canonicalRaceState } from "$lib/utils/states";
 
@@ -15,7 +16,7 @@ type TitleRace = Pick<Race | RaceSummary, "id"> &
     >
   > & {
     district?: string | null;
-    candidates?: { name: string; withdrawn?: boolean }[];
+    candidates?: { name: string; party?: string; withdrawn?: boolean }[];
   };
 
 type MetadataCandidate = Pick<Candidate, "name"> &
@@ -120,11 +121,11 @@ export function raceMetaDescription(
   race: TitleRace | null | undefined,
 ): string {
   const title = race ? raceDisplayTitle(race) : "this election";
-  const activeNames =
-    race?.candidates
-      ?.filter((candidate) => !candidate.withdrawn)
-      .map((candidate) => candidate.name)
-      .filter(Boolean) ?? [];
+  const activeNames = neutralCandidateOrder(
+    race?.candidates?.filter((candidate) => !candidate.withdrawn),
+  )
+    .map((candidate) => candidate.name)
+    .filter(Boolean);
   const candidateLabel =
     activeNames.length > 2
       ? `${activeNames[0]}, ${activeNames[1]}, and others`

@@ -1,7 +1,10 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onDestroy, onMount } from "svelte";
-  import AdminTabs from "$lib/components/admin/AdminTabs.svelte";
+  import AdminTabs, {
+    ADMIN_TABPANEL_ID,
+    tabId,
+  } from "$lib/components/admin/AdminTabs.svelte";
   import DashboardTab from "$lib/components/admin/DashboardTab.svelte";
   import RacesTab from "$lib/components/admin/RacesTab.svelte";
   import RunsTab from "$lib/components/admin/RunsTab.svelte";
@@ -26,8 +29,13 @@
   let queueItems: QueueItem[] = [];
   let runs: RunHistoryItem[] = [];
   let isRefreshingRuns = false;
-  let isPruningRuns = false;
+  let isClearingQueue = false;
+  let runsTruncated = false;
+  let runsLimit = 0;
   let runsError = "";
+  let queueActionError = "";
+  /** Queue item whose graceful cancel failed; offers a separate force remove. */
+  let forceRemoveCandidate: QueueItem | null = null;
   let connected = false;
   let queueTimer: ReturnType<typeof setInterval> | null = null;
   let cancellingItemId: string | null = null;
@@ -189,10 +197,41 @@
     if (!confirm(`Cancel ${item.race_id || item.run_id || "this queue item"}?`))
       return;
     cancellingItemId = item.id;
+    queueActionError = "";
+    forceRemoveCandidate = null;
     try {
       await apiService.removeQueueItem(item.id);
-    } catch {
+    } catch (err) {
+      // Never escalate to a force delete silently: surface the failure and
+      // let the operator choose "Force remove" explicitly.
+      queueActionError = `Could not cancel ${
+        item.race_id || item.run_id || item.id
+      }: ${err instanceof Error ? err.message : String(err)}`;
+      forceRemoveCandidate = item;
+    } finally {
+      cancellingItemId = null;
+      await refreshQueue();
+    }
+  }
+
+  async function forceRemoveQueueItem(item: QueueItem) {
+    if (
+      !confirm(
+        `Force remove ${item.race_id || item.run_id || item.id}?\n\n` +
+          "This deletes the queue document even if a worker is still running it. " +
+          "Use only for stuck items.",
+      )
+    )
+      return;
+    cancellingItemId = item.id;
+    queueActionError = "";
+    try {
       await apiService.removeQueueItem(item.id, true);
+      forceRemoveCandidate = null;
+    } catch (err) {
+      queueActionError = `Force remove failed for ${
+        item.race_id || item.run_id || item.id
+      }: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       cancellingItemId = null;
       await refreshQueue();
@@ -204,7 +243,10 @@
     isRefreshingRuns = true;
     runsError = "";
     try {
-      runs = await apiService.loadRunHistory();
+      const page = await apiService.loadRunHistoryPage();
+      runs = page.runs;
+      runsTruncated = page.truncated;
+      runsLimit = page.limit;
     } catch (err) {
       console.error("Failed to load runs history:", err);
       runsError =
@@ -214,25 +256,19 @@
     }
   }
 
-  async function pruneCompletedRuns() {
-    if (!apiService) return;
-    isPruningRuns = true;
-    try {
-      await apiService.pruneRuns();
-      await refreshRuns();
-    } catch (err) {
-      alert("Failed to prune runs: " + err);
-    } finally {
-      isPruningRuns = false;
-    }
-  }
-
   async function handleClearQueue() {
+    if (!apiService || isClearingQueue) return;
+    isClearingQueue = true;
+    queueActionError = "";
     try {
       await apiService.clearPendingQueue();
-      await refreshQueue();
     } catch (err) {
-      alert("Failed to clear queue: " + err);
+      queueActionError = `Failed to clear queue: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+    } finally {
+      isClearingQueue = false;
+      await refreshQueue();
     }
   }
 </script>
@@ -326,6 +362,35 @@
       </div>
     {/if}
 
+    {#if queueActionError}
+      <div
+        class="mb-4 flex flex-wrap items-start justify-between gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+        role="alert"
+      >
+        <p class="min-w-0 flex-1">{queueActionError}</p>
+        <div class="flex shrink-0 items-center gap-2">
+          {#if forceRemoveCandidate}
+            {@const candidate = forceRemoveCandidate}
+            <button
+              type="button"
+              class="rounded border border-red-400 px-3 py-1 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:hover:bg-red-900/40"
+              disabled={cancellingItemId === candidate.id}
+              on:click={() => forceRemoveQueueItem(candidate)}
+              >Force remove</button
+            >
+          {/if}
+          <button
+            type="button"
+            class="text-xs underline"
+            on:click={() => {
+              queueActionError = "";
+              forceRemoveCandidate = null;
+            }}>Dismiss</button
+          >
+        </div>
+      </div>
+    {/if}
+
     {#if queueLikelyStalled}
       <div
         class="mb-4 card p-3 border-amber-300 bg-amber-50 dark:bg-amber-900/20"
@@ -340,40 +405,49 @@
       </div>
     {/if}
 
-    {#if activeTab === "dashboard"}
-      <DashboardTab {apiService} on:view-runs={() => (activeTab = "runs")} />
-    {:else if activeTab === "research" && apiService}
-      <div class="card p-6">
-        {#if ResearchProgramTabComponent}
-          <svelte:component this={ResearchProgramTabComponent} {apiService} />
+    <div
+      id={ADMIN_TABPANEL_ID}
+      role="tabpanel"
+      aria-labelledby={tabId(activeTab)}
+      tabindex="0"
+      class="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+    >
+      {#if activeTab === "dashboard"}
+        <DashboardTab {apiService} on:view-runs={() => (activeTab = "runs")} />
+      {:else if activeTab === "research" && apiService}
+        <div class="card p-6">
+          {#if ResearchProgramTabComponent}
+            <svelte:component this={ResearchProgramTabComponent} {apiService} />
+          {/if}
+        </div>
+      {:else if activeTab === "races" && apiService}
+        <div class="card p-6">
+          <RacesTab bind:this={racesTab} />
+        </div>
+      {:else if activeTab === "runs" && apiService}
+        <RunsTab
+          {apiService}
+          {runs}
+          {queueItems}
+          isRefreshing={isRefreshingRuns}
+          {isClearingQueue}
+          historyTruncated={runsTruncated}
+          historyLimit={runsLimit}
+          {runsError}
+          on:refresh={refreshRuns}
+          on:clear-queue={handleClearQueue}
+        />
+      {:else if activeTab === "forecasts" && apiService}
+        <div class="card p-6">
+          {#if ForecastsTabComponent}
+            <svelte:component this={ForecastsTabComponent} {apiService} />
+          {/if}
+        </div>
+      {:else if activeTab === "costs"}
+        {#if CostsTabComponent}
+          <svelte:component this={CostsTabComponent} />
         {/if}
-      </div>
-    {:else if activeTab === "races" && apiService}
-      <div class="card p-6">
-        <RacesTab bind:this={racesTab} />
-      </div>
-    {:else if activeTab === "runs" && apiService}
-      <RunsTab
-        {apiService}
-        {runs}
-        {queueItems}
-        isRefreshing={isRefreshingRuns}
-        isPruning={isPruningRuns}
-        {runsError}
-        on:refresh={refreshRuns}
-        on:clear-queue={handleClearQueue}
-        on:prune-runs={pruneCompletedRuns}
-      />
-    {:else if activeTab === "forecasts" && apiService}
-      <div class="card p-6">
-        {#if ForecastsTabComponent}
-          <svelte:component this={ForecastsTabComponent} {apiService} />
-        {/if}
-      </div>
-    {:else if activeTab === "costs"}
-      {#if CostsTabComponent}
-        <svelte:component this={CostsTabComponent} />
       {/if}
-    {/if}
+    </div>
   </div>
 {/if}

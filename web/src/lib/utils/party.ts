@@ -32,10 +32,27 @@ const ABBR: Record<PartyKey, string | null> = {
   other: null,
 };
 
+const MINOR_WORDS = new Set(["for", "and", "of", "the", "&"]);
+
 /** Abbreviated party label (D, R, I, L, G, etc.). */
 export function partyAbbr(party: string | undefined): string {
   if (!party) return "?";
-  return ABBR[partyKey(party)] ?? party[0].toUpperCase();
+  const known = ABBR[partyKey(party)];
+  if (known) return known;
+  // Unrecognised parties must not collapse to a letter that reads as a known
+  // party ("Legal Marijuana Now" -> "L" looks Libertarian, "Reform" -> "R"
+  // looks Republican). Use word initials, or the first three letters.
+  const words = party
+    .trim()
+    .split(/[\s-]+/)
+    .filter((word) => word && !MINOR_WORDS.has(word.toLowerCase()));
+  if (words.length > 1)
+    return words
+      .slice(0, 3)
+      .map((word) => word[0].toUpperCase())
+      .join("");
+  const word = words[0] ?? party.trim();
+  return word.charAt(0).toUpperCase() + word.slice(1, 3).toLowerCase();
 }
 
 const BADGE_CLASS: Record<PartyKey, string> = {

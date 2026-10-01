@@ -7,7 +7,7 @@
   export let onSelect: (tab: ForecastTab) => void;
 </script>
 
-<div class="border-b border-stroke/60 flex gap-1 overflow-x-auto">
+<div class="border-b border-stroke flex gap-1 overflow-x-auto">
   {#each tabs as tab}
     <TabButton active={activeTab === tab.id} onClick={() => onSelect(tab.id)}>
       {tab.label}

@@ -3187,6 +3187,110 @@ def test_delete_active_run_cancels_matching_queue_item():
     race_ref.set.assert_called()
 
 
+def _run_cancel_client(run_data):
+    """Build a TestClient whose pipeline_runs/pipeline_queue/races collections are mocked."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    run_ref = MagicMock()
+    if run_data is None:
+        missing = MagicMock()
+        missing.exists = False
+        run_ref.get.return_value = missing
+    else:
+        run_ref.get.return_value = _make_existing_doc(run_data)
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-x", "status": "pending"}
+    queue_doc.reference = MagicMock()
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.limit.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    race_ref = MagicMock()
+    race_ref.get.return_value = _make_existing_doc(
+        {"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-x"}
+    )
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: {
+        "pipeline_runs": runs_coll,
+        "pipeline_queue": queue_coll,
+        "races": races_coll,
+    }.get(name, MagicMock())
+    return db, run_ref, queue_doc
+
+
+def _call_run_endpoint(db, method, path):
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        return getattr(tc, method)(path)
+
+
+def test_cancel_run_endpoint_cancels_active_run():
+    db, run_ref, queue_doc = _run_cancel_client({"run_id": "run-x", "race_id": "az-senate-2026", "status": "pending"})
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    run_ref.update.assert_called_with({"status": "cancelled"})
+    assert queue_doc.reference.update.call_args.args[0]["status"] == "cancelled"
+    db.batch.assert_not_called()
+
+
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled"])
+def test_cancel_run_endpoint_refuses_finished_runs_without_deleting(status):
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "status": status})
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 409
+    run_ref.update.assert_not_called()
+    run_ref.delete.assert_not_called()
+    db.batch.assert_not_called()
+
+
+def test_cancel_run_endpoint_404_for_missing_run():
+    db, _, _ = _run_cancel_client(None)
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 404
+
+
+def test_delete_run_cancel_only_refuses_to_delete_finished_run():
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "status": "completed"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x?cancel_only=true")
+    assert resp.status_code == 409
+    db.batch.assert_not_called()
+    run_ref.delete.assert_not_called()
+
+
+def test_delete_run_cancel_only_still_cancels_active_run():
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x?cancel_only=true")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    run_ref.update.assert_called_with({"status": "cancelled"})
+
+
+def test_delete_finished_run_without_cancel_only_still_deletes():
+    db, _, _ = _run_cancel_client({"run_id": "run-x", "status": "completed"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run deleted"
+    db.batch.return_value.commit.assert_called()
+
+
 def test_delete_superseded_active_run_does_not_cancel_published_race():
     """Cancelling an old active run must not overwrite a completed race record."""
     os.environ["SKIP_AUTH"] = "true"
