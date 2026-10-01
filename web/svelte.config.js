@@ -91,6 +91,11 @@ const config = {
         "script-src": [
           "self",
           ...templateScriptHashes,
+          // Svelte 5 SSR puts onload/onerror="this.__e=event" on <img> (and other
+          // load/error targets) so events that fire before hydration are
+          // replayed. 'unsafe-hashes' + that exact handler's hash allows only it.
+          "unsafe-hashes",
+          "sha256-7dQwUgLau1NFCCGjfn9FsYptB6ZtWxJin6VohGIu20I=",
           "https://maps.googleapis.com",
           "https://maps.gstatic.com",
           "https://geocoding.geo.census.gov",
