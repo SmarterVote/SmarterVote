@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from shared.models import CanonicalIssue
 from shared.pipeline_config import CANONICAL_ISSUE_COUNT, FreshnessConfig
 from shared.race_cleanup import forecast_evidence_gaps
+from shared.text_quality import is_placeholder_text
 
 _PLACEHOLDER_STANCES = {
     "",
@@ -138,6 +139,7 @@ def _issue_verdict(value: Any) -> tuple[bool, bool, bool]:
     # from being discarded as a placeholder. Only a short one is junk.
     if (
         not stance
+        or is_placeholder_text(stance)
         or normalized in _PLACEHOLDER_STANCES
         or (len(normalized) <= _PLACEHOLDER_PREFIX_MAX_CHARS and placeholder_prefix)
     ):

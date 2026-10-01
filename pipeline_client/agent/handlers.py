@@ -1525,6 +1525,7 @@ def _make_editing_handlers(
 
     def set_issue_stance(args: Dict[str, Any]) -> str:
         from pipeline_client.agent.agent import _is_missing_stance_text
+        from shared.text_quality import clean_pipeline_language, normalize_no_position_stance
 
         name, issue = args["candidate_name"], args["issue"]
         if issue not in _CANONICAL_ISSUE_SET:
@@ -1535,6 +1536,9 @@ def _make_editing_handlers(
         if not c:
             return f"Candidate '{name}' not found."
         stance_text = str(args["stance"] or "")
+        # "No specific public position was identified on ..." is the marker in
+        # other words; store the exact marker so the frontend recognizes it.
+        stance_text = normalize_no_position_stance(clean_pipeline_language(stance_text))
         if _is_missing_stance_text(stance_text) and "no public position found" not in stance_text.lower():
             log("warning", f"    set_issue_stance({name!r}, {issue!r}) BLOCKED: placeholder stance {stance_text!r}")
             return (
@@ -1559,7 +1563,7 @@ def _make_editing_handlers(
         # research and later review/iteration passes. Models often append their
         # search narrative to this field despite being told to use the exact
         # marker; the research audit is the proper place for that evidence.
-        stored_stance = "No public position found" if is_documented_absence else args["stance"]
+        stored_stance = "No public position found" if is_documented_absence else stance_text
         stored_confidence = "low" if is_documented_absence else args["confidence"]
         stance_data: Dict[str, Any] = {
             "stance": stored_stance,

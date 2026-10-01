@@ -134,6 +134,12 @@ PLACEHOLDER_JUNK_MARKERS = frozenset(
         "sample",
         "example",
         "dummy",
+        "tba",
+        "to be updated",
+        "to be added",
+        "to be determined",
+        "to be announced",
+        "coming soon",
     }
 )
 
@@ -147,7 +153,9 @@ def is_placeholder_junk_stance(stance: Any) -> bool:
     """
     if not isinstance(stance, str):
         return False
-    normalized = stance.strip().strip(".").strip().lower()
+    # Brackets and stray punctuation around a marker do not make it a stance:
+    # CA-50 published "(to be updated)" as an Election Policy position.
+    normalized = stance.strip().strip(" .()[]{}<>*-_:;!?\"'").strip().lower()
     return normalized in PLACEHOLDER_JUNK_MARKERS
 
 
