@@ -417,7 +417,7 @@ The installed `smartervote-races` MCP server intentionally exposes a lean, durab
 
 - Public reads: `health`, `list_published_races`, `list_race_summaries`, `get_published_race`, `get_race_data`.
 - Admin race operations: `list_admin_races`, `get_race_record`, `list_draft_races`, `list_unpublished_drafts`, `publish_race`, `publish_races`, `unpublish_race`, `recheck_race`, `recheck_all_races`, `delete_draft`, `delete_race`.
-- Queue and run monitoring: `queue_races`, `run_race`, `cancel_race`, `get_queue`, `list_runs`, `list_active_runs`, `get_run`, `get_run_logs`, `cancel_or_delete_run`.
+- Queue and run monitoring: `queue_races`, `run_race`, `cancel_race`, `get_queue`, `list_runs`, `list_active_runs`, `get_run`, `get_run_logs`, `cancel_run` (cancel only) and `delete_finished_run`.
 - Operations and analytics: `list_pipeline_steps`, `get_pipeline_metrics`, `get_pipeline_metrics_summary`, `clear_races_api_cache`, and the analytics overview/race/timeseries/traffic tools.
 - Chamber forecasts: `generate_chamber_forecasts`, `review_chamber_forecast_drafts`, `publish_chamber_forecasts`, `verify_live_forecast_page_data`.
 

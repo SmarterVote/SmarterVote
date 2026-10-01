@@ -14,6 +14,7 @@
   } from "$lib/services/pipelineApiService";
   import { analyticsService } from "$lib/services/analyticsService";
   import { MAX_LOG_ENTRIES } from "$lib/config/constants";
+  import { RUN_HISTORY_MAX_LIMIT } from "$lib/services/pipelineApiService";
 
   export let runs: RunHistoryItem[] = [];
   export let queueItems: QueueItem[] = [];
@@ -28,6 +29,7 @@
   const dispatch = createEventDispatcher<{
     refresh: void;
     "clear-queue": void;
+    "load-more": void;
   }>();
 
   // Date/Time Range Filter
@@ -86,8 +88,30 @@
   let runModeFilter = "all"; // 'all', 'cheap', 'full'
   let runModelNameFilter = "all";
 
+  $: canLoadMore = historyTruncated && historyLimit < RUN_HISTORY_MAX_LIMIT;
+  $: historyFiltersActive =
+    runSearchQuery.trim() !== "" ||
+    runStatusFilter !== "all" ||
+    runModeFilter !== "all" ||
+    runModelNameFilter !== "all";
+  // Filters over a truncated page would silently miss older matches, so the
+  // first filter use widens the window once (one larger read, not per poll).
+  let autoLoadedForFilters = false;
+  $: if (historyFiltersActive && canLoadMore && !autoLoadedForFilters) {
+    autoLoadedForFilters = true;
+    dispatch("load-more");
+  }
+
   // Actions
-  let cancellingRunId: string | null = null;
+  /** Runs with a cancel request in flight (several can be cancelled at once). */
+  let cancellingRunIds = new Set<string>();
+  /**
+   * Runs the server confirmed cancelled, shown as cancelled immediately while
+   * the follow-up refresh catches up.
+   */
+  let locallyCancelledRunIds = new Set<string>();
+  let followUpRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  const CANCEL_FOLLOW_UP_MS = 3000;
   let downloadingDiagnosticsRunId: string | null = null;
   let actionError = "";
   let actionNotice = "";
@@ -191,8 +215,15 @@
     // A long run polls for hours; without a cap the drawer grows without
     // bound and the tab eventually stalls.
     const merged = [...drawerLogs, ...fresh];
-    if (merged.length > MAX_LOG_ENTRIES) drawerLogsTruncated = true;
-    drawerLogs = merged.slice(-MAX_LOG_ENTRIES);
+    if (merged.length > MAX_LOG_ENTRIES) {
+      drawerLogsTruncated = true;
+      drawerLogs = merged.slice(-MAX_LOG_ENTRIES);
+      // Keep the dedupe set in step with the trimmed list so it cannot grow
+      // for hours. Forward cursor polling never re-sends trimmed entries.
+      session.seenLogKeys = new Set(drawerLogs.map(logKey));
+    } else {
+      drawerLogs = merged;
+    }
   }
 
   function isCurrent(session: DrawerSession): boolean {
@@ -290,13 +321,12 @@
       if (!isCurrent(session)) return;
       selectedRunDetail = detail;
 
-      // Page to the end so the newest logs (not the oldest page) are shown.
-      const tail = await apiService.getRunLogsTail(runId, MAX_LOG_ENTRIES, {
-        isCancelled: () => !isCurrent(session),
-      });
+      // One bounded tail request: the newest entries, oldest-first, plus the
+      // cursor to continue forward polling from.
+      const tail = await apiService.getRunLogsTail(runId, MAX_LOG_ENTRIES);
       if (!isCurrent(session)) return;
       session.cursor = tail.next_cursor;
-      drawerLogsTruncated = tail.truncated || !tail.complete;
+      drawerLogsTruncated = tail.truncated;
       appendLogs(session, tail.logs);
     } catch (err) {
       if (isCurrent(session)) drawerError = String(err);
@@ -387,24 +417,79 @@
     dispatch("clear-queue");
   }
 
-  /** Queue item backing a row that has no run document yet. */
+  /**
+   * Active queue item backing a row: the row's own run, or (for a collapsed
+   * continuation chain) any invocation in that chain or its continuation.
+   */
   function queueItemForRun(runId: string): QueueItem | undefined {
-    return queueItems.find(
-      (q) =>
-        q.run_id === runId &&
-        (q.status === "running" || q.status === "pending"),
+    const run = runs.find((r) => r.run_id === runId) as
+      | RunMetricFields
+      | undefined;
+    const chain = new Set<string>([runId, ...(run?.invocation_run_ids ?? [])]);
+    const active = queueItems.filter(
+      (q) => q.status === "running" || q.status === "pending",
     );
+    return (
+      active.find((q) => q.run_id === runId) ??
+      active.find(
+        (q) =>
+          (q.run_id && chain.has(q.run_id)) ||
+          (q.parent_run_id && chain.has(q.parent_run_id)),
+      )
+    );
+  }
+
+  function httpStatus(err: unknown): number | null {
+    const match = /HTTP (\d{3})/.exec(
+      err instanceof Error ? err.message : String(err),
+    );
+    return match ? Number(match[1]) : null;
+  }
+
+  /** The server's `detail` from an error thrown by the API service. */
+  function serverDetail(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err);
+    const jsonStart = message.indexOf("{");
+    if (jsonStart >= 0) {
+      try {
+        const parsed = JSON.parse(message.slice(jsonStart)) as {
+          detail?: unknown;
+        };
+        if (typeof parsed.detail === "string" && parsed.detail)
+          return parsed.detail;
+      } catch {
+        /* fall through to the raw message */
+      }
+    }
+    return message;
+  }
+
+  function scheduleFollowUpRefresh() {
+    if (followUpRefreshTimer) clearTimeout(followUpRefreshTimer);
+    followUpRefreshTimer = setTimeout(() => {
+      followUpRefreshTimer = null;
+      if (!destroyed) dispatch("refresh");
+    }, CANCEL_FOLLOW_UP_MS);
+  }
+
+  function markCancelledLocally(runId: string) {
+    locallyCancelledRunIds = new Set(locallyCancelledRunIds).add(runId);
+    if (selectedRunId === runId && selectedRunDetail) {
+      selectedRunDetail = { ...selectedRunDetail, status: "cancelled" };
+    }
   }
 
   /**
    * Cancel only — never deletes. Rows that exist only in the queue (no run
-   * doc yet) are cancelled through the queue item endpoint.
+   * doc yet) are cancelled through the queue item endpoint, as are collapsed
+   * continuation rows whose run doc is not written yet (the cancel endpoint
+   * answers 404 for those).
    */
   async function handleCancelRun(runId: string) {
-    if (!runId) return;
+    if (!runId || cancellingRunIds.has(runId)) return;
     const label = raceIdForRunId(runId);
     if (!confirm(`Cancel run ${runId}${label ? ` (${label})` : ""}?`)) return;
-    cancellingRunId = runId;
+    cancellingRunIds = new Set(cancellingRunIds).add(runId);
     actionError = "";
     actionNotice = "";
     try {
@@ -414,23 +499,32 @@
       if (!hasRunDoc && queueItem) {
         await apiService.removeQueueItem(queueItem.id);
       } else {
-        await apiService.cancelRun(runId);
+        try {
+          await apiService.cancelRun(runId);
+        } catch (err) {
+          if (httpStatus(err) !== 404 || !queueItem) throw err;
+          await apiService.removeQueueItem(queueItem.id);
+        }
       }
+      markCancelledLocally(runId);
       actionNotice = `Cancelled run ${runId}.`;
       dispatch("refresh");
+      scheduleFollowUpRefresh();
       void fetchMetrics();
-      if (selectedRunId === runId && hasRunDoc) {
-        const detail = await apiService.getRunDetails(runId);
-        if (selectedRunId === runId) selectedRunDetail = detail;
-      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      actionError = message.includes("HTTP 409")
-        ? `Run ${runId} already finished; nothing was cancelled.`
-        : `Failed to cancel run: ${message}`;
+      const status = httpStatus(err);
+      const detail = serverDetail(err);
+      actionError =
+        status === 409
+          ? `Run ${runId} was not cancelled: ${detail}`
+          : status === 404
+            ? `Run ${runId} was not found and has no active queue item to cancel.`
+            : `Failed to cancel run: ${detail}`;
       dispatch("refresh");
     } finally {
-      cancellingRunId = null;
+      const next = new Set(cancellingRunIds);
+      next.delete(runId);
+      cancellingRunIds = next;
     }
   }
 
@@ -577,11 +671,36 @@
     return step ? String(step).replaceAll("_", " ") : run.status;
   }
 
+  // Server rows that are no longer active retire the local override.
+  $: if (locallyCancelledRunIds.size) {
+    const stillActive = new Set(
+      runs
+        .filter((r) => r.status === "running" || r.status === "pending")
+        .map((r) => r.run_id),
+    );
+    for (const q of queueItems) {
+      if ((q.status === "running" || q.status === "pending") && q.run_id)
+        stillActive.add(q.run_id);
+    }
+    const kept = [...locallyCancelledRunIds].filter((id) =>
+      stillActive.has(id),
+    );
+    if (kept.length !== locallyCancelledRunIds.size)
+      locallyCancelledRunIds = new Set(kept);
+  }
+  $: displayRuns = locallyCancelledRunIds.size
+    ? runs.map((r) =>
+        locallyCancelledRunIds.has(r.run_id) &&
+        (r.status === "running" || r.status === "pending")
+          ? ({ ...r, status: "cancelled" } as RunHistoryItem)
+          : r,
+      )
+    : runs;
   $: liveRunIds = new Set(
     queueItems
       .filter((q) => q.status === "running" || q.status === "pending")
       .map((q) => q.run_id)
-      .filter(Boolean),
+      .filter((id): id is string => !!id && !locallyCancelledRunIds.has(id)),
   );
   $: continuationParentRunIds = new Set(
     queueItems.map((q) => q.parent_run_id).filter(Boolean),
@@ -589,7 +708,8 @@
   $: activeQueueItems = queueItems.filter(
     (q) =>
       (q.status === "running" || q.status === "pending") &&
-      !continuationParentRunIds.has(q.run_id),
+      !continuationParentRunIds.has(q.run_id) &&
+      !(q.run_id && locallyCancelledRunIds.has(q.run_id)),
   );
 
   $: activeQueueRuns = activeQueueItems
@@ -597,7 +717,7 @@
       (q) =>
         (q.status === "running" || q.status === "pending") &&
         q.run_id &&
-        !runs.some((r) => r.run_id === q.run_id),
+        !displayRuns.some((r) => r.run_id === q.run_id),
     )
     .map(
       (q, idx) =>
@@ -620,7 +740,7 @@
     );
 
   $: activeRuns = [
-    ...runs.filter(
+    ...displayRuns.filter(
       (r) =>
         (r.status === "running" ||
           r.status === "pending" ||
@@ -630,7 +750,7 @@
     ...activeQueueRuns,
   ];
   $: pendingQueue = activeQueueItems.filter((q) => q.status === "pending");
-  $: historicalRuns = runs.filter(
+  $: historicalRuns = displayRuns.filter(
     (r) =>
       r.status !== "running" &&
       r.status !== "pending" &&
@@ -724,6 +844,7 @@
 
   onDestroy(() => {
     destroyed = true;
+    if (followUpRefreshTimer) clearTimeout(followUpRefreshTimer);
     stopDrawerSession();
   });
 </script>
@@ -883,13 +1004,28 @@
   {/if}
 
   {#if historyTruncated}
-    <p
-      class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+    <div
+      class="alert-warn flex flex-wrap items-center justify-between gap-3 text-xs"
       role="status"
     >
-      Showing the {historyLimit || runs.length} most recent runs; older runs are
-      not loaded, so history filters and totals below cover only these.
-    </p>
+      <p>
+        Showing the {historyLimit || runs.length} most recent runs; older runs are
+        not loaded, so history filters and totals below cover only these.
+        {#if !canLoadMore}
+          This is the server's maximum page ({RUN_HISTORY_MAX_LIMIT}).
+        {/if}
+      </p>
+      {#if canLoadMore}
+        <button
+          type="button"
+          class="btn-secondary min-h-0 px-3 py-1.5 text-xs"
+          disabled={isRefreshing}
+          on:click={() => dispatch("load-more")}
+        >
+          Load up to {RUN_HISTORY_MAX_LIMIT} runs
+        </button>
+      {/if}
+    </div>
   {/if}
 
   <!-- Time range selector & Metrics Section -->
@@ -1160,11 +1296,11 @@
             <button
               type="button"
               class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
-              disabled={cancellingRunId === run.run_id}
+              disabled={cancellingRunIds.has(run.run_id)}
               aria-label="Cancel run for {raceId(run)}"
               on:click={() => handleCancelRun(run.run_id)}
             >
-              {#if cancellingRunId === run.run_id}
+              {#if cancellingRunIds.has(run.run_id)}
                 <svg
                   class="animate-spin h-3 w-3"
                   xmlns="http://www.w3.org/2000/svg"
@@ -1447,10 +1583,11 @@
           <button
             type="button"
             class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
-            disabled={cancellingRunId === selectedRunId}
+            disabled={selectedRunId !== null &&
+              cancellingRunIds.has(selectedRunId)}
             on:click={() => handleCancelRun(selectedRunId ?? "")}
           >
-            {#if cancellingRunId === selectedRunId}
+            {#if selectedRunId !== null && cancellingRunIds.has(selectedRunId)}
               <svg
                 class="animate-spin h-3 w-3"
                 xmlns="http://www.w3.org/2000/svg"

@@ -59,9 +59,23 @@ describe("API Fallback Functionality", () => {
     vi.stubEnv("VITE_PUBLIC_DATA_URL", "https://static.example/races");
     const mockFetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
 
-    await expect(getRaceSummaries(mockFetch, false)).rejects.toThrow(
-      "Static data request failed: 404",
-    );
+    await expect(getRaceSummaries(mockFetch, false)).rejects.toThrow(/404/);
+  });
+
+  it("shares one cached summaries request with the page loaders", async () => {
+    vi.resetModules();
+    const api = await import("./api");
+    const prerender = await import("./prerenderData");
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ id: "a", candidates: [] }]),
+    });
+
+    const fromPage = await prerender.fetchPublishedRaceSummaries(mockFetch);
+    const fromHeader = await api.getRaceSummaries(mockFetch, false);
+
+    expect(fromHeader).toBe(fromPage);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
   it("fetches draft races through the lazily loaded auth fetcher", async () => {

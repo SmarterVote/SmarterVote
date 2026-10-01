@@ -69,9 +69,18 @@ test.describe("race detail page", () => {
         name: "Select Senator Jordan Ellsworth to compare",
       })
       .check();
+    // One selection is not a comparison yet: the drawer says so, and the
+    // polite live region announces it.
+    await expect(page.getByText("Select 1 more to compare")).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "1 candidate selected" }),
+    ).toHaveCount(1);
     await page
       .getByRole("checkbox", { name: "Select Casey Whitfield to compare" })
       .check();
+    await expect(
+      page.getByRole("status").filter({ hasText: "2 candidates selected" }),
+    ).toHaveCount(1);
 
     await page.getByRole("link", { name: "Compare Now" }).click();
 

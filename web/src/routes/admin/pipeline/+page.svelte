@@ -9,9 +9,15 @@
   import RacesTab from "$lib/components/admin/RacesTab.svelte";
   import RunsTab from "$lib/components/admin/RunsTab.svelte";
   import type { RunHistoryItem } from "$lib/types";
-  import { initializeAuth } from "$lib/stores/apiStore";
+  import {
+    initializeAuth,
+    isLoginRequired,
+    SIGN_IN_PATH,
+  } from "$lib/stores/apiStore";
   import {
     PipelineApiService,
+    RUN_HISTORY_MAX_LIMIT,
+    RUN_HISTORY_POLL_LIMIT,
     type QueueItem,
   } from "$lib/services/pipelineApiService";
   import { racesApiBase } from "$lib/config/api";
@@ -31,7 +37,8 @@
   let isRefreshingRuns = false;
   let isClearingQueue = false;
   let runsTruncated = false;
-  let runsLimit = 0;
+  /** Widest history window loaded so far (grows only on an explicit "Load more"). */
+  let runsLimit = RUN_HISTORY_POLL_LIMIT;
   let runsError = "";
   let queueActionError = "";
   /** Queue item whose graceful cancel failed; offers a separate force remove. */
@@ -135,6 +142,12 @@
       await initializeAuth();
       apiService = new PipelineApiService(API_BASE);
     } catch (err) {
+      // No session at all (signed out, direct visit): use the normal sign-in
+      // flow rather than an "authentication failed" or "expired" notice.
+      if (isLoginRequired(err)) {
+        window.location.assign(SIGN_IN_PATH);
+        return;
+      }
       authError =
         err instanceof Error
           ? err.message
@@ -156,8 +169,8 @@
       activeTab = "dashboard";
     }
 
+    // Run history loads when the Runs tab is shown (reactive block above).
     await refreshQueue();
-    await refreshRuns();
   });
 
   onDestroy(() => {
@@ -188,7 +201,7 @@
   async function refreshAllAdminState() {
     await Promise.allSettled([
       refreshQueue(),
-      refreshRuns(),
+      activeTab === "runs" ? refreshRuns() : Promise.resolve(),
       racesTab?.refresh(false) ?? Promise.resolve(),
     ]);
   }
@@ -238,15 +251,45 @@
     }
   }
 
-  async function refreshRuns() {
-    if (!apiService || isRefreshingRuns) return;
+  /**
+   * Merge a fresh newest-first page with previously loaded (older) runs so a
+   * small poll does not discard history the operator explicitly loaded.
+   */
+  function mergeRunPages(
+    fresh: RunHistoryItem[],
+    previous: RunHistoryItem[],
+  ): RunHistoryItem[] {
+    const seen = new Set(fresh.map((r) => r.run_id));
+    return [...fresh, ...previous.filter((r) => !seen.has(r.run_id))];
+  }
+
+  /**
+   * Refresh run history. Background polls read only RUN_HISTORY_POLL_LIMIT
+   * docs; `pageSize` widens the read for an explicit "Load more".
+   */
+  let pendingWiderLoad = 0;
+
+  async function refreshRuns(pageSize: number = RUN_HISTORY_POLL_LIMIT) {
+    if (!apiService) return;
+    if (isRefreshingRuns) {
+      // Never drop an explicit wider load behind a background poll.
+      if (pageSize > RUN_HISTORY_POLL_LIMIT)
+        pendingWiderLoad = Math.max(pendingWiderLoad, pageSize);
+      return;
+    }
     isRefreshingRuns = true;
     runsError = "";
     try {
-      const page = await apiService.loadRunHistoryPage();
-      runs = page.runs;
-      runsTruncated = page.truncated;
-      runsLimit = page.limit;
+      const page = await apiService.loadRunHistoryPage(pageSize);
+      if (page.limit >= runsLimit) {
+        runs = page.runs;
+        runsLimit = page.limit;
+        runsTruncated = page.truncated;
+      } else {
+        // Small poll over a wider loaded window: keep the older rows and the
+        // truncation state of the wider load.
+        runs = mergeRunPages(page.runs, runs);
+      }
     } catch (err) {
       console.error("Failed to load runs history:", err);
       runsError =
@@ -254,6 +297,17 @@
     } finally {
       isRefreshingRuns = false;
     }
+    if (pendingWiderLoad > runsLimit) {
+      const next = pendingWiderLoad;
+      pendingWiderLoad = 0;
+      await refreshRuns(next);
+    } else {
+      pendingWiderLoad = 0;
+    }
+  }
+
+  function loadMoreRuns() {
+    return refreshRuns(RUN_HISTORY_MAX_LIMIT);
   }
 
   async function handleClearQueue() {
@@ -412,7 +466,18 @@
       tabindex="0"
       class="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
     >
-      {#if activeTab === "dashboard"}
+      {#if !apiService}
+        <p
+          class="flex items-center gap-2 py-12 text-sm text-content-muted"
+          role="status"
+        >
+          <span
+            class="h-4 w-4 animate-spin rounded-full border-2 border-stroke border-t-primary"
+            aria-hidden="true"
+          ></span>
+          Checking your session…
+        </p>
+      {:else if activeTab === "dashboard"}
         <DashboardTab {apiService} on:view-runs={() => (activeTab = "runs")} />
       {:else if activeTab === "research" && apiService}
         <div class="card p-6">
@@ -434,7 +499,8 @@
           historyTruncated={runsTruncated}
           historyLimit={runsLimit}
           {runsError}
-          on:refresh={refreshRuns}
+          on:refresh={() => refreshRuns()}
+          on:load-more={loadMoreRuns}
           on:clear-queue={handleClearQueue}
         />
       {:else if activeTab === "forecasts" && apiService}
@@ -443,7 +509,7 @@
             <svelte:component this={ForecastsTabComponent} {apiService} />
           {/if}
         </div>
-      {:else if activeTab === "costs"}
+      {:else if activeTab === "costs" && apiService}
         {#if CostsTabComponent}
           <svelte:component this={CostsTabComponent} />
         {/if}

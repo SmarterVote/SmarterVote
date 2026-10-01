@@ -38,8 +38,11 @@ class RaceStatus(str):
     DRAFT = "draft"
     PUBLISHED = "published"
     FAILED = "failed"
-    # Written by the races-api when a queued/running job is cancelled
-    # (routers/queue.py) and when a race record is reset to rest (records.py).
+    # Written by the races-api (routers/runs.py, routers/queue.py,
+    # routers/races_admin/records.py) when a queued/running job is cancelled
+    # and the race has no published or draft copy to fall back to; otherwise
+    # the race returns to "published"/"draft". "idle" is written only by
+    # routers/queue.py when a still-pending item is withdrawn.
     CANCELLED = "cancelled"
     IDLE = "idle"
 

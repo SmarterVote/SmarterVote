@@ -19,7 +19,7 @@
       >
         <!-- Dem segment -->
         <div
-          class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
+          class="bg-blue-600 dark:bg-blue-700 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
           style="width: {((projectedSeats.Democratic ?? 0) / totalSeats) *
             100}%"
           title="Democratic projected seats: {projectedSeats.Democratic ?? 0}"
@@ -31,7 +31,7 @@
         <!-- Other segment -->
         {#if projectedSeats.Other}
           <div
-            class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
+            class="bg-slate-500 dark:bg-slate-600 transition-all duration-500 flex items-center justify-center text-xs font-black text-white"
             style="width: {((projectedSeats.Other ?? 0) / totalSeats) * 100}%"
             title="Other (independents and third parties) projected seats: {projectedSeats.Other}"
           >
@@ -42,7 +42,7 @@
         {/if}
         <!-- Rep segment -->
         <div
-          class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center text-xs font-black text-white ml-auto"
+          class="bg-red-600 dark:bg-red-700 transition-all duration-500 flex items-center justify-center text-xs font-black text-white ml-auto"
           style="width: {((projectedSeats.Republican ?? 0) / totalSeats) *
             100}%"
           title="Republican projected seats: {projectedSeats.Republican ?? 0}"

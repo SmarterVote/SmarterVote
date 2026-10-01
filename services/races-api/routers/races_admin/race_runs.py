@@ -6,14 +6,8 @@ import firestore_helpers
 from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
 from request_models import validate_race_id
-from routers.utils import _queue_ttl_at
 
-from shared.config import (
-    FIRESTORE_QUEUE_COLLECTION,
-    FIRESTORE_RACE_RUNS_SUBCOLLECTION,
-    FIRESTORE_RACES_COLLECTION,
-    FIRESTORE_RUNS_COLLECTION,
-)
+from shared.config import FIRESTORE_RACE_RUNS_SUBCOLLECTION, FIRESTORE_RACES_COLLECTION, FIRESTORE_RUNS_COLLECTION
 
 router = APIRouter()
 
@@ -87,17 +81,14 @@ def delete_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
     if run_doc.exists:
         status = (run_doc.to_dict() or {}).get("status", "")
         if status in ("pending", "running"):
-            run_ref.update({"status": "cancelled"})
-            for queue_doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", run_id).stream():
-                queue_data = queue_doc.to_dict() or {}
-                if queue_data.get("status") in ("pending", "running"):
-                    queue_doc.reference.update({"status": "cancelled", "ttl_at": _queue_ttl_at()})
-            race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).get()
-            if race_doc.exists and (race_doc.to_dict() or {}).get("status") in ("running", "queued"):
-                firestore_helpers._fs_update_race(race_id, {"status": "cancelled"})
-            return {"message": "Run cancelled", "run_id": run_id}
+            from routers.runs import _cancel_active_run
+
+            return _cancel_active_run(db, run_ref, run_id, snapshot=run_doc)
         else:
+            from routers.runs import _invalidate_legacy_runs_cache
+
             run_ref.delete()
+            _invalidate_legacy_runs_cache()
         return {"message": "Run deleted", "run_id": run_id}
     sub_ref = (
         db.collection(FIRESTORE_RACES_COLLECTION)

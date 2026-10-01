@@ -69,7 +69,6 @@ describe("RunsTab", () => {
     getRunLogs: ReturnType<typeof vi.fn>;
     getRunLogsTail: ReturnType<typeof vi.fn>;
     cancelRun: ReturnType<typeof vi.fn>;
-    deleteRun: ReturnType<typeof vi.fn>;
     removeQueueItem: ReturnType<typeof vi.fn>;
   };
 
@@ -99,10 +98,8 @@ describe("RunsTab", () => {
         logs: [],
         next_cursor: null,
         truncated: false,
-        complete: true,
       }),
       cancelRun: vi.fn().mockResolvedValue(undefined),
-      deleteRun: vi.fn().mockResolvedValue(undefined),
       removeQueueItem: vi.fn().mockResolvedValue(undefined),
     };
 
@@ -175,7 +172,6 @@ describe("RunsTab", () => {
     expect(apiService.getRunLogsTail).toHaveBeenCalledWith(
       "run-newest",
       expect.any(Number),
-      expect.any(Object),
     );
 
     // Expect drawer content to be displayed
@@ -248,7 +244,6 @@ describe("RunsTab", () => {
     await waitFor(() =>
       expect(apiService.cancelRun).toHaveBeenCalledWith("run-active"),
     );
-    expect(apiService.deleteRun).not.toHaveBeenCalled();
   });
 
   it("cancels a queue-only row through its queue item", async () => {
@@ -278,13 +273,14 @@ describe("RunsTab", () => {
       expect(apiService.removeQueueItem).toHaveBeenCalledWith("queue-1"),
     );
     expect(apiService.cancelRun).not.toHaveBeenCalled();
-    expect(apiService.deleteRun).not.toHaveBeenCalled();
   });
 
   it("explains a 409 instead of deleting an already-finished run", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     apiService.cancelRun.mockRejectedValue(
-      new Error("HTTP 409: Conflict. Run is not active"),
+      new Error(
+        'HTTP 409: Conflict. {"detail":"Run is not active (status: completed)"}',
+      ),
     );
     const module = await import("./RunsTab.svelte");
     const { getByRole, findByRole } = render(module.default, {
@@ -306,8 +302,10 @@ describe("RunsTab", () => {
     );
 
     const alert = await findByRole("alert");
-    expect(alert.textContent).toContain("already finished");
-    expect(apiService.deleteRun).not.toHaveBeenCalled();
+    // The server's own 409 detail is shown, not a guess.
+    expect(alert.textContent).toContain(
+      "Run run-active was not cancelled: Run is not active (status: completed)",
+    );
   });
 
   it("flags truncated run history", async () => {
@@ -321,5 +319,156 @@ describe("RunsTab", () => {
       },
     });
     expect(container.textContent).toContain("500 most recent runs");
+  });
+
+  function activeRun(runId = "run-active") {
+    return {
+      ...mockRuns[0],
+      run_id: runId,
+      status: "running",
+    } as RunHistoryItem;
+  }
+
+  it("shows a cancelled run as cancelled immediately and schedules a follow-up refresh", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const module = await import("./RunsTab.svelte");
+    const refreshes = vi.fn();
+    const { getByRole, queryByRole } = render(module.default, {
+      props: {
+        runs: [activeRun()],
+        queueItems: [],
+        apiService: apiService as unknown as PipelineApiService,
+      },
+      events: { refresh: refreshes },
+    });
+
+    await fireEvent.click(
+      getByRole("button", { name: "Cancel run for mn-governor-2026" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        queryByRole("button", { name: "Cancel run for mn-governor-2026" }),
+      ).toBeNull(),
+    );
+    expect(refreshes).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(3500);
+    expect(refreshes).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("tracks cancelling state per run so two cancels can be in flight", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const pending: ((v?: unknown) => void)[] = [];
+    apiService.cancelRun.mockImplementation(
+      () => new Promise((resolve) => pending.push(resolve)),
+    );
+    const module = await import("./RunsTab.svelte");
+    const first = {
+      ...activeRun("run-a"),
+      race_id: "race-a",
+    } as RunHistoryItem;
+    const second = {
+      ...activeRun("run-b"),
+      race_id: "race-b",
+    } as RunHistoryItem;
+    (first as { payload?: unknown }).payload = { race_id: "race-a" };
+    (second as { payload?: unknown }).payload = { race_id: "race-b" };
+    const { getByRole } = render(module.default, {
+      props: {
+        runs: [first, second],
+        queueItems: [],
+        apiService: apiService as unknown as PipelineApiService,
+      },
+    });
+
+    const buttonA = getByRole("button", { name: "Cancel run for race-a" });
+    const buttonB = getByRole("button", { name: "Cancel run for race-b" });
+    await fireEvent.click(buttonA);
+    await waitFor(() =>
+      expect((buttonA as HTMLButtonElement).disabled).toBe(true),
+    );
+    expect((buttonB as HTMLButtonElement).disabled).toBe(false);
+    await fireEvent.click(buttonB);
+
+    await waitFor(() => expect(apiService.cancelRun).toHaveBeenCalledTimes(2));
+    pending.forEach((resolve) => resolve());
+  });
+
+  it("falls back to the active queue item when a collapsed continuation row 404s", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    apiService.cancelRun.mockRejectedValue(
+      new Error('HTTP 404: Not Found. {"detail":"Run not found"}'),
+    );
+    const module = await import("./RunsTab.svelte");
+    const collapsed = {
+      ...activeRun("run-next"),
+      invocation_run_ids: ["run-root", "run-next"],
+    } as RunHistoryItem;
+    const { getByRole } = render(module.default, {
+      props: {
+        runs: [collapsed],
+        queueItems: [
+          {
+            id: "queue-cont",
+            race_id: "mn-governor-2026",
+            run_id: "run-next",
+            parent_run_id: "run-root",
+            status: "pending",
+            is_continuation: true,
+          } as unknown as QueueItem,
+        ],
+        apiService: apiService as unknown as PipelineApiService,
+      },
+    });
+
+    await fireEvent.click(
+      getByRole("button", { name: "Cancel run for mn-governor-2026" }),
+    );
+
+    await waitFor(() =>
+      expect(apiService.removeQueueItem).toHaveBeenCalledWith("queue-cont"),
+    );
+    expect(apiService.cancelRun).toHaveBeenCalledWith("run-next");
+  });
+
+  it("offers an explicit load-more when the polled page is truncated", async () => {
+    const module = await import("./RunsTab.svelte");
+    const loadMore = vi.fn();
+    const { getByRole } = render(module.default, {
+      props: {
+        runs: mockRuns,
+        queueItems: [],
+        historyTruncated: true,
+        historyLimit: 50,
+      },
+      events: { "load-more": loadMore },
+    });
+
+    await fireEvent.click(getByRole("button", { name: /Load up to 500 runs/ }));
+    expect(loadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it("widens a truncated history once when a filter is used", async () => {
+    const module = await import("./RunsTab.svelte");
+    const loadMore = vi.fn();
+    const { getByLabelText } = render(module.default, {
+      props: {
+        runs: mockRuns,
+        queueItems: [],
+        historyTruncated: true,
+        historyLimit: 50,
+      },
+      events: { "load-more": loadMore },
+    });
+    const search = getByLabelText(
+      "Filter run history by race ID or run ID",
+    ) as HTMLInputElement;
+
+    await fireEvent.input(search, { target: { value: "mn" } });
+    await fireEvent.input(search, { target: { value: "mn-g" } });
+
+    expect(loadMore).toHaveBeenCalledTimes(1);
   });
 });

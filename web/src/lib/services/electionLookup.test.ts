@@ -88,6 +88,26 @@ describe("matchingNationalRaces", () => {
     ).toEqual(["senate", "governor", "house-4"]);
   });
 
+  it("accepts a postal code or any-case state name from a shared link", () => {
+    const races = [
+      race({
+        id: "ak-house-2026",
+        office: "U.S. House of Representatives",
+        state: "Alaska",
+        jurisdiction: "Alaska's At-Large Congressional District",
+      }),
+    ];
+    for (const state of ["AK", "ak", "alaska", "ALASKA"]) {
+      expect(
+        matchingNationalRaces(
+          races,
+          { state, congressionalDistrict: "00" },
+          new Date("2026-07-12"),
+        ).map(({ id }) => id),
+      ).toEqual(["ak-house-2026"]);
+    }
+  });
+
   it("matches at-large House races and excludes past elections", () => {
     const races = [
       race({

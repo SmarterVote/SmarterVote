@@ -1,0 +1,460 @@
+{
+  "_comment": "Edge cases that both shared/forecast_summary.py (tests/test_forecast_summary.py) and web/src/lib/utils/forecast.ts (forecastParity.test.ts) must project identically. Every case is a partial race set, so Python uses its per-race tally (not the full-coverage distribution mode). 'uncounted' is a seat with no forecast party and no holder evidence: left out of the tally on both sides.",
+  "cases": [
+    {
+      "name": "winner label 'D' with D/R probability keys",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "tx-house-01-2026",
+          "title": "tx-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_d",
+            "predicted_winner_party": "D",
+            "party_probabilities": {
+              "D": 0.6,
+              "R": 0.4
+            }
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 1,
+        "Republican": 0,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "winner label 'R' and 'rep'",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "tx-house-01-2026",
+          "title": "tx-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_r",
+            "predicted_winner_party": "R"
+          }
+        },
+        {
+          "id": "tx-house-02-2026",
+          "title": "tx-house-02-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_r",
+            "predicted_winner_party": "rep"
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 2,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "unspecified winner, Dem/Rep probability keys",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "tx-house-01-2026",
+          "title": "tx-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_d",
+            "predicted_winner_party": "",
+            "party_probabilities": {
+              "Dem": 0.6,
+              "Rep": 0.4
+            }
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 1,
+        "Republican": 0,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "bare 'Other' winner resolves from rep/dem keys",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "tx-house-01-2026",
+          "title": "tx-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_r",
+            "predicted_winner_party": "Other",
+            "party_probabilities": {
+              "rep": 0.7,
+              "dem": 0.3
+            }
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 1,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "named Independent favorite is Other",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "ne-house-02-2026",
+          "title": "ne-house-02-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "other",
+            "predicted_winner_party": "Independent",
+            "party_probabilities": {
+              "Independent": 0.55,
+              "Republican": 0.45
+            }
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 0,
+        "Other": 1,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "American Independent favorite is Other, DFL and GOP map to majors",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "ca-house-01-2026",
+          "title": "ca-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "other",
+            "predicted_winner_party": "American Independent"
+          }
+        },
+        {
+          "id": "mn-house-05-2026",
+          "title": "mn-house-05-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_d",
+            "predicted_winner_party": "Democratic-Farmer-Labor"
+          }
+        },
+        {
+          "id": "mn-house-06-2026",
+          "title": "mn-house-06-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_r",
+            "predicted_winner_party": "GOP"
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 1,
+        "Republican": 1,
+        "Other": 1,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "probabilities tie with unknown winner falls to the incumbent",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "oh-house-09-2026",
+          "title": "oh-house-09-2026",
+          "office": "U.S. House",
+          "candidates": [
+            {
+              "name": "A",
+              "party": "Republican",
+              "incumbent": true
+            },
+            {
+              "name": "B",
+              "party": "Democratic",
+              "incumbent": false
+            }
+          ],
+          "forecast": {
+            "rating": "tossup",
+            "predicted_winner_party": "unknown",
+            "party_probabilities": {
+              "Democratic": 0.5,
+              "Republican": 0.5
+            }
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 1,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "no forecast, Independent incumbent plus one Democrat",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "vt-house-00-2026",
+          "title": "vt-house-00-2026",
+          "office": "U.S. House",
+          "candidates": [
+            {
+              "name": "A",
+              "party": "Independent",
+              "incumbent": true
+            },
+            {
+              "name": "B",
+              "party": "Democratic",
+              "incumbent": false
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 0,
+        "Other": 1,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "no forecast, incumbent without a party label falls to roster majority",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "ok-house-01-2026",
+          "title": "ok-house-01-2026",
+          "office": "U.S. House",
+          "candidates": [
+            {
+              "name": "A",
+              "party": "",
+              "incumbent": true
+            },
+            {
+              "name": "B",
+              "party": "Republican",
+              "incumbent": false
+            },
+            {
+              "name": "C",
+              "party": "Republican",
+              "incumbent": false
+            },
+            {
+              "name": "D",
+              "party": "Democratic",
+              "incumbent": false
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 1,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "no forecast, empty roster is uncounted",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "ga-house-05-2026",
+          "title": "ga-house-05-2026",
+          "office": "U.S. House",
+          "candidates": []
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 0,
+        "Other": 0,
+        "uncounted": 1
+      }
+    },
+    {
+      "name": "forecast with no party or probabilities and empty roster is uncounted",
+      "chamber": "house",
+      "races": [
+        {
+          "id": "ga-house-06-2026",
+          "title": "ga-house-06-2026",
+          "office": "U.S. House",
+          "candidates": [],
+          "forecast": {
+            "rating": "tossup"
+          }
+        }
+      ],
+      "expected": {
+        "Democratic": 0,
+        "Republican": 0,
+        "Other": 0,
+        "uncounted": 1
+      }
+    },
+    {
+      "name": "Senate race with lowercase full state name trims the holdover",
+      "chamber": "senate",
+      "races": [
+        {
+          "id": "virginia-senate-2026",
+          "title": "virginia-senate-2026",
+          "office": "U.S. Senate",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_d",
+            "predicted_winner_party": "Democratic"
+          },
+          "state": "virginia"
+        }
+      ],
+      "expected": {
+        "Democratic": 35,
+        "Republican": 32,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "Senate race keyed by jurisdiction name and by id prefix",
+      "chamber": "senate",
+      "races": [
+        {
+          "id": "tx-senate-2026",
+          "title": "tx-senate-2026",
+          "office": "U.S. Senate",
+          "candidates": [],
+          "forecast": {
+            "rating": "likely_r",
+            "predicted_winner_party": "Republican"
+          },
+          "state": "District 5"
+        },
+        {
+          "id": "wv-senate-2026",
+          "title": "wv-senate-2026",
+          "office": "U.S. Senate",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_r",
+            "predicted_winner_party": "Republican"
+          },
+          "jurisdiction": "WEST VIRGINIA"
+        }
+      ],
+      "expected": {
+        "Democratic": 35,
+        "Republican": 33,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "Senate race with no forecast and empty roster uses the holdover table",
+      "chamber": "senate",
+      "races": [
+        {
+          "id": "wy-senate-2026",
+          "title": "wy-senate-2026",
+          "office": "U.S. Senate",
+          "candidates": [],
+          "state": "WY"
+        }
+      ],
+      "expected": {
+        "Democratic": 35,
+        "Republican": 33,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "Governor race in a holdover state written in lowercase is excluded",
+      "chamber": "governors",
+      "races": [
+        {
+          "id": "va-governor-2026",
+          "title": "va-governor-2026",
+          "office": "Governor",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_d",
+            "predicted_winner_party": "Democratic"
+          },
+          "state": "virginia"
+        },
+        {
+          "id": "az-governor-2026",
+          "title": "az-governor-2026",
+          "office": "Governor",
+          "candidates": [],
+          "forecast": {
+            "rating": "lean_d",
+            "predicted_winner_party": "dem"
+          },
+          "state": "az"
+        }
+      ],
+      "expected": {
+        "Democratic": 7,
+        "Republican": 8,
+        "Other": 0,
+        "uncounted": 0
+      }
+    },
+    {
+      "name": "DC never enters state-keyed math",
+      "chamber": "governors",
+      "races": [
+        {
+          "id": "dc-governor-2026",
+          "title": "dc-governor-2026",
+          "office": "Governor",
+          "candidates": [],
+          "forecast": {
+            "rating": "safe_d",
+            "predicted_winner_party": "Democratic"
+          },
+          "state": "DC"
+        }
+      ],
+      "expected": {
+        "Democratic": 7,
+        "Republican": 8,
+        "Other": 0,
+        "uncounted": 0
+      }
+    }
+  ]
+}

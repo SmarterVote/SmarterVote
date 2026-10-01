@@ -936,6 +936,8 @@ export interface ChamberForecastDetails {
   threshold: number;
   total_seats: number;
   tossup_count: number;
+  /** Seats with no forecast party and no holder evidence; left out of projected_seats. */
+  uncounted_seats?: number;
   competitive_race_count?: number;
   competitive_races: string[];
   method: string;

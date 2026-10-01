@@ -30,7 +30,8 @@ const candidate: Candidate = {
   issues: {
     Healthcare: {
       stance:
-        "U.S. Senate candidate supports expanding coverage. More details follow.",
+        "U.S. Senate candidate supports expanding coverage through a public option, lower prescription drug prices, and new funding for rural hospitals statewide. " +
+        "More details follow about how the plan would be financed over the next decade, including payroll changes and federal matching funds for states.",
       confidence: "high",
       sources,
     },
@@ -63,8 +64,11 @@ describe("MobileCandidateComparison", () => {
   it("previews a complete stance and expands its full source list", async () => {
     render(MobileCandidateComparison, { race, candidates: [candidate] });
 
+    // Same sentence-bounded preview as the desktop comparison cells.
     expect(
-      screen.getByText("U.S. Senate candidate supports expanding coverage."),
+      screen.getByText(
+        "U.S. Senate candidate supports expanding coverage through a public option, lower prescription drug prices, and new funding for rural hospitals statewide.",
+      ),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: /First source/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Second source/ })).toBeNull();

@@ -62,7 +62,7 @@
 {#if !hasIssues}
   <NoDataFallback dataType="issues" {raceId} {candidateName} />
 {:else}
-  <div class="hidden lg:block overflow-x-auto">
+  <div class="relative hidden lg:block overflow-x-auto">
     <table class="w-full table-fixed border-collapse">
       <thead>
         <tr class="border-b border-stroke">
@@ -195,8 +195,12 @@
 
   <!-- Mobile-friendly view for smaller screens -->
   <div class="lg:hidden space-y-4">
+    <!-- Sticks directly under whatever is pinned above it: the site header,
+         plus any sticky section strip a page publishes as
+         --section-nav-height (0 when there is none). -->
     <div
-      class="sticky top-[calc(var(--site-header-height)+4.5rem)] z-20 rounded-lg border border-stroke bg-surface p-3 shadow-sm"
+      class="sticky z-20 rounded-lg border border-stroke bg-surface p-3 shadow-sm"
+      style="top: calc(var(--site-header-height, 0px) + var(--section-nav-height, 0px))"
     >
       <label
         for={issueSelectId}

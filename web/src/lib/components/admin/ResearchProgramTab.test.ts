@@ -258,25 +258,78 @@ describe("ResearchProgramTab", () => {
     );
   });
 
-  it("round-trips check timestamps through datetime-local without drift", async () => {
-    const status = programStatus([row("ga-senate-2026")]);
+  it("sends untouched check timestamps verbatim (no seconds/DST loss)", async () => {
+    const base = row("ga-senate-2026");
+    const withSeconds = row("ga-senate-2026", {
+      checkpoint: {
+        ...base.checkpoint!,
+        first_checked_at: "2026-06-16T12:00:42.123Z",
+        second_checked_at: "2026-06-16T18:30:59Z",
+      },
+    });
+    const status = programStatus([withSeconds]);
     const service = api(status);
     const { getByLabelText, getByRole } = await renderLoaded(service, status);
 
     await fireEvent.click(getByRole("button", { name: "Checkpoint" }));
     const first = getByLabelText("First check") as HTMLInputElement;
-    expect(first.value).toBe(isoToLocalInput("2026-06-16T12:00:00Z"));
+    expect(first.value).toBe(isoToLocalInput("2026-06-16T12:00:42.123Z"));
     await fireEvent.submit(getByRole("button", { name: "Save checkpoint" }));
 
     await waitFor(() =>
       expect(service.recordResearchCheckpoint).toHaveBeenCalledWith(
         "ga-senate-2026",
         expect.objectContaining({
-          first_checked_at: "2026-06-16T12:00:00.000Z",
-          second_checked_at: "2026-06-16T18:30:00.000Z",
+          first_checked_at: "2026-06-16T12:00:42.123Z",
+          second_checked_at: "2026-06-16T18:30:59Z",
         }),
       ),
     );
+  });
+
+  it("re-derives only the timestamp the operator edited", async () => {
+    const status = programStatus([row("ga-senate-2026")]);
+    const service = api(status);
+    const { getByLabelText, getByRole } = await renderLoaded(service, status);
+
+    await fireEvent.click(getByRole("button", { name: "Checkpoint" }));
+    const edited = isoToLocalInput("2026-06-17T09:15:00Z");
+    await fireEvent.input(getByLabelText("Second check (≥6h later)"), {
+      target: { value: edited },
+    });
+    await fireEvent.submit(getByRole("button", { name: "Save checkpoint" }));
+
+    await waitFor(() =>
+      expect(service.recordResearchCheckpoint).toHaveBeenCalledWith(
+        "ga-senate-2026",
+        expect.objectContaining({
+          first_checked_at: "2026-06-16T12:00:00Z",
+          second_checked_at: localInputToIso(edited),
+        }),
+      ),
+    );
+  });
+
+  it("withdraws the discovery review fingerprint when unchecked", async () => {
+    const status = programStatus([row("ga-senate-2026")]);
+    const service = api(status);
+    const { getByLabelText, getByRole } = await renderLoaded(service, status);
+
+    await fireEvent.click(getByRole("button", { name: "Checkpoint" }));
+    const reviewed = getByLabelText(
+      "Discovery artifact reviewed against this exact result fingerprint",
+    ) as HTMLInputElement;
+    expect(reviewed.checked).toBe(true);
+    await fireEvent.click(reviewed);
+    expect(reviewed.checked).toBe(false);
+    await fireEvent.submit(getByRole("button", { name: "Save checkpoint" }));
+
+    await waitFor(() =>
+      expect(service.recordResearchCheckpoint).toHaveBeenCalledOnce(),
+    );
+    const payload = service.recordResearchCheckpoint.mock.calls[0][1];
+    expect(payload.result_state).toBe("stable");
+    expect(payload).not.toHaveProperty("last_reviewed_discovery_fingerprint");
   });
 
   it("converts between UTC ISO and local datetime-local strings", () => {

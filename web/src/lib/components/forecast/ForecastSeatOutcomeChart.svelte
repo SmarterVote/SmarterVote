@@ -70,7 +70,7 @@
           {#each seatBuckets as bucket}
             {#if bucket.probability > 0}
               <div
-                class={`${bucket.colorClass} transition-all duration-500 flex items-center justify-center text-xs font-bold text-white shadow-inner relative group cursor-pointer`}
+                class={`${bucket.colorClass} ${bucket.textClass} transition-all duration-500 flex items-center justify-center text-xs font-bold shadow-inner relative group cursor-pointer`}
                 style={`width: ${bucket.probability * 100}%`}
               >
                 <!-- Tooltip -->

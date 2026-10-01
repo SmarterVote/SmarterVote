@@ -10,6 +10,7 @@
 import type { Race, RaceSummary } from "./types";
 import { logger } from "./utils/logger";
 import { publicDataBase, racesApiBase } from "$lib/config/api";
+import { fetchPublishedRaceSummaries } from "./prerenderData";
 
 const USE_SAMPLE_FALLBACK = import.meta.env.DEV;
 
@@ -65,7 +66,10 @@ export async function getRaceSummaries(
   useFallback: boolean = USE_SAMPLE_FALLBACK,
 ): Promise<RaceSummary[]> {
   try {
-    return await fetchPublicJson<RaceSummary[]>("summaries.json", fetchFn);
+    // Share the one cached request with the pages (elections, home, forecast)
+    // that load the same ~2 MB catalog, instead of downloading it again for
+    // the header search.
+    return await fetchPublishedRaceSummaries(fetchFn);
   } catch (error) {
     // If fallback is enabled, create summaries from sample races
     if (useFallback) {

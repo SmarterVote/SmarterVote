@@ -12,12 +12,37 @@
 /** Canonical bucket for a free-text party label. */
 export type PartyKey = "dem" | "rep" | "ind" | "grn" | "lib" | "other";
 
+/**
+ * Labels that mean "no party" rather than naming one. Matched exactly (after
+ * dropping a trailing "party"), not by substring: "American Independent Party"
+ * is California's right-wing party, and `includes("independent")` rendered its
+ * nominees as independents.
+ */
+const INDEPENDENT_LABELS = new Set([
+  "i",
+  "ind",
+  "independent",
+  "independents",
+  "unaffiliated",
+  "no party preference",
+  "no party affiliation",
+  "no political party",
+  "no party",
+  "npp",
+  "npa",
+  "nonpartisan",
+  "non-partisan",
+]);
+
 export function partyKey(party: string | undefined): PartyKey {
-  const p = (party || "").toLowerCase().trim();
+  const p = (party || "").toLowerCase().trim().replace(/\s+/g, " ");
   if (!p) return "other";
-  if (p.includes("democrat") || p === "d" || p === "dfl") return "dem";
-  if (p.includes("republican") || p === "r" || p === "gop") return "rep";
-  if (p.includes("independent") || p === "i") return "ind";
+  if (p.includes("democrat") || p === "d" || p === "dem" || p === "dfl")
+    return "dem";
+  if (p.includes("republican") || p === "r" || p === "rep" || p === "gop")
+    return "rep";
+  const bare = p.replace(/\s+party$/, "");
+  if (INDEPENDENT_LABELS.has(p) || INDEPENDENT_LABELS.has(bare)) return "ind";
   if (p.includes("green") || p === "g") return "grn";
   if (p.includes("libertarian") || p === "l") return "lib";
   return "other";

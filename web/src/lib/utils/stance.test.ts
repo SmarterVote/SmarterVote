@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { collapsedPreview, stancePreview } from "./stance";
+import {
+  collapsedPreview,
+  comparePreview,
+  splitSentences,
+  stancePreview,
+} from "./stance";
 
 describe("stancePreview", () => {
   it("keeps abbreviations inside the first sentence", () => {
@@ -58,5 +63,19 @@ describe("collapsedPreview", () => {
     const result = collapsedPreview(`${"beta ".repeat(40).trim()}.`, 20);
 
     expect(result.length).toBeLessThanOrEqual(21);
+  });
+});
+
+describe("one sentence splitter for every preview", () => {
+  it("stancePreview shares the race page abbreviation list", () => {
+    expect(
+      stancePreview("Gov. Smith signed it on Aug. 6 in St. Louis. Then more."),
+    ).toBe("Gov. Smith signed it on Aug. 6 in St. Louis.");
+  });
+
+  it("comparePreview is re-exported by racePage unchanged", async () => {
+    const racePage = await import("./racePage");
+    expect(racePage.comparePreview).toBe(comparePreview);
+    expect(racePage.splitSentences).toBe(splitSentences);
   });
 });

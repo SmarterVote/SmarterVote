@@ -1,6 +1,6 @@
 import type { RaceSummary } from "$lib/types";
 import { daysUntilElection } from "$lib/utils/electionDate";
-import { canonicalRaceState } from "$lib/utils/states";
+import { canonicalRaceState, canonicalStateName } from "$lib/utils/states";
 
 export interface ElectionGeography {
   state: string;
@@ -154,7 +154,8 @@ export function matchingNationalRaces(
   geography: ElectionGeography,
   now = new Date(),
 ): RaceSummary[] {
-  const state = geography.state;
+  // A postal code ("AK") from a shared link must match like the full name.
+  const state = canonicalStateName(geography.state) ?? geography.state;
   const district = geography.congressionalDistrict.padStart(2, "0");
   return races.filter((race) => {
     // Compare calendar dates, not instants: "2026-11-03" parsed as UTC

@@ -47,9 +47,12 @@
 <span
   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-300 {style.bg} {style.border} {style.text}"
   title={description}
+  role="img"
   aria-label={description}
 >
-  <span class="w-1.5 h-1.5 rounded-full {style.dot} transition-all duration-300"
+  <span
+    class="w-1.5 h-1.5 rounded-full {style.dot} transition-all duration-300"
+    aria-hidden="true"
   ></span>
-  <span class="capitalize">{confidence}</span>
+  <span class="capitalize" aria-hidden="true">{confidence}</span>
 </span>

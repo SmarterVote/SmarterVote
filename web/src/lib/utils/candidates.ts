@@ -70,8 +70,36 @@ export function neutralCandidateOrder<
   return [...(candidates ?? [])].sort(compareCandidatesForDisplay);
 }
 
-/** @deprecated alias kept for callers written against the earlier name. */
-export const compareCandidatesNeutral = compareCandidatesForDisplay;
+/**
+ * The roster with exact-duplicate names removed (first entry wins). A
+ * duplicated candidate would otherwise render twice and collide on its slug.
+ */
+export function uniqueCandidatesByName<T extends Pick<Candidate, "name">>(
+  candidates: readonly T[] | null | undefined,
+): T[] {
+  const seen = new Set<string>();
+  return (candidates ?? []).filter((candidate) => {
+    const key = (candidate.name ?? "").trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * One or two initials for an avatar placeholder: first and last name, skipping
+ * suffixes ("Robert F. Kennedy Jr." -> "RK") and leading punctuation.
+ */
+export function candidateInitials(name: string): string {
+  const tokens = nameTokens(name)
+    .map((token) => token.replace(/^[^\p{L}\p{N}]+/u, ""))
+    .filter(Boolean);
+  while (tokens.length > 1 && isSuffix(tokens[tokens.length - 1])) tokens.pop();
+  if (tokens.length === 0) return "";
+  const first = Array.from(tokens[0])[0] ?? "";
+  const last = tokens.length > 1 ? (Array.from(tokens.at(-1)!)[0] ?? "") : "";
+  return `${first}${last}`.toLocaleUpperCase();
+}
 
 /** True when an issue stance has displayable text. */
 export function hasStance(

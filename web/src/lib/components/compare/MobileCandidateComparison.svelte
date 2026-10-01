@@ -5,15 +5,22 @@
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, CanonicalIssue, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
-  import { hasStance, neutralCandidateOrder } from "$lib/utils/candidates";
+  import {
+    candidateInitials,
+    hasStance,
+    neutralCandidateOrder,
+    uniqueCandidatesByName,
+  } from "$lib/utils/candidates";
   import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
   import { headshotFallback } from "$lib/utils/racePageImage";
-  import { collapsedPreview, stancePreview } from "$lib/utils/stance";
+  import { collapsedPreview } from "$lib/utils/stance";
   import {
     candidateForecastProbability,
     cleanDisplayText,
+    comparePreview,
+    formatWinProbability,
     isNoPositionStance,
   } from "$lib/utils/racePage";
 
@@ -35,7 +42,9 @@
   $: if (!issueKeys.includes(selectedIssue))
     selectedIssue = issueKeys[0] ?? "Healthcare";
   $: activeCandidates = neutralCandidateOrder(
-    race.candidates.filter((candidate) => !candidate.withdrawn),
+    uniqueCandidatesByName(race.candidates).filter(
+      (candidate) => !candidate.withdrawn,
+    ),
   );
   // Same per-candidate probabilities as the desktop forecast row.
   $: forecastRows = race.forecast
@@ -77,22 +86,14 @@
     failedImages = { ...failedImages, [candidate.name]: true };
   }
 
-  function initials(name: string): string {
-    return name
-      .split(" ")
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("");
-  }
-
+  /** Same collapsed text as the desktop comparison cells. */
   function positionPreview(stance: string): string {
-    if (!collapseText) return stancePreview(stance);
-    return collapsedPreview(stance);
+    return collapseText ? collapsedPreview(stance) : comparePreview(stance);
   }
 </script>
 
 <div
-  class="overflow-hidden rounded-xl border border-stroke bg-surface shadow-sm lg:hidden"
+  class="relative overflow-hidden rounded-xl border border-stroke bg-surface shadow-sm lg:hidden"
 >
   {#if showQuality && race.validation_grade}
     <div
@@ -112,10 +113,10 @@
   {/if}
 
   <div
-    class="hide-scrollbar flex snap-x snap-mandatory overflow-x-auto border-b border-stroke bg-surface-alt/30"
+    class="hide-scrollbar relative flex snap-x snap-mandatory overflow-x-auto border-b border-stroke bg-surface-alt/30"
     aria-label="Candidates in this comparison"
   >
-    {#each candidates as candidate (candidateSlug(candidate.name))}
+    {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
       <a
         href="/races/{race.id}/{candidateSlug(candidate.name)}/{isDraftPreview
           ? '?draft=true'
@@ -138,7 +139,7 @@
           <span
             class="flex h-14 w-14 items-center justify-center rounded-full border border-stroke bg-surface-alt text-sm font-extrabold text-content-muted"
           >
-            {initials(candidate.name)}
+            {candidateInitials(candidate.name)}
           </span>
         {/if}
         <span class="mt-2 text-sm font-extrabold text-content"
@@ -182,7 +183,7 @@
     </select>
 
     <div class="mt-4 space-y-3">
-      {#each candidates as candidate (candidateSlug(candidate.name))}
+      {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
         {@const rawStance = candidate.issues?.[selectedIssue]}
         {@const stance = hasStance(rawStance) ? rawStance : undefined}
         {@const stanceText = stance ? cleanDisplayText(stance.stance) : ""}
@@ -278,13 +279,13 @@
       </div>
       {#if forecastRows.length > 0}
         <dl class="mt-3 grid grid-cols-2 gap-2">
-          {#each forecastRows as row (row.name)}
+          {#each forecastRows as row, index (`${index}-${row.name}`)}
             <div class="rounded-lg border border-stroke bg-surface px-3 py-2">
               <dt class="truncate text-xs text-content-muted" title={row.name}>
                 {row.name}
               </dt>
               <dd class="text-lg font-extrabold text-content">
-                {Math.round(row.probability * 100)}%
+                {formatWinProbability(row.probability)}
               </dd>
             </div>
           {/each}

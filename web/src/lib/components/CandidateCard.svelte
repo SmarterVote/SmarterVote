@@ -10,6 +10,7 @@
   import { isExternalUrl } from "$lib/utils/url";
   import { headshotFallback } from "$lib/utils/racePageImage";
   import { cleanDisplayText } from "$lib/utils/racePage";
+  import { candidateInitials } from "$lib/utils/candidates";
   import { createEventDispatcher } from "svelte";
 
   export let candidate: Candidate;
@@ -50,12 +51,7 @@
     typeof candidate.summary === "string" ? candidate.summary : "",
   );
   $: profileHref = `/races/${raceId}/${candidateSlug(candidate.name)}/${draftQuery}`;
-  $: initials = candidate.name
-    .split(" ")
-    .filter((n) => n.length > 0)
-    .map((n) => n[0].toUpperCase())
-    .slice(0, 2)
-    .join("");
+  $: initials = candidateInitials(candidate.name);
 </script>
 
 <Card
@@ -130,11 +126,12 @@
       class="expand-button"
       on:click={toggleExpanded}
       aria-expanded={expanded}
-      aria-label={expanded
-        ? "Collapse candidate details"
-        : "Expand candidate details"}
     >
-      <span>{expanded ? "Show less" : "Show more"}</span>
+      <span
+        >{expanded ? "Show less" : "Show more"}<span class="sr-only">
+          for {candidate.name}</span
+        ></span
+      >
       <svg
         class="expand-icon"
         class:expanded

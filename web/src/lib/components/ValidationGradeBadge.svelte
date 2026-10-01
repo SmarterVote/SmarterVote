@@ -1,10 +1,51 @@
 <script lang="ts">
   import type { ValidationGrade } from "$lib/types";
+  import { tick } from "svelte";
   import { scrollBehavior } from "$lib/utils/motion";
 
   export let grade: ValidationGrade;
 
   let showPopover = false;
+  let wrapper: HTMLDivElement | undefined;
+  let badge: HTMLButtonElement | undefined;
+  let popover: HTMLDivElement | undefined;
+  /** Open toward the right of the badge when right-aligning would run off-screen. */
+  let alignLeft = false;
+
+  /** Popover width in px (w-72), capped like its max-width. */
+  const POPOVER_WIDTH = 288;
+  const EDGE_GAP = 8;
+
+  function placePopover() {
+    if (!wrapper || typeof window === "undefined") return;
+    const rect = wrapper.getBoundingClientRect();
+    const width = Math.min(POPOVER_WIDTH, window.innerWidth - 32);
+    // Right-aligned to the badge unless that would cross the left edge.
+    alignLeft = rect.right - width < EDGE_GAP;
+  }
+
+  async function togglePopover() {
+    if (showPopover) {
+      showPopover = false;
+      return;
+    }
+    placePopover();
+    showPopover = true;
+    // Move focus into the dialog so Escape and Tab work from inside it.
+    await tick();
+    popover?.focus();
+  }
+
+  function closePopover(returnFocus = false) {
+    showPopover = false;
+    if (returnFocus) badge?.focus();
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !showPopover) return;
+    event.stopPropagation();
+    closePopover(true);
+  }
 
   function gradeColor(g: string): string {
     switch (g) {
@@ -24,22 +65,30 @@
   }
 
   function scrollToReview() {
-    showPopover = false;
+    closePopover();
     const el = document.getElementById("ai-review");
     if (el) el.scrollIntoView({ behavior: scrollBehavior() });
   }
 </script>
 
-<div class="grade-wrapper">
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div class="grade-wrapper" bind:this={wrapper} on:keydown={onKeydown}>
   <button
+    type="button"
+    bind:this={badge}
     class="grade-badge {gradeColor(grade.grade)}"
-    on:click={() => (showPopover = !showPopover)}
-    on:keydown={(e) => e.key === "Escape" && (showPopover = false)}
+    on:click={togglePopover}
     aria-label="Automated research score: {grade.grade}"
     aria-expanded={showPopover}
     aria-controls={showPopover ? "validation-grade-popover" : undefined}
   >
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg
+      class="w-4 h-4"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
       <path
         stroke-linecap="round"
         stroke-linejoin="round"
@@ -54,9 +103,12 @@
   {#if showPopover}
     <!-- svelte-ignore a11y-click-events-have-key-events -->
     <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="popover-backdrop" on:click={() => (showPopover = false)}></div>
+    <div class="popover-backdrop" on:click={() => closePopover(true)}></div>
     <div
       class="popover"
+      class:popover--left={alignLeft}
+      bind:this={popover}
+      tabindex="-1"
       id="validation-grade-popover"
       role="dialog"
       aria-label="Automated research score details"
@@ -74,10 +126,11 @@
         neutrality. The score summarizes those research checks; it is not a
         guarantee that every claim is correct.
       </p>
-      <button class="popover-link" on:click={scrollToReview}>
+      <button type="button" class="popover-link" on:click={scrollToReview}>
         View review details
         <svg
           class="w-3.5 h-3.5"
+          aria-hidden="true"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -119,10 +172,15 @@
     @apply fixed inset-0 z-40;
   }
 
+  /* Right-aligned to the badge by default; placePopover() flips it to open
+     rightward when the badge sits too close to the left edge. */
   .popover {
-    @apply absolute top-full left-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)]
-           bg-surface border border-stroke rounded-xl shadow-lg p-4
-           sm:left-auto sm:right-0;
+    @apply absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)]
+           bg-surface border border-stroke rounded-xl shadow-lg p-4 focus:outline-none;
+  }
+
+  .popover--left {
+    @apply left-0 right-auto;
   }
 
   .popover-header {

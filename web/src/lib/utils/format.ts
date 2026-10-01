@@ -43,13 +43,43 @@ function slugify(value: string): string {
 }
 
 /**
+ * Latin letters that Unicode decomposition does not reduce to a base letter
+ * plus accent ("ø", "ł", "æ", "ß"), folded to their usual ASCII spelling.
+ * Keep in sync with scripts/generate-sitemap.mjs.
+ */
+const LETTER_FOLDS: Record<string, string> = {
+  ø: "o",
+  Ø: "O",
+  đ: "d",
+  Đ: "D",
+  ð: "d",
+  Ð: "D",
+  æ: "ae",
+  Æ: "AE",
+  œ: "oe",
+  Œ: "OE",
+  ł: "l",
+  Ł: "L",
+  ß: "ss",
+  þ: "th",
+  Þ: "TH",
+  ı: "i",
+};
+const LETTER_FOLD_PATTERN = /[øØđĐðÐæÆœŒłŁßþÞı]/g;
+
+/**
  * Turn a candidate name into a URL-safe slug. Accents are folded first
- * ("José Peña" -> "jose-pena"); names with no Latin letters fall back to a
- * stable hex encoding so the URL is never empty. Keep in sync with
- * scripts/generate-sitemap.mjs.
+ * ("José Peña" -> "jose-pena", "Søren Łukasz" -> "soren-lukasz"); names with
+ * no Latin letters fall back to a stable hex encoding so the URL is never
+ * empty. Keep in sync with scripts/generate-sitemap.mjs.
  */
 export function candidateSlug(name: string): string {
-  const folded = slugify(name.normalize("NFD").replace(/\p{M}/gu, ""));
+  const folded = slugify(
+    name
+      .replace(LETTER_FOLD_PATTERN, (ch) => LETTER_FOLDS[ch] ?? ch)
+      .normalize("NFD")
+      .replace(/\p{M}/gu, ""),
+  );
   if (folded) return folded;
   const hex = Array.from(name.trim())
     .map((ch) => ch.codePointAt(0)!.toString(16))

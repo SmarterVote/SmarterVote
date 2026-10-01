@@ -65,9 +65,9 @@
             class="text-xs px-3 py-1.5 rounded-full font-bold transition-all border
             {filterParty === pill.id
               ? pill.id === 'Democratic'
-                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-700 dark:border-blue-700'
                 : pill.id === 'Republican'
-                  ? 'bg-red-600 text-white border-red-600 dark:bg-red-500 dark:border-red-500'
+                  ? 'bg-red-600 text-white border-red-600 dark:bg-red-700 dark:border-red-700'
                   : 'bg-content text-surface border-content'
               : 'bg-surface border-stroke hover:bg-surface-alt/50 text-content-muted'}"
             aria-pressed={filterParty === pill.id}

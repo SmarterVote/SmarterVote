@@ -192,8 +192,10 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
 
 export function probability(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
-  if (value >= 1) return ">99%";
-  if (value <= 0) return "<1%";
+  // Clamp before rounding: 0.996 must read ">99%", never "100%" (no race is a
+  // certainty), and 0.004 must read "<1%", never "0%".
+  if (value >= 0.995) return ">99%";
+  if (value < 0.005) return "<1%";
   return `${Math.round(value * 100)}%`;
 }
 
@@ -203,16 +205,55 @@ export function probabilityOneDecimal(value?: number | null): string {
 }
 
 /**
- * Chamber/control probability for display. One decimal, so complementary
- * values (72.5% / 27.5%) sum to 100 and match the model narrative, which
- * quotes control odds to one decimal place. Whole-percent rounding of each
- * side independently can show 73% / 28%.
+ * A single chamber/control probability for display, to one decimal place so it
+ * matches the model narrative, which quotes control odds to one decimal.
+ *
+ * Do not format the halves of a complementary set (D / R control) one at a
+ * time with this: each side rounds independently, so 0.25% / 99.75% shows as
+ * 0.3% / 99.8%. Use {@link controlProbabilities}, which derives the last value
+ * as the complement of the others.
  */
 export function controlProbability(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
   if (value >= 0.9995) return ">99.9%";
   if (value <= 0.0005) return "<0.1%";
   return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatTenths(tenths: number): string {
+  if (tenths <= 0) return "<0.1%";
+  if (tenths >= 1000) return ">99.9%";
+  return `${(tenths / 10).toFixed(1)}%`;
+}
+
+/**
+ * Format a set of probabilities that together cover every outcome (D / R
+ * control, or D / split / R) so the displayed values always add up to 100%.
+ *
+ * Every value but the last is rounded to one decimal; the last is shown as
+ * 100 − (the sum of the displayed others). If the values do not actually sum
+ * to 1 (missing or partial data) each is formatted on its own instead, since a
+ * complement would then invent a number.
+ */
+export function controlProbabilities(
+  values: readonly (number | null | undefined)[],
+): string[] {
+  const numbers = values.map((value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : null,
+  );
+  const total = numbers.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  if (
+    numbers.length < 2 ||
+    numbers.some((value) => value === null) ||
+    Math.abs(total - 1) > 0.002
+  ) {
+    return numbers.map((value) => controlProbability(value));
+  }
+  const tenths = (numbers as number[])
+    .slice(0, -1)
+    .map((value) => Math.round(value * 1000));
+  const last = 1000 - tenths.reduce((sum, value) => sum + value, 0);
+  return [...tenths, last].map(formatTenths);
 }
 
 export function marketSignalTarget(signal: {
@@ -347,7 +388,7 @@ export function buildSeatOutcomeChart(
 /** Returns a URL's hostname (without a leading "www.") for compact source display. */
 export function getHostname(urlString: string): string {
   try {
-    return new URL(urlString).hostname.replace("www.", "");
+    return new URL(urlString).hostname.replace(/^www\./, "");
   } catch {
     return "Source Link";
   }

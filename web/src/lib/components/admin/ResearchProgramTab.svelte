@@ -63,6 +63,9 @@
   let blocker = "";
   let selectedEventKey = "";
   let discoveryReviewed = false;
+  /** Input values as first shown, so unchanged timestamps are sent verbatim. */
+  let initialFirstCheckedAt = "";
+  let initialSecondCheckedAt = "";
 
   $: trafficByRace = aggregateTraffic(traffic?.top_pages ?? []);
   $: states = [
@@ -154,6 +157,8 @@
     officialResultUrl = checkpoint?.official_result_url ?? "";
     firstCheckedAt = isoToLocalInput(checkpoint?.first_checked_at);
     secondCheckedAt = isoToLocalInput(checkpoint?.second_checked_at);
+    initialFirstCheckedAt = firstCheckedAt;
+    initialSecondCheckedAt = secondCheckedAt;
     advancingNames = checkpoint?.advancing_names?.join(", ") ?? "";
     blocker = checkpoint?.blocker ?? "";
     discoveryReviewed = Boolean(
@@ -203,8 +208,18 @@
         (choice) => choice.key === selectedEventKey,
       );
       payload.official_result_url = officialResultUrl.trim();
-      payload.first_checked_at = localInputToIso(firstCheckedAt);
-      payload.second_checked_at = localInputToIso(secondCheckedAt);
+      // datetime-local has minute precision and DST-ambiguous wall times, so
+      // only a timestamp the operator actually edited is re-derived; an
+      // untouched one keeps its stored value (seconds and offset intact).
+      payload.first_checked_at =
+        firstCheckedAt === initialFirstCheckedAt && existing?.first_checked_at
+          ? existing.first_checked_at
+          : localInputToIso(firstCheckedAt);
+      payload.second_checked_at =
+        secondCheckedAt === initialSecondCheckedAt &&
+        existing?.second_checked_at
+          ? existing.second_checked_at
+          : localInputToIso(secondCheckedAt);
       payload.advancing_names = advancingNames
         .split(",")
         .map((name) => name.trim())
@@ -214,6 +229,9 @@
       if (discoveryReviewed && existing?.result_fingerprint) {
         payload.last_reviewed_discovery_fingerprint =
           existing.result_fingerprint;
+      } else if (!discoveryReviewed) {
+        // Unchecking must withdraw the review, not carry it forward.
+        delete payload.last_reviewed_discovery_fingerprint;
       }
     }
     for (const key of Object.keys(payload) as (keyof typeof payload)[]) {

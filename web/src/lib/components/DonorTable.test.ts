@@ -44,4 +44,18 @@ describe("DonorTable", () => {
     expect(getByText("example.com")).toBeTruthy();
     expect(container.querySelectorAll("a")).toHaveLength(2);
   });
+
+  it("uses the shared source-link style with an icon, not a text arrow", () => {
+    const { container } = render(DonorTable, {
+      donorSummary: "Summary.",
+      donorSourceUrl: "https://www.fec.gov/data/candidate/H0ALICE/",
+    });
+
+    const link = container.querySelector("a")!;
+    expect(link.className).toContain("source-link-btn");
+    expect(link.className).not.toContain("donor-source-btn");
+    expect(link.textContent).not.toContain("->");
+    expect(link.querySelector(".ui-icon--external")).not.toBeNull();
+    expect(link.textContent).toContain("(opens in a new tab)");
+  });
 });

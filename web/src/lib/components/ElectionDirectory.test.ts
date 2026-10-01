@@ -148,6 +148,30 @@ describe("ElectionDirectory rendering", () => {
     ).toBe("true");
   });
 
+  it("does not mount the map (or fetch its topology) on a narrow screen until requested", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const { getByRole, container } = renderDirectory();
+
+    await waitFor(() => expect(cards(container)).toHaveLength(1));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.querySelector(".map-container")).toBeNull();
+
+    await fireEvent.click(
+      getByRole("button", { name: "Show interactive map" }),
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/states-10m.json"),
+    );
+  });
+
   // PAGE_SIZE is 24; anything beyond that waits for the load-more control.
   it("shows at most one page of races initially", async () => {
     const many = Array.from({ length: 30 }, (_, i) =>
@@ -538,6 +562,17 @@ describe("ElectionDirectory filter persistence", () => {
     navigateTo(`${ROUTE}?state=Kansas&office=Senate`);
     await waitFor(() => expect(cards(container)).toHaveLength(1));
     expect(cards(container)[0].getAttribute("href")).toBe("/races/ks/");
+  });
+
+  it("canonicalizes a postal-code or lowercase state from a shared link", async () => {
+    const { container } = renderDirectory(mixed);
+    for (const state of ["KS", "kansas"]) {
+      navigateTo(`${ROUTE}?state=${state}`);
+      await waitFor(() => expect(cards(container)).toHaveLength(1));
+      expect(cards(container)[0].getAttribute("href")).toBe("/races/ks/");
+      navigateTo(ROUTE);
+      await waitFor(() => expect(cards(container)).toHaveLength(3));
+    }
   });
 
   it("keeps the selected state in the picker when search no longer matches it", async () => {

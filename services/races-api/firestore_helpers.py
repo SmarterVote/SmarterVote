@@ -82,3 +82,112 @@ def _fs_build_published_catalog_fields(race_id: str, race_data: Dict[str, Any]) 
     fields.update(build_versioned_catalog_fields("published", race_data))
     fields["published_at"] = race_data.get("updated_utc")
     return fields
+
+
+# ---------------------------------------------------------------------------
+# Conditional (read-then-write) updates
+# ---------------------------------------------------------------------------
+
+_ACTIVE_RACE_STATUSES = ("queued", "running")
+
+
+def _update_if_unchanged(db: Any, doc_ref: Any, snapshot: Any, fields: Dict[str, Any]) -> bool:
+    """Apply ``fields`` only if the document has not changed since ``snapshot``.
+
+    Uses Firestore's ``last_update_time`` precondition so a concurrent writer
+    (the worker finishing a run, another admin click) is never silently
+    overwritten by a decision made on stale data. Returns False when the
+    precondition fails (or the document vanished) so the caller can re-read.
+    """
+    from google.api_core import exceptions as gexc  # type: ignore
+
+    update_time = getattr(snapshot, "update_time", None)
+    try:
+        if update_time is None:
+            doc_ref.update(fields)
+        else:
+            doc_ref.update(fields, option=db.write_option(last_update_time=update_time))
+    except (gexc.FailedPrecondition, gexc.NotFound):
+        return False
+    return True
+
+
+def _update_with_retry(
+    db: Any,
+    doc_ref: Any,
+    build_fields: Any,
+    snapshot: Any = None,
+    attempts: int = 3,
+) -> tuple[str, Dict[str, Any] | None]:
+    """Read-decide-write loop guarded by an update-time precondition.
+
+    ``build_fields(data)`` returns the fields to write, or None when the
+    current document state no longer warrants a write. Returns
+    ``(outcome, data)`` where outcome is ``updated``, ``skipped``, ``missing``
+    or ``conflict`` (precondition kept failing) and data is the state the
+    decision was made on.
+    """
+    data: Dict[str, Any] | None = None
+    for _ in range(max(1, attempts)):
+        if snapshot is None:
+            snapshot = doc_ref.get()
+        if not getattr(snapshot, "exists", False):
+            return "missing", None
+        data = snapshot.to_dict() or {}
+        fields = build_fields(data)
+        if fields is None:
+            return "skipped", data
+        if _update_if_unchanged(db, doc_ref, snapshot, fields):
+            return "updated", data
+        snapshot = None
+    return "conflict", data
+
+
+def _settled_race_status(race_data: Dict[str, Any], default: str) -> str:
+    """Status a race returns to when its active run stops without finishing.
+
+    Mirrors ``_self_heal_stale_active_race``: a race that still has a published
+    or draft copy goes back to that state rather than looking empty.
+    """
+    if race_data.get("published_at"):
+        return "published"
+    if race_data.get("draft_updated_at"):
+        return "draft"
+    return default
+
+
+def _settle_race_after_run_stop(db: Any, race_id: str, run_id: str | None, default_status: str) -> str:
+    """Release a race's active status after its run was cancelled.
+
+    Only touches the race while it is still queued/running for ``run_id`` (or
+    has no run pointer), so cancelling a superseded run never clobbers a newer
+    run or a finished race. Returns the outcome from ``_update_with_retry``.
+    """
+    try:
+        from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
+    except Exception:  # pragma: no cover - library always present in deploys
+        SERVER_TIMESTAMP = None
+
+    def build(race_data: Dict[str, Any]) -> Dict[str, Any] | None:
+        if race_data.get("status") not in _ACTIVE_RACE_STATUSES:
+            return None
+        current = race_data.get("current_run_id")
+        if run_id and current and str(current) != str(run_id):
+            return None
+        fields: Dict[str, Any] = {
+            "status": _settled_race_status(race_data, default_status),
+            "current_run_id": None,
+        }
+        if SERVER_TIMESTAMP is not None:
+            fields["updated_at"] = SERVER_TIMESTAMP
+        return fields
+
+    race_ref = db.collection(FIRESTORE_RACES_COLLECTION).document(str(race_id))
+    try:
+        outcome, _ = _update_with_retry(db, race_ref, build)
+    except Exception as exc:
+        logging.warning("Firestore race settle %s failed: %s", race_id, exc)
+        return "error"
+    if outcome == "conflict":
+        logging.warning("Race %s changed concurrently while settling cancelled run %s", race_id, run_id)
+    return outcome

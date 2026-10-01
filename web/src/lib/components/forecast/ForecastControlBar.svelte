@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { ForecastTab } from "$lib/utils/forecast";
-  import { controlProbability } from "$lib/utils/forecastPresentation";
+  import {
+    controlProbabilities,
+    controlProbability,
+  } from "$lib/utils/forecastPresentation";
 
   export let activeTab: ForecastTab;
   export let outcomeProbabilities: Record<string, number> | undefined;
@@ -66,16 +69,18 @@
         text: "text-red-700 dark:text-red-300",
       },
     ]}
+    {@const shown = controlProbabilities(segments.map((s) => s.value))}
+    <!-- `shown` is formatted as one set so the values always add up to 100%. -->
     <div class="space-y-3">
       <!-- Values sit above the bar rather than inside it, so a small segment
            never has to fit a label it cannot hold on a phone. -->
       <div
         class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm font-bold tabular-nums"
       >
-        {#each segments as segment (segment.key)}
+        {#each segments as segment, index (segment.key)}
           <span class={segment.text}>
             {segment.label}
-            {controlProbability(segment.value)}
+            {shown[index]}
           </span>
         {/each}
       </div>
@@ -83,20 +88,15 @@
         class="h-3 rounded-full overflow-hidden bg-surface-alt flex"
         role="img"
         aria-label={segments
-          .map(
-            (segment) =>
-              `${segment.label} ${controlProbability(segment.value)}`,
-          )
+          .map((segment, index) => `${segment.label} ${shown[index]}`)
           .join(", ")}
       >
-        {#each segments as segment (segment.key)}
+        {#each segments as segment, index (segment.key)}
           {#if segment.value > 0}
             <div
               class="{segment.bar} transition-all duration-500"
               style="width: {segment.value * 100}%"
-              title="{segment.label} control probability: {controlProbability(
-                segment.value,
-              )}"
+              title="{segment.label} control probability: {shown[index]}"
             ></div>
           {/if}
         {/each}

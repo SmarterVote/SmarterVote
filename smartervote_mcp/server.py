@@ -1430,8 +1430,26 @@ async def restore_race_version(race_id: str, filename: str) -> Dict[str, Any]:
 
 
 @mcp.tool(structured_output=False)
-async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run or delete a finished run record."""
+async def cancel_run(run_id: str) -> Dict[str, Any]:
+    """Cancel an active pipeline run. Never deletes anything.
+
+    Uses POST /runs/{run_id}/cancel, which returns 409 when the run already
+    finished, so a stale cancel can never destroy a completed run's history.
+    """
+    return await _client().post(f"/runs/{run_id}/cancel")
+
+
+@mcp.tool(structured_output=False)
+async def delete_finished_run(run_id: str) -> Dict[str, Any]:
+    """Permanently delete a FINISHED run record and its logs (destructive).
+
+    Refuses active runs; use `cancel_run` for those. Deleted run history and
+    logs cannot be recovered.
+    """
+    run = await _client().get(f"/runs/{run_id}")
+    status = str((run or {}).get("status") or "")
+    if status in {"pending", "running"}:
+        raise ValueError(f"Run {run_id} is still {status}; use cancel_run instead of deleting it")
     return await _client().delete(f"/runs/{run_id}")
 
 

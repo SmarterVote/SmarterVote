@@ -534,4 +534,63 @@ describe("RacesTab preview and render flow", () => {
     expect(options).toEqual(expect.arrayContaining(["cancelled", "idle"]));
     expect(getByText("cancelled").className).toContain("bg-orange-100");
   });
+
+  it("drops a chosen action the row no longer offers after a refresh", async () => {
+    rows = [makeRace({ race_id: "state-change", status: "queued" })];
+
+    const { component, getByLabelText, getByText } = await renderTab();
+    await component.refresh();
+    await waitFor(() => expect(getByText("state-change")).toBeTruthy());
+
+    const select = getByLabelText(
+      "Actions for state-change",
+    ) as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: "cancel" } });
+    const go = getByLabelText(
+      "Run selected action for state-change",
+    ) as HTMLButtonElement;
+    expect(go.disabled).toBe(false);
+
+    // The run finished between the choice and the click.
+    rows = [
+      makeRace({
+        race_id: "state-change",
+        status: "draft",
+        draft_exists: true,
+      }),
+    ];
+    await component.refresh();
+
+    const goAfter = () =>
+      getByLabelText(
+        "Run selected action for state-change",
+      ) as HTMLButtonElement;
+    await waitFor(() => expect(goAfter().disabled).toBe(true));
+    const selectAfter = getByLabelText(
+      "Actions for state-change",
+    ) as HTMLSelectElement;
+    expect(Array.from(selectAfter.options).map((o) => o.value)).not.toContain(
+      "cancel",
+    );
+    const callsBefore = mockFetchWithAuth.mock.calls.length;
+    await fireEvent.click(goAfter());
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(mockFetchWithAuth.mock.calls.length).toBe(callsBefore);
+  });
+
+  it("refuses to price full research when the candidate count is unknown", async () => {
+    rows = [makeRace({ race_id: "no-roster", candidate_count: 0 })];
+    confirmSpy.mockReturnValue(false);
+
+    const { component, getByLabelText, getByText } = await renderTab();
+    await component.refresh();
+    await waitFor(() => expect(getByText("no-roster")).toBeTruthy());
+
+    await chooseAction(getByLabelText, "no-roster", "run-full");
+
+    expect(confirmSpy.mock.calls[0][0]).toContain(
+      "unknown candidate count — verify roster first",
+    );
+    expect(confirmSpy.mock.calls[0][0]).not.toMatch(/Estimated cost: ~\$0\.20/);
+  });
 });

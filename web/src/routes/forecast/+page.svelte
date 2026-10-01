@@ -33,6 +33,7 @@
     buildSeatOutcomeChart,
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
+  import { canonicalStateName } from "$lib/utils/states";
 
   const tabs: { id: ForecastTab; label: string }[] = [
     { id: "house", label: "House" },
@@ -47,6 +48,10 @@
   let hydrated = false;
   onMount(() => {
     hydrated = true;
+    // app.html set this flag to hide the prerendered House view on a first
+    // load with another ?tab=. Hydration has now rendered the right tab, so
+    // drop it rather than leave a page-wide "hide" switch on <html>.
+    document.documentElement.removeAttribute("data-forecast-pending-tab");
   });
 
   $: races = ($page.data.races as RaceSummary[] | undefined) ?? [];
@@ -55,8 +60,13 @@
   $: activeTab = browser
     ? parseForecastTab($page.url.searchParams.get("tab"))
     : "house";
+  // A shared link may say `?state=TX` or `texas`; the map and race lists are
+  // keyed by the full name.
   $: selectedState = browser
-    ? $page.url.searchParams.get("state") || null
+    ? (() => {
+        const param = $page.url.searchParams.get("state")?.trim() || null;
+        return canonicalStateName(param) ?? param;
+      })()
     : null;
   $: aggregate = aggregateForecasts(races, activeTab);
 
@@ -337,6 +347,16 @@
      hide the prerendered House content until hydration renders the right tab. */
   :global(html[data-forecast-pending-tab]) .forecast-prerendered {
     visibility: hidden;
+    /* Safety net: if hydration never happens (a script error, a blocked
+       bundle), reveal the prerendered content anyway after a few seconds
+       rather than leaving the page blank. Hydration normally removes the
+       flag (onMount) long before this fires. */
+    animation: forecast-pending-reveal 0s linear 4s forwards;
+  }
+  @keyframes forecast-pending-reveal {
+    to {
+      visibility: visible;
+    }
   }
   /* :global() is required here: buttons/selects for this page now live inside
      child components (forecast/*.svelte), so a plain scoped selector would no

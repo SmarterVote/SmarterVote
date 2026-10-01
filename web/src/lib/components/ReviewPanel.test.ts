@@ -129,10 +129,10 @@ describe("ReviewPanel review filtering", () => {
 
 describe("ReviewPanel verdicts and scores", () => {
   it.each([
-    ["approved", "green"],
-    ["needs_revision", "yellow"],
-    ["flagged", "red"],
-  ])("colours the %s verdict with the %s ramp", async (verdict, hue) => {
+    ["approved", "review-verdict--approved"],
+    ["needs_revision", "review-verdict--needs_revision"],
+    ["flagged", "review-verdict--flagged"],
+  ])("styles the %s verdict with %s", async (verdict, hue) => {
     const { container } = await renderExpanded([
       makeReview({ verdict: verdict as AgentReview["verdict"] }),
     ]);
@@ -148,7 +148,7 @@ describe("ReviewPanel verdicts and scores", () => {
     ]);
 
     expect(container.querySelector(".review-verdict")?.className).toContain(
-      "bg-surface-alt",
+      "review-verdict--neutral",
     );
   });
 
@@ -223,20 +223,22 @@ describe("ReviewPanel flags", () => {
   });
 
   it.each([
-    ["error", "🔴"],
-    ["warning", "🟡"],
-    ["info", "🔵"],
-    ["anything-else", "🔵"],
-  ])("marks %s severity with %s", async (severity, icon) => {
+    ["error", "Error", "flag-severity--error"],
+    ["warning", "Warning", "flag-severity--warning"],
+    ["info", "Note", "flag-severity--info"],
+    ["anything-else", "Note", "flag-severity--info"],
+  ])("labels %s severity as %s", async (severity, label, cls) => {
     const { container } = await renderExpanded([
       makeReview({
         flags: [makeFlag({ severity: severity as ReviewFlag["severity"] })],
       }),
     ]);
 
-    expect(container.querySelector(".flag-severity")?.textContent).toContain(
-      icon,
-    );
+    const badge = container.querySelector(".flag-severity");
+    expect(badge?.textContent?.trim()).toBe(label);
+    expect(badge?.className).toContain(cls);
+    // Text labels, not emoji, so screen readers and forced colors work.
+    expect(container.textContent).not.toMatch(/[🔴🟡🔵💡]/u);
   });
 
   it("renders the flagged field and concern", async () => {

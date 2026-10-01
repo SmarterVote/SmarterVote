@@ -64,7 +64,8 @@ async def test_smartervote_mcp_exposes_lean_tool_surface():
         "list_race_versions",
         "get_race_version",
         "restore_race_version",
-        "cancel_or_delete_run",
+        "cancel_run",
+        "delete_finished_run",
         "get_pipeline_metrics",
         "get_pipeline_metrics_summary",
         "get_gcp_pipeline_costs",
@@ -1353,3 +1354,38 @@ def test_contains_placeholder_only_matches_a_whole_value():
 
     assert not _contains_placeholder({"stance": "Supports a draft treaty on emissions"})
     assert not _contains_placeholder({"summary": "Chaired the committee's XXXI review"})
+
+
+@pytest.mark.asyncio
+async def test_cancel_run_uses_non_destructive_cancel_endpoint(monkeypatch):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = type("Client", (), {"post": AsyncMock(return_value={"message": "Run cancelled"}), "delete": AsyncMock()})()
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    await server.cancel_run("run-1")
+
+    client.post.assert_awaited_once_with("/runs/run-1/cancel")
+    client.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_finished_run_refuses_active_runs(monkeypatch):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = type("Client", (), {"get": AsyncMock(return_value={"status": "running"}), "delete": AsyncMock()})()
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    with pytest.raises(ValueError, match="cancel_run"):
+        await server.delete_finished_run("run-1")
+    client.delete.assert_not_awaited()
+
+    client.get.return_value = {"status": "completed"}
+    await server.delete_finished_run("run-1")
+    client.delete.assert_awaited_once_with("/runs/run-1")
