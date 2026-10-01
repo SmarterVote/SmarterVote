@@ -3,11 +3,20 @@
 
   export let reviews: AgentReview[] = [];
 
-  $: displayReviews = (reviews || []).filter(
-    (r) =>
-      r.model !== "automated-link-validator" &&
-      r.model !== "automated-profile-quality",
-  );
+  // Current reviews first: a stale review judged a roster the race has since
+  // replaced, so it must never read as a current approval.
+  $: displayReviews = (reviews || [])
+    .filter(
+      (r) =>
+        r.model !== "automated-link-validator" &&
+        r.model !== "automated-profile-quality",
+    )
+    .sort((a, b) => Number(isStale(a)) - Number(isStale(b)));
+  $: staleCount = displayReviews.filter(isStale).length;
+
+  function isStale(review: AgentReview): boolean {
+    return review.stale === true;
+  }
 
   let collapsed = true;
 
@@ -38,6 +47,7 @@
 
 <div id="ai-review" class="review-panel">
   <button
+    type="button"
     class="review-title"
     on:click={() => (collapsed = !collapsed)}
     aria-expanded={!collapsed}
@@ -60,7 +70,7 @@
       <span class="review-count"
         >{displayReviews.length} review{displayReviews.length !== 1
           ? "s"
-          : ""}</span
+          : ""}{staleCount > 0 ? ` · ${staleCount} stale` : ""}</span
       >
     {/if}
     <svg
@@ -87,18 +97,34 @@
     {:else}
       <div class="review-cards">
         {#each displayReviews as review}
-          <div class="review-card">
+          <div class="review-card" class:review-card-stale={isStale(review)}>
             <div class="review-header">
               <span class="review-model">{review.model}</span>
               <div class="review-header-right">
                 {#if review.score != null}
                   <span class="review-score">{review.score}/100</span>
                 {/if}
-                <span class="review-verdict {verdictColor(review.verdict)}">
-                  {review.verdict.replace("_", " ")}
-                </span>
+                {#if isStale(review)}
+                  <span
+                    class="review-verdict review-verdict-stale"
+                    title="Reviewed an earlier roster; not a current verdict"
+                  >
+                    Stale · was {review.verdict.replace("_", " ")}
+                  </span>
+                {:else}
+                  <span class="review-verdict {verdictColor(review.verdict)}">
+                    {review.verdict.replace("_", " ")}
+                  </span>
+                {/if}
               </div>
             </div>
+            {#if isStale(review)}
+              <p class="review-stale-note" role="note">
+                This review no longer applies to the current candidate roster{review.stale_reason
+                  ? `: ${review.stale_reason}`
+                  : "."}
+              </p>
+            {/if}
             {#if review.summary}
               <p class="review-summary">{review.summary}</p>
             {/if}
@@ -128,7 +154,7 @@
                   {/each}
                 </ul>
               </details>
-            {:else}
+            {:else if !isStale(review)}
               <p class="review-all-clear">No issues flagged in this review.</p>
             {/if}
             <span class="review-date">
@@ -170,6 +196,18 @@
 
   .review-card {
     @apply bg-surface rounded-lg border border-stroke p-4;
+  }
+
+  .review-card-stale {
+    @apply border-dashed opacity-80;
+  }
+
+  .review-verdict-stale {
+    @apply bg-surface-alt text-content-subtle border border-stroke normal-case;
+  }
+
+  .review-stale-note {
+    @apply text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 rounded px-2 py-1 mb-2;
   }
 
   .review-header {

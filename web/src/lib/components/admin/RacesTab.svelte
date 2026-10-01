@@ -19,6 +19,15 @@
   import { PipelineApiService } from "$lib/services/pipelineApiService";
   import type { RaceRecord, RaceStatusType } from "$lib/types";
   import { racesApiBase } from "$lib/config/api";
+  import {
+    FULL_RESEARCH_STEPS,
+    MAX_BATCH_QUEUE,
+    REFRESH_STEPS,
+    fullResearchCostEstimate,
+    fullResearchRunOptions,
+    refreshCostEstimate,
+    refreshRunOptions,
+  } from "./pipelinePresets";
 
   const API_BASE = racesApiBase();
   const apiService = new PipelineApiService(API_BASE);
@@ -26,6 +35,10 @@
   let rows: RaceRecord[] = [];
   let loading = true;
   let error = "";
+  /** Background refresh failure while earlier data is still shown. */
+  let staleError = "";
+  let loadSeq = 0;
+  let rowActionChoice: Record<string, string> = {};
   let globalFilter = "";
   let statusFilter: RaceStatusType | "all" = "all";
   let sorting: SortingState = [{ id: "draft_updated_at", desc: true }];
@@ -264,11 +277,41 @@
 
   const table = createSvelteTable(options);
 
-  $: filteredCount = $table.getFilteredRowModel().rows.length;
+  $: visibleRows = $table.getFilteredRowModel().rows;
+  $: filteredCount = visibleRows.length;
+  $: visibleRaceIds = new Set(visibleRows.map((row) => row.id));
+  // Batch actions act only on rows the operator can see: drop selections that
+  // a filter (or a refresh) has hidden.
+  $: pruneHiddenSelection(visibleRaceIds);
   $: selectedRaceIds = Object.entries(rowSelection)
-    .filter(([, selected]) => selected)
+    .filter(([raceId, selected]) => selected && visibleRaceIds.has(raceId))
     .map(([raceId]) => raceId);
   $: selectedCount = selectedRaceIds.length;
+  $: footerCounts = countStatuses(rows);
+
+  function pruneHiddenSelection(visible: Set<string>) {
+    const selection = rowSelection as Record<string, boolean>;
+    const kept = Object.fromEntries(
+      Object.entries(selection).filter(
+        ([raceId, selected]) => selected && visible.has(raceId),
+      ),
+    );
+    if (Object.keys(kept).length !== Object.keys(selection).length) {
+      rowSelection = kept;
+      updateTableState();
+    }
+  }
+
+  function countStatuses(list: RaceRecord[]) {
+    const counts = { published: 0, draft: 0, active: 0, discoveryOnly: 0 };
+    for (const r of list) {
+      if (r.status === "published") counts.published++;
+      else if (r.status === "draft") counts.draft++;
+      else if (r.status === "queued" || r.status === "running") counts.active++;
+      if (isDiscoveryOnly(r)) counts.discoveryOnly++;
+    }
+    return counts;
+  }
 
   function updateTableState() {
     options.update((old) => ({
@@ -320,15 +363,24 @@
   }
 
   async function loadData() {
+    const seq = ++loadSeq;
     try {
+      const next = await apiService.listRaces();
+      // An older request finishing after a newer one must not win.
+      if (seq !== loadSeq) return;
+      rows = next;
       error = "";
-      rows = await apiService.listRaces();
+      staleError = "";
       computeFilteredRows();
       updateTableState();
     } catch (e) {
-      error = String(e);
+      if (seq !== loadSeq) return;
+      // Keep the last good table on a failed background poll; only show the
+      // full error card when there is nothing to show.
+      if (rows.length) staleError = String(e);
+      else error = String(e);
     } finally {
-      loading = false;
+      if (seq === loadSeq) loading = false;
     }
   }
 
@@ -420,12 +472,25 @@
     }
   }
 
-  async function handleRun(raceId: string) {
-    if (!confirm(`Queue pipeline run for race ${raceId}?`)) return;
+  async function handleRun(row: RaceRecord, mode: "refresh" | "full") {
+    const raceId = row.race_id;
+    const steps = mode === "refresh" ? REFRESH_STEPS : FULL_RESEARCH_STEPS;
+    const estimate =
+      mode === "refresh"
+        ? refreshCostEstimate(1)
+        : fullResearchCostEstimate(row.candidate_count ?? 0);
+    const prompt =
+      mode === "refresh"
+        ? `Queue a lightweight refresh for ${raceId}?\n\nSteps: ${steps.join(", ")}\nModel profile: default\nEstimated cost: ${estimate}`
+        : `Queue FULL issue research for ${raceId}?\n\nThis is roughly 5-10x the cost of a refresh. Verify the roster first.\n\nSteps: ${steps.join(", ")}\nModel profile: default · baseline: latest draft\nEstimated cost: ${estimate}`;
+    if (!confirm(prompt)) return;
     actionNotice = null;
     rowActionLoading = { ...rowActionLoading, [raceId]: "running" };
     try {
-      const res = await apiService.queueRaces([raceId]);
+      const res = await apiService.queueRaces(
+        [raceId],
+        mode === "refresh" ? refreshRunOptions() : fullResearchRunOptions(),
+      );
       if (res.errors.length > 0 || res.added.length === 0) {
         const detail = res.errors.length
           ? formatActionErrors(res.errors)
@@ -433,7 +498,12 @@
         setActionNotice("error", `Queue failed for ${raceId}: ${detail}`);
         return;
       }
-      setActionNotice("success", `${raceId} was added to the pipeline queue.`);
+      setActionNotice(
+        "success",
+        `${raceId} was added to the pipeline queue (${
+          mode === "refresh" ? "refresh" : "full research"
+        }).`,
+      );
       await refresh(false);
     } catch (e) {
       setActionNotice(
@@ -514,17 +584,28 @@
     }
   }
 
-  function handleRowAction(event: Event, row: RaceRecord) {
-    const select = event.currentTarget as HTMLSelectElement;
-    const action = select.value;
-    select.value = "";
+  /**
+   * Row actions run only from the explicit "Go" button — never on <select>
+   * change, which fires on arrow-key navigation in some browsers.
+   */
+  function handleRowAction(row: RaceRecord) {
+    const action = rowActionChoice[row.race_id] ?? "";
+    if (!action) return;
+    rowActionChoice = { ...rowActionChoice, [row.race_id]: "" };
 
     if (action === "publish") void handlePublish(row.race_id);
     if (action === "unpublish") void handleUnpublish(row.race_id);
-    if (action === "run") void handleRun(row.race_id);
+    if (action === "run") void handleRun(row, "refresh");
+    if (action === "run-full") void handleRun(row, "full");
     if (action === "cancel") void handleCancel(row.race_id);
     if (action === "recheck") void handleRecheck(row.race_id);
     if (action === "delete") void handleDelete(row.race_id);
+  }
+
+  function listIds(ids: string[]): string {
+    const shown = ids.slice(0, 25);
+    const more = ids.length - shown.length;
+    return shown.join("\n") + (more > 0 ? `\n…and ${more} more` : "");
   }
 
   // Batch Action Handlers
@@ -533,7 +614,7 @@
     if (selectedIds.length === 0) return;
     if (
       !confirm(
-        `Are you sure you want to publish the ${selectedIds.length} selected race(s)?`,
+        `Publish the ${selectedIds.length} selected race(s)?\n\n${listIds(selectedIds)}`,
       )
     )
       return;
@@ -566,16 +647,26 @@
   async function handleBatchRun() {
     const selectedIds = selectedRaceIds;
     if (selectedIds.length === 0) return;
+    if (selectedIds.length > MAX_BATCH_QUEUE) {
+      setActionNotice(
+        "error",
+        `Batch refresh is capped at ${MAX_BATCH_QUEUE} races per action (${selectedIds.length} selected). Queue a small batch, verify the results, then continue.`,
+      );
+      return;
+    }
     if (
       !confirm(
-        `Are you sure you want to run the pipeline for the ${selectedIds.length} selected race(s)?`,
+        `Queue a lightweight refresh for ${selectedIds.length} race(s)?\n\n` +
+          `Steps: ${REFRESH_STEPS.join(", ")}\nModel profile: default\n` +
+          `Estimated cost: ${refreshCostEstimate(selectedIds.length)}\n\n` +
+          listIds(selectedIds),
       )
     )
       return;
     batchActionLoading = true;
     actionNotice = null;
     try {
-      const res = await apiService.queueRaces(selectedIds);
+      const res = await apiService.queueRaces(selectedIds, refreshRunOptions());
       if (res.errors.length > 0) {
         setActionNotice(
           "error",
@@ -605,7 +696,7 @@
     if (selectedIds.length === 0) return;
     if (
       !confirm(
-        `WARNING: Are you sure you want to permanently delete the ${selectedIds.length} selected race(s)? This will delete firestore records and GCS drafts/published files.`,
+        `WARNING: Permanently delete the ${selectedIds.length} selected race(s)? This deletes Firestore records and GCS drafts/published files.\n\n${listIds(selectedIds)}`,
       )
     )
       return;
@@ -656,6 +747,10 @@
         return "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200";
       case "failed":
         return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200";
+      case "cancelled":
+        return "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200";
+      case "idle":
+        return "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200";
       default:
         return "bg-surface-alt text-content-muted";
     }
@@ -696,6 +791,8 @@
     { value: "queued", label: "Queued" },
     { value: "running", label: "Running" },
     { value: "failed", label: "Failed" },
+    { value: "cancelled", label: "Cancelled" },
+    { value: "idle", label: "Idle" },
     { value: "empty", label: "Empty" },
   ];
 
@@ -708,6 +805,7 @@
     <div class="flex items-center gap-2 flex-1 min-w-0">
       <input
         type="search"
+        aria-label="Search visible races"
         value={globalFilter}
         on:input={handleGlobalFilterInput}
         placeholder="Search visible races..."
@@ -810,6 +908,20 @@
     </div>
   {/if}
 
+  {#if staleError && !error}
+    <div
+      class="flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+      role="status"
+    >
+      <span>Showing the last loaded data; refresh failed: {staleError}</span>
+      <button
+        type="button"
+        class="shrink-0 font-semibold underline"
+        on:click={() => loadData()}>Retry</button
+      >
+    </div>
+  {/if}
+
   {#if error}
     <div
       class="card p-6 flex flex-col items-center justify-center text-center space-y-3"
@@ -849,6 +961,7 @@
             <tr>
               {#each $table.getHeaderGroups()[0].headers as header}
                 <th
+                  scope="col"
                   class="px-4 py-3 text-left font-semibold text-content-muted align-middle whitespace-nowrap"
                 >
                   {#if !header.isPlaceholder}
@@ -860,7 +973,7 @@
                           !$table.getIsAllPageRowsSelected()}
                         on:change={$table.getToggleAllPageRowsSelectedHandler()}
                         class="rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
-                        aria-label="Select all rows"
+                        aria-label="Select all visible rows"
                       />
                     {:else}
                       <button
@@ -927,7 +1040,7 @@
                         disabled={!tableRow.getCanSelect()}
                         on:change={tableRow.getToggleSelectedHandler()}
                         class="rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
-                        aria-label="Select row"
+                        aria-label="Select row {row.race_id}"
                       />
                     {:else if cell.column.id === "race_id"}
                       <div
@@ -1071,11 +1184,10 @@
                           {hasDraft(row) ? "View Draft" : "View Page"}
                         </button>
                         <select
-                          value=""
-                          class="w-[104px] rounded border border-stroke bg-surface px-2 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-wait disabled:opacity-50"
+                          bind:value={rowActionChoice[row.race_id]}
+                          class="w-[150px] rounded border border-stroke bg-surface px-2 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-wait disabled:opacity-50"
                           disabled={!!rowActionLoading[row.race_id]}
                           aria-label="Actions for {row.race_id}"
-                          on:change={(event) => handleRowAction(event, row)}
                         >
                           <option value="">
                             {rowActionLoading[row.race_id]
@@ -1092,10 +1204,23 @@
                             <option value="cancel">Cancel run</option>
                             <option value="recheck">Recheck status</option>
                           {:else}
-                            <option value="run">Queue pipeline</option>
+                            <option value="run">Queue refresh (~$0.09)</option>
+                            <option value="run-full"
+                              >Queue full research…</option
+                            >
                           {/if}
                           <option value="delete">Delete race</option>
                         </select>
+                        <button
+                          type="button"
+                          class="rounded border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={!!rowActionLoading[row.race_id] ||
+                            !rowActionChoice[row.race_id]}
+                          aria-label="Run selected action for {row.race_id}"
+                          on:click={() => handleRowAction(row)}
+                        >
+                          Go
+                        </button>
                       </div>
                     {:else}
                       {cell.getValue() ?? ""}
@@ -1118,13 +1243,12 @@
             · filtered by {statusFilter}{/if}
         </span>
         <span>
-          {rows.filter((r) => r.status === "published").length} published ·
-          {rows.filter((r) => r.status === "draft").length} draft ·
-          {rows.filter((r) => r.status === "queued" || r.status === "running")
-            .length} active
-          {#if rows.filter(isDiscoveryOnly).length > 0}
+          {footerCounts.published} published ·
+          {footerCounts.draft} draft ·
+          {footerCounts.active} active
+          {#if footerCounts.discoveryOnly > 0}
             · <span class="text-violet-600 dark:text-violet-400"
-              >{rows.filter(isDiscoveryOnly).length} discovery-only</span
+              >{footerCounts.discoveryOnly} discovery-only</span
             >
           {/if}
         </span>
@@ -1136,6 +1260,8 @@
 <!-- Floating Batch Toolbar -->
 {#if selectedCount > 0}
   <div
+    role="region"
+    aria-label="Batch actions"
     class="fixed bottom-4 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-xl border border-stroke bg-surface px-4 py-3 shadow-2xl"
   >
     <span class="text-sm font-medium text-content">
@@ -1155,9 +1281,12 @@
         type="button"
         class="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-full font-medium transition-colors disabled:opacity-50"
         disabled={batchActionLoading}
+        title="Queue a lightweight refresh ({REFRESH_STEPS.join(
+          ', ',
+        )}) for up to {MAX_BATCH_QUEUE} races"
         on:click={handleBatchRun}
       >
-        Batch Run
+        Batch Refresh
       </button>
       <button
         type="button"

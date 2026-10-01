@@ -601,6 +601,8 @@ export interface Artifact {
 }
 
 export interface LogEntry {
+  /** Firestore log document id; stable across polls, used to dedupe lines. */
+  id?: string;
   timestamp: string;
   level: string;
   message: string;
@@ -872,7 +874,12 @@ export type RaceStatusType =
   | "running"
   | "draft"
   | "published"
-  | "failed";
+  | "failed"
+  // Written by races-api when queued/running work is cancelled
+  // (routers/queue.py, routers/races_admin/records.py).
+  | "cancelled"
+  // Written when a pending queue item is cancelled before it started.
+  | "idle";
 
 export interface RaceRecord {
   race_id: string;

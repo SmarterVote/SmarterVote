@@ -261,7 +261,10 @@ describe("CostsTab cost arithmetic", () => {
     expect(container.textContent).not.toContain("$99.00");
   });
 
-  it("adds pipeline, search, and GCP spend into one figure", async () => {
+  // cost_usd/estimated_usd (and the server summary built from them) already
+  // include Serper at $0.001/call; adding a search estimate on top
+  // double-counted it.
+  it("adds pipeline and GCP spend without double-counting search", async () => {
     setup({
       windowSummary: { total_usd: 10 },
       records: [record({ serper_calls: 2000, cost_usd: 0 })],
@@ -269,8 +272,9 @@ describe("CostsTab cost arithmetic", () => {
     });
     const { container } = await renderLoaded();
 
-    // 10 pipeline + 2 search + 5 GCP = 17
-    await waitFor(() => expect(container.textContent).toContain("$17.00"));
+    // 10 pipeline (search included) + 5 GCP = 15
+    await waitFor(() => expect(container.textContent).toContain("$15.00"));
+    expect(container.textContent).not.toContain("$17.00");
   });
 
   it("omits GCP spend from the total when billing export is off", async () => {
@@ -281,6 +285,44 @@ describe("CostsTab cost arithmetic", () => {
     });
     const { container } = await renderLoaded();
 
-    await waitFor(() => expect(container.textContent).toContain("$12.00"));
+    await waitFor(() => expect(container.textContent).toContain("$10.00"));
+    expect(container.textContent).not.toContain("$12.00");
+  });
+
+  it("prefers the recorded search_cost_usd and reports Searlo calls", async () => {
+    setup({
+      records: [
+        record({
+          serper_calls: 10,
+          searlo_calls: 7,
+          search_cost_usd: 0.42,
+        }),
+      ],
+    });
+    const { container } = await renderLoaded();
+
+    await waitFor(() => expect(container.textContent).toContain("$0.42"));
+    expect(container.textContent).toMatch(/7\s*Searlo/);
+  });
+
+  it("flags when the record page does not cover the whole window", async () => {
+    const old = new Date(Date.now() - 2 * DAY_MS).toISOString();
+    setup({
+      records: Array.from({ length: 500 }, () => record({ timestamp: old })),
+    });
+    const { container } = await renderLoaded();
+
+    await waitFor(() =>
+      expect(container.textContent).toContain("only the latest 500"),
+    );
+  });
+
+  it("names the request that failed", async () => {
+    setup();
+    getPipelineMetrics.mockRejectedValue(new Error("metrics exploded"));
+    const { findByRole } = await renderLoaded();
+
+    const alert = await findByRole("alert");
+    expect(alert.textContent).toContain("Run records: metrics exploded");
   });
 });

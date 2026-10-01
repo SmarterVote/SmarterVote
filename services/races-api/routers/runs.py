@@ -436,9 +436,31 @@ def prune_runs() -> Dict[str, Any]:
     return {"message": f"Pruned {run_count} finished runs", "count": run_count}
 
 
-@router.delete("/runs/{run_id}", dependencies=[Depends(verify_token)])
-def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run or delete a finished one from Firestore."""
+def _cancel_active_run(db: Any, doc_ref: Any, run_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Mark an active run cancelled, release its queue lease, and settle its race record."""
+    doc_ref.update({"status": "cancelled"})
+    for queue_doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", run_id).limit(20).stream():
+        queue_data = queue_doc.to_dict() or {}
+        if queue_data.get("status") in ("pending", "running"):
+            queue_doc.reference.update(
+                {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
+            )
+    race_id = data.get("race_id")
+    if race_id:
+        race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(str(race_id)).get()
+        race_data = firestore_helpers._doc_to_plain(race_doc) or {}
+        if race_data.get("status") in ("queued", "running") and race_data.get("current_run_id") == run_id:
+            firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
+    return {"message": "Run cancelled", "run_id": run_id}
+
+
+@router.post("/runs/{run_id}/cancel", dependencies=[Depends(verify_token)])
+def cancel_run(run_id: str) -> Dict[str, Any]:
+    """Cancel an active run. Never deletes anything.
+
+    Returns 409 when the run is already finished so a stale "Cancel" button can
+    never destroy a completed run's history and logs.
+    """
     db = firestore_helpers._get_fs()
     doc_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
     doc = doc_ref.get()
@@ -446,34 +468,41 @@ def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Run not found")
     data = doc.to_dict() or {}
     status = data.get("status", "")
-    if status in ("pending", "running"):
-        doc_ref.update({"status": "cancelled"})
-        for queue_doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", run_id).limit(20).stream():
-            queue_data = queue_doc.to_dict() or {}
-            if queue_data.get("status") in ("pending", "running"):
-                queue_doc.reference.update(
-                    {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
-                )
-        race_id = data.get("race_id")
-        if race_id:
-            race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(str(race_id)).get()
-            race_data = firestore_helpers._doc_to_plain(race_doc) or {}
-            if race_data.get("status") in ("queued", "running") and race_data.get("current_run_id") == run_id:
-                firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
-        return {"message": "Run cancelled", "run_id": run_id}
-    else:
-        # Delete logs subcollection first
-        batch = db.batch()
-        op_count = 0
-        logs_ref = doc_ref.collection(FIRESTORE_RUN_LOGS_SUBCOLLECTION)
-        log_docs = list(logs_ref.stream())
-        for log_doc in log_docs:
-            batch.delete(log_doc.reference)
-            op_count += 1
-            if op_count >= 500:
-                batch.commit()
-                batch = db.batch()
-                op_count = 0
-        batch.delete(doc_ref)
-        batch.commit()
+    if status not in _ACTIVE_STATUSES:
+        raise HTTPException(status_code=409, detail=f"Run is not active (status: {status or 'unknown'})")
+    return _cancel_active_run(db, doc_ref, run_id, data)
+
+
+@router.delete("/runs/{run_id}", dependencies=[Depends(verify_token)])
+def cancel_or_delete_run(run_id: str, cancel_only: bool = False) -> Dict[str, Any]:
+    """Cancel an active run or delete a finished one from Firestore.
+
+    With ``cancel_only=true`` a finished run is left untouched and the request
+    fails with 409 instead of deleting the run and its logs.
+    """
+    db = firestore_helpers._get_fs()
+    doc_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Run not found")
+    data = doc.to_dict() or {}
+    status = data.get("status", "")
+    if status in _ACTIVE_STATUSES:
+        return _cancel_active_run(db, doc_ref, run_id, data)
+    if cancel_only:
+        raise HTTPException(status_code=409, detail=f"Run is not active (status: {status or 'unknown'})")
+    # Delete logs subcollection first
+    batch = db.batch()
+    op_count = 0
+    logs_ref = doc_ref.collection(FIRESTORE_RUN_LOGS_SUBCOLLECTION)
+    log_docs = list(logs_ref.stream())
+    for log_doc in log_docs:
+        batch.delete(log_doc.reference)
+        op_count += 1
+        if op_count >= 500:
+            batch.commit()
+            batch = db.batch()
+            op_count = 0
+    batch.delete(doc_ref)
+    batch.commit()
     return {"message": "Run deleted", "run_id": run_id}

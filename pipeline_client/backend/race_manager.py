@@ -38,6 +38,10 @@ class RaceStatus(str):
     DRAFT = "draft"
     PUBLISHED = "published"
     FAILED = "failed"
+    # Written by the races-api when a queued/running job is cancelled
+    # (routers/queue.py) and when a race record is reset to rest (records.py).
+    CANCELLED = "cancelled"
+    IDLE = "idle"
 
 
 class RaceRecord(BaseModel):
@@ -48,7 +52,7 @@ class RaceRecord(BaseModel):
     election_date: Optional[str] = None
 
     # Status
-    status: str = "empty"  # empty | queued | running | draft | published | failed
+    status: str = "empty"  # empty | queued | running | draft | published | failed | cancelled | idle
     published_at: Optional[str] = None
     draft_updated_at: Optional[str] = None
 

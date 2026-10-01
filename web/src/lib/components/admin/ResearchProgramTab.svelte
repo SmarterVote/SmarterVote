@@ -1,3 +1,31 @@
+<script lang="ts" context="module">
+  /**
+   * Checkpoints store UTC ISO timestamps; <input type="datetime-local"> wants
+   * local wall-clock "YYYY-MM-DDTHH:mm". Slicing the UTC string shifted every
+   * timestamp by the viewer's UTC offset on each save.
+   */
+  export function isoToLocalInput(iso?: string | null): string {
+    if (!iso) return "";
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+      `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    );
+  }
+
+  /** Parse a datetime-local value as local time and return UTC ISO. */
+  export function localInputToIso(value: string): string | undefined {
+    if (!value) return undefined;
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!match) return undefined;
+    const [, y, mo, d, h, mi] = match.map(Number);
+    const date = new Date(y, mo - 1, d, h, mi);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+  }
+</script>
+
 <script lang="ts">
   import { onMount } from "svelte";
   import { analyticsService } from "$lib/services/analyticsService";
@@ -24,6 +52,7 @@
   let selected: ResearchProgramRow | null = null;
   let saving = false;
   let notice = "";
+  let noticeType: "success" | "error" = "success";
 
   let resultState: ResearchResultState = "stabilizing";
   let operator = "";
@@ -123,8 +152,8 @@
     resultState = checkpoint?.result_state ?? "stabilizing";
     operator = checkpoint?.operator ?? "";
     officialResultUrl = checkpoint?.official_result_url ?? "";
-    firstCheckedAt = checkpoint?.first_checked_at?.slice(0, 16) ?? "";
-    secondCheckedAt = checkpoint?.second_checked_at?.slice(0, 16) ?? "";
+    firstCheckedAt = isoToLocalInput(checkpoint?.first_checked_at);
+    secondCheckedAt = isoToLocalInput(checkpoint?.second_checked_at);
     advancingNames = checkpoint?.advancing_names?.join(", ") ?? "";
     blocker = checkpoint?.blocker ?? "";
     discoveryReviewed = Boolean(
@@ -150,41 +179,56 @@
     if (!selected) return;
     saving = true;
     notice = "";
+    const existing = selected.checkpoint;
+    // The API replaces the whole checkpoint document, so a non-stable save
+    // must carry the existing result proof forward or it is silently erased
+    // (and the result fingerprint changes).
     const payload: ResearchCheckpointInput = {
       result_state: resultState,
       operator: operator.trim(),
       blocker: blocker.trim() || undefined,
+      official_result_url: existing?.official_result_url || undefined,
+      first_checked_at: existing?.first_checked_at || undefined,
+      second_checked_at: existing?.second_checked_at || undefined,
+      advancing_names: existing?.advancing_names?.length
+        ? [...existing.advancing_names]
+        : undefined,
+      event_type: existing?.event_type || undefined,
+      event_date: existing?.event_date || undefined,
+      last_reviewed_discovery_fingerprint:
+        existing?.last_reviewed_discovery_fingerprint || undefined,
     };
     if (resultState === "stable") {
       const event = researchEventChoices(selected.manifest).find(
         (choice) => choice.key === selectedEventKey,
       );
       payload.official_result_url = officialResultUrl.trim();
-      payload.first_checked_at = firstCheckedAt
-        ? new Date(firstCheckedAt).toISOString()
-        : undefined;
-      payload.second_checked_at = secondCheckedAt
-        ? new Date(secondCheckedAt).toISOString()
-        : undefined;
+      payload.first_checked_at = localInputToIso(firstCheckedAt);
+      payload.second_checked_at = localInputToIso(secondCheckedAt);
       payload.advancing_names = advancingNames
         .split(",")
         .map((name) => name.trim())
         .filter(Boolean);
       payload.event_type = event?.eventType;
       payload.event_date = event?.eventDate;
-      if (discoveryReviewed && selected.checkpoint?.result_fingerprint) {
+      if (discoveryReviewed && existing?.result_fingerprint) {
         payload.last_reviewed_discovery_fingerprint =
-          selected.checkpoint.result_fingerprint;
+          existing.result_fingerprint;
       }
+    }
+    for (const key of Object.keys(payload) as (keyof typeof payload)[]) {
+      if (payload[key] === undefined) delete payload[key];
     }
     try {
       await apiService.recordResearchCheckpoint(selected.race_id, payload);
-      notice = "Checkpoint saved.";
       await loadData();
       selected =
         status?.rows.find((row) => row.race_id === selected?.race_id) ?? null;
+      noticeType = "success";
+      notice = "Checkpoint saved.";
     } catch (err) {
-      notice = err instanceof Error ? err.message : String(err);
+      noticeType = "error";
+      notice = `Save failed: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       saving = false;
     }
@@ -209,7 +253,10 @@
 {#if loading}
   <p class="py-12 text-center text-content-subtle">Loading research status…</p>
 {:else if error}
-  <div class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+  <div
+    class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+    role="alert"
+  >
     {error}
   </div>
 {:else if status}
@@ -393,8 +440,19 @@
       <div class="mt-3 flex items-center gap-3">
         <button class="btn-primary text-sm" type="submit" disabled={saving}
           >{saving ? "Saving…" : "Save checkpoint"}</button
-        >{#if notice}<span class="text-sm text-content-subtle">{notice}</span
-          >{/if}
+        >{#if notice}
+          {#if noticeType === "error"}
+            <span
+              class="rounded border border-red-300 bg-red-50 px-2 py-1 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+              role="alert">{notice}</span
+            >
+          {:else}
+            <span
+              class="rounded border border-green-300 bg-green-50 px-2 py-1 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200"
+              role="status">{notice}</span
+            >
+          {/if}
+        {/if}
       </div>
     </form>
   {/if}
@@ -404,13 +462,18 @@
       <thead
         class="bg-surface-alt text-left text-xs uppercase tracking-wide text-content-subtle"
         ><tr
-          ><th class="p-3">Race</th><th class="p-3">Primary</th><th class="p-3"
-            >Result proof</th
-          ><th class="p-3">Discovery</th><th class="p-3">Issues</th><th
-            class="p-3">Artifact stage</th
-          ><th class="p-3 text-right">30d views</th><th class="p-3 text-right"
-            >Spend</th
-          ><th class="p-3"></th></tr
+          ><th scope="col" class="p-3">Race</th><th scope="col" class="p-3"
+            >Primary</th
+          ><th scope="col" class="p-3">Result proof</th><th
+            scope="col"
+            class="p-3">Discovery</th
+          ><th scope="col" class="p-3">Issues</th><th scope="col" class="p-3"
+            >Artifact stage</th
+          ><th scope="col" class="p-3 text-right">30d views</th><th
+            scope="col"
+            class="p-3 text-right">Spend</th
+          ><th scope="col" class="p-3"><span class="sr-only">Actions</span></th
+          ></tr
         ></thead
       >
       <tbody class="divide-y divide-stroke">

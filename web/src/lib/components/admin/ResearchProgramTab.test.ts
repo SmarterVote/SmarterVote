@@ -2,7 +2,10 @@ import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PipelineApiService } from "$lib/services/pipelineApiService";
 import type { ResearchProgramRow, ResearchProgramStatus } from "$lib/types";
-import ResearchProgramTab from "./ResearchProgramTab.svelte";
+import ResearchProgramTab, {
+  isoToLocalInput,
+  localInputToIso,
+} from "./ResearchProgramTab.svelte";
 
 const { getTraffic } = vi.hoisted(() => ({ getTraffic: vi.fn() }));
 
@@ -242,9 +245,47 @@ describe("ResearchProgramTab", () => {
           result_state: "manual_review",
           operator: "operator@example.com",
           blocker: "Awaiting certification",
+          // The API replaces the document, so existing proof is carried over.
+          official_result_url: "https://example.gov/results",
+          first_checked_at: "2026-06-16T12:00:00Z",
+          second_checked_at: "2026-06-16T18:30:00Z",
+          advancing_names: ["Alex One", "Blair Two"],
+          event_type: "primary_runoff",
+          event_date: "2026-06-16",
+          last_reviewed_discovery_fingerprint: "fingerprint-1",
         },
       ),
     );
+  });
+
+  it("round-trips check timestamps through datetime-local without drift", async () => {
+    const status = programStatus([row("ga-senate-2026")]);
+    const service = api(status);
+    const { getByLabelText, getByRole } = await renderLoaded(service, status);
+
+    await fireEvent.click(getByRole("button", { name: "Checkpoint" }));
+    const first = getByLabelText("First check") as HTMLInputElement;
+    expect(first.value).toBe(isoToLocalInput("2026-06-16T12:00:00Z"));
+    await fireEvent.submit(getByRole("button", { name: "Save checkpoint" }));
+
+    await waitFor(() =>
+      expect(service.recordResearchCheckpoint).toHaveBeenCalledWith(
+        "ga-senate-2026",
+        expect.objectContaining({
+          first_checked_at: "2026-06-16T12:00:00.000Z",
+          second_checked_at: "2026-06-16T18:30:00.000Z",
+        }),
+      ),
+    );
+  });
+
+  it("converts between UTC ISO and local datetime-local strings", () => {
+    const iso = "2026-06-16T12:34:00.000Z";
+    const local = isoToLocalInput(iso);
+    expect(local).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    expect(localInputToIso(local)).toBe(iso);
+    expect(isoToLocalInput("not-a-date")).toBe("");
+    expect(localInputToIso("")).toBeUndefined();
   });
 
   it("shows load and save failures without hiding the rest of the admin", async () => {
@@ -268,9 +309,8 @@ describe("ResearchProgramTab", () => {
     await fireEvent.submit(
       second.getByRole("button", { name: "Save checkpoint" }),
     );
-    await waitFor(() =>
-      expect(second.container.textContent).toContain("checkpoint rejected"),
-    );
+    const alert = await second.findByRole("alert");
+    expect(alert.textContent).toContain("checkpoint rejected");
     await fireEvent.click(second.getByRole("button", { name: "Close" }));
     expect(second.container.textContent).not.toContain("Result checkpoint ·");
   });

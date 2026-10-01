@@ -1,16 +1,25 @@
-import type { Race, RaceSummary, ChamberForecasts } from "./types";
-import { sampleRaces } from "./sampleData";
+/**
+ * Public race-data fetchers.
+ *
+ * This module is imported by public pages (SiteHeader, race pages, ballot
+ * explorer), so it must stay free of static auth imports: anything that pulls
+ * `$lib/auth` / `@auth0/auth0-spa-js` here would be modulepreloaded on every
+ * public page. Authenticated helpers load the auth stack lazily via
+ * `await import()`, and the sample-data fallback (dev only) is lazy too.
+ */
+import type { Race, RaceSummary } from "./types";
 import { logger } from "./utils/logger";
-import { aggregateForecasts, type ForecastTab } from "./utils/forecast";
-import { fetchWithAuth } from "$lib/stores/apiStore";
 import { publicDataBase, racesApiBase } from "$lib/config/api";
 
-const API_BASE = racesApiBase();
 const USE_SAMPLE_FALLBACK = import.meta.env.DEV;
+
+async function loadSampleRaces(): Promise<Record<string, Race>> {
+  const { sampleRaces } = await import("./sampleData");
+  return sampleRaces;
+}
 
 async function fetchPublicJson<T>(
   staticPath: string,
-  apiPath: string,
   fetchFn: typeof fetch,
 ): Promise<T> {
   const dataBase = publicDataBase() || "";
@@ -30,17 +39,19 @@ export async function getRace(
   try {
     return await fetchPublicJson<Race>(
       `${encodeURIComponent(id)}.json`,
-      `/races/${encodeURIComponent(id)}`,
       fetchFn,
     );
   } catch (error) {
     // If fallback is enabled and we have sample data for this race, use it
-    if (useFallback && sampleRaces[id]) {
-      logger.warn(
-        `API request failed for race ${id}, falling back to sample data:`,
-        error,
-      );
-      return sampleRaces[id];
+    if (useFallback) {
+      const sampleRaces = await loadSampleRaces();
+      if (sampleRaces[id]) {
+        logger.warn(
+          `API request failed for race ${id}, falling back to sample data:`,
+          error,
+        );
+        return sampleRaces[id];
+      }
     }
 
     // Unknown race IDs must fail explicitly. Showing an unrelated generic race
@@ -54,11 +65,7 @@ export async function getRaceSummaries(
   useFallback: boolean = USE_SAMPLE_FALLBACK,
 ): Promise<RaceSummary[]> {
   try {
-    return await fetchPublicJson<RaceSummary[]>(
-      "summaries.json",
-      "/races/summaries",
-      fetchFn,
-    );
+    return await fetchPublicJson<RaceSummary[]>("summaries.json", fetchFn);
   } catch (error) {
     // If fallback is enabled, create summaries from sample races
     if (useFallback) {
@@ -66,6 +73,7 @@ export async function getRaceSummaries(
         `API request failed for race summaries, falling back to sample data:`,
         error,
       );
+      const sampleRaces = await loadSampleRaces();
       return Object.values(sampleRaces).map((race) => ({
         id: race.id,
         title: race.title,
@@ -91,10 +99,12 @@ export async function getRaceSummaries(
 /**
  * Fetch draft race data from the races-api backend (admin-only, requires auth).
  * Used for admin preview of un-published races via ?draft=true query param.
+ * The auth stack is imported lazily so public pages never preload Auth0.
  */
 export async function getDraftRace(id: string): Promise<Race> {
+  const { fetchWithAuth } = await import("$lib/stores/apiStore");
   const res = await fetchWithAuth(
-    `${API_BASE}/api/races/${encodeURIComponent(id)}/data?draft=true`,
+    `${racesApiBase()}/api/races/${encodeURIComponent(id)}/data?draft=true`,
     {},
     15000,
   );
@@ -102,110 +112,4 @@ export async function getDraftRace(id: string): Promise<Race> {
     throw new Error(`Failed to fetch draft race: ${res.status}`);
   }
   return (await res.json()) as Race;
-}
-
-export async function getChamberForecasts(
-  fetchFn: typeof fetch = fetch,
-  useFallback: boolean = USE_SAMPLE_FALLBACK,
-): Promise<ChamberForecasts> {
-  try {
-    const forecasts = await fetchPublicJson<ChamberForecasts>(
-      "chamber_forecasts.json",
-      "/races/chamber_forecasts",
-      fetchFn,
-    );
-    const summaries = await getRaceSummaries(fetchFn, false);
-    return normalizeChamberForecasts(forecasts, summaries);
-  } catch (error) {
-    if (useFallback) {
-      logger.warn(
-        `API request failed for chamber forecasts, falling back to sample data:`,
-        error,
-      );
-      return {
-        house:
-          "The Republican party is currently projected to maintain a narrow majority in the US House, though key suburban districts remain highly competitive.",
-        senate:
-          "Democrats face a challenging map but have key paths to holding their majority, with crucial toss-up races in key battleground states.",
-        governors:
-          "Gubernatorial contests are expected to largely favor incumbents, though open seats present critical opportunities for both parties to gain ground.",
-        updated_at: new Date().toISOString(),
-      };
-    }
-    throw error;
-  }
-}
-
-function normalizeChamberForecasts(
-  forecasts: ChamberForecasts,
-  summaries: RaceSummary[],
-): ChamberForecasts {
-  if (forecasts.chambers) return forecasts;
-
-  const chambers = Object.fromEntries(
-    (["house", "senate", "governors"] as ForecastTab[]).map((tab) => {
-      const aggregate = aggregateForecasts(summaries, tab);
-      const controlParty =
-        controlPartyFromProjected(aggregate.projected, aggregate.threshold) ||
-        controlPartyFromNarrative(forecasts[tab]);
-      const competitiveRaces = aggregate.races
-        .filter((race) =>
-          ["tossup", "tilt_d", "tilt_r", "lean_d", "lean_r"].includes(
-            race.forecast.rating,
-          ),
-        )
-        .map((race) => race.id);
-
-      return [
-        tab,
-        {
-          narrative: forecasts[tab],
-          control_party: controlParty,
-          control_probability:
-            controlParty === "Other"
-              ? 0
-              : Math.min(
-                  1,
-                  (aggregate.projected[controlParty] ?? 0) /
-                    aggregate.threshold,
-                ),
-          outcome_probabilities:
-            controlParty === "Other" ? {} : { [controlParty]: 1 },
-          projected_seats: aggregate.projected,
-          expected_seats: aggregate.projected,
-          threshold: aggregate.threshold,
-          total_seats: aggregate.totalExpected,
-          tossup_count: aggregate.ratingCounts.tossup ?? 0,
-          competitive_race_count: competitiveRaces.length,
-          competitive_races: competitiveRaces,
-          method: "derived_from_race_summaries",
-        },
-      ];
-    }),
-  ) as NonNullable<ChamberForecasts["chambers"]>;
-
-  return { ...forecasts, chambers };
-}
-
-function controlPartyFromProjected(
-  projected: Record<string, number>,
-  threshold: number,
-): "Democratic" | "Republican" | null {
-  if ((projected.Democratic ?? 0) >= threshold) return "Democratic";
-  if ((projected.Republican ?? 0) >= threshold) return "Republican";
-  return null;
-}
-
-function controlPartyFromNarrative(
-  narrative: string,
-): "Democratic" | "Republican" | "Other" {
-  const normalized = narrative.toLowerCase();
-  const republicanIndex = normalized.search(/republican|republicans|gop/);
-  const democraticIndex = normalized.search(/democratic|democrats|democrat/);
-  if (republicanIndex >= 0 && democraticIndex >= 0) {
-    return republicanIndex < democraticIndex ? "Republican" : "Democratic";
-  }
-  if (republicanIndex >= 0) return "Republican";
-  if (democraticIndex >= 0) return "Democratic";
-  return "Other";
 }

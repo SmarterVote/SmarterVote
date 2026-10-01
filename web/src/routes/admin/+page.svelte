@@ -4,11 +4,12 @@
   import { getAuth0Client } from "$lib/auth";
 
   let authError = "";
+  let sessionExpired = false;
 
   function clearAuthQueryParams() {
     const url = new URL(window.location.href);
-    ["code", "state", "error", "error_description"].forEach((p) =>
-      url.searchParams.delete(p),
+    ["code", "state", "error", "error_description", "session_expired"].forEach(
+      (p) => url.searchParams.delete(p),
     );
     history.replaceState({}, "", `${url.pathname}${url.search}`);
   }
@@ -30,6 +31,15 @@
           params.get("error_description") || "Access denied by Auth0.";
         clearAuthQueryParams();
         authError = decodeURIComponent(description.replace(/\+/g, " "));
+        return;
+      }
+
+      if (params.has("session_expired")) {
+        // fetchWithAuth sends us here after the API rejected a refreshed
+        // token. Explain why instead of bouncing straight into a redirect.
+        clearAuthQueryParams();
+        sessionExpired = true;
+        authError = "Your admin session expired — sign in again.";
         return;
       }
 
@@ -69,11 +79,15 @@
 {#if authError}
   <div class="max-w-xl mx-auto mt-16 px-4">
     <div
-      class="rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3 text-sm"
+      class="rounded-lg border px-4 py-3 text-sm {sessionExpired
+        ? 'border-amber-300 bg-amber-50 text-amber-900'
+        : 'border-red-200 bg-red-50 text-red-800'}"
+      role="alert"
     >
       <p>{authError}</p>
       <button
-        class="mt-3 inline-flex items-center rounded bg-red-700 px-3 py-1.5 text-white hover:bg-red-800"
+        type="button"
+        class="mt-3 inline-flex items-center rounded bg-red-700 px-3 py-1.5 text-white hover:bg-red-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
         on:click={() => startLogin()}
       >
         Sign in again

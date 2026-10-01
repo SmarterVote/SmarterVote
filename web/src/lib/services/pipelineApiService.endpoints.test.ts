@@ -69,15 +69,15 @@ const cases: Case[] = [
   {
     name: "loadRunHistory",
     run: () => svc.loadRunHistory(),
-    path: "/runs",
+    path: "/runs?limit=500",
     timeout: API_TIMEOUT_ARTIFACT,
     payload: { runs: [] },
   },
   {
-    name: "pruneRuns",
-    run: () => svc.pruneRuns(),
-    path: "/runs",
-    method: "DELETE",
+    name: "cancelRun",
+    run: () => svc.cancelRun("run-1"),
+    path: "/runs/run-1/cancel",
+    method: "POST",
     timeout: API_TIMEOUT_SHORT,
   },
   {
@@ -111,13 +111,6 @@ const cases: Case[] = [
     name: "getPublishedRace",
     run: () => svc.getPublishedRace("mo-senate-2024"),
     path: "/races/mo-senate-2024",
-    timeout: API_TIMEOUT_DEFAULT,
-  },
-  {
-    name: "deletePublishedRace",
-    run: () => svc.deletePublishedRace("mo-senate-2024"),
-    path: "/api/races/mo-senate-2024/unpublish",
-    method: "POST",
     timeout: API_TIMEOUT_DEFAULT,
   },
   // -- Drafts ---------------------------------------------------------------
@@ -345,8 +338,7 @@ describe("PipelineApiService error propagation", () => {
   // is useless when the API is explaining *why* a publish was refused.
   it.each([
     ["deleteRun", () => svc.deleteRun("r")],
-    ["pruneRuns", () => svc.pruneRuns()],
-    ["deletePublishedRace", () => svc.deletePublishedRace("r")],
+    ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
     ["runRace", () => svc.runRace("r")],
@@ -368,8 +360,7 @@ describe("PipelineApiService error propagation", () => {
   // promise from inside the error path itself.
   it.each([
     ["deleteRun", () => svc.deleteRun("r")],
-    ["pruneRuns", () => svc.pruneRuns()],
-    ["deletePublishedRace", () => svc.deletePublishedRace("r")],
+    ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["deleteDraftRace", () => svc.deleteDraftRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
@@ -646,5 +637,85 @@ describe("loadRunHistory shaping", () => {
     fetchWithAuth.mockResolvedValue(jsonResponse({}));
 
     await expect(svc.loadRunHistory()).resolves.toEqual([]);
+  });
+});
+
+describe("loadRunHistoryPage truncation", () => {
+  it("requests the server cap and flags a full page as truncated", async () => {
+    const runs = Array.from({ length: 3 }, (_, i) => ({ run_id: `r${i}` }));
+    fetchWithAuth.mockResolvedValue(jsonResponse({ runs }));
+
+    const page = await svc.loadRunHistoryPage(3);
+
+    expect(lastCall().url).toBe(`${BASE}/runs?limit=3`);
+    expect(page.truncated).toBe(true);
+    expect(page.runs).toHaveLength(3);
+  });
+
+  it("clamps oversized limits to the server maximum", async () => {
+    fetchWithAuth.mockResolvedValue(jsonResponse({ runs: [{ run_id: "a" }] }));
+
+    const page = await svc.loadRunHistoryPage(10_000);
+
+    expect(lastCall().url).toBe(`${BASE}/runs?limit=500`);
+    expect(page.truncated).toBe(false);
+  });
+});
+
+describe("getRunLogsTail", () => {
+  const log = (id: string) => ({
+    id,
+    level: "info",
+    message: id,
+    timestamp: "2026-01-01T00:00:00Z",
+  });
+
+  it("pages until has_more is false and keeps only the newest entries", async () => {
+    fetchWithAuth
+      .mockResolvedValueOnce(
+        jsonResponse({
+          logs: [log("1"), log("2")],
+          next_cursor: "c2",
+          has_more: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          logs: [log("3"), log("4")],
+          next_cursor: "c4",
+          has_more: false,
+        }),
+      );
+
+    const tail = await svc.getRunLogsTail("run-1", 3);
+
+    expect(tail.logs.map((l) => (l as { id?: string }).id)).toEqual([
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(tail.truncated).toBe(true);
+    expect(tail.complete).toBe(true);
+    expect(tail.next_cursor).toBe("c4");
+    expect(fetchWithAuth.mock.calls[1][0]).toContain("cursor=c2");
+  });
+
+  it("stops when the caller cancels between pages", async () => {
+    let cancelled = false;
+    fetchWithAuth.mockImplementation(async () => {
+      cancelled = true;
+      return jsonResponse({
+        logs: [log("1")],
+        next_cursor: "c1",
+        has_more: true,
+      });
+    });
+
+    const tail = await svc.getRunLogsTail("run-1", 10, {
+      isCancelled: () => cancelled,
+    });
+
+    expect(fetchWithAuth).toHaveBeenCalledTimes(1);
+    expect(tail.complete).toBe(false);
   });
 });
