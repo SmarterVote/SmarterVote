@@ -22,10 +22,8 @@
 </script>
 
 <!-- Forecast Above-The-Fold Layout: Election Summary -->
-<div
-  class="bg-surface/60 border border-stroke rounded-2xl p-6 shadow-sm backdrop-blur-md animate-fade-in"
->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<div class="card p-4 sm:p-6 animate-fade-in">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
     <!-- Left Column: Summary -->
     <ForecastSummaryStats
       {activeTab}
@@ -40,7 +38,7 @@
 
     <!-- Right Column: Charts / Stats -->
     <div
-      class="lg:col-span-6 flex flex-col space-y-6 bg-surface-alt/25 border border-stroke/60 rounded-2xl p-6"
+      class="lg:col-span-6 flex flex-col space-y-6 lg:rounded-xl lg:border lg:border-stroke lg:bg-surface-alt/25 lg:p-6"
     >
       <ForecastControlBar {activeTab} {outcomeProbabilities} {projectedSeats} />
       <ForecastSeatsBar {activeTab} {projectedSeats} {totalSeats} {threshold} />

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ForecastTab } from "$lib/utils/forecast";
-  import { probability } from "$lib/utils/forecastPresentation";
+  import { controlProbability as formatControlProbability } from "$lib/utils/forecastPresentation";
 
   export let activeTab: ForecastTab;
   export let controlParty: "Democratic" | "Republican" | "Other";
@@ -16,7 +16,7 @@
 <div class="lg:col-span-6 flex flex-col space-y-6">
   <div class="space-y-2">
     <div class="flex items-center justify-between">
-      <h2 class="text-2xl font-black text-content tracking-tight">
+      <h2 class="h-section">
         {[
           cycleYear,
           activeTab === "house"
@@ -53,9 +53,6 @@
           No clear control projected
         {:else}
           {controlParty} control projected
-          {#if controlProbability}
-            ({probability(controlProbability)})
-          {/if}
         {/if}
       </span>
 
@@ -71,18 +68,16 @@
   </div>
 
   <!-- Probability Stat Cards -->
-  <div class="grid grid-cols-3 gap-3">
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     <!-- Control Probability -->
     <div
-      class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
+      class="rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center"
     >
-      <div
-        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
-      >
-        Control Prob.
+      <div class="mb-1 text-xs font-semibold text-content-subtle">
+        Control chance
       </div>
       <div
-        class={`text-xl font-black tabular-nums ${
+        class={`text-xl font-bold tabular-nums ${
           controlParty === "Democratic"
             ? "text-blue-600 dark:text-blue-400"
             : controlParty === "Republican"
@@ -90,26 +85,24 @@
               : "text-content"
         }`}
       >
-        {probability(controlProbability)}
+        {formatControlProbability(controlProbability)}
       </div>
-      <div class="text-xs font-semibold text-content-muted mt-0.5">
+      <div class="mt-0.5 text-xs text-content-muted">
         {controlParty}
       </div>
     </div>
 
     <!-- Most Likely Outcome -->
     <div
-      class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
+      class="order-last col-span-2 rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center sm:order-none sm:col-span-1"
     >
-      <div
-        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
-      >
-        Most Likely Exact Split
+      <div class="mb-1 text-xs font-semibold text-content-subtle">
+        Most likely exact split
       </div>
-      <div class="text-xl font-black text-content tabular-nums">
+      <div class="text-xl font-bold text-content tabular-nums">
         {mostLikelyOutcome.key || "—"}
       </div>
-      <div class="text-xs font-semibold text-content-muted mt-0.5">
+      <div class="mt-0.5 text-xs text-content-muted">
         {mostLikelyOutcome.probability
           ? `${(mostLikelyOutcome.probability * 100).toFixed(1)}% chance of this split`
           : ""}
@@ -118,19 +111,17 @@
 
     <!-- Competitive Races -->
     <div
-      class="bg-surface-alt/30 border border-stroke/40 rounded-xl p-3 text-center backdrop-blur-sm"
+      class="rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center"
     >
-      <div
-        class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-1"
-      >
+      <div class="mb-1 text-xs font-semibold text-content-subtle">
         Battlegrounds
       </div>
       <div
-        class="text-xl font-black text-yellow-600 dark:text-yellow-400 tabular-nums"
+        class="text-xl font-bold text-amber-700 dark:text-amber-400 tabular-nums"
       >
         {tossupCount}
       </div>
-      <div class="text-xs font-semibold text-content-muted mt-0.5">
+      <div class="mt-0.5 text-xs text-content-muted">
         toss-ups / {competitiveRaceCount} competitive
       </div>
     </div>

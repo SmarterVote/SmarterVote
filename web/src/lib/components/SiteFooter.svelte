@@ -18,8 +18,8 @@
   ];
 </script>
 
-<footer class="mt-12 border-t border-stroke bg-surface sm:mt-16">
-  <div class="container mx-auto max-w-7xl px-4 py-8">
+<footer class="mt-12 border-t border-stroke bg-page sm:mt-16">
+  <div class="page-container py-8">
     <div
       class="flex flex-col gap-6 md:flex-row md:items-start md:justify-between"
     >
@@ -45,7 +45,7 @@
       </nav>
     </div>
     <div
-      class="mt-7 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+      class="mt-7 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-100/90"
       role="note"
       aria-label="AI-generated content notice"
     >

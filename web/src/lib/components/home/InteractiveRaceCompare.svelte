@@ -5,6 +5,35 @@
   import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { candidateSlug } from "$lib/utils/format";
   import { scrollBehavior } from "$lib/utils/motion";
+  import {
+    cleanDisplayText,
+    officeDisplayName,
+    raceShortLabel,
+  } from "$lib/utils/forecastPresentation";
+
+  /**
+   * Some stored stance text still carries JSON escapes (`\"Medicare for
+   * Y'all\"`). Clean every string in the featured race before it reaches the
+   * shared comparison components, which render text verbatim.
+   */
+  function cleanStrings<T>(value: T): T {
+    if (typeof value === "string") return cleanDisplayText(value) as T;
+    if (Array.isArray(value)) return value.map(cleanStrings) as T;
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, item]) => [key, cleanStrings(item)]),
+      ) as T;
+    }
+    return value;
+  }
+
+  /** Short chip text: "TX Senate", "OH Governor", or "AZ-01" for a district. */
+  function chipLabel(race: Race): string {
+    const short = raceShortLabel(race);
+    if (short?.includes("-")) return short;
+    const office = officeDisplayName(race.office).replace(/^U\.S\.\s+/, "");
+    return [short ?? race.jurisdiction, office].filter(Boolean).join(" ");
+  }
 
   export let races: Race[] = [];
   let selectedId = races[0]?.id ?? "";
@@ -12,7 +41,7 @@
   $: if (races.length && !races.some((race) => race.id === selectedId))
     selectedId = races[0].id;
   $: selectedIndex = races.findIndex((race) => race.id === selectedId);
-  $: selectedRace = races[selectedIndex] ?? races[0];
+  $: selectedRace = cleanStrings(races[selectedIndex] ?? races[0]);
   $: candidates = neutralCandidateOrder(
     selectedRace?.candidates.filter((candidate) => !candidate.withdrawn),
   );
@@ -40,26 +69,22 @@
 
 {#if selectedRace && candidates.length >= 2}
   <div
-    class="flex flex-col overflow-hidden rounded-[1.75rem] border border-blue-200 bg-surface shadow-2xl shadow-blue-950/10 dark:border-blue-900"
+    class="flex flex-col overflow-hidden rounded-2xl border border-stroke bg-surface shadow-xl shadow-slate-900/5"
   >
     <div
       class="flex flex-col gap-4 border-b border-stroke bg-surface-alt/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7"
     >
       <div>
-        <div
-          class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-        >
-          Featured comparison
-        </div>
+        <p class="eyebrow">Featured comparison</p>
         <h2
-          class="mt-2 text-xl font-extrabold tracking-tight text-content sm:text-2xl"
+          class="mt-2 text-xl font-bold tracking-tight text-content sm:text-2xl"
         >
           {selectedRace.title}
         </h2>
       </div>
       <a
         href="/races/{selectedRace.id}/"
-        class="shrink-0 text-sm font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400"
+        class="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300"
         >Open race page <UiIcon name="arrow-right" size="sm" /></a
       >
     </div>
@@ -73,35 +98,36 @@
         <button
           type="button"
           on:click={() => moveRace(-1)}
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-primary"
+          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-primary-400 hover:text-primary"
           aria-label="Previous featured race"
           ><UiIcon name="arrow-left" /></button
         >
         <div
           bind:this={pillList}
-          class="hide-scrollbar flex min-w-0 flex-1 gap-2 overflow-x-auto py-1"
+          class="chip-scroller hide-scrollbar flex min-w-0 flex-1 gap-2 overflow-x-auto px-3 py-1"
         >
           {#each races as race, index}
             <button
               type="button"
               on:click={() => (selectedId = race.id)}
               aria-pressed={selectedId === race.id}
-              class="min-h-11 max-w-[220px] whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition sm:max-w-none {selectedId ===
+              class="min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition {selectedId ===
               race.id
-                ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                : 'border-stroke bg-surface text-content-muted hover:border-blue-400 hover:text-blue-700'}"
+                ? 'border-content bg-content text-surface'
+                : 'border-stroke bg-surface text-content-muted hover:border-content-subtle hover:text-content'}"
+              title="{race.jurisdiction} · {race.office}"
             >
-              <span class="mr-1 shrink-0 opacity-70"
+              <span class="mr-1 tabular-nums opacity-70"
                 >{String(index + 1).padStart(2, "0")}</span
               >
-              <span class="truncate">{race.jurisdiction} · {race.office}</span>
+              {chipLabel(race)}
             </button>
           {/each}
         </div>
         <button
           type="button"
           on:click={() => moveRace(1)}
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-blue-400 hover:text-primary"
+          class="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-stroke bg-surface text-lg text-content transition hover:border-primary-400 hover:text-primary"
           aria-label="Next featured race"><UiIcon name="arrow-right" /></button
         >
       </div>
@@ -120,7 +146,7 @@
           href="/races/{selectedRace.id}/compare/?candidates={candidates
             .map((candidate) => candidateSlug(candidate.name))
             .join(',')}"
-          class="inline-flex min-h-11 shrink-0 items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white no-underline transition hover:bg-blue-700"
+          class="btn-primary no-underline"
         >
           Compare all {candidates.length} candidates
           <UiIcon name="arrow-right" size="sm" />
@@ -129,3 +155,23 @@
     </section>
   </div>
 {/if}
+
+<style>
+  /* Fade the chip row's edges so clipped chips read as "scroll for more". */
+  .chip-scroller {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 0.75rem,
+      #000 calc(100% - 1.5rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 0.75rem,
+      #000 calc(100% - 1.5rem),
+      transparent
+    );
+  }
+</style>

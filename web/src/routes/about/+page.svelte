@@ -169,7 +169,7 @@
         and missing required research.
       </p>
       <p>
-        The Automated Research Score combines the review models' scores and
+        The automated research score combines the review models' scores and
         accounts for unresolved warnings. A failing score or an unresolved error
         blocks publication. This is automated editorial quality control, not a
         promise that every statement has been independently fact-checked by a

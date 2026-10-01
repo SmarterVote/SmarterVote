@@ -97,7 +97,7 @@
   Skip to main content
 </a>
 
-<div class="min-h-screen bg-page overflow-x-hidden flex flex-col">
+<div class="min-h-screen bg-page overflow-x-clip flex flex-col">
   {#if $navigating}
     <div class="fixed top-0 left-0 right-0 z-[60] h-0.5 overflow-hidden">
       <div

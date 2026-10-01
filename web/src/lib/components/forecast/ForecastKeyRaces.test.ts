@@ -52,4 +52,16 @@ describe("ForecastKeyRaces", () => {
 
     expect(screen.getByText("A close race in a swing district.")).toBeTruthy();
   });
+
+  it("labels House cards by district so two seats in one state differ", () => {
+    render(ForecastKeyRaces, {
+      races: [
+        { ...race, id: "az-house-01-2026", title: "AZ-1" },
+        { ...race, id: "az-house-06-2026", title: "AZ-6" },
+      ],
+    });
+
+    expect(screen.getByText("AZ-01 · Arizona")).toBeTruthy();
+    expect(screen.getByText("AZ-06 · Arizona")).toBeTruthy();
+  });
 });

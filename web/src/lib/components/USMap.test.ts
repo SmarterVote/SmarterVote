@@ -192,6 +192,21 @@ describe("USMap fill precedence", () => {
     );
   });
 
+  it("shades active states by race count when shadeByCount is set", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas"]),
+      raceCounts: { Missouri: 12, Kansas: 1 },
+      shadeByCount: true,
+    });
+
+    expect(pathFor(container, "Missouri")?.getAttribute("fill")).toBe(
+      "var(--map-count-4)",
+    );
+    expect(pathFor(container, "Kansas")?.getAttribute("fill")).toBe(
+      "var(--map-count-1)",
+    );
+  });
+
   // An explicit per-state colour outranks everything, including selection —
   // that is what lets a forecast tab paint the map by party.
   it("lets an explicit state colour win over selection", async () => {

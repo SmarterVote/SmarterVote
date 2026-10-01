@@ -108,17 +108,33 @@ describe("RaceCard content", () => {
     expect(container.textContent).toContain("Missouri");
   });
 
-  it("omits the jurisdiction chip when absent", () => {
-    const withChip = render(RaceCard, { race: makeRace() });
-    const chip = withChip.container.querySelector(".bg-green-100");
-    expect(chip?.textContent?.trim()).toBe("Missouri");
+  it("shows a compact location chip derived from the race id", () => {
+    const senate = render(RaceCard, { race: makeRace() });
+    expect(
+      senate.container
+        .querySelector("[data-testid=race-location]")
+        ?.textContent?.trim(),
+    ).toBe("MO");
+    cleanup();
+
+    const house = render(RaceCard, {
+      race: makeRace({
+        id: "al-house-03-2026",
+        office: "U.S. House",
+        jurisdiction: "Alabama's 3rd Congressional District",
+      }),
+    });
+    expect(
+      house.container
+        .querySelector("[data-testid=race-location]")
+        ?.textContent?.trim(),
+    ).toBe("AL-03");
     cleanup();
 
     const { container } = render(RaceCard, {
-      race: makeRace({ jurisdiction: undefined }),
+      race: makeRace({ id: "custom-race", jurisdiction: undefined }),
     });
-
-    expect(container.querySelector(".bg-green-100")).toBeNull();
+    expect(container.querySelector("[data-testid=race-location]")).toBeNull();
   });
 
   it("renders every candidate name", () => {

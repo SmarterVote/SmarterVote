@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RaceSummary } from "$lib/types";
-  import USMap from "$lib/components/USMap.svelte";
+  import USMap, { RACE_COUNT_BUCKETS } from "$lib/components/USMap.svelte";
   import RaceCard from "$lib/components/RaceCard.svelte";
   import { page } from "$app/stores";
   import { afterNavigate, replaceState } from "$app/navigation";
@@ -233,15 +233,11 @@
       : `Showing ${visibleRaces.length} of ${races.length} races`;
 </script>
 
-<div class="max-w-7xl mx-auto px-4 py-8 sm:py-10">
+<div class="page-container py-8 sm:py-10">
   <!-- Hero -->
   <header class="text-center mb-8 sm:mb-10 flex flex-col items-center">
-    <h1
-      class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-content tracking-tight mb-3"
-    >
-      Explore elections.
-    </h1>
-    <p class="text-lg sm:text-xl text-content-muted max-w-xl mx-auto mb-6">
+    <h1 class="h-page mb-3">Explore elections.</h1>
+    <p class="text-base sm:text-lg text-content-muted max-w-xl mx-auto mb-6">
       Browse sourced candidate research for U.S. House, Senate, and governor
       races by state, office, or candidate.
     </p>
@@ -276,7 +272,7 @@
         bind:value={searchQuery}
         on:input={handleHeroSearchInput}
         placeholder="Search by candidate name, office, or state..."
-        class="block w-full pl-11 pr-10 py-3 border border-stroke rounded-full text-base bg-surface placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-content transition-all duration-300"
+        class="block w-full pl-11 pr-10 py-3 border border-stroke rounded-full text-base bg-surface placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-content transition-all duration-300"
       />
       {#if searchQuery.trim()}
         <button
@@ -312,7 +308,7 @@
       <button
         type="button"
         on:click={() => setStateFilter(null)}
-        class="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-blue-600 pl-3 pr-2 text-sm font-medium text-white shadow-sm"
+        class="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-content bg-content pl-4 pr-3 text-sm font-medium text-surface"
         aria-label="Clear state filter: {selectedState}"
       >
         {selectedState}
@@ -349,16 +345,14 @@
   </div>
 
   <!-- Map section -->
-  <section
-    class="bg-surface border border-stroke rounded-2xl shadow-sm p-4 sm:p-6 mb-6"
-  >
+  <section class="card p-4 sm:p-6 mb-6" aria-labelledby="election-map-heading">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-base font-semibold text-content">
+      <h2 id="election-map-heading" class="h-card">
         {selectedState
           ? `${selectedState} · ${filteredRaceCounts[selectedState] ?? 0} race${
               (filteredRaceCounts[selectedState] ?? 0) !== 1 ? "s" : ""
             }`
-          : "Select a state"}
+          : "Races by state"}
       </h2>
       {#if selectedState}
         <button
@@ -377,13 +371,13 @@
         for="mobile-state-select"
         class="block text-xs font-semibold text-content-subtle mb-1"
       >
-        Or select a state:
+        State
       </label>
       <select
         id="mobile-state-select"
         value={selectedState || ""}
         on:change={(e) => setStateFilter(e.currentTarget.value || null)}
-        class="block w-full px-3 py-2 border border-stroke rounded-lg text-sm bg-surface text-content focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+        class="block min-h-11 w-full px-3 py-2 border border-stroke rounded-lg text-sm bg-surface text-content focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
       >
         <option value="">All States</option>
         {#each stateOptions as state}
@@ -408,14 +402,37 @@
       {mapExpanded ? "Hide interactive map" : "Show interactive map"}
       <span aria-hidden="true">{mapExpanded ? "−" : "+"}</span>
     </button>
-    <div id="election-state-map" class:hidden={!mapExpanded} class="sm:block">
+    <div
+      id="election-state-map"
+      class:hidden={!mapExpanded}
+      class="mx-auto max-w-3xl sm:block"
+    >
       <USMap
         {activeStates}
         {selectedState}
         raceCounts={filteredRaceCounts}
         {matchingCandidatesByState}
+        shadeByCount
         on:stateClick={handleStateClick}
       />
+      <div
+        class="mt-3 flex flex-col items-center justify-between gap-2 text-xs text-content-muted sm:flex-row"
+      >
+        <p class="hidden sm:block">Select a state to filter the races below.</p>
+        <ul class="flex items-center gap-3" aria-label="Races per state">
+          <li class="font-semibold text-content-subtle">Races</li>
+          {#each RACE_COUNT_BUCKETS as bucket (bucket.label)}
+            <li class="flex items-center gap-1.5">
+              <span
+                class="block h-3 w-3 rounded-sm border border-stroke"
+                style="background: {bucket.fill};"
+                aria-hidden="true"
+              ></span>
+              {bucket.label}
+            </li>
+          {/each}
+        </ul>
+      </div>
     </div>
   </section>
 
@@ -449,7 +466,7 @@
       <!-- Loading spinner + skeleton grid -->
       <div class="flex justify-center items-center py-6">
         <svg
-          class="animate-spin h-10 w-10 text-blue-500"
+          class="animate-spin h-10 w-10 text-primary"
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -473,9 +490,7 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {#each Array(6) as _}
-          <div
-            class="bg-surface border border-stroke rounded-xl h-40 animate-pulse"
-          ></div>
+          <div class="card h-40 animate-pulse"></div>
         {/each}
       </div>
     {:else if loadError && races.length === 0}
@@ -521,7 +536,7 @@
           <button
             type="button"
             on:click={clearFilters}
-            class="mt-3 min-h-11 text-primary hover:text-blue-700 dark:hover:text-blue-300 text-sm underline underline-offset-2"
+            class="btn-ghost mt-3 underline underline-offset-2"
           >
             Clear all filters
           </button>
@@ -540,7 +555,7 @@
         <div class="mt-8 flex justify-center">
           <button
             type="button"
-            class="min-h-11 rounded-lg border border-stroke bg-surface px-5 py-2.5 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-surface-alt focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            class="btn-secondary"
             aria-controls="election-results-grid"
             on:click={() => (visibleRaceCount += PAGE_SIZE)}
           >

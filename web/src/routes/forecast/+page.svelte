@@ -194,17 +194,13 @@
   <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
 </svelte:head>
 
-<div class="forecast-page max-w-7xl mx-auto px-4 py-8 sm:py-10 space-y-8">
+<div class="forecast-page page-container py-8 sm:py-10 space-y-8">
   <header>
     <div
       class="flex flex-col md:flex-row md:items-center md:justify-between gap-4"
     >
       <div>
-        <h1
-          class="text-4xl font-extrabold text-content tracking-tight bg-gradient-to-r from-blue-600 to-red-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-red-400"
-        >
-          2026 Election Forecast
-        </h1>
+        <h1 class="h-page">2026 Election Forecast</h1>
         <p class="mt-2 text-base text-content-muted max-w-3xl">
           See who’s favored, what could decide control, and where the model sees
           the most uncertainty across the 2026 House, Senate, and governor
@@ -232,7 +228,7 @@
           <span aria-hidden="true">·</span>
           <a
             href="/about/#forecast-methodology"
-            class="text-blue-700 hover:underline dark:text-blue-400"
+            class="inline-flex items-center gap-1.5 text-primary-700 hover:underline dark:text-primary-300"
             >How the forecast works <UiIcon name="arrow-right" size="sm" /></a
           >
         </div>
@@ -246,7 +242,7 @@
     <!-- Prerendered HTML is the House view (crawlers index it). A visit with a
          different ?tab= hides it until hydration via the data-forecast-pending-tab
          flag app.html sets, so the House view never flashes. -->
-    <div class:forecast-prerendered={!hydrated}>
+    <div class="space-y-8" class:forecast-prerendered={!hydrated}>
       <ForecastTabNav {tabs} {activeTab} onSelect={setActiveTab} />
 
       <ForecastSummaryCard
@@ -289,7 +285,6 @@
             {threshold}
             {projectedSeats}
             totalExpected={aggregate.totalExpected}
-            {outcomeProbabilities}
             {expectedSeats}
             netChange={aggregate.netChange}
           />

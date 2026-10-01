@@ -281,28 +281,14 @@
   {#if !submitted}
     <div
       data-address-search-card
-      class="relative rounded-[2rem] border border-blue-100 bg-surface/95 p-6 shadow-2xl shadow-blue-950/10 backdrop-blur sm:p-10 dark:border-blue-900"
+      class="card relative rounded-2xl p-6 shadow-lg sm:p-10"
     >
-      <div
-        class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-700 via-blue-500 to-sky-400"
-        aria-hidden="true"
-      ></div>
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <p
-            class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-          >
-            Address search
-          </p>
-          <h2 class="mt-2 text-3xl font-bold tracking-tight text-content">
-            Where are you registered to vote?
-          </h2>
-        </div>
-        <span
-          class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-          >Free</span
-        >
-      </div>
+      <p class="eyebrow">Address search</p>
+      <h2
+        class="mt-2 text-2xl font-bold tracking-tight text-content sm:text-3xl"
+      >
+        Where are you registered to vote?
+      </h2>
       <p class="mt-4 max-w-xl leading-7 text-content-muted">
         Enter the full residential address where you are registered. We’ll
         identify your district and show the U.S. House, Senate, and governor
@@ -331,7 +317,7 @@
               ? `address-suggestion-${suggestions[activeSuggestionIndex].id}`
               : undefined}
             placeholder="1600 Pennsylvania Ave NW, Washington, DC 20500"
-            class="mt-2 min-h-[60px] w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-blue-300 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15"
+            class="mt-2 min-h-[60px] w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15"
           />
           {#if suggestionsOpen}
             <div
@@ -363,7 +349,7 @@
         <button
           type="submit"
           disabled={loading || !address.trim()}
-          class="mt-4 inline-flex min-h-[56px] w-full items-center justify-center rounded-xl bg-blue-700 px-6 font-bold text-white shadow-lg shadow-blue-900/10 transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+          class="btn-primary mt-4 min-h-[56px] w-full rounded-xl text-base"
           >{loading ? "Finding your district…" : "Show my elections"}</button
         >
       </form>
@@ -381,16 +367,13 @@
         Senate, and governor research. This is not yet a complete local ballot.
         <a
           href="/elections/"
-          class="ml-1 font-semibold text-blue-600 hover:underline dark:text-blue-400"
+          class="ml-1 font-semibold text-primary-700 hover:underline dark:text-primary-300"
           >Browse national elections</a
         >
       </div>
 
       {#if loadError && races.length === 0}
-        <div
-          role="alert"
-          class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        >
+        <div role="alert" class="alert-warn mt-5">
           <p class="font-semibold">
             We couldn’t load the published election guides.
           </p>
@@ -406,10 +389,7 @@
       {/if}
 
       {#if error}
-        <div
-          role="alert"
-          class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        >
+        <div role="alert" class="alert-warn mt-5">
           <p class="font-semibold">We couldn’t complete the lookup.</p>
           <p class="mt-1">
             {error} Check the full street, city, state, and ZIP, or browse by state.
@@ -425,16 +405,14 @@
         class="flex flex-col gap-5 border-b border-stroke pb-6 sm:flex-row sm:items-end sm:justify-between"
       >
         <div>
-          <p
-            class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-          >
+          <p class="eyebrow">
             {state} · {districtLabel(district)}
           </p>
           <h1
             id="ballot-results-heading"
             bind:this={resultsHeading}
             tabindex="-1"
-            class="mt-2 text-3xl font-extrabold tracking-tight text-content focus:outline-none sm:text-4xl"
+            class="h-page mt-2 focus:outline-none"
           >
             Your election guide
           </h1>
@@ -451,7 +429,7 @@
               href="https://www.vote411.org/ballot"
               target="_blank"
               rel="noopener noreferrer"
-              class="ml-1 font-semibold text-blue-600 hover:underline dark:text-blue-400"
+              class="ml-1 font-semibold text-primary-700 hover:underline dark:text-primary-300"
               >See what's on your full ballot at VOTE411
               <span class="sr-only"> (opens in a new tab)</span></a
             >.
@@ -460,7 +438,7 @@
         <button
           type="button"
           on:click={searchAnotherAddress}
-          class="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border border-stroke bg-surface px-4 text-sm font-bold text-content transition hover:border-blue-400 hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="btn-secondary shrink-0"
         >
           <UiIcon name="arrow-left" size="sm" /> Search another address
         </button>

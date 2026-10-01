@@ -11,18 +11,12 @@
 </script>
 
 <!-- Seat Outcome Distribution Card -->
-<div
-  class="bg-surface/60 border border-stroke rounded-2xl p-6 shadow-sm backdrop-blur-md flex-1"
->
+<div class="card p-4 sm:p-6 flex-1">
   <div
     class="flex items-center justify-between mb-4 border-b border-stroke/40 pb-3"
   >
     <div>
-      <h3
-        class="text-sm font-black uppercase text-content-subtle tracking-wider"
-      >
-        Seat Outcome Distribution
-      </h3>
+      <h3 class="eyebrow text-content-subtle">Seat Outcome Distribution</h3>
       <p class="text-xs text-content-subtle font-medium mt-0.5">
         Probability of final Republican/Democratic seat splits
       </p>

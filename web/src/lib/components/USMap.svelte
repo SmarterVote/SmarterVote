@@ -1,3 +1,25 @@
+<script lang="ts" context="module">
+  /**
+   * Race-count buckets for the elections directory map. A neutral slate ramp
+   * (not party blue) says "more races here" without reading as a result map.
+   * The directory legend renders these same buckets and variables.
+   */
+  export const RACE_COUNT_BUCKETS = [
+    { min: 1, max: 1, label: "1", fill: "var(--map-count-1)" },
+    { min: 2, max: 4, label: "2–4", fill: "var(--map-count-2)" },
+    { min: 5, max: 9, label: "5–9", fill: "var(--map-count-3)" },
+    { min: 10, max: Infinity, label: "10+", fill: "var(--map-count-4)" },
+  ] as const;
+
+  export function raceCountFill(count: number): string | null {
+    if (count <= 0) return null;
+    const bucket = RACE_COUNT_BUCKETS.find(
+      (b) => count >= b.min && count <= b.max,
+    );
+    return bucket?.fill ?? null;
+  }
+</script>
+
 <script lang="ts">
   import { onMount, createEventDispatcher } from "svelte";
   import { geoAlbersUsa, geoPath } from "d3-geo";
@@ -9,6 +31,8 @@
   export let selectedState: string | null = null;
   export let raceCounts: Record<string, number> = {};
   export let matchingCandidatesByState: Record<string, string[]> = {};
+  /** Shade active states by how many races they hold (elections directory). */
+  export let shadeByCount = false;
   export let stateColors: Record<string, string> = {};
   export let stateTooltips: Record<
     string,
@@ -189,7 +213,12 @@
   $: getFill = (name: string): string => {
     if (stateColors[name]) return stateColors[name];
     if (name === selectedState) return "var(--map-selected)";
-    if (activeStates.has(name)) return "var(--map-active)";
+    if (activeStates.has(name)) {
+      if (shadeByCount) {
+        return raceCountFill(raceCounts[name] ?? 0) ?? "var(--map-count-1)";
+      }
+      return "var(--map-active)";
+    }
     return "var(--map-inactive)";
   };
 
@@ -386,10 +415,16 @@
        read as a party result map. The --color-*-d / --color-*-r ramps below
        are the forecast's party ratings and stay blue/red on purpose. */
     --map-active: #0d9488;
-    --map-selected: #0f766e;
+    /* Selection is UI chrome, so it uses the primary accent. */
+    --map-selected: #1d4ed8;
     --map-selected-stroke: #ffffff;
-    --map-inactive: #e5e7eb;
+    --map-inactive: #f1f5f9;
     --map-stroke: #d1d5db;
+    /* Elections directory: neutral slate ramp, light to dark by race count. */
+    --map-count-1: #cbd5e1;
+    --map-count-2: #94a3b8;
+    --map-count-3: #64748b;
+    --map-count-4: #334155;
 
     --color-safe-d: #1d4ed8;
     --color-likely-d: #3b82f6;
@@ -412,25 +447,34 @@
 
   :global(.dark) {
     --map-active: #14b8a6;
-    --map-selected: #2dd4bf;
-    --map-selected-stroke: #0f172a;
+    --map-selected: #60a5fa;
+    --map-selected-stroke: #f8fafc;
     --map-inactive: #1f2937;
     --map-stroke: #374151;
+    /* On a dark card more races = brighter, so intensity still climbs. */
+    --map-count-1: #475569;
+    --map-count-2: #64748b;
+    --map-count-3: #94a3b8;
+    --map-count-4: #cbd5e1;
 
-    --color-safe-d: #1e3a8a;
-    --color-likely-d: #1d4ed8;
-    --color-lean-d: #2563eb;
-    --color-tilt-d: #3b82f6;
-    --color-tossup: #334155;
-    --color-tilt-r: #ef4444;
-    --color-lean-r: #dc2626;
-    --color-likely-r: #b91c1c;
-    --color-safe-r: #7f1d1d;
-    --color-other: #475569;
-    --color-holdover-d: rgba(59, 130, 246, 0.28);
-    --color-holdover-r: rgba(239, 68, 68, 0.28);
-    --color-holdover-d-solid: #1e3a5f;
-    --color-holdover-r-solid: #4c1d1d;
+    /* On a dark card, intensity climbs with brightness: each step mixes more
+       of the party color into the gray-900 surface (45/62/80/100%), so Safe is the most vivid
+       and Tilt the most muted, and Toss-up stays a visible mid-gray. */
+    --color-safe-d: #3b82f6;
+    --color-likely-d: #336dcd;
+    --color-lean-d: #2b5aa7;
+    --color-tilt-d: #244884;
+    --color-tossup: #6b7280;
+    --color-tilt-r: #752c34;
+    --color-lean-r: #9b3339;
+    --color-likely-r: #c33b3e;
+    --color-safe-r: #ef4444;
+    --color-other: #64748b;
+    /* Holdovers stay close to the surface so they never read as a Tilt. */
+    --color-holdover-d: rgba(59, 130, 246, 0.12);
+    --color-holdover-r: rgba(239, 68, 68, 0.12);
+    --color-holdover-d-solid: #1b2c4d;
+    --color-holdover-r-solid: #3a1e26;
     --color-no-forecast-bg: #0f172a;
     --color-no-forecast-line: #475569;
   }
@@ -450,7 +494,7 @@
   }
 
   .state-path.clickable:hover {
-    filter: brightness(1.15) drop-shadow(0 6px 16px rgba(59, 130, 246, 0.4));
+    filter: brightness(1.15) drop-shadow(0 6px 16px rgba(15, 23, 42, 0.25));
     transform: scale(1.012);
   }
 

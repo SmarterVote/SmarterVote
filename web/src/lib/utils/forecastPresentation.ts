@@ -11,6 +11,58 @@ import {
 } from "$lib/utils/forecast";
 import { GOVERNOR_HOLDOVERS, SENATE_HOLDOVERS } from "./holdovers";
 import { raceDisplayTitle } from "./raceTitle";
+import { STATE_NAMES_BY_CODE } from "./states";
+
+/**
+ * Compact race label for badges and cards: "AZ-01" for a House district,
+ * "AK-AL" for an at-large seat, and the state code ("TX") otherwise. Parsed
+ * from the stable race id (`az-house-01-2026`), so it never depends on the
+ * free-text jurisdiction. Returns null when the id has no state prefix.
+ */
+export function raceShortLabel(race: {
+  id?: string | null;
+  office?: string | null;
+}): string | null {
+  const id = (race.id ?? "").toLowerCase();
+  const code = id.split("-", 1)[0];
+  if (!code || !STATE_NAMES_BY_CODE[code]) return null;
+  const state = code.toUpperCase();
+  // Both id shapes exist in the catalog: `az-house-01-2026` and `az-01-house-2026`.
+  const house =
+    id.match(/^[a-z]{2}-house(?:-(\d{1,2}|al))?(?:-\d{4})?$/) ??
+    id.match(/^[a-z]{2}-(\d{1,2}|al)-house(?:-\d{4})?$/);
+  if (house) {
+    const district = house[1];
+    if (!district || district === "al") return `${state}-AL`;
+    return `${state}-${district.padStart(2, "0")}`;
+  }
+  return state;
+}
+
+/**
+ * Display name for an office in compact subtitles: the many spellings in the
+ * data ("United States House of Representatives", "U.S. Representative",
+ * "Governor of Ohio") collapse to "U.S. House", "U.S. Senate", "Governor".
+ */
+export function officeDisplayName(office: string | null | undefined): string {
+  const value = (office ?? "").trim();
+  const o = value.toLowerCase();
+  if (!o) return "";
+  if (o.startsWith("state ")) return value;
+  if (o.includes("senate") || o.includes("senator")) return "U.S. Senate";
+  if (o.includes("house") || o.includes("representative")) return "U.S. House";
+  if (o.includes("lieutenant governor")) return "Lieutenant Governor";
+  if (o.includes("governor") || o.includes("gubernatorial")) return "Governor";
+  return value;
+}
+
+/**
+ * Model text sometimes arrives with JSON escapes left in (`\"Medicare for
+ * Y'all\"`). Strip the stray backslashes before rendering.
+ */
+// One display sanitizer for the whole site (unescapes leaked JSON quotes and
+// drops inline "(https://…)" citations); re-exported for existing importers.
+export { cleanDisplayText } from "$lib/utils/racePage";
 
 export function partyClass(party: string): string {
   if (party === "Democratic") return "text-blue-600 dark:text-blue-400";
@@ -147,6 +199,19 @@ export function probability(value?: number | null): string {
 
 export function probabilityOneDecimal(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * Chamber/control probability for display. One decimal, so complementary
+ * values (72.5% / 27.5%) sum to 100 and match the model narrative, which
+ * quotes control odds to one decimal place. Whole-percent rounding of each
+ * side independently can show 73% / 28%.
+ */
+export function controlProbability(value?: number | null): string {
+  if (value === undefined || value === null) return "n/a";
+  if (value >= 0.9995) return ">99.9%";
+  if (value <= 0.0005) return "<0.1%";
   return `${(value * 100).toFixed(1)}%`;
 }
 
@@ -333,7 +398,7 @@ export function buildStateMapData(
       tooltips[state] = {
         title: state,
         subtitle: noElection,
-        badge: `${party === "Democratic" ? "Democratic" : "Republican"} Holdover`,
+        badge: `${party === "Democratic" ? "Democratic" : "Republican"} holdover`,
         badgeClass:
           party === "Democratic"
             ? "!bg-blue-600/90 !text-white"
@@ -395,12 +460,12 @@ export function buildStateMapData(
         }
 
         const seatStrings = holdoverSeats.map((p) =>
-          p === "Democratic" ? "Democrat" : "Republican",
+          p === "Democratic" ? "Democratic" : "Republican",
         );
         tooltips[state] = {
           title: state,
           subtitle: noElection,
-          badge: `${holdoverSeats.length} Holdover Seat${
+          badge: `${holdoverSeats.length} holdover seat${
             holdoverSeats.length > 1 ? "s" : ""
           }`,
           badgeClass: "!bg-slate-500 !text-white",
@@ -418,8 +483,8 @@ export function buildStateMapData(
       const holdoverSeat = parties.length > 0 ? parties[0] : null;
 
       const holdoverDetail = holdoverSeat
-        ? `Holdover Seat: ${
-            holdoverSeat === "Democratic" ? "Democrat" : "Republican"
+        ? `Holdover seat: ${
+            holdoverSeat === "Democratic" ? "Democratic" : "Republican"
           }`
         : null;
 

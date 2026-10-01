@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  cleanDisplayText,
   colorForRating,
+  controlProbability,
+  officeDisplayName,
+  raceShortLabel,
   marketAsOf,
   marketSignalTarget,
   marketSpread,
@@ -244,5 +248,41 @@ describe("oneDecimal", () => {
     [-2.5, "-2.5"],
   ])("formats %s as %s", (value, expected) => {
     expect(oneDecimal(value)).toBe(expected);
+  });
+});
+
+describe("display helpers", () => {
+  it("formats control probabilities to one decimal so complements sum to 100", () => {
+    expect(controlProbability(0.725)).toBe("72.5%");
+    expect(controlProbability(0.275)).toBe("27.5%");
+    expect(controlProbability(1)).toBe(">99.9%");
+    expect(controlProbability(0)).toBe("<0.1%");
+    expect(controlProbability(undefined)).toBe("n/a");
+  });
+
+  it("derives compact race labels from the race id", () => {
+    expect(raceShortLabel({ id: "az-house-01-2026" })).toBe("AZ-01");
+    expect(raceShortLabel({ id: "fl-house-6-2026" })).toBe("FL-06");
+    expect(raceShortLabel({ id: "az-06-house-2026" })).toBe("AZ-06");
+    expect(raceShortLabel({ id: "ak-house-2026" })).toBe("AK-AL");
+    expect(raceShortLabel({ id: "tx-senate-2026" })).toBe("TX");
+    expect(raceShortLabel({ id: "custom" })).toBeNull();
+  });
+
+  it("normalizes office names for compact subtitles", () => {
+    expect(officeDisplayName("United States House of Representatives")).toBe(
+      "U.S. House",
+    );
+    expect(officeDisplayName("U.S. Representative")).toBe("U.S. House");
+    expect(officeDisplayName("United States Senate")).toBe("U.S. Senate");
+    expect(officeDisplayName("Governor of Ohio")).toBe("Governor");
+    expect(officeDisplayName("State Senate")).toBe("State Senate");
+  });
+
+  it("removes stray JSON escapes from display text", () => {
+    expect(cleanDisplayText('Backs \\"Medicare for Y\\\'all\\"')).toBe(
+      'Backs "Medicare for Y\'all"',
+    );
+    expect(cleanDisplayText(undefined)).toBe("");
   });
 });

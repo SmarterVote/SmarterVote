@@ -40,7 +40,7 @@
       Something went wrong while loading the forecast. Please check your
       connection and <a
         href="/forecast/"
-        class="text-blue-700 underline dark:text-blue-300"
+        class="text-primary-700 underline dark:text-primary-300"
         data-sveltekit-reload>try again</a
       >.
     </p>

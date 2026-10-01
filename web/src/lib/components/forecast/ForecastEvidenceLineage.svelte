@@ -29,7 +29,7 @@
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
+              class="mt-1 inline-flex items-center gap-1 text-xs text-primary-700 dark:text-primary-300 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
             >
               {getHostname(item.source_url)}
               <UiIcon name="external" size="sm" />
