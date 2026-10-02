@@ -15,7 +15,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 const base =
   "inline-flex items-center justify-center gap-1.5 font-medium transition-colors " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 " +
+  "focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 " +
   "disabled:opacity-60 disabled:cursor-not-allowed";
 
 const variantClasses: Record<Exclude<ButtonVariant, "pill">, string> = {

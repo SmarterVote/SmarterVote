@@ -35,7 +35,7 @@ export function SiteHeader({
   searchResults,
 }: SiteHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-sm border-b border-stroke/50">
+    <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-xs border-b border-stroke/50">
       <div className="container mx-auto max-w-7xl px-4 py-3">
         <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap">
           <a href="/" className="mr-auto text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-700 whitespace-nowrap" aria-label="Smarter.Vote home">
@@ -43,7 +43,7 @@ export function SiteHeader({
           </a>
 
           <nav
-            className="order-3 flex w-full items-center gap-x-4 gap-y-2 overflow-x-auto text-sm lg:order-none lg:w-auto"
+            className="order-3 flex w-full items-center gap-x-4 gap-y-2 overflow-x-auto text-sm lg:order-0 lg:w-auto"
             aria-label="Primary navigation"
           >
             {links.map((link) => (
@@ -57,7 +57,7 @@ export function SiteHeader({
             ))}
           </nav>
 
-          <div className="relative order-2 w-full sm:order-none sm:w-64 lg:w-72">
+          <div className="relative order-2 w-full sm:order-0 sm:w-64 lg:w-72">
             <label className="sr-only" htmlFor="site-search">
               Search elections and candidates
             </label>
@@ -67,7 +67,7 @@ export function SiteHeader({
               onChange={(e) => onSearchChange?.(e.target.value)}
               autoComplete="off"
               placeholder={searchPlaceholder}
-              className="w-full rounded-full border border-stroke bg-surface-alt py-2 pl-4 pr-9 text-sm text-content focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-full border border-stroke bg-surface-alt py-2 pl-4 pr-9 text-sm text-content focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
             {searchValue && (
               <button type="button" aria-label="Clear search" className="absolute inset-y-0 right-0 px-3 text-content-subtle hover:text-content">

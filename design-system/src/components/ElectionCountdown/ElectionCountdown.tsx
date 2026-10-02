@@ -42,7 +42,7 @@ export function ElectionCountdown({ electionDate }: ElectionCountdownProps) {
   const { status, days, hours, minutes, seconds } = parts;
 
   return (
-    <div className="bg-gradient-to-r from-blue-500/10 to-red-500/10 border border-stroke rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="bg-linear-to-r from-blue-500/10 to-red-500/10 border border-stroke rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
@@ -67,7 +67,7 @@ export function ElectionCountdown({ electionDate }: ElectionCountdownProps) {
         </div>
       ) : (
         <div
-          className={`px-4 py-2 rounded-xl text-sm font-black border uppercase tracking-wider shadow-sm ${
+          className={`px-4 py-2 rounded-xl text-sm font-black border uppercase tracking-wider shadow-xs ${
             status === "today"
               ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400"
               : "bg-slate-500/10 text-slate-700 border-slate-500/20 dark:text-slate-400"

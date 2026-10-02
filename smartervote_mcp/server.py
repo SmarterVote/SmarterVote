@@ -8,12 +8,12 @@ import re
 from typing import Any, Dict, List, Literal, Tuple
 from urllib.parse import quote, unquote
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL
 from smartervote_mcp.client import RacesApiClient, compact_options
 
-mcp = FastMCP("SmarterVote Races")
+mcp = MCPServer("SmarterVote Races")
 
 
 _RACE_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")

@@ -91,8 +91,7 @@
   let allRaces: RaceRecord[] = [];
   $: discoveryOnlyRaces = allRaces.filter((r) => {
     const opts = (r.last_run_options ?? r.queue_options) as
-      | { enabled_steps?: string[] }
-      | undefined;
+      { enabled_steps?: string[] } | undefined;
     if (!opts) return false;
     const steps = opts.enabled_steps;
     return (

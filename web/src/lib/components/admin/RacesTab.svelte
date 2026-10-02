@@ -127,8 +127,7 @@
 
   function isDiscoveryOnly(row: RaceRecord): boolean {
     const opts = (row.last_run_options ?? row.queue_options) as
-      | { enabled_steps?: string[] }
-      | undefined;
+      { enabled_steps?: string[] } | undefined;
     if (!opts) return false;
     const steps = opts.enabled_steps;
     return (
@@ -393,8 +392,7 @@
     columnFilters = resolveUpdater(updater, columnFilters);
     statusFilter =
       (columnFilters.find((filter) => filter.id === "status")?.value as
-        | RaceStatusType
-        | undefined) ?? "all";
+        RaceStatusType | undefined) ?? "all";
     updateTableState();
   }
 
@@ -466,8 +464,7 @@
 
   function handleStatusFilter(event: Event) {
     const value = (event.currentTarget as HTMLSelectElement).value as
-      | RaceStatusType
-      | "all";
+      RaceStatusType | "all";
     statusFilter = value;
     $table.getColumn("status")?.setFilterValue(value === "all" ? "" : value);
   }

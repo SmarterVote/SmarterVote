@@ -33,7 +33,6 @@
 
 import { chromium, devices } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 
 const BASE_URL = (process.env.BASE_URL || "https://smarter.vote").replace(
@@ -128,7 +127,9 @@ const setDark = async (page) => {
   await page.addInitScript(() => {
     try {
       localStorage.setItem("darkMode", "true");
-    } catch {}
+    } catch {
+      // localStorage may be unavailable; dark mode is best-effort.
+    }
   });
 };
 
