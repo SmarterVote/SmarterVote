@@ -17,7 +17,7 @@ const externalIcon = (
   </svg>
 );
 
-const btnBase = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 no-underline shadow-sm";
+const btnBase = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 no-underline shadow-xs";
 
 /**
  * Row of external-resource CTA chips (Ballotpedia, Register to Vote, How
@@ -39,7 +39,7 @@ export function VoterResources({
           href={ballotpediaUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${btnBase} bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:shadow dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40 dark:hover:border-amber-600`}
+          className={`${btnBase} bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:shadow-sm dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/40 dark:hover:border-amber-600`}
         >
           <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -58,7 +58,7 @@ export function VoterResources({
         href={registerToVoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${btnBase} bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700 hover:shadow dark:bg-blue-700 dark:border-blue-600 dark:hover:bg-blue-600`}
+        className={`${btnBase} bg-blue-600 border border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700 hover:shadow-sm dark:bg-blue-700 dark:border-blue-600 dark:hover:bg-blue-600`}
       >
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -76,7 +76,7 @@ export function VoterResources({
         href={howToVoteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${btnBase} bg-green-600 border border-green-600 text-white hover:bg-green-700 hover:border-green-700 hover:shadow dark:bg-green-700 dark:border-green-600 dark:hover:bg-green-600`}
+        className={`${btnBase} bg-green-600 border border-green-600 text-white hover:bg-green-700 hover:border-green-700 hover:shadow-sm dark:bg-green-700 dark:border-green-600 dark:hover:bg-green-600`}
       >
         <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

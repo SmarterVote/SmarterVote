@@ -59,7 +59,7 @@ export interface CandidateCardProps {
 }
 
 const externalIcon = (
-  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -123,7 +123,7 @@ export function CandidateCard({ candidate, href, selectable = false, selected = 
                   checked={selected}
                   onChange={onToggleSelect}
                   aria-label={`Select ${candidate.name} to compare`}
-                  className="w-5 h-5 cursor-pointer text-blue-600 border-stroke rounded focus:ring-blue-500 bg-surface"
+                  className="w-5 h-5 cursor-pointer text-blue-600 border-stroke rounded-sm focus:ring-blue-500 bg-surface"
                 />
               </div>
             )}

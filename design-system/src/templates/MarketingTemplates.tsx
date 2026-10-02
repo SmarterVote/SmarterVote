@@ -8,7 +8,7 @@ export type MarketingFormat = "square" | "landscape" | "story" | "document";
 
 const formatClasses: Record<MarketingFormat, string> = {
   square: "aspect-square max-w-[1080px]",
-  landscape: "aspect-[16/9] max-w-[1200px]",
+  landscape: "aspect-video max-w-[1200px]",
   story: "aspect-[9/16] max-w-[675px]",
   document: "aspect-[8.5/11] max-w-[850px]",
 };

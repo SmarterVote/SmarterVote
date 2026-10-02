@@ -18,7 +18,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(function Card(
   return (
     <Component
       ref={ref}
-      className={cx("bg-surface rounded-lg shadow-sm border border-stroke", className)}
+      className={cx("bg-surface rounded-lg shadow-xs border border-stroke", className)}
       {...rest}
     >
       {children}

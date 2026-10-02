@@ -51,7 +51,7 @@ export function ValidationGradeBadge({ grade, onViewReview }: ValidationGradeBad
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-content">AI Validation Grade</span>
-        <span className={`px-2 py-0.5 rounded text-sm font-bold border ${colorClass}`}>{grade.grade}</span>
+        <span className={`px-2 py-0.5 rounded-sm text-sm font-bold border ${colorClass}`}>{grade.grade}</span>
       </div>
       <p className="text-sm font-medium text-content-muted mb-1">Score: {grade.score}/100</p>
       <p className="text-sm text-content-muted mb-3">{grade.summary}</p>
