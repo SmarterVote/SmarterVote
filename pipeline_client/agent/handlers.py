@@ -7,6 +7,7 @@ LLM receives as the tool result.
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from difflib import get_close_matches
@@ -38,6 +39,8 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
+
+logger = logging.getLogger("pipeline")
 
 _CANONICAL_ISSUE_SET = set(CANONICAL_ISSUES)
 
@@ -747,8 +750,15 @@ def _get_other_state_candidates(race_id: str, state: str | None) -> set[str]:
                 for cand in data.get("candidates", []):
                     if isinstance(cand, dict) and cand.get("name") and cand.get("withdrawn") is not True:
                         other_names.add(cand["name"].strip())
-        except Exception:
-            pass
+        except Exception as exc:
+            # Fails open: the cross-race contamination guard runs without
+            # other-race names. Log so a broken Firestore read is visible.
+            logger.warning(
+                "Cross-race contamination guard disabled for %s: could not load other %s races from Firestore: %s",
+                race_id,
+                state,
+                exc,
+            )
     else:
         try:
             from shared.config import FIRESTORE_RACES_COLLECTION, local_paths
@@ -770,10 +780,16 @@ def _get_other_state_candidates(race_id: str, state: str | None) -> set[str]:
                             for cand in data.get("candidates", []):
                                 if isinstance(cand, dict) and cand.get("name") and cand.get("withdrawn") is not True:
                                     other_names.add(cand["name"].strip())
-                    except Exception:
+                    except Exception as exc:
+                        logger.warning("Contamination guard skipped unreadable race file %s: %s", path, exc)
                         continue
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Cross-race contamination guard disabled for %s: could not load other %s races locally: %s",
+                race_id,
+                state,
+                exc,
+            )
 
     return other_names
 

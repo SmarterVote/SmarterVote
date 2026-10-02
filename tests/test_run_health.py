@@ -410,3 +410,74 @@ def test_classify_exception_reads_the_provider_error_family_by_attribute():
 
 def test_classify_exception_falls_back_to_unknown():
     assert classify_exception(ValueError("something else")) is RunFailureReason.UNKNOWN_ERROR
+
+
+# ---------------------------------------------------------------------------
+# Partial finance gaps and name mismatches
+# ---------------------------------------------------------------------------
+
+
+def test_find_finance_gaps_reports_partial_missing_candidates():
+    from shared.run_health import find_finance_gaps
+
+    race_json = {
+        "candidates": [
+            {"name": "Alice", "donor_summary": "Raised $2M.", "voting_summary": None},
+            {"name": "Bob", "donor_summary": None, "voting_summary": None},
+        ]
+    }
+    gaps = find_finance_gaps(race_json, ["Alice", "Bob"])
+    assert gaps["missing"] == ["Bob"]
+    assert gaps["unmatched"] == []
+    # Partial gaps do not trip the all-empty detector.
+    assert detect_empty_finance_output(race_json, ["Alice", "Bob"]) is False
+
+
+def test_find_finance_gaps_counts_baseline_carryover_as_present():
+    from shared.run_health import find_finance_gaps
+
+    race_json = {"candidates": [{"name": "Alice", "voting_summary": "Carried from baseline."}]}
+    assert find_finance_gaps(race_json, ["Alice"]) == {"missing": [], "unmatched": [], "targeted": 1}
+
+
+def test_detect_empty_finance_output_flags_target_name_mismatch():
+    from shared.run_health import find_finance_gaps
+
+    race_json = {"candidates": [{"name": "Alice Smith", "donor_summary": "Has data", "voting_summary": None}]}
+    assert detect_empty_finance_output(race_json, ["Alicia Smith"]) is True
+    assert find_finance_gaps(race_json, ["Alicia Smith"])["unmatched"] == ["Alicia Smith"]
+
+
+@pytest.mark.asyncio
+async def test_finance_phase_records_partial_gap(monkeypatch):
+    from pipeline_client.agent import phases
+    from pipeline_client.agent.phases.context import PhaseContext
+    from pipeline_client.agent.phases.finance import run_finance_phase
+    from shared.run_health import get_step_failures
+
+    async def fake_loop(*_args, **_kwargs):
+        return {"Alice": {"donor_summary": "Raised $2M from PACs."}}
+
+    monkeypatch.setattr(phases, "_agent_loop", fake_loop)
+    race_json = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}, {"name": "Bob"}]}
+    logs = []
+    await run_finance_phase(
+        PhaseContext(
+            race_json=race_json,
+            race_id="ga-senate-2026",
+            model="test-model",
+            small_model="test-model",
+            on_log=None,
+            log=lambda level, msg: logs.append((level, msg)),
+            max_iterations=1,
+            step_enabled=lambda _step: True,
+            track=lambda *_a, **_kw: None,
+            candidate_names=["Alice", "Bob"],
+        )
+    )
+
+    failures = get_step_failures(race_json)
+    assert [(f.step, f.reason) for f in failures] == [("finance", RunFailureReason.STEP_NO_DATA)]
+    assert "Bob" in (failures[0].detail or "")
+    assert "Alice" not in (failures[0].detail or "")
+    assert any(level == "warning" and "left gaps" in msg for level, msg in logs)

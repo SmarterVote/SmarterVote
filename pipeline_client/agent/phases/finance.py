@@ -10,6 +10,7 @@ from ._common import (
     RunFailureReason,
     _classify_exception,
     _detect_empty_finance_output,
+    _find_finance_gaps,
     _race_identity_context,
     _record_step_failure,
 )
@@ -82,4 +83,18 @@ async def run_finance_phase(ctx: PhaseContext) -> None:
             RunFailureReason.STEP_NO_DATA,
             "no candidate has donor_summary or voting_summary after the finance step",
         )
+    else:
+        # Partial silent failure: some targeted candidates got nothing, or a
+        # target name matched no roster candidate (so nothing could be written).
+        # Baseline-carried data counts as present, so reruns are not flagged.
+        gaps = _find_finance_gaps(race_json, candidate_names)
+        problems = []
+        if gaps["missing"]:
+            problems.append("no donor_summary or voting_summary for " + ", ".join(gaps["missing"]))
+        if gaps["unmatched"]:
+            problems.append("target names matched no roster candidate: " + ", ".join(gaps["unmatched"]))
+        if problems:
+            detail = "; ".join(problems)
+            log("warning", f"  Finance/voting phase left gaps — {detail}")
+            _record_step_failure(race_json, "finance", RunFailureReason.STEP_NO_DATA, detail)
     track("complete", "finance", duration_ms=int((time.perf_counter() - fin_t0) * 1000), race_json=race_json)

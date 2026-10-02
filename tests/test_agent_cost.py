@@ -277,3 +277,18 @@ def test_continuation_starts_units_fresh_but_keeps_logical_total(cost_accumulato
     assert total_token_budget_reached() is False
     assert reserve_search_call("serper") is True
     assert cost_accumulator["serper_calls"] == 3
+
+
+def test_search_cost_prices_serper_and_reads_searlo_price_from_env(monkeypatch):
+    from pipeline_client.agent.cost import SERPER_COST_PER_CALL_USD, search_cost_usd, searlo_cost_per_call_usd
+
+    monkeypatch.delenv("SEARLO_COST_PER_CALL_USD", raising=False)
+    assert searlo_cost_per_call_usd() == 0.0
+    assert search_cost_usd(10, 7) == pytest.approx(10 * SERPER_COST_PER_CALL_USD)
+
+    monkeypatch.setenv("SEARLO_COST_PER_CALL_USD", "0.0005")
+    assert search_cost_usd(10, 7) == pytest.approx(10 * SERPER_COST_PER_CALL_USD + 7 * 0.0005)
+
+    for bad in ("abc", "-1"):
+        monkeypatch.setenv("SEARLO_COST_PER_CALL_USD", bad)
+        assert searlo_cost_per_call_usd() == 0.0

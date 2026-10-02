@@ -189,3 +189,35 @@ def test_resolved_pipeline_run_options_allows_overriding_defaults():
     resolved = ResolvedPipelineRunOptions(cheap_mode=False, baseline_source="published")
     assert resolved.cheap_mode is False
     assert resolved.baseline_source == "published"
+
+
+# ---------------------------------------------------------------------------
+# Model ID validation against shared/model_catalog.py
+# ---------------------------------------------------------------------------
+
+
+def test_model_fields_accept_catalog_ids_and_legacy_aliases():
+    from shared.model_catalog import DEFAULT_RESEARCH_MODEL, DEFAULT_REVIEW_CLAUDE
+
+    options = PipelineRunOptions(
+        research_model=DEFAULT_RESEARCH_MODEL,
+        claude_model=DEFAULT_REVIEW_CLAUDE,
+        grok_model="grok-4.3",  # legacy bare alias maps onto a catalog key
+        model_overrides={"primary": DEFAULT_RESEARCH_MODEL},
+    )
+    assert options.research_model == DEFAULT_RESEARCH_MODEL
+    assert options.grok_model == "grok-4.3"
+    assert options.model_overrides == {"primary": DEFAULT_RESEARCH_MODEL}
+
+
+@pytest.mark.parametrize("field", ["research_model", "claude_model", "gemini_model", "grok_model"])
+def test_model_fields_reject_unknown_slugs(field):
+    with pytest.raises(ValidationError, match="Unknown"):
+        PipelineRunOptions(**{field: "acme/not-a-real-model"})
+
+
+def test_model_overrides_reject_unknown_slug_values():
+    with pytest.raises(ValidationError, match="model_overrides"):
+        PipelineRunOptions(model_overrides={"primary": "acme/not-a-real-model"})
+    with pytest.raises(ValidationError):
+        ResolvedPipelineRunOptions(research_model="acme/not-a-real-model")
