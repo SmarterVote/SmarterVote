@@ -283,6 +283,7 @@
         class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"
       >
         <svg
+          aria-hidden="true"
           class="h-5 w-5 text-content-subtle"
           fill="none"
           stroke="currentColor"
@@ -311,6 +312,7 @@
           aria-label="Clear search query"
         >
           <svg
+            aria-hidden="true"
             class="w-4 h-4"
             fill="none"
             stroke="currentColor"
@@ -343,6 +345,7 @@
       >
         {selectedState}
         <svg
+          aria-hidden="true"
           class="h-3.5 w-3.5"
           fill="none"
           stroke="currentColor"
@@ -546,6 +549,7 @@
     {:else if filteredRaces.length === 0}
       <div class="text-center py-16 text-content-subtle">
         <svg
+          aria-hidden="true"
           class="mx-auto h-12 w-12 text-content-faint mb-4"
           fill="none"
           stroke="currentColor"

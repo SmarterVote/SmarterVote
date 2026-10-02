@@ -1,7 +1,12 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import type { RaceSummary } from "$lib/types";
-  import { formatRating, getRaceState, raceHref } from "$lib/utils/forecast";
+  import {
+    formatRating,
+    getRaceState,
+    isUncontestedForecastRace,
+    raceHref,
+  } from "$lib/utils/forecast";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import {
     cleanDisplayText,
@@ -55,6 +60,7 @@
           aria-label="Scroll left"
         >
           <svg
+            aria-hidden="true"
             class="w-4 h-4"
             fill="none"
             stroke="currentColor"
@@ -75,6 +81,7 @@
           aria-label="Scroll right"
         >
           <svg
+            aria-hidden="true"
             class="w-4 h-4"
             fill="none"
             stroke="currentColor"
@@ -97,6 +104,7 @@
       style="-ms-overflow-style: none; scrollbar-width: none;"
     >
       {#each races as race}
+        {@const uncontested = isUncontestedForecastRace(race)}
         {@const rating = race.forecast?.rating}
         {@const ratingBorderColor = rating
           ? rating.endsWith("_d")
@@ -118,15 +126,15 @@
             {#if rating}
               <span
                 class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
-                  rating,
+                  uncontested ? "other" : rating,
                 )}`}
               >
-                {formatRating(rating)}
+                {uncontested ? "Uncontested" : formatRating(rating)}
               </span>
             {/if}
           </div>
 
-          {#if race.forecast}
+          {#if race.forecast && !uncontested}
             <div class="flex items-center gap-3 mb-2">
               <span class="text-xs font-bold text-content tabular-nums">
                 {probability(race.forecast.win_probability)} win
@@ -137,7 +145,7 @@
                 >
                   {race.forecast.margin_estimate > 0
                     ? "+"
-                    : ""}{race.forecast.margin_estimate.toFixed(1)}% margin
+                    : ""}{race.forecast.margin_estimate.toFixed(1)} pts margin
                 </span>
               {/if}
             </div>
@@ -157,7 +165,8 @@
               href={browser ? raceHref(race.id) : undefined}
               class="inline-flex min-h-11 items-center gap-1.5 text-xs text-primary-700 dark:text-primary-300 font-bold hover:underline"
             >
-              View details <UiIcon name="arrow-right" size="sm" />
+              View details<span class="sr-only"> for {keyRaceLabel(race)}</span>
+              <UiIcon name="arrow-right" size="sm" />
             </a>
           </div>
         </div>

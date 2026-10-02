@@ -43,6 +43,7 @@
       class="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-primary-50 blur-3xl dark:bg-primary-950"
     ></div>
     <svg
+      aria-hidden="true"
       class="absolute inset-0 h-full w-full text-primary-900/[0.035] dark:text-primary-100/[0.035]"
       viewBox="0 0 1200 800"
       preserveAspectRatio="xMidYMid slice"
@@ -57,17 +58,21 @@
   </div>
 
   <div
-    class="page-container grid items-start gap-8 py-8 sm:py-12 {exploring
+    class="page-container grid items-start gap-5 py-5 sm:gap-8 sm:py-12 {exploring
       ? ''
       : 'sm:gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:py-16'}"
   >
     {#if !exploring}
       <header class="max-w-xl">
         <p class="eyebrow lg:mt-6">Your election guide</p>
-        <h1 class="h-page mt-4 lg:text-5xl">
+        <h1 class="h-page mt-2 sm:mt-4 lg:text-5xl">
           Find the races that apply to you.
         </h1>
-        <p class="mt-6 max-w-lg text-lg leading-8 text-content-muted">
+        <!-- Phones skip this paragraph: the search card below says the same,
+             and dropping it keeps the address field above the fold. -->
+        <p
+          class="mt-6 hidden max-w-lg text-lg leading-8 text-content-muted sm:block"
+        >
           We use your address only to identify your congressional district, then
           match it with our published House, Senate, and governor research.
         </p>

@@ -14,6 +14,8 @@
   export let selectedState: string | null;
   export let chamberSummary: ChamberForecastDetails | undefined;
   export let onClearStateFilter: () => void;
+  /** Anchor the map's "View races" control scrolls to and focuses. */
+  export let sectionId = "forecast-race-list";
 
   let filterRating = "all";
   let filterParty = "all";
@@ -58,7 +60,12 @@
 </script>
 
 <!-- Active competitive/active races list -->
-<section class="card overflow-hidden">
+<section
+  id={sectionId}
+  tabindex="-1"
+  aria-label="Race forecasts"
+  class="card overflow-hidden scroll-mt-24 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+>
   <ForecastRaceFilters
     {filterRating}
     {filterParty}

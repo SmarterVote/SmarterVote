@@ -225,8 +225,6 @@ describe("ReviewPanel flags", () => {
   it.each([
     ["error", "Error", "flag-severity--error"],
     ["warning", "Warning", "flag-severity--warning"],
-    ["info", "Note", "flag-severity--info"],
-    ["anything-else", "Note", "flag-severity--info"],
   ])("labels %s severity as %s", async (severity, label, cls) => {
     const { container } = await renderExpanded([
       makeReview({
@@ -241,7 +239,7 @@ describe("ReviewPanel flags", () => {
     expect(container.textContent).not.toMatch(/[🔴🟡🔵💡]/u);
   });
 
-  it("renders the flagged field and concern", async () => {
+  it("renders the flagged field as a reader label and the concern", async () => {
     const { container } = await renderExpanded([
       makeReview({
         flags: [
@@ -250,8 +248,112 @@ describe("ReviewPanel flags", () => {
       }),
     ]);
 
-    expect(container.textContent).toContain("polling[0]");
+    expect(container.textContent).not.toContain("polling[0]");
+    expect(container.querySelector(".flag-field")?.textContent).toBe("Polling");
     expect(container.textContent).toContain("Pollster missing.");
+  });
+
+  it("names the candidate and issue a flag is about", async () => {
+    const result = render(ReviewPanel, {
+      reviews: [
+        makeReview({
+          flags: [
+            makeFlag({
+              field: "candidates[1].issues.Healthcare.sources",
+              concern: "Substantive issue stance has no supporting sources.",
+            }),
+          ],
+        }),
+      ],
+      candidateNames: ["Jane Doe", "John Roe"],
+    });
+    await fireEvent.click(result.container.querySelector(".review-title")!);
+
+    expect(result.container.querySelector(".flag-field")?.textContent).toBe(
+      "John Roe · Healthcare",
+    );
+  });
+
+  it.each(["info", "anything-else"])(
+    "hides %s-level flags",
+    async (severity) => {
+      const { container } = await renderExpanded([
+        makeReview({
+          flags: [makeFlag({ severity: severity as ReviewFlag["severity"] })],
+        }),
+      ]);
+
+      expect(container.querySelector(".flag-item")).toBeNull();
+      expect(container.querySelector(".review-all-clear")).not.toBeNull();
+    },
+  );
+
+  it.each([
+    "research_audit: null (no audit object recorded) for this issue.",
+    "All 12 slots completed but candidates[0].issues.Healthcare is thin.",
+    "The terminal issue outputs disagree with the summary.",
+    "Pipeline marked the step complete without evidence.",
+    "Field does not match the schema.",
+    "The education array is empty.",
+  ])("hides the internal-jargon flag %j", async (concern) => {
+    const { container } = await renderExpanded([
+      makeReview({
+        flags: [makeFlag({ concern }), makeFlag({ concern: "Bio is thin." })],
+      }),
+    ]);
+
+    expect(container.querySelectorAll(".flag-item")).toHaveLength(1);
+    expect(container.textContent).toContain("Bio is thin.");
+    expect(container.querySelector(".flags-toggle")?.textContent?.trim()).toBe(
+      "1 flag",
+    );
+  });
+
+  it("strips Markdown from summaries, concerns and suggestions", async () => {
+    const { container } = await renderExpanded([
+      makeReview({
+        summary: "**Mostly** sound; see `sources` and __notes__.",
+        flags: [
+          makeFlag({
+            concern: "The **stance** is unsourced.",
+            suggestion: "Add a `citation`.",
+          }),
+        ],
+      }),
+    ]);
+
+    const text = container.textContent ?? "";
+    expect(text).toContain("Mostly sound; see sources and notes.");
+    expect(text).toContain("The stance is unsourced.");
+    expect(text).toContain("Add a citation.");
+    expect(text).not.toMatch(/\*\*|__|`/);
+  });
+
+  it("hides a review with no summary and no score", async () => {
+    const { container } = await renderExpanded([
+      makeReview({
+        model: "anthropic/claude-haiku-4.5",
+        summary: "",
+        score: undefined,
+        verdict: "flagged",
+      }),
+      makeReview({ model: "x-ai/grok-4.3" }),
+    ]);
+
+    expect(container.querySelectorAll(".review-card")).toHaveLength(1);
+    expect(container.textContent).not.toContain("claude-haiku");
+  });
+
+  it("lists the research models inside the details", async () => {
+    const result = render(ReviewPanel, {
+      reviews: [makeReview()],
+      models: ["GPT-5.4 Mini", "DeepSeek V3.2"],
+    });
+    expect(result.container.textContent).not.toContain("DeepSeek");
+    await fireEvent.click(result.container.querySelector(".review-title")!);
+    expect(
+      result.container.querySelector(".review-models")?.textContent,
+    ).toContain("GPT-5.4 Mini, DeepSeek V3.2");
   });
 
   it("shows a suggestion when one is offered", async () => {

@@ -1,5 +1,6 @@
 import type { Candidate, IssueStance } from "$lib/types";
 import { partyKey } from "$lib/utils/party";
+import { isNoPositionStance } from "$lib/utils/stance";
 
 const NAME_SUFFIXES = new Set([
   "jr",
@@ -50,23 +51,42 @@ function isMajorParty(party: string | undefined): boolean {
   return key === "dem" || key === "rep";
 }
 
+type OrderableCandidate = Pick<Candidate, "name" | "party"> & {
+  incumbent?: boolean | null;
+};
+
 /**
- * Display order for candidates: major-party (Democratic/Republican) candidates
- * first, then everyone else, otherwise keeping the roster's existing order.
- * The sort is stable, so this only lifts major-party candidates ahead of
- * minor-party and independent ones.
+ * Display order for candidates, applied identically everywhere a field is
+ * listed:
+ *
+ * 1. Democratic and Republican candidates first, then every other party and
+ *    independents.
+ * 2. Within each of those two groups, the incumbent first.
+ * 3. Then alphabetical by last name (suffixes like "Jr." ignored), then by
+ *    full name, so the order never depends on the order research found them.
  */
 export function compareCandidatesForDisplay(
-  a: Pick<Candidate, "name" | "party">,
-  b: Pick<Candidate, "name" | "party">,
+  a: OrderableCandidate,
+  b: OrderableCandidate,
 ): number {
-  return Number(isMajorParty(b.party)) - Number(isMajorParty(a.party));
+  const major = Number(isMajorParty(b.party)) - Number(isMajorParty(a.party));
+  if (major !== 0) return major;
+  const incumbent = Number(!!b.incumbent) - Number(!!a.incumbent);
+  if (incumbent !== 0) return incumbent;
+  const options = { sensitivity: "base" } as const;
+  return (
+    candidateLastName(a.name ?? "").localeCompare(
+      candidateLastName(b.name ?? ""),
+      "en",
+      options,
+    ) || (a.name ?? "").localeCompare(b.name ?? "", "en", options)
+  );
 }
 
-/** Return a new array of candidates in display order (major parties first). */
-export function neutralCandidateOrder<
-  T extends Pick<Candidate, "name" | "party">,
->(candidates: readonly T[] | null | undefined): T[] {
+/** Return a new array of candidates in display order (see compareCandidatesForDisplay). */
+export function neutralCandidateOrder<T extends OrderableCandidate>(
+  candidates: readonly T[] | null | undefined,
+): T[] {
   return [...(candidates ?? [])].sort(compareCandidatesForDisplay);
 }
 
@@ -106,4 +126,23 @@ export function hasStance(
   stance: Pick<IssueStance, "stance"> | null | undefined,
 ): boolean {
   return typeof stance?.stance === "string" && stance.stance.trim().length > 0;
+}
+
+/** True when an issue stance states an actual position (not a "no public position found" marker). */
+export function hasPublicPosition(
+  stance: Pick<IssueStance, "stance"> | null | undefined,
+): boolean {
+  return hasStance(stance) && !isNoPositionStance(stance?.stance);
+}
+
+/**
+ * True when a candidate has no researched positions to show: no issues at
+ * all, only empty stances, or only "no public position found" markers.
+ */
+export function hasNoResearchedPositions(
+  candidate: Pick<Candidate, "issues"> | null | undefined,
+): boolean {
+  return !Object.values(candidate?.issues ?? {}).some((issue) =>
+    hasPublicPosition(issue),
+  );
 }

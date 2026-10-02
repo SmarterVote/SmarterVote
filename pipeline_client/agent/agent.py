@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 from shared.pipeline_config import DEFAULT_UPDATE_PIPELINE_STEPS, PIPELINE_STEP_IDS, REVIEW_PROVIDERS, PipelineRuntimeConfig
 from shared.race_cleanup import cleanup_race_data, validate_forecast_evidence
 from shared.run_health import clear_step_failures
+from shared.text_quality import is_placeholder_text as _is_placeholder_text
 
 from .ballotpedia import default_ballotpedia_race_url
 from .cost import _cost_ctx, estimate_cost
@@ -162,6 +163,9 @@ def _is_missing_stance_text(stance: str) -> bool:
     """
     normalized = stance.strip()
     if not normalized:
+        return True
+    # "(to be updated)", "[TBD]": brackets around a placeholder are still a placeholder.
+    if _is_placeholder_text(normalized):
         return True
     lowered = normalized.lower()
     if lowered in _MISSING_STANCE_MARKERS or "no public position found" in lowered:

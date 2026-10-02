@@ -130,9 +130,9 @@ describe("IssueTable source expansion", () => {
     const { container } = renderTable(fiveSources);
     const toggle = desktop(container).querySelector("button")!;
 
-    expect(toggle.textContent?.trim()).toBe("Show 2 more");
-    expect(toggle.getAttribute("aria-label")).toContain(
-      "Show 2 more sources for Healthcare",
+    expect(toggle.textContent?.trim()).toBe("Show 2 more sources");
+    expect(toggle.getAttribute("aria-label")).toBe(
+      "Show 2 more sources for Jane Doe on Healthcare",
     );
   });
 
@@ -144,9 +144,9 @@ describe("IssueTable source expansion", () => {
 
     expect(desktop(container).querySelectorAll("a")).toHaveLength(5);
     const collapse = desktop(container).querySelector("button")!;
-    expect(collapse.textContent?.trim()).toBe("Show fewer");
-    expect(collapse.getAttribute("aria-label")).toContain(
-      "Show fewer sources for Healthcare",
+    expect(collapse.textContent?.trim()).toBe("Show fewer sources");
+    expect(collapse.getAttribute("aria-label")).toBe(
+      "Show fewer sources for Jane Doe on Healthcare",
     );
 
     await fireEvent.click(collapse);
@@ -294,5 +294,80 @@ describe("IssueTable renamed-issue tooltip", () => {
 
     expect(desktop(container).querySelector('[role="tooltip"]')).not.toBeNull();
     expect(mobile(container).querySelector('[role="tooltip"]')).toBeNull();
+  });
+});
+
+describe("IssueTable no-position markers", () => {
+  const marker = (text = "No public position found") =>
+    stance({ stance: text, confidence: "low" });
+
+  it("collapses a candidate with only markers to one line", async () => {
+    const { container, getByText } = renderTable({
+      Healthcare: marker(),
+      Economy: marker("No specific public position was identified on taxes."),
+      Immigration: marker("No public stance found."),
+    } as Partial<Record<IssueKey, IssueStance>>);
+
+    expect(container.querySelector("table")).toBeNull();
+    expect(
+      getByText("No public positions found yet on these issues"),
+    ).toBeTruthy();
+    const details = container.querySelector("details")!;
+    expect(details.querySelector("summary")?.textContent).toContain(
+      "Show the 3 issues we checked",
+    );
+    expect(details.textContent).toContain("Healthcare, Economy, Immigration");
+  });
+
+  it("lists markers once instead of a row each", () => {
+    const { container } = renderTable({
+      Healthcare: stance(),
+      Economy: marker(),
+    } as Partial<Record<IssueKey, IssueStance>>);
+
+    expect(desktop(container).querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(container.querySelector(".no-position-line")?.textContent).toContain(
+      "Economy",
+    );
+  });
+
+  it.each([
+    [1, "Show 1 more source"],
+    [2, "Show 2 more sources"],
+  ])("pluralises %i hidden source(s)", (hidden, text) => {
+    const { container } = renderTable({
+      Healthcare: stance({
+        sources: Array.from({ length: 3 + hidden }, (_, i) => source(i)),
+      }),
+    } as Partial<Record<IssueKey, IssueStance>>);
+    expect(
+      desktop(container).querySelector("button")?.textContent?.trim(),
+    ).toBe(text);
+  });
+});
+
+describe("IssueTable semantics and stickiness", () => {
+  const issues = {
+    Healthcare: stance(),
+    Economy: stance({ stance: "Cut taxes." }),
+  } as Partial<Record<IssueKey, IssueStance>>;
+
+  it("uses column and row headers with a caption", () => {
+    const { container } = renderTable(issues);
+    const table = desktop(container);
+    expect(table.querySelector("caption")?.textContent).toContain("Jane Doe");
+    expect(table.querySelectorAll('thead th[scope="col"]')).toHaveLength(4);
+    expect(table.querySelectorAll('tbody th[scope="row"]')).toHaveLength(2);
+  });
+
+  it("pins the issue picker unless the page already pins a section strip", () => {
+    const sticky = renderTable(issues);
+    expect(
+      sticky.container.querySelector(".issue-picker--sticky"),
+    ).not.toBeNull();
+    cleanup();
+    const plain = renderTable(issues, { stickyPicker: false });
+    expect(plain.container.querySelector(".issue-picker")).not.toBeNull();
+    expect(plain.container.querySelector(".issue-picker--sticky")).toBeNull();
   });
 });

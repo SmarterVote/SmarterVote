@@ -3,8 +3,20 @@
   import InteractiveRaceCompare from "$lib/components/home/InteractiveRaceCompare.svelte";
   import TrustPrinciples from "$lib/components/home/TrustPrinciples.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
+  import { jsonLdScript } from "$lib/utils/racePage";
   import type { PageData } from "./$types";
   export let data: PageData;
+
+  // Site-level structured data belongs on the home page only, not on every
+  // page of the site.
+  const websiteJsonLd = jsonLdScript({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Smarter.Vote",
+    url: "https://smarter.vote/",
+    description:
+      "Candidate research tool for informed voting decisions, using publicly available sources",
+  });
 </script>
 
 <svelte:head>
@@ -30,6 +42,8 @@
     content="Sourced, nonpartisan candidate research with uncertainty and original evidence kept visible."
   />
   <meta name="twitter:image" content="https://smarter.vote/og-image.png" />
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  {@html websiteJsonLd}
 </svelte:head>
 
 <!-- -mb cancels the footer's top margin here so the closing band meets the

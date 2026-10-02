@@ -108,4 +108,26 @@ describe("ForecastElectoralMap", () => {
     await fireEvent.change(select, { target: { value: "" } });
     expect(props.onClearFilter).toHaveBeenCalledTimes(1);
   });
+
+  it("summarises a map selection next to the map and jumps to the results", async () => {
+    const onViewResults = vi.fn();
+    render(ForecastElectoralMap, {
+      activeTab: "house",
+      ...baseProps(),
+      activeStates: new Set(["Georgia"]),
+      selectedState: "Georgia",
+      stateRaceCounts: { Georgia: 14 },
+      onViewResults,
+    });
+
+    const summary = screen.getByTestId("map-selection-summary");
+    expect(summary.textContent).toMatch(/14 races\s+in Georgia/);
+    await fireEvent.click(screen.getByRole("button", { name: "View races" }));
+    expect(onViewResults).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no selection summary without a selected state", () => {
+    render(ForecastElectoralMap, { activeTab: "house", ...baseProps() });
+    expect(screen.queryByTestId("map-selection-summary")).toBeNull();
+  });
 });

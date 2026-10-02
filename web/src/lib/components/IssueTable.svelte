@@ -4,19 +4,41 @@
   import NoDataFallback from "./NoDataFallback.svelte";
   import type { IssueKey, IssueStance } from "$lib/types";
   import { RENAMED_ISSUE_NOTES, getIssueDisplayName } from "$lib/types";
-  import { hasStance } from "$lib/utils/candidates";
+  import { hasPublicPosition, hasStance } from "$lib/utils/candidates";
   import { candidateSlug } from "$lib/utils/format";
   import { cleanDisplayText } from "$lib/utils/racePage";
 
   export let issues: Partial<Record<IssueKey, IssueStance>>;
   export let raceId: string = "";
   export let candidateName: string = "";
+  /**
+   * Pin the phone issue picker under the site header. A page that already
+   * pins its own section strip turns this off so only one secondary bar sticks.
+   */
+  export let stickyPicker = true;
 
   const INITIAL_SOURCE_LIMIT = 3;
 
-  $: issueEntries = (
-    Object.entries(issues) as [IssueKey, IssueStance][]
+  $: allEntries = (
+    Object.entries(issues ?? {}) as [IssueKey, IssueStance][]
   ).filter(([, stance]) => hasStance(stance));
+  // "No public position found" markers are listed once, by issue name, rather
+  // than as a row each; a candidate with nothing but markers gets one line.
+  $: issueEntries = allEntries.filter(([, stance]) =>
+    hasPublicPosition(stance),
+  );
+  $: noPositionIssues = allEntries
+    .filter(([, stance]) => !hasPublicPosition(stance))
+    .map(([issue]) => getIssueDisplayName(issue));
+  $: subject = candidateName || "this candidate";
+
+  function moreSourcesLabel(issue: string, hidden: number): string {
+    return `Show ${hidden} more source${hidden === 1 ? "" : "s"} for ${subject} on ${getIssueDisplayName(issue)}`;
+  }
+
+  function moreSourcesText(hidden: number): string {
+    return `Show ${hidden} more source${hidden === 1 ? "" : "s"}`;
+  }
   // Several IssueTables can share a page (one per candidate card), so every id
   // is namespaced by race and candidate.
   $: idBase = `issues-${candidateSlug(raceId || "race")}-${candidateSlug(
@@ -59,27 +81,46 @@
   }
 </script>
 
-{#if !hasIssues}
+{#if !hasIssues && noPositionIssues.length > 0}
+  <div class="no-positions">
+    <p class="no-positions-title">
+      No public positions found yet on these issues
+    </p>
+    <details class="no-positions-details">
+      <summary
+        >Show the {noPositionIssues.length} issue{noPositionIssues.length === 1
+          ? ""
+          : "s"} we checked</summary
+      >
+      <p class="no-positions-list">{noPositionIssues.join(", ")}</p>
+    </details>
+  </div>
+{:else if !hasIssues}
   <NoDataFallback dataType="issues" {raceId} {candidateName} />
 {:else}
   <div class="relative hidden lg:block overflow-x-auto">
     <table class="w-full table-fixed border-collapse">
+      <caption class="sr-only">Positions of {subject} on key issues</caption>
       <thead>
         <tr class="border-b border-stroke">
           <th
+            scope="col"
             class="w-[18%] py-3 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
             >Issue</th
           >
           <th
+            scope="col"
             class="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
           >
             Stance
           </th>
           <th
+            scope="col"
             class="w-28 py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
             >Confidence</th
           >
           <th
+            scope="col"
             class="w-[24%] py-3 pl-4 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle"
             >Sources</th
           >
@@ -88,7 +129,10 @@
       <tbody>
         {#each issueEntries as [issue, stance]}
           <tr class="border-b border-stroke align-top last:border-b-0">
-            <td class="py-4 pr-4 font-semibold text-content">
+            <th
+              scope="row"
+              class="py-4 pr-4 text-left font-semibold text-content"
+            >
               <span class="inline-flex items-center gap-1">
                 {getIssueDisplayName(issue)}
                 {#if RENAMED_ISSUE_NOTES[issue]}
@@ -112,6 +156,7 @@
                         viewBox="0 0 20 20"
                         fill="currentColor"
                         class="w-4 h-4"
+                        aria-hidden="true"
                       >
                         <path
                           fill-rule="evenodd"
@@ -139,7 +184,7 @@
                   </span>
                 {/if}
               </span>
-            </td>
+            </th>
             <td
               class="whitespace-normal py-4 px-4 text-sm leading-relaxed text-content-muted"
             >
@@ -163,22 +208,18 @@
                     aria-expanded={expandedSources.has(issue)}
                     class="mt-2 inline-flex min-h-11 items-center text-primary hover:text-primary-700 dark:hover:text-primary-300 text-sm underline"
                     aria-label={expandedSources.has(issue)
-                      ? `Show fewer sources for ${getIssueDisplayName(issue)}`
-                      : `Show ${
-                          stance.sources.length - INITIAL_SOURCE_LIMIT
-                        } more sources for ${getIssueDisplayName(issue)}`}
-                    title={expandedSources.has(issue)
-                      ? "Show fewer sources"
-                      : `Show ${
-                          stance.sources.length - INITIAL_SOURCE_LIMIT
-                        } more sources`}
+                      ? `Show fewer sources for ${subject} on ${getIssueDisplayName(issue)}`
+                      : moreSourcesLabel(
+                          issue,
+                          stance.sources.length - INITIAL_SOURCE_LIMIT,
+                        )}
                     on:click={() => toggleSources(issue)}
                   >
                     {expandedSources.has(issue)
-                      ? "Show fewer"
-                      : `Show ${
-                          stance.sources.length - INITIAL_SOURCE_LIMIT
-                        } more`}
+                      ? "Show fewer sources"
+                      : moreSourcesText(
+                          stance.sources.length - INITIAL_SOURCE_LIMIT,
+                        )}
                   </button>
                 {/if}
               {:else}
@@ -195,12 +236,12 @@
 
   <!-- Mobile-friendly view for smaller screens -->
   <div class="lg:hidden space-y-4">
-    <!-- Sticks directly under whatever is pinned above it: the site header,
-         plus any sticky section strip a page publishes as
-         --section-nav-height (0 when there is none). -->
+    <!-- Sticks directly under the site header unless the page already pins
+         its own section strip (stickyPicker=false): only one secondary bar
+         may stick, and none on short (zoomed or landscape) viewports. -->
     <div
-      class="sticky z-20 rounded-lg border border-stroke bg-surface p-3 shadow-sm"
-      style="top: calc(var(--site-header-height, 0px) + var(--section-nav-height, 0px))"
+      class="issue-picker rounded-lg border border-stroke bg-surface p-3 shadow-sm"
+      class:issue-picker--sticky={stickyPicker}
     >
       <label
         for={issueSelectId}
@@ -244,6 +285,7 @@
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     class="w-4 h-4"
+                    aria-hidden="true"
                   >
                     <path
                       fill-rule="evenodd"
@@ -293,15 +335,18 @@
                 aria-expanded={expandedSources.has(issue + "-mobile")}
                 class="mt-2 inline-flex min-h-11 items-center text-primary hover:text-primary-700 dark:hover:text-primary-300 text-sm underline"
                 aria-label={expandedSources.has(issue + "-mobile")
-                  ? `Show fewer sources for ${getIssueDisplayName(issue)}`
-                  : `Show ${
-                      stance.sources.length - INITIAL_SOURCE_LIMIT
-                    } more sources for ${getIssueDisplayName(issue)}`}
+                  ? `Show fewer sources for ${subject} on ${getIssueDisplayName(issue)}`
+                  : moreSourcesLabel(
+                      issue,
+                      stance.sources.length - INITIAL_SOURCE_LIMIT,
+                    )}
                 on:click={() => toggleSources(issue + "-mobile")}
               >
                 {expandedSources.has(issue + "-mobile")
-                  ? "Show fewer"
-                  : `Show ${stance.sources.length - INITIAL_SOURCE_LIMIT} more`}
+                  ? "Show fewer sources"
+                  : moreSourcesText(
+                      stance.sources.length - INITIAL_SOURCE_LIMIT,
+                    )}
               </button>
             {/if}
           </div>
@@ -312,8 +357,58 @@
         {/if}
       </div>
     {/each}
-    <p class="text-sm text-content-subtle">
-      Choose another issue above to review the remaining researched positions.
-    </p>
+    {#if issueEntries.length > 1}
+      <p class="text-sm text-content-subtle">
+        Choose another issue above to review the remaining researched positions.
+      </p>
+    {/if}
   </div>
+  {#if noPositionIssues.length > 0}
+    <p class="no-position-line">
+      <span class="font-semibold text-content-muted"
+        >No public position found:</span
+      >
+      {noPositionIssues.join(", ")}
+    </p>
+  {/if}
 {/if}
+
+<style lang="postcss">
+  .issue-picker--sticky {
+    @apply sticky z-20;
+    top: var(--site-header-height, 0px);
+  }
+
+  /* At 200% zoom or on a landscape phone, pinned bars would cover most of
+     the screen. */
+  @media (max-height: 500px) {
+    .issue-picker--sticky {
+      position: static;
+    }
+  }
+
+  .no-positions {
+    @apply rounded-lg border border-dashed border-stroke bg-surface-alt/40 p-4;
+  }
+
+  .no-positions-title {
+    @apply text-sm font-semibold text-content-muted;
+  }
+
+  .no-positions-details {
+    @apply mt-1 text-sm text-content-subtle;
+  }
+
+  .no-positions-details summary {
+    @apply inline-flex min-h-11 cursor-pointer items-center font-semibold text-primary hover:underline;
+  }
+
+  .no-positions-list,
+  .no-position-line {
+    @apply text-sm leading-6 text-content-subtle;
+  }
+
+  .no-position-line {
+    @apply mt-4 border-t border-stroke pt-3;
+  }
+</style>

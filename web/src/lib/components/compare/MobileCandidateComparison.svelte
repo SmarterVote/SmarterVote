@@ -5,8 +5,9 @@
   import SourceLink from "$lib/components/SourceLink.svelte";
   import type { Candidate, CanonicalIssue, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
+  import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import {
-    candidateInitials,
+    hasPublicPosition,
     hasStance,
     neutralCandidateOrder,
     uniqueCandidatesByName,
@@ -14,7 +15,6 @@
   import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
-  import { headshotFallback } from "$lib/utils/racePageImage";
   import { collapsedPreview } from "$lib/utils/stance";
   import {
     candidateForecastProbability,
@@ -22,6 +22,7 @@
     comparePreview,
     formatWinProbability,
     isNoPositionStance,
+    isUncontestedRace,
   } from "$lib/utils/racePage";
 
   export let race: Race;
@@ -31,14 +32,22 @@
   export let isDraftPreview = false;
   export let showQuality = false;
 
-  let selectedIssue: CanonicalIssue = "Healthcare";
+  /** The issue being compared; bindable so a page can keep it in the URL. */
+  export let selectedIssue: CanonicalIssue = "Healthcare";
   let expandedStances: Record<string, boolean> = {};
   let expandedSources: Record<string, boolean> = {};
-  let failedImages: Record<string, boolean> = {};
 
+  // Issues where at least one compared candidate states a position; issues
+  // where everyone only has a "no public position found" marker are listed
+  // once below the picker instead of being choosable.
   $: issueKeys = CANONICAL_ISSUES.filter((key) =>
-    candidates.some((candidate) => hasStance(candidate.issues?.[key])),
+    candidates.some((candidate) => hasPublicPosition(candidate.issues?.[key])),
   );
+  $: noPositionIssues = CANONICAL_ISSUES.filter(
+    (key) =>
+      !issueKeys.includes(key) &&
+      candidates.some((candidate) => hasStance(candidate.issues?.[key])),
+  ).map(getIssueDisplayName);
   $: if (!issueKeys.includes(selectedIssue))
     selectedIssue = issueKeys[0] ?? "Healthcare";
   $: activeCandidates = neutralCandidateOrder(
@@ -46,6 +55,8 @@
       (candidate) => !candidate.withdrawn,
     ),
   );
+  // No forecast for an uncontested race (the race page has none to link to).
+  $: uncontested = isUncontestedRace(race, activeCandidates.length);
   // Same per-candidate probabilities as the desktop forecast row.
   $: forecastRows = race.forecast
     ? candidates
@@ -80,10 +91,6 @@
   function toggleSources(candidate: Candidate) {
     const key = sourcesKey(candidate);
     expandedSources = { ...expandedSources, [key]: !expandedSources[key] };
-  }
-
-  function markImageFailed(candidate: Candidate) {
-    failedImages = { ...failedImages, [candidate.name]: true };
   }
 
   /** Same collapsed text as the desktop comparison cells. */
@@ -124,24 +131,12 @@
         aria-label={candidate.name}
         class="flex w-1/2 min-w-[9.5rem] max-w-[13rem] shrink-0 snap-start flex-col items-center border-r border-stroke px-3 py-4 text-center last:border-0"
       >
-        {#if candidate.image_url && !failedImages[candidate.name]}
-          <img
-            src={candidate.image_url}
-            alt=""
-            width="56"
-            height="56"
-            decoding="async"
-            referrerpolicy="no-referrer"
-            class="h-14 w-14 rounded-full border border-stroke object-cover"
-            use:headshotFallback={() => markImageFailed(candidate)}
-          />
-        {:else}
-          <span
-            class="flex h-14 w-14 items-center justify-center rounded-full border border-stroke bg-surface-alt text-sm font-extrabold text-content-muted"
-          >
-            {candidateInitials(candidate.name)}
-          </span>
-        {/if}
+        <CandidateAvatar
+          name={candidate.name}
+          imageUrl={candidate.image_url}
+          size={56}
+          loading="eager"
+        />
         <span class="mt-2 text-sm font-extrabold text-content"
           >{candidate.name}</span
         >
@@ -162,106 +157,139 @@
   {/if}
 
   <div class="p-4">
-    <label
-      for={issueSelectId}
-      class="text-xs font-extrabold uppercase tracking-wider text-content-subtle"
-      >Compare an issue</label
-    >
-    <select
-      id={issueSelectId}
-      bind:value={selectedIssue}
-      disabled={issueKeys.length === 0}
-      class="mt-2 min-h-12 w-full rounded-lg border border-stroke bg-surface px-4 font-bold text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {#if issueKeys.length === 0}
-        <option>No researched issues available</option>
-      {:else}
-        {#each issueKeys as issue}
-          <option value={issue}>{getIssueDisplayName(issue)}</option>
-        {/each}
-      {/if}
-    </select>
-
-    <div class="mt-4 space-y-3">
-      {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
-        {@const rawStance = candidate.issues?.[selectedIssue]}
-        {@const stance = hasStance(rawStance) ? rawStance : undefined}
-        {@const stanceText = stance ? cleanDisplayText(stance.stance) : ""}
-        {@const noPosition = !!stance && isNoPositionStance(stanceText)}
-        {@const preview = stance ? positionPreview(stanceText) : ""}
-        {@const isExpanded = expandedStances[stanceKey(candidate)] ?? false}
-        {@const isTruncated = stance ? preview !== stanceText.trim() : false}
-        <article
-          aria-label="{candidate.name} position on {getIssueDisplayName(
-            selectedIssue,
-          )}"
-          class="rounded-lg border border-stroke bg-surface-alt/35 p-4"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="font-extrabold text-content">{candidate.name}</h3>
-            {#if stance && !noPosition}
-              <ConfidenceIndicator confidence={stance.confidence} />
-            {/if}
-          </div>
-          <p
-            class="mt-3 text-sm leading-6 {stance && !noPosition
-              ? 'text-content-muted'
-              : 'italic text-content-subtle'}"
+    {#if issueKeys.length === 0 && noPositionIssues.length > 0}
+      <div
+        class="rounded-lg border border-dashed border-stroke bg-surface-alt/40 p-4 text-sm"
+      >
+        <p class="font-semibold text-content-muted">
+          No public positions found yet on these issues
+        </p>
+        <details class="mt-1 text-content-subtle">
+          <summary
+            class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-primary hover:underline"
+            >Show the {noPositionIssues.length} issues we checked</summary
           >
-            {noPosition
-              ? "No public position found"
-              : stance
-                ? isExpanded
-                  ? stanceText
-                  : preview
-                : "No sourced position available yet."}
-          </p>
-          {#if stance && isTruncated}
-            <button
-              type="button"
-              aria-expanded={isExpanded}
-              on:click={() => toggleStance(candidate)}
-              class="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
-            >
-              {isExpanded ? "Show less" : "Show more"}
-              <span class="sr-only"> for {candidate.name}</span>
-            </button>
-          {/if}
-          {#if !noPosition && stance?.sources?.length && (!collapseText || isExpanded || !isTruncated)}
-            {@const areSourcesExpanded =
-              expandedSources[sourcesKey(candidate)] ?? false}
-            <div class="mt-3 border-t border-stroke pt-3">
-              <div class="flex flex-col items-start gap-2">
-                {#each areSourcesExpanded ? stance.sources : stance.sources.slice(0, 1) as source}
-                  <SourceLink {source} />
-                {/each}
-              </div>
-              {#if stance.sources.length > 1}
-                <button
-                  type="button"
-                  aria-expanded={areSourcesExpanded}
-                  on:click={() => toggleSources(candidate)}
-                  class="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
-                >
-                  {areSourcesExpanded
-                    ? "Show fewer sources"
-                    : `Show ${stance.sources.length - 1} more ${stance.sources.length === 2 ? "source" : "sources"}`}
-                  <span class="sr-only"> for {candidate.name}</span>
-                </button>
+          <p class="leading-6">{noPositionIssues.join(", ")}</p>
+        </details>
+      </div>
+    {:else}
+      <label
+        for={issueSelectId}
+        class="text-xs font-extrabold uppercase tracking-wider text-content-subtle"
+        >Compare an issue</label
+      >
+      <select
+        id={issueSelectId}
+        bind:value={selectedIssue}
+        disabled={issueKeys.length === 0}
+        class="mt-2 min-h-12 w-full rounded-lg border border-stroke bg-surface px-4 font-bold text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {#if issueKeys.length === 0}
+          <option>No researched issues available</option>
+        {:else}
+          {#each issueKeys as issue}
+            <option value={issue}>{getIssueDisplayName(issue)}</option>
+          {/each}
+        {/if}
+      </select>
+
+      <div class="mt-4 space-y-3">
+        {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
+          {@const rawStance = candidate.issues?.[selectedIssue]}
+          {@const stance = hasStance(rawStance) ? rawStance : undefined}
+          {@const stanceText = stance ? cleanDisplayText(stance.stance) : ""}
+          {@const noPosition = !!stance && isNoPositionStance(stanceText)}
+          {@const preview = stance ? positionPreview(stanceText) : ""}
+          {@const isExpanded = expandedStances[stanceKey(candidate)] ?? false}
+          {@const isTruncated = stance ? preview !== stanceText.trim() : false}
+          <article
+            aria-label="{candidate.name} position on {getIssueDisplayName(
+              selectedIssue,
+            )}"
+            class="rounded-lg border border-stroke bg-surface-alt/35 p-4"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="font-extrabold text-content">{candidate.name}</h3>
+              {#if stance && !noPosition}
+                <ConfidenceIndicator confidence={stance.confidence} />
               {/if}
             </div>
-          {/if}
-        </article>
-      {/each}
-    </div>
-    {#if compact}
-      <p class="mt-4 text-center text-xs text-content-subtle">
-        Choose another issue above to review more research fields.
-      </p>
+            <p
+              class="mt-3 text-sm leading-6 {stance && !noPosition
+                ? 'text-content-muted'
+                : 'italic text-content-subtle'}"
+            >
+              {noPosition
+                ? "No public position found"
+                : stance
+                  ? isExpanded
+                    ? stanceText
+                    : preview
+                  : "No sourced position available yet."}
+            </p>
+            {#if stance && isTruncated}
+              <button
+                type="button"
+                aria-expanded={isExpanded}
+                on:click={() => toggleStance(candidate)}
+                class="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+              >
+                {isExpanded ? "Show less" : "Show more"}
+                <span class="sr-only">
+                  of {candidate.name} on {getIssueDisplayName(
+                    selectedIssue,
+                  )}</span
+                >
+              </button>
+            {/if}
+            {#if !noPosition && stance?.sources?.length && (!collapseText || isExpanded || !isTruncated)}
+              {@const areSourcesExpanded =
+                expandedSources[sourcesKey(candidate)] ?? false}
+              <div class="mt-3 border-t border-stroke pt-3">
+                <div class="flex flex-col items-start gap-2">
+                  {#each areSourcesExpanded ? stance.sources : stance.sources.slice(0, 1) as source}
+                    <SourceLink {source} />
+                  {/each}
+                </div>
+                {#if stance.sources.length > 1}
+                  <button
+                    type="button"
+                    aria-expanded={areSourcesExpanded}
+                    on:click={() => toggleSources(candidate)}
+                    class="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+                  >
+                    {areSourcesExpanded
+                      ? "Show fewer sources"
+                      : `Show ${stance.sources.length - 1} more ${stance.sources.length === 2 ? "source" : "sources"}`}
+                    <span class="sr-only">
+                      for {candidate.name} on {getIssueDisplayName(
+                        selectedIssue,
+                      )}</span
+                    >
+                  </button>
+                {/if}
+              </div>
+            {/if}
+          </article>
+        {/each}
+      </div>
+      {#if noPositionIssues.length > 0}
+        <p class="mt-4 text-sm leading-6 text-content-subtle">
+          <span class="font-semibold text-content-muted"
+            >No public position found from anyone compared:</span
+          >
+          {noPositionIssues.join(", ")}
+        </p>
+      {/if}
+      {#if compact}
+        <p class="mt-4 text-center text-xs text-content-subtle">
+          Choose another issue above to review more research fields.
+        </p>
+      {/if}
     {/if}
   </div>
 
-  {#if race.forecast}
+  {#if race.forecast && !uncontested}
     <div class="border-t border-stroke bg-surface-alt/50 px-5 py-4">
       <div class="flex items-center justify-between gap-3">
         <div>

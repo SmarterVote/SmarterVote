@@ -17,8 +17,11 @@ import {
   legacyCandidateSlug,
   matchesCandidateSlug,
 } from "$lib/utils/format";
+import { avatarSrc } from "$lib/utils/avatar";
 import { partyKey, type PartyKey } from "$lib/utils/party";
 import { raceDisplayTitle } from "$lib/utils/raceTitle";
+import { canonicalRaceState } from "$lib/utils/states";
+import { isExternalUrl } from "$lib/utils/url";
 import { splitSentences } from "$lib/utils/stance";
 
 export {
@@ -130,6 +133,221 @@ export function pollDateLabel(value: string | null | undefined): string {
   if (formatted) return formatted;
   const raw = (value ?? "").trim();
   return raw.length > 40 ? `${raw.slice(0, 39)}…` : raw;
+}
+
+/** Polls older than this many days show their age next to the date. */
+export const POLL_AGE_NOTICE_DAYS = 60;
+/** Polls fielded more than this many months before Election Day belong to a previous cycle. */
+export const PREVIOUS_CYCLE_MONTHS = 18;
+
+function utcDay(date: ElectionCalendarDate): number {
+  return Date.UTC(date.year, date.month - 1, date.day);
+}
+
+/**
+ * "3 months old" for a poll fielded more than POLL_AGE_NOTICE_DAYS before
+ * `now`; empty for recent or undated polls.
+ */
+export function pollAgeLabel(
+  value: string | null | undefined,
+  now: Date = new Date(),
+): string {
+  const date = pollCalendarDate(value);
+  if (!date) return "";
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.floor((today - utcDay(date)) / 86_400_000);
+  if (days <= POLL_AGE_NOTICE_DAYS) return "";
+  const months = Math.floor(days / 30.4375);
+  if (months < 12) return `${months} months old`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? "over a year old" : `over ${years} years old`;
+}
+
+/**
+ * True when a poll was fielded more than PREVIOUS_CYCLE_MONTHS before the
+ * race's Election Day, i.e. it measured an earlier campaign. Such a poll is
+ * never the race's "latest poll".
+ */
+export function isPreviousCyclePoll(
+  value: string | null | undefined,
+  electionDate: string | null | undefined,
+): boolean {
+  const poll = pollCalendarDate(value);
+  const election = parseElectionDate(electionDate ?? "");
+  if (!poll || !election) return false;
+  const cutoff = Date.UTC(
+    election.year,
+    election.month - 1 - PREVIOUS_CYCLE_MONTHS,
+    election.day,
+  );
+  return utcDay(poll) < cutoff;
+}
+
+// ---------------------------------------------------------------------------
+// Contest stage
+// ---------------------------------------------------------------------------
+
+export interface ContestStageNotice {
+  kind: "uncontested" | "primary" | "ranked_choice" | "top_two" | "runoff";
+  title: string;
+  body: string;
+}
+
+/** Only one active candidate in a general election: nothing to forecast. */
+export function isUncontestedRace(
+  race: { contest_stage?: Race["contest_stage"] | null },
+  activeCandidateCount: number,
+): boolean {
+  if (race.contest_stage === "uncontested") return true;
+  return (
+    activeCandidateCount === 1 && race.contest_stage === "post_primary_general"
+  );
+}
+
+/** Federal offices that Maine elects by ranked choice in the general election. */
+function isFederalOffice(office: string | undefined): boolean {
+  return /senate|house|representative|congress/i.test(office ?? "");
+}
+
+/**
+ * What a voter needs to know when this contest is not an ordinary two-way
+ * general election, or null when it is. Wording depends only on the
+ * published `contest_stage`, the state, and the office.
+ */
+export function contestStageNotice(
+  race: Pick<
+    Race,
+    "id" | "contest_stage" | "state" | "jurisdiction" | "office"
+  >,
+  activeCandidates: readonly Pick<Candidate, "name">[],
+): ContestStageNotice | null {
+  const state = canonicalRaceState(race);
+  if (isUncontestedRace(race, activeCandidates.length)) {
+    const only =
+      activeCandidates.length === 1 ? activeCandidates[0].name : null;
+    return {
+      kind: "uncontested",
+      title: "Uncontested race",
+      body: `${only ? `${only} is the only candidate` : "Only one candidate is running"}, so this race won't appear on your ballot, or appears with one name, depending on state rules. There is no forecast for an uncontested race.`,
+    };
+  }
+  if (race.contest_stage === "pre_primary") {
+    if (state === "Louisiana") {
+      return {
+        kind: "primary",
+        title: "Nov 3 is an open primary for this seat",
+        body: "In Louisiana, every candidate for this seat appears on the same Nov 3 ballot, regardless of party. If no one wins a majority, the top two finishers advance to a runoff in December.",
+      };
+    }
+    return {
+      kind: "primary",
+      title: "The primary hasn't happened yet",
+      body: "The candidates listed are running for their party's nomination. The general-election field will be set after the primary.",
+    };
+  }
+  if (
+    race.contest_stage === "top_four_rcv" ||
+    state === "Alaska" ||
+    (state === "Maine" && isFederalOffice(race.office))
+  ) {
+    return {
+      kind: "ranked_choice",
+      title: "Ranked-choice general election",
+      body: `${state === "Alaska" ? "Alaska's top-four primary sent up to four candidates to this ballot, and the" : "The"} general election uses ranked-choice voting: you may rank the candidates in order of preference. If no one wins a majority of first choices, the last-place candidate is eliminated and those ballots count for their next choice, until one candidate has a majority.`,
+    };
+  }
+  if (race.contest_stage === "top_two") {
+    return {
+      kind: "top_two",
+      title: "Top-two general election",
+      body: "The top two finishers in an all-candidate primary advanced to this ballot, so both can be from the same party.",
+    };
+  }
+  if (race.contest_stage === "runoff") {
+    return {
+      kind: "runoff",
+      title: "Runoff election",
+      body: "No candidate won a majority in the first round, so the top finishers meet again in a runoff.",
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Senate seat class
+// ---------------------------------------------------------------------------
+
+/**
+ * Senate seat classes on the ballot in 2026. Source: U.S. Senate, "Senators
+ * by class" (senate.gov/senators/Class_II.htm) — the 33 Class II seats whose
+ * terms end January 3, 2027 — plus the two 2026 special elections for Class
+ * III seats: Ohio (vacated by JD Vance, appointed Jon Husted) and Florida
+ * (vacated by Marco Rubio, appointed Ashley Moody), both terms ending
+ * January 3, 2029.
+ */
+const SENATE_CLASS_2026: Readonly<Record<string, 2 | 3>> = {
+  Alabama: 2,
+  Alaska: 2,
+  Arkansas: 2,
+  Colorado: 2,
+  Delaware: 2,
+  Georgia: 2,
+  Idaho: 2,
+  Illinois: 2,
+  Iowa: 2,
+  Kansas: 2,
+  Kentucky: 2,
+  Louisiana: 2,
+  Maine: 2,
+  Massachusetts: 2,
+  Michigan: 2,
+  Minnesota: 2,
+  Mississippi: 2,
+  Montana: 2,
+  Nebraska: 2,
+  "New Hampshire": 2,
+  "New Jersey": 2,
+  "New Mexico": 2,
+  "North Carolina": 2,
+  Oklahoma: 2,
+  Oregon: 2,
+  "Rhode Island": 2,
+  "South Carolina": 2,
+  "South Dakota": 2,
+  Tennessee: 2,
+  Texas: 2,
+  Virginia: 2,
+  "West Virginia": 2,
+  Wyoming: 2,
+};
+const SENATE_SPECIALS_2026: Readonly<Record<string, 3>> = {
+  Ohio: 3,
+  Florida: 3,
+};
+
+const ROMAN_CLASS = { 1: "I", 2: "II", 3: "III" } as const;
+
+/**
+ * "Class II seat" / "Class III seat (special election)" for a Senate race,
+ * from the table above rather than the research text, or null when the seat
+ * is not in the table (another cycle, or not a Senate race).
+ */
+export function senateSeatLabel(
+  race: Pick<Race, "id" | "office" | "state" | "jurisdiction"> &
+    Partial<Pick<Race, "election_date">>,
+): string | null {
+  if (!/senate/i.test(race.office ?? "")) return null;
+  const year =
+    race.id.match(/\b(20\d{2})\b/)?.[1] ?? race.election_date?.slice(0, 4);
+  if (year !== "2026") return null;
+  const state = canonicalRaceState(race);
+  if (!state) return null;
+  const special = /(^|-)special(-|$)/.test(race.id);
+  const seatClass = special
+    ? SENATE_SPECIALS_2026[state]
+    : SENATE_CLASS_2026[state];
+  if (!seatClass) return null;
+  return `Class ${ROMAN_CLASS[seatClass]} seat${special ? " (special election)" : ""}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -335,56 +553,157 @@ export function selectComparedCandidates(
 // Structured data
 // ---------------------------------------------------------------------------
 
-/**
- * schema.org JSON-LD for a race page: the election as an Event whose
- * performers are the active candidates. Deliberately factual — no ratings,
- * forecasts, or party ordering.
- */
-export function raceJsonLd(
-  race: Race,
-  now: Date = new Date(),
+const ELECTIONS_CRUMB = { name: "Elections", url: `${SITE_ORIGIN}/elections/` };
+
+function breadcrumbList(
+  url: string,
+  crumbs: readonly { name: string; url: string }[],
 ): Record<string, unknown> {
-  const url = `${SITE_ORIGIN}/races/${race.id}/`;
-  const candidates = neutralCandidateOrder(
-    uniqueCandidatesByName(race.candidates).filter((c) => !c.withdrawn),
-  );
-  const people = candidates.map((c) => {
-    const person: Record<string, unknown> = {
-      "@type": "Person",
-      name: c.name,
-      url: `${SITE_ORIGIN}/races/${race.id}/${candidateSlug(c.name)}/`,
-    };
-    if (c.party)
-      person.affiliation = { "@type": "Organization", name: c.party };
-    if (c.image_url) person.image = c.image_url;
-    return person;
-  });
-  const data: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": "Event",
-    name: raceDisplayTitle(race),
-    url,
-    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    location: {
-      "@type": "Place",
-      name: race.jurisdiction || race.state || "United States",
-      address: race.state || race.jurisdiction || "United States",
-    },
-    performer: people,
+  return {
+    "@type": "BreadcrumbList",
+    "@id": `${url}#breadcrumb`,
+    itemListElement: crumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: crumb.url,
+    })),
   };
-  const date = parseElectionDate(race.election_date);
-  if (date) {
-    data.startDate = `${date.year}-${String(date.month).padStart(2, "0")}-${String(
-      date.day,
-    ).padStart(2, "0")}`;
-    // "Scheduled" is only true until Election Day has passed.
-    const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-    if (Date.UTC(date.year, date.month - 1, date.day) >= today)
-      data.eventStatus = "https://schema.org/EventScheduled";
-  }
+}
+
+const SITE_ENTITY = {
+  "@type": "WebSite",
+  name: "Smarter.Vote",
+  url: `${SITE_ORIGIN}/`,
+};
+
+/**
+ * schema.org JSON-LD for a race page: a WebPage with an
+ * Elections › Race breadcrumb. Deliberately factual — no ratings, forecasts,
+ * or candidate ordering.
+ */
+export function raceJsonLd(race: Race): Record<string, unknown> {
+  const url = `${SITE_ORIGIN}/races/${race.id}/`;
+  const name = raceDisplayTitle(race);
+  const page: Record<string, unknown> = {
+    "@type": "WebPage",
+    "@id": url,
+    url,
+    name,
+    isPartOf: SITE_ENTITY,
+    breadcrumb: { "@id": `${url}#breadcrumb` },
+  };
   const description = cleanDisplayText(race.description);
-  if (description) data.description = description;
-  return data;
+  if (description) page.description = description;
+  if (race.updated_utc) page.dateModified = race.updated_utc;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [page, breadcrumbList(url, [ELECTIONS_CRUMB, { name, url }])],
+  };
+}
+
+/** Formal party name for structured data, or null for independents and blanks. */
+export function politicalPartyName(party: string | undefined): string | null {
+  const trimmed = (party ?? "").trim();
+  if (!trimmed) return null;
+  const key = partyKey(trimmed);
+  if (key === "ind") return null;
+  if (key === "dem") return "Democratic Party";
+  if (key === "rep") return "Republican Party";
+  if (key === "grn") return "Green Party";
+  if (key === "lib") return "Libertarian Party";
+  return /\bparty\b/i.test(trimmed) ? trimmed : `${trimmed} Party`;
+}
+
+/**
+ * schema.org JSON-LD for a candidate page: a ProfilePage whose main entity is
+ * the candidate (Person), with an Elections › Race › Candidate breadcrumb.
+ */
+export function candidateJsonLd(
+  race: Race,
+  candidate: Candidate,
+): Record<string, unknown> {
+  const raceUrl = `${SITE_ORIGIN}/races/${race.id}/`;
+  const url = `${raceUrl}${candidateSlug(candidate.name)}/`;
+  const person: Record<string, unknown> = {
+    "@type": "Person",
+    name: candidate.name,
+    url,
+  };
+  const image = avatarSrc(candidate.image_url);
+  if (image && isExternalUrl(image)) person.image = image;
+  const party = politicalPartyName(candidate.party);
+  if (party) person.affiliation = { "@type": "PoliticalParty", name: party };
+  const sameAs = [
+    candidate.website,
+    ...Object.values(candidate.social_media ?? {}),
+  ]
+    .filter((link): link is string => isExternalUrl(link))
+    .map((link) => link.trim());
+  if (sameAs.length > 0) person.sameAs = [...new Set(sameAs)];
+  const page: Record<string, unknown> = {
+    "@type": "ProfilePage",
+    "@id": url,
+    url,
+    name: candidate.name,
+    isPartOf: SITE_ENTITY,
+    mainEntity: person,
+    breadcrumb: { "@id": `${url}#breadcrumb` },
+  };
+  if (race.updated_utc) page.dateModified = race.updated_utc;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      page,
+      breadcrumbList(url, [
+        ELECTIONS_CRUMB,
+        { name: raceDisplayTitle(race), url: raceUrl },
+        { name: candidate.name, url },
+      ]),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Social share image
+// ---------------------------------------------------------------------------
+
+export const SITE_SHARE_IMAGE = `${SITE_ORIGIN}/og-image.png`;
+
+/**
+ * Headshot hosts that reliably serve a real portrait to link-preview
+ * crawlers: Ballotpedia's S3 bucket, Wikimedia (via its thumbnail service),
+ * and Congress's official bioguide photos. Anything else (campaign sites,
+ * CDNs that block hotlinking, partisan guides) falls back to the site image.
+ */
+function isKnownGoodHeadshot(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.hostname === "s3.amazonaws.com")
+      return parsed.pathname.startsWith("/ballotpedia-api");
+    return [
+      "upload.wikimedia.org",
+      "bioguide.congress.gov",
+      "www.congress.gov",
+    ].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * og:image / twitter:card for a candidate page. A headshot is small and
+ * portrait-shaped, so it uses the compact "summary" card; without a reliable
+ * headshot the page shares the site image as a large card.
+ */
+export function candidateShareImage(
+  candidate: Pick<Candidate, "image_url"> | null | undefined,
+): { image: string; card: "summary" | "summary_large_image" } {
+  const headshot = avatarSrc(candidate?.image_url);
+  if (headshot && isKnownGoodHeadshot(headshot))
+    return { image: headshot, card: "summary" };
+  return { image: SITE_SHARE_IMAGE, card: "summary_large_image" };
 }
 
 /** Serialise JSON-LD into a <script> tag that cannot be broken out of with "</script>". */
@@ -687,14 +1006,24 @@ export function splitSourcedText(
 }
 
 /**
- * "Office · District · Jurisdiction" without repeating a place: a part that
+ * "Office · District · Jurisdiction" without repeating a place (for Senate
+ * races the district is the seat class from `senateSeatLabel`): a part that
  * another part already contains ("10th Congressional District" inside
  * "Florida's 10th Congressional District") is dropped.
  */
 export function raceLocationLabel(
-  race: Pick<Race, "office" | "district" | "jurisdiction">,
+  race: Pick<Race, "office" | "district" | "jurisdiction"> &
+    Partial<Pick<Race, "id" | "state" | "election_date">>,
 ): string {
-  const parts = [race.office, race.district, race.jurisdiction]
+  // Senate "districts" are free research text ("Statewide (Class 1 seat)",
+  // sometimes wrong); the seat class comes from a fixed table instead.
+  const isSenate = /senate/i.test(race.office ?? "");
+  const district = isSenate
+    ? race.id
+      ? senateSeatLabel({ ...race, id: race.id })
+      : null
+    : race.district;
+  const parts = [race.office, district, race.jurisdiction]
     .map((part) => (part ?? "").trim())
     .filter(Boolean);
   const kept = parts.filter((part, index) => {
@@ -707,4 +1036,112 @@ export function raceLocationLabel(
     });
   });
   return kept.join(" · ");
+}
+
+// ---------------------------------------------------------------------------
+// Build-time page payloads
+// ---------------------------------------------------------------------------
+
+/** Pipeline bookkeeping no public page reads. */
+function withoutPipelineFields(race: Race): Race {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { pipeline_state, run_audit, agent_metrics, ...rest } = race;
+  return rest as Race;
+}
+
+/** The race as the race page embeds it: everything shown, minus pipeline internals. */
+export function raceDetailPayload(race: Race): Race {
+  return withoutPipelineFields(race);
+}
+
+/**
+ * The race as a candidate page embeds it: the race header fields, the one
+ * candidate in full, and only name/party/photo/status for everyone else.
+ */
+export function candidatePagePayload(race: Race, slug: string): Race {
+  const { candidate } = resolveCandidate(race, slug);
+  const {
+    description,
+    polling,
+    polling_note,
+    forecast,
+    reviews,
+    validation_grade,
+    ...header
+  } = withoutPipelineFields(race);
+  void description;
+  void polling;
+  void polling_note;
+  void forecast;
+  void reviews;
+  void validation_grade;
+  return {
+    ...header,
+    polling: [],
+    reviews: [],
+    candidates: (race.candidates ?? []).map((entry) =>
+      entry === candidate
+        ? entry
+        : ({
+            name: entry.name,
+            party: entry.party,
+            incumbent: entry.incumbent,
+            image_url: entry.image_url,
+            withdrawn: entry.withdrawn,
+          } as Candidate),
+    ),
+  } as Race;
+}
+
+/**
+ * The race as the compare page embeds it: the fields the comparison shows
+ * (positions with their sources, background, donor and voting summaries,
+ * the forecast headline) without the race overview, polls, or reviews.
+ */
+export function comparePagePayload(race: Race): Race {
+  const base = withoutPipelineFields(race);
+  return {
+    id: base.id,
+    schema_version: base.schema_version,
+    title: base.title,
+    office: base.office,
+    state: base.state,
+    jurisdiction: base.jurisdiction,
+    district: base.district,
+    election_date: base.election_date,
+    updated_utc: base.updated_utc,
+    contest_stage: base.contest_stage,
+    generator: [],
+    polling: [],
+    reviews: [],
+    validation_grade: base.validation_grade,
+    forecast: base.forecast
+      ? ({
+          rating: base.forecast.rating,
+          predicted_winner_name: base.forecast.predicted_winner_name,
+          predicted_winner_party: base.forecast.predicted_winner_party,
+          win_probability: base.forecast.win_probability,
+          party_probabilities: base.forecast.party_probabilities,
+        } as RaceForecast)
+      : undefined,
+    candidates: (base.candidates ?? []).map(
+      (candidate) =>
+        ({
+          name: candidate.name,
+          party: candidate.party,
+          incumbent: candidate.incumbent,
+          withdrawn: candidate.withdrawn,
+          image_url: candidate.image_url,
+          website: candidate.website,
+          summary: candidate.summary,
+          issues: candidate.issues,
+          career_history: candidate.career_history,
+          education: candidate.education,
+          donor_summary: candidate.donor_summary,
+          donor_source_url: candidate.donor_source_url,
+          voting_summary: candidate.voting_summary,
+          voting_source_url: candidate.voting_source_url,
+        }) as Candidate,
+    ),
+  } as Race;
 }

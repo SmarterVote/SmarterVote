@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ValidationGradeBadge from "./ValidationGradeBadge.svelte";
-import type { ValidationGrade } from "$lib/types";
+import type { AgentReview, ValidationGrade } from "$lib/types";
 
 function makeGrade(overrides: Partial<ValidationGrade> = {}): ValidationGrade {
   return {
@@ -233,5 +233,93 @@ describe("ValidationGradeBadge popover placement and focus", () => {
 
     expect(container.querySelector(".popover")).toBeNull();
     expect(document.activeElement).toBe(badge);
+  });
+});
+
+describe("ValidationGradeBadge stale reviews", () => {
+  function review(overrides: Partial<AgentReview> = {}): AgentReview {
+    return {
+      model: "x-ai/grok-4.3",
+      reviewed_at: "2026-09-01T00:00:00Z",
+      verdict: "approved",
+      score: 90,
+      flags: [],
+      summary: "Looks good.",
+      stale: false,
+      ...overrides,
+    };
+  }
+  const validated = makeGrade({
+    summary: "Validated by 3/3 reviewers with an average score of 90/100.",
+  });
+
+  async function openPopover(reviews: AgentReview[]) {
+    const result = render(ValidationGradeBadge, { grade: validated, reviews });
+    await fireEvent.click(result.container.querySelector(".grade-badge")!);
+    return result;
+  }
+
+  it("says the review predates the roster when every review is stale", async () => {
+    const { container, getByLabelText } = await openPopover([
+      review({ stale: true }),
+      review({ stale: true }),
+      review({ stale: true }),
+    ]);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Reviewed before the latest roster update");
+    expect(text).not.toContain("Validated by 3/3");
+    expect(text).toContain("Review outdated");
+    expect(
+      getByLabelText(/reviewed before the latest roster update/),
+    ).toBeTruthy();
+  });
+
+  it("counts only current reviews when some are stale", async () => {
+    const { container } = await openPopover([
+      review(),
+      review({ verdict: "needs_revision" }),
+      review({ stale: true }),
+    ]);
+    const text = container.textContent ?? "";
+    expect(text).toContain("Validated by 1/2 current reviewers");
+    expect(text).toContain("2 of 3 reviews current");
+  });
+
+  it("keeps the grade summary when every review is current", async () => {
+    const { container } = await openPopover([review(), review(), review()]);
+    expect(container.textContent).toContain("Validated by 3/3 reviewers");
+    expect(container.textContent).not.toContain("reviews current");
+  });
+});
+
+describe("ValidationGradeBadge published review counts", () => {
+  async function open(grade: ValidationGrade, reviews: AgentReview[] = []) {
+    const result = render(ValidationGradeBadge, { grade, reviews });
+    await fireEvent.click(result.container.querySelector(".grade-badge")!);
+    return result.container.textContent ?? "";
+  }
+
+  it("uses current_review_count/stale_review_count when the grade has them", async () => {
+    const text = await open(
+      makeGrade({
+        summary: "Validated by 3/3 reviewers with an average score of 90/100.",
+        current_review_count: 0,
+        stale_review_count: 3,
+      }),
+    );
+    expect(text).toContain("Reviewed before the latest roster update");
+    expect(text).not.toContain("Validated by 3/3");
+  });
+
+  it("counts N from current_review_count when some reviews are stale", async () => {
+    const text = await open(
+      makeGrade({
+        summary: "Validated by 2/2 reviewers with an average score of 90/100.",
+        current_review_count: 2,
+        stale_review_count: 1,
+      }),
+    );
+    expect(text).toContain("Validated by 2/2 current reviewers");
+    expect(text).toContain("2 of 3 reviews current");
   });
 });

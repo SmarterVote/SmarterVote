@@ -110,7 +110,9 @@ describe("USMap loading", () => {
     const { container } = await renderMap();
 
     expect(container.querySelectorAll("path")).toHaveLength(3);
-    expect(fetch).toHaveBeenCalledWith("/states-10m.json");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("states-10m.json"),
+    );
   });
 
   it("maps FIPS ids to state names", async () => {
@@ -292,6 +294,57 @@ describe("USMap accessibility labelling", () => {
     expect(path.getAttribute("tabindex")).toBe("0");
   });
 
+  it("gives the whole map a single Tab stop (roving tabindex)", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas", "California"]),
+    });
+
+    const stops = container.querySelectorAll('path[tabindex="0"]');
+    expect(stops).toHaveLength(1);
+    // Alphabetical order: California holds the stop by default.
+    expect(stops[0].getAttribute("data-state")).toBe("California");
+    expect(pathFor(container, "Kansas")?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("puts the Tab stop on the selected state", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas", "California"]),
+      selectedState: "Missouri",
+    });
+
+    expect(pathFor(container, "Missouri")?.getAttribute("tabindex")).toBe("0");
+    expect(pathFor(container, "California")?.getAttribute("tabindex")).toBe(
+      "-1",
+    );
+  });
+
+  it("moves between states A-Z with the arrow keys", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri", "Kansas", "California"]),
+    });
+    const california = pathFor(container, "California")!;
+    california.focus();
+
+    await fireEvent.keyDown(california, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(pathFor(container, "Kansas"));
+    await fireEvent.keyDown(document.activeElement!, { key: "End" });
+    expect(document.activeElement).toBe(pathFor(container, "Missouri"));
+    await fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(california);
+    await waitFor(() => expect(california.getAttribute("tabindex")).toBe("0"));
+  });
+
+  it("offers a skip link past the map", async () => {
+    const { container, getByRole } = await renderMap({
+      activeStates: new Set(["Missouri"]),
+    });
+
+    await fireEvent.click(getByRole("link", { name: "Skip map" }));
+
+    expect(document.activeElement?.id).toMatch(/-end$/);
+    expect(container.contains(document.activeElement)).toBe(true);
+  });
+
   it("hides an inactive state from assistive tech and the tab order", async () => {
     const { container } = await renderMap();
 
@@ -402,6 +455,36 @@ describe("USMap interaction", () => {
 
     await fireEvent.focus(path);
     await fireEvent.blur(path);
+
+    await waitFor(() => expect(container.querySelector(".tooltip")).toBeNull());
+  });
+
+  it("does not leave a tooltip behind after a touch tap", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri"]),
+      raceCounts: { Missouri: 2 },
+    });
+    const path = pathFor(container, "Missouri")!;
+
+    await fireEvent.pointerDown(path, { pointerType: "touch" });
+    // Browsers emulate mouse events after a tap.
+    await fireEvent.mouseEnter(path);
+    await fireEvent.pointerUp(path, { pointerType: "touch" });
+
+    expect(container.querySelector(".tooltip")).toBeNull();
+  });
+
+  it("hides the tooltip when the page scrolls", async () => {
+    const { container } = await renderMap({
+      activeStates: new Set(["Missouri"]),
+      raceCounts: { Missouri: 2 },
+    });
+
+    await fireEvent.mouseEnter(pathFor(container, "Missouri")!);
+    await waitFor(() =>
+      expect(container.querySelector(".tooltip")).not.toBeNull(),
+    );
+    await fireEvent.scroll(window);
 
     await waitFor(() => expect(container.querySelector(".tooltip")).toBeNull());
   });

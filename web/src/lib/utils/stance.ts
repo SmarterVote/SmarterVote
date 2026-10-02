@@ -148,15 +148,34 @@ export function collapsedPreview(text: string, limit = 120): string {
   return hardCap(normalized, limit);
 }
 
+/** Qualifiers that may precede "public" in a no-position opener. */
+const NO_POSITION_QUALIFIER =
+  "(?:(?:specific|clear|clearly|explicit|detailed|direct|official|formal)\\s+)?";
+/** Up to four topic words between "public" and "position" ("public foreign policy position"). */
+const NO_POSITION_TOPIC = "(?:[\\w&’'/-]+\\s+){0,4}?";
+/** Words that close the "nothing was found" finding. */
+const NO_POSITION_FINDING =
+  "(?:found|identified|located|stated|published|available|given|made|articulated|announced)";
+
 /**
- * True for the pipeline's "nothing found" stance: the exact marker "No public
- * position found." or a stance that opens with that finding ("No public
- * position on healthcare policy found. …", "No publicly stated position on …
- * found."). A substantive stance that merely mentions a missing position
- * elsewhere is not one.
+ * Opening clause of the pipeline's "nothing found" stance, in every wording
+ * seen in published data: "No public position found.", "No specific public
+ * position was identified on …", "No public stance found …", "No publicly
+ * stated stance found …", "No public foreign policy position is stated …",
+ * "No public position could be found". Anchored at the start and confined to
+ * the first sentence.
+ */
+const NO_POSITION_OPENER = new RegExp(
+  `^no\\s+${NO_POSITION_QUALIFIER}public(?:ly)?(?:\\s+(?:stated|available|declared|documented|articulated))?\\s+${NO_POSITION_TOPIC}(?:position|stance|statement)s?\\b[^.;!?]{0,200}?\\b${NO_POSITION_FINDING}\\b`,
+  "i",
+);
+
+/**
+ * True for the pipeline's "nothing found" stance: the marker "No public
+ * position found." or a stance that opens with that finding in any of its
+ * wordings (see NO_POSITION_OPENER). A substantive stance that merely
+ * mentions a missing position later on is not one.
  */
 export function isNoPositionStance(text: string | null | undefined): boolean {
-  return /^no public(?:ly stated)? position\b[^.]{0,160}?\bfound\b/i.test(
-    (text ?? "").trim(),
-  );
+  return NO_POSITION_OPENER.test((text ?? "").trim());
 }

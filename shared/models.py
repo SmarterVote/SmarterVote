@@ -240,6 +240,18 @@ class ValidationGrade(BaseModel):
     score: int = Field(..., ge=0, le=100, description="Average score across reviewers")
     passed: bool = Field(..., description="Whether the grade meets the quality threshold (B or above)")
     summary: str = Field("", description="Brief explanation of the grade")
+    current_review_count: Optional[int] = Field(
+        None,
+        ge=0,
+        description=(
+            "Model reviews that judged the current candidate roster. 0 with stale_review_count > 0 means every "
+            "review predates a roster change, so the grade does not describe today's roster. None on grades "
+            "computed before this field existed."
+        ),
+    )
+    stale_review_count: Optional[int] = Field(
+        None, ge=0, description="Model reviews that judged an earlier roster (AgentReview.stale) and are not counted."
+    )
 
 
 # ---------------------------------------------------------------------------

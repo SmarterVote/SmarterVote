@@ -53,6 +53,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from rate_limit import limiter
+from routers import geocode as geocode_router_module
 from routers import payments as payments_router_module
 from routers import pipeline as pipeline_router_module
 from routers import queue as queue_router_module
@@ -99,8 +100,39 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def _is_production() -> bool:
+    """True on the deployed service.
+
+    The deployed stack's ``ENVIRONMENT`` is currently ``dev`` (resource names
+    carry it), so the reliable production signal is ``K_SERVICE``, which Cloud
+    Run sets on every revision. An explicit ``ENVIRONMENT``/``ENV`` of
+    ``prod``/``production`` also counts.
+    """
+    env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "").strip().lower()
+    return env in {"prod", "production"} or bool(os.getenv("K_SERVICE"))
+
+
+def _env_flag(name: str) -> bool | None:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return None
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+IS_PRODUCTION = _is_production()
+# Interactive docs and the OpenAPI schema enumerate every admin route, so they
+# are off in production unless API_DOCS_ENABLED=true opts back in.
+_docs_flag = _env_flag("API_DOCS_ENABLED")
+API_DOCS_ENABLED = (not IS_PRODUCTION) if _docs_flag is None else _docs_flag
+
 # Initialize FastAPI app
-app = FastAPI(title="SmarterVote Races API", lifespan=lifespan)
+app = FastAPI(
+    title="SmarterVote Races API",
+    lifespan=lifespan,
+    docs_url="/docs" if API_DOCS_ENABLED else None,
+    redoc_url="/redoc" if API_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if API_DOCS_ENABLED else None,
+)
 app.state.limiter = limiter
 app.state.publish_service = publish_service
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -112,11 +144,17 @@ app.add_middleware(AnalyticsMiddleware)
 origins = [
     "https://smarter.vote",
     "https://www.smarter.vote",
+]
+# Local dev servers may make credentialed calls only to a non-production API;
+# any local process can claim these origins, so production never trusts them.
+LOCAL_DEV_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
 ]
+if not IS_PRODUCTION:
+    origins.extend(LOCAL_DEV_ORIGINS)
 
 # Cloudflare Pages preview deployments for *this* project only.
 #
@@ -159,6 +197,22 @@ app.include_router(research_program_router_module.router)
 # Payment routers (public checkout + webhook)
 # ---------------------------------------------------------------------------
 app.include_router(payments_router_module.router)
+
+# ---------------------------------------------------------------------------
+# Public address geocoding proxy (My Ballot)
+# ---------------------------------------------------------------------------
+app.include_router(geocode_router_module.router)
+
+# Internal pipeline bookkeeping that is never part of the public race record.
+# It stays in GCS (the pipeline reads ``pipeline_state`` back from the
+# published blob as its baseline) and in the admin ``/api/races/{id}/data``
+# view; only public reads strip it.
+PUBLIC_RACE_INTERNAL_FIELDS = ("pipeline_state", "agent_metrics", "run_audit")
+
+
+def public_race_view(race_data: dict) -> dict:
+    """Return a shallow copy of a race record without internal pipeline fields."""
+    return {key: value for key, value in race_data.items() if key not in PUBLIC_RACE_INTERNAL_FIELDS}
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +271,7 @@ def get_race(request: Request, response: Response, race_id: str):
     if not race_data:
         raise HTTPException(status_code=404, detail="Race not found")
     response.headers["Cache-Control"] = "public, max-age=300"
-    return race_data
+    return public_race_view(race_data)
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +281,7 @@ def get_race(request: Request, response: Response, race_id: str):
 
 @app.post("/cache/clear")
 @limiter.limit("10/minute")
-def clear_cache(request: Request, _auth: None = Depends(_require_admin_access)):
+def clear_cache(request: Request, response: Response, _auth: None = Depends(_require_admin_access)):
     """Clear the in-memory GCS response cache so the next request re-fetches fresh data.
 
     Call this after pushing new race data to GCS so the API reflects the update
@@ -241,6 +295,7 @@ def clear_cache(request: Request, _auth: None = Depends(_require_admin_access)):
 @limiter.limit("20/minute")
 async def analytics_overview(
     request: Request,
+    response: Response,
     hours: int = Query(default=24, ge=1, le=720),
     _auth: None = Depends(_require_admin_access),
 ):
@@ -252,6 +307,7 @@ async def analytics_overview(
 @limiter.limit("20/minute")
 async def analytics_traffic(
     request: Request,
+    response: Response,
     hours: int = Query(default=24, ge=1, le=720),
     _auth: None = Depends(_require_admin_access),
 ):
@@ -263,6 +319,7 @@ async def analytics_traffic(
 @limiter.limit("20/minute")
 async def analytics_races(
     request: Request,
+    response: Response,
     hours: int = Query(default=24, ge=1, le=720),
     _auth: None = Depends(_require_admin_access),
 ):
@@ -285,6 +342,7 @@ async def analytics_races(
 @limiter.limit("20/minute")
 async def analytics_timeseries(
     request: Request,
+    response: Response,
     hours: int = Query(default=24, ge=1, le=720),
     bucket: int = Query(default=60, ge=5, le=360),
     _auth: None = Depends(_require_admin_access),

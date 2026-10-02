@@ -146,6 +146,10 @@ export interface ValidationGrade {
   score: number;
   passed: boolean;
   summary: string;
+  /** Reviews that judged the current roster (older grades omit this). */
+  current_review_count?: number;
+  /** Reviews that judged an earlier roster; ignored for the score. */
+  stale_review_count?: number;
 }
 
 export type ForecastRating =

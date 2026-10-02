@@ -34,6 +34,7 @@
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
   import { canonicalStateName } from "$lib/utils/states";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   const tabs: { id: ForecastTab; label: string }[] = [
     { id: "house", label: "House" },
@@ -173,6 +174,14 @@
     setUrlState(activeTab, null);
   }
 
+  const RACE_LIST_ID = "forecast-race-list";
+  function scrollToRaceList() {
+    const list = document.getElementById(RACE_LIST_ID);
+    if (!list) return;
+    list.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+    list.focus({ preventScroll: true });
+  }
+
   $: mostLikelyOutcome = getMostLikelySeatOutcome(
     chamberSummary?.seat_distribution ?? {},
   );
@@ -253,91 +262,105 @@
          different ?tab= hides it until hydration via the data-forecast-pending-tab
          flag app.html sets, so the House view never flashes. -->
     <div class="space-y-8" class:forecast-prerendered={!hydrated}>
-      <ForecastTabNav {tabs} {activeTab} onSelect={setActiveTab} />
-
-      <ForecastSummaryCard
+      <ForecastTabNav
+        {tabs}
         {activeTab}
-        {controlParty}
-        controlProbability={chamberSummary?.control_probability}
-        vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
-        {mostLikelyOutcome}
-        tossupCount={chamberSummary?.tossup_count ?? 0}
-        competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
-        {cycleYear}
-        {outcomeProbabilities}
-        {projectedSeats}
-        {totalSeats}
-        {threshold}
-        narrative={chamberNarrative}
-        updatedAt={chamberForecasts?.updated_at}
+        onSelect={setActiveTab}
+        panelId="forecast-tabpanel"
       />
 
-      <!-- Interactive Map & Statistics Dashboard Grid -->
-      <section
-        class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] gap-6 items-stretch"
+      <div
+        id="forecast-tabpanel"
+        role="tabpanel"
+        aria-labelledby="forecast-tab-{activeTab}"
+        class="space-y-8"
       >
-        <ForecastElectoralMap
+        <ForecastSummaryCard
           {activeTab}
-          {activeStates}
-          {selectedState}
-          {stateRaceCounts}
-          {stateColors}
-          {stateTooltips}
-          onStateClick={handleStateClick}
-          onClearFilter={clearStateFilter}
+          {controlParty}
+          controlProbability={chamberSummary?.control_probability}
+          vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
+          {mostLikelyOutcome}
+          tossupCount={chamberSummary?.tossup_count ?? 0}
+          competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
+          {cycleYear}
+          {outcomeProbabilities}
+          {projectedSeats}
+          {totalSeats}
+          {threshold}
+          narrative={chamberNarrative}
+          updatedAt={chamberForecasts?.updated_at}
         />
 
-        <!-- Stats Panel Column -->
-        <div class="space-y-6 h-full flex flex-col">
-          <ForecastProjectionSummary
-            label={aggregate.label}
-            {controlParty}
-            {threshold}
-            {projectedSeats}
-            totalExpected={aggregate.totalExpected}
-            {expectedSeats}
-            netChange={aggregate.netChange}
+        <!-- Interactive Map & Statistics Dashboard Grid -->
+        <section
+          class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] gap-6 items-stretch"
+        >
+          <ForecastElectoralMap
+            {activeTab}
+            {activeStates}
+            {selectedState}
+            {stateRaceCounts}
+            {stateColors}
+            {stateTooltips}
+            onStateClick={handleStateClick}
+            onClearFilter={clearStateFilter}
+            onViewResults={scrollToRaceList}
           />
 
-          {#if chamberSummary?.seat_distribution && Object.keys(chamberSummary.seat_distribution).length > 0}
-            <ForecastSeatOutcomeChart
-              {seatBuckets}
-              sortedOutcomes={seatOutcomeChart.outcomes}
-              maxProbability={seatOutcomeChart.maxProbability}
-              svgData={seatOutcomeChart.svgData}
+          <!-- Stats Panel Column -->
+          <div class="space-y-6 h-full flex flex-col">
+            <ForecastProjectionSummary
+              label={aggregate.label}
+              {controlParty}
+              {threshold}
+              {projectedSeats}
+              totalExpected={aggregate.totalExpected}
+              {expectedSeats}
+              netChange={aggregate.netChange}
             />
-          {/if}
-        </div>
-      </section>
 
-      <ForecastRatingsBreakdown
-        ratingOrder={ratingBreakdownOrder}
-        ratingCounts={aggregate.ratingCounts}
-      />
+            {#if chamberSummary?.seat_distribution && Object.keys(chamberSummary.seat_distribution).length > 0}
+              <ForecastSeatOutcomeChart
+                {seatBuckets}
+                sortedOutcomes={seatOutcomeChart.outcomes}
+                maxProbability={seatOutcomeChart.maxProbability}
+                svgData={seatOutcomeChart.svgData}
+              />
+            {/if}
+          </div>
+        </section>
 
-      <ForecastKeyRaces races={keyRacesList} />
+        <ForecastRatingsBreakdown
+          ratingOrder={ratingBreakdownOrder}
+          ratingCounts={aggregate.ratingCounts}
+        />
 
-      <ForecastOutlookAnalysis
-        {activeTab}
-        {chamberSummary}
-        {chamberNarrative}
-      />
+        <ForecastKeyRaces races={keyRacesList} />
 
-      <ForecastRaceList
-        races={aggregate.races}
-        {activeTab}
-        {selectedState}
-        {chamberSummary}
-        onClearStateFilter={clearStateFilter}
-      />
+        <ForecastOutlookAnalysis
+          {activeTab}
+          {chamberSummary}
+          {chamberNarrative}
+        />
 
-      <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />
+        <ForecastRaceList
+          races={aggregate.races}
+          {activeTab}
+          {selectedState}
+          {chamberSummary}
+          onClearStateFilter={clearStateFilter}
+          sectionId={RACE_LIST_ID}
+        />
 
-      <ForecastHoldovers
-        {activeTab}
-        holdovers={aggregate.holdovers}
-        {cycleYear}
-      />
+        <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />
+
+        <ForecastHoldovers
+          {activeTab}
+          holdovers={aggregate.holdovers}
+          {cycleYear}
+        />
+      </div>
     </div>
   {/if}
 </div>

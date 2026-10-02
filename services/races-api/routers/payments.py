@@ -85,7 +85,7 @@ def _validate_session_id(session_id: str) -> None:
 
 @router.post("/checkout")
 @limiter.limit("10/minute")
-def create_checkout_session(body: CheckoutRequest, request: Request):
+def create_checkout_session(body: CheckoutRequest, request: Request, response: Response):
     """Create a Stripe Checkout session and return the hosted session URL."""
     if not _STRIPE_SECRET_KEY:
         raise HTTPException(status_code=503, detail="Payments are not yet available.")

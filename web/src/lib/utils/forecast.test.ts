@@ -743,3 +743,30 @@ describe("forecast utilities", () => {
     });
   });
 });
+
+describe("isUncontestedForecastRace", () => {
+  const base = {
+    candidates: [
+      { name: "A", party: "Democratic", incumbent: true },
+      { name: "B", party: "Republican", incumbent: false },
+    ],
+  };
+  it("flags the uncontested stage and single-candidate generals", async () => {
+    const { isUncontestedForecastRace } = await import("./forecast");
+    expect(
+      isUncontestedForecastRace({ ...base, contest_stage: "uncontested" }),
+    ).toBe(true);
+    expect(
+      isUncontestedForecastRace({
+        candidates: [base.candidates[0]],
+        contest_stage: "post_primary_general",
+      }),
+    ).toBe(true);
+    expect(
+      isUncontestedForecastRace({
+        ...base,
+        contest_stage: "post_primary_general",
+      }),
+    ).toBe(false);
+  });
+});

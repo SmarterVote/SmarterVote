@@ -1,9 +1,14 @@
 <script lang="ts">
-  import type { ValidationGrade } from "$lib/types";
+  import type { AgentReview, ValidationGrade } from "$lib/types";
   import { tick } from "svelte";
   import { scrollBehavior } from "$lib/utils/motion";
+  import { reviewStatus } from "$lib/utils/reviews";
 
   export let grade: ValidationGrade;
+  /** The race's reviews: stale ones (an earlier roster) never count as validation. */
+  export let reviews: AgentReview[] = [];
+
+  $: status = reviewStatus(grade, reviews);
 
   let showPopover = false;
   let wrapper: HTMLDivElement | undefined;
@@ -78,7 +83,9 @@
     bind:this={badge}
     class="grade-badge {gradeColor(grade.grade)}"
     on:click={togglePopover}
-    aria-label="Automated research score: {grade.grade}"
+    aria-label="Automated research score: {grade.grade}{status.allStale
+      ? ' (reviewed before the latest roster update)'
+      : ''}"
     aria-expanded={showPopover}
     aria-controls={showPopover ? "validation-grade-popover" : undefined}
   >
@@ -97,7 +104,9 @@
       />
     </svg>
     <span class="grade-letter">{grade.grade}</span>
-    <span class="grade-label">Research score</span>
+    <span class="grade-label"
+      >{status.allStale ? "Review outdated" : "Research score"}</span
+    >
   </button>
 
   {#if showPopover}
@@ -120,7 +129,10 @@
         >
       </div>
       <p class="popover-score">Score: {grade.score}/100</p>
-      <p class="popover-summary">{grade.summary}</p>
+      <p class="popover-summary">{status.summary}</p>
+      {#if status.currencyNote}
+        <p class="popover-currency">{status.currencyNote}</p>
+      {/if}
       <p class="popover-explain">
         Separate AI models review source quality, completeness, consistency, and
         neutrality. The score summarizes those research checks; it is not a
@@ -201,6 +213,10 @@
 
   .popover-summary {
     @apply text-sm text-content-muted mb-3;
+  }
+
+  .popover-currency {
+    @apply -mt-2 mb-3 text-xs font-medium text-content-subtle;
   }
 
   .popover-explain {

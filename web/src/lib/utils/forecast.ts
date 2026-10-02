@@ -10,6 +10,21 @@ import {
   SENATE_HOLDOVERS,
 } from "./holdovers";
 import { canonicalRaceState } from "./states";
+import { isUncontestedRace } from "$lib/utils/racePage";
+
+/**
+ * An uncontested race (one active candidate, or a published "uncontested"
+ * stage) has nothing to forecast: show "Uncontested" rather than a rating or
+ * win odds. It still counts toward its party's seat totals.
+ */
+export function isUncontestedForecastRace(
+  race: Pick<RaceSummary, "contest_stage" | "candidates">,
+): boolean {
+  const active = (race.candidates ?? []).filter(
+    (candidate) => !(candidate as { withdrawn?: boolean }).withdrawn,
+  ).length;
+  return isUncontestedRace(race, active);
+}
 
 export type ForecastTab = "house" | "senate" | "governors";
 

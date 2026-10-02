@@ -8,9 +8,8 @@
   import { candidateSlug } from "$lib/utils/format";
   import { partyBadgeClass } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
-  import { headshotFallback } from "$lib/utils/racePageImage";
+  import CandidateAvatar from "./CandidateAvatar.svelte";
   import { cleanDisplayText } from "$lib/utils/racePage";
-  import { candidateInitials } from "$lib/utils/candidates";
   import { createEventDispatcher } from "svelte";
 
   export let candidate: Candidate;
@@ -24,13 +23,6 @@
   $: draftQuery = draft ? "?draft=true" : "";
 
   let expanded = false;
-  let imageError = false;
-  let imageUrlSeen: string | undefined = candidate?.image_url;
-  // A different headshot gets a fresh chance to load.
-  $: if (candidate.image_url !== imageUrlSeen) {
-    imageUrlSeen = candidate.image_url;
-    imageError = false;
-  }
   let activeTab: "issues" | "background" | "donors" | "voting" = "issues";
 
   function toggleExpanded() {
@@ -51,7 +43,6 @@
     typeof candidate.summary === "string" ? candidate.summary : "",
   );
   $: profileHref = `/races/${raceId}/${candidateSlug(candidate.name)}/${draftQuery}`;
-  $: initials = candidateInitials(candidate.name);
 </script>
 
 <Card
@@ -60,27 +51,14 @@
 >
   <!-- Candidate Header -->
   <div class="flex items-start gap-3 sm:gap-4">
-    {#if candidate.image_url && !imageError}
-      <img
-        src={candidate.image_url}
+    <span class="card-avatar">
+      <CandidateAvatar
+        name={candidate.name}
+        imageUrl={candidate.image_url}
+        size={64}
         alt={candidate.name}
-        class="candidate-image"
-        width="64"
-        height="64"
-        loading="lazy"
-        decoding="async"
-        referrerpolicy="no-referrer"
-        use:headshotFallback={() => (imageError = true)}
       />
-    {:else}
-      <div
-        class="candidate-image-placeholder"
-        role="img"
-        aria-label={candidate.name}
-      >
-        <span class="candidate-initials" aria-hidden="true">{initials}</span>
-      </div>
-    {/if}
+    </span>
     <div class="min-w-0 flex-1">
       <div class="flex items-start justify-between gap-2">
         <h3 class="candidate-name">
@@ -259,6 +237,7 @@
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
+                            aria-hidden="true"
                           >
                             <path
                               stroke-linecap="round"
@@ -302,6 +281,7 @@
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
+                            aria-hidden="true"
                           >
                             <path
                               stroke-linecap="round"
@@ -353,16 +333,15 @@
     @apply flex h-full w-full flex-col p-4 sm:p-5;
   }
 
-  .candidate-image {
-    @apply h-14 w-14 flex-shrink-0 rounded-full border-2 border-stroke object-cover sm:h-16 sm:w-16;
+  .card-avatar {
+    @apply flex shrink-0;
+    --avatar-display-size: 3.5rem;
   }
 
-  .candidate-image-placeholder {
-    @apply flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full border-2 border-stroke bg-surface-alt sm:h-16 sm:w-16;
-  }
-
-  .candidate-initials {
-    @apply select-none text-lg font-bold text-content-muted;
+  @media (min-width: 640px) {
+    .card-avatar {
+      --avatar-display-size: 4rem;
+    }
   }
 
   .candidate-name {

@@ -4,6 +4,7 @@ import {
   formatRating,
   getRaceState,
   isRaceInForecastTab,
+  isUncontestedForecastRace,
   forecastWinnerParty,
   normalizeForecastParty,
   parseSeatDistributionKey,
@@ -118,7 +119,18 @@ function forecastBadgeClass(rating: ForecastRating): string {
       : "!bg-slate-500 !text-white";
 }
 
-function forecastDetails(forecast: NonNullable<RaceSummary["forecast"]>) {
+function forecastDetails(
+  forecast: NonNullable<RaceSummary["forecast"]>,
+  uncontested = false,
+) {
+  if (uncontested) {
+    const name =
+      forecast.predicted_winner_name || forecast.predicted_winner_party;
+    return {
+      lead: [name ? `Uncontested: ${name}` : "Uncontested"],
+      rationale: "",
+    };
+  }
   const winProbText = forecast.win_probability
     ? ` (${Math.round(forecast.win_probability * 100)}% prob.)`
     : "";
@@ -126,7 +138,8 @@ function forecastDetails(forecast: NonNullable<RaceSummary["forecast"]>) {
     forecast.predicted_winner_name ||
     forecast.predicted_winner_party ||
     "Not stated";
-  const rationale = forecast.rationale ?? "";
+  // The forecast page's payload carries the takeaway, not the full rationale.
+  const rationale = forecast.rationale || forecast.takeaway || "";
   return {
     lead: [
       `Projected: ${projected}${winProbText}`,
@@ -173,6 +186,8 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
     ).length,
     details: sorted.slice(0, 3).map((race) => {
       const forecast = race.forecast!;
+      if (isUncontestedForecastRace(race))
+        return `${raceDisplayTitle(race)}: Uncontested`;
       const party = normalizeForecastParty(
         forecast.predicted_winner_party,
         forecast.party_probabilities,
@@ -456,11 +471,16 @@ export function buildStateMapData(
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const { lead, rationale } = forecastDetails(r.forecast);
+        const { lead, rationale } = forecastDetails(
+          r.forecast,
+          isUncontestedForecastRace(r),
+        );
         tooltips[state] = {
           title: state,
           subtitle: `${cyclePrefix}Governor Race`,
-          badge: formatRating(rating),
+          badge: isUncontestedForecastRace(r)
+            ? "Uncontested"
+            : formatRating(rating),
           badgeClass: forecastBadgeClass(rating),
           details: rationale ? [...lead, rationale] : lead,
         };
@@ -532,7 +552,10 @@ export function buildStateMapData(
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const { lead, rationale } = forecastDetails(r.forecast);
+        const { lead, rationale } = forecastDetails(
+          r.forecast,
+          isUncontestedForecastRace(r),
+        );
         const details = [...lead];
         if (holdoverDetail) details.push(holdoverDetail);
         if (rationale) details.push(rationale);
@@ -540,7 +563,9 @@ export function buildStateMapData(
         tooltips[state] = {
           title: state,
           subtitle: `${cyclePrefix}Senate Election`,
-          badge: formatRating(rating),
+          badge: isUncontestedForecastRace(r)
+            ? "Uncontested"
+            : formatRating(rating),
           badgeClass: forecastBadgeClass(rating),
           details,
         };

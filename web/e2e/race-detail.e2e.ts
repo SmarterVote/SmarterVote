@@ -122,6 +122,13 @@ test.describe("race detail page", () => {
     await expect(page.getByRole("link", { name: "Compare all" })).toHaveCount(
       0,
     );
+    // contest_stage "uncontested": a stage note, and no favorite or odds.
+    await expect(
+      page.getByText("Uncontested race", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Forecast" })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole("checkbox")).toHaveCount(0);
   });
 

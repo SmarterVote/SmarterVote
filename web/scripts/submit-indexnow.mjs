@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { INDEXNOW_CHANGES_PATH, sitemapHash } from "./generate-sitemap.mjs";
 
 const DEFAULT_ENDPOINT = "https://api.indexnow.org/indexnow";
 const DEFAULT_HOST = "smarter.vote";
@@ -22,9 +23,40 @@ if (!key) {
 }
 
 const sitemapXml = await fs.readFile(sitemapPath, "utf8");
-const urls = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g), (match) =>
-  unescapeXml(match[1]),
-).filter((url) => {
+const allUrls = Array.from(
+  sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g),
+  (match) => unescapeXml(match[1]),
+);
+
+/**
+ * generate-sitemap.mjs records which URLs are new or changed compared with
+ * the sitemap deployed before this build. Use that list when it was made for
+ * exactly this sitemap; otherwise (or with INDEXNOW_SUBMIT_ALL=true) submit
+ * every URL.
+ */
+async function changedUrls() {
+  if (process.env.INDEXNOW_SUBMIT_ALL === "true") return null;
+  try {
+    const record = JSON.parse(await fs.readFile(INDEXNOW_CHANGES_PATH, "utf8"));
+    if (
+      record?.sitemapSha256 === sitemapHash(sitemapXml) &&
+      Array.isArray(record.urls)
+    )
+      return record.urls.map(String);
+  } catch {
+    // No usable record: submit everything.
+  }
+  return null;
+}
+
+const changed = await changedUrls();
+if (changed === null) {
+  console.log(
+    "Submitting every sitemap URL (no change record for this sitemap).",
+  );
+}
+const candidates = changed ?? allUrls;
+const urls = candidates.filter((url) => {
   try {
     return new URL(url).host === host;
   } catch {
@@ -32,8 +64,13 @@ const urls = Array.from(sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g), (match) =>
   }
 });
 
-if (urls.length === 0) {
+if (allUrls.length === 0) {
   throw new Error(`No URLs for ${host} found in ${sitemapPath}`);
+}
+
+if (urls.length === 0) {
+  console.log("No new or changed sitemap URLs since the last deployment.");
+  process.exit(0);
 }
 
 for (let start = 0; start < urls.length; start += MAX_URLS_PER_REQUEST) {

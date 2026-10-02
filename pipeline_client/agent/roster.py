@@ -6,6 +6,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from shared.party_labels import normalize_party
+
 ROSTER_CAP = 8
 
 
@@ -30,6 +32,9 @@ def normalize_candidate_entries(race_json: Dict[str, Any], log: Any | None = Non
             dropped += 1
             continue
         candidate["name"] = name
+        # "Democratic Party" / "Democrat" -> "Democratic", so one party is one label.
+        if isinstance(candidate.get("party"), str):
+            candidate["party"] = normalize_party(candidate["party"])
         # A blank string is not a valid URL. One stored in website/image_url fails
         # RaceJSON validation for the whole race, so a single cleared field blocks
         # publication of an otherwise complete profile. Clearing means null.

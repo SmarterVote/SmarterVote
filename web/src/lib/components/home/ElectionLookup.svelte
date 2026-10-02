@@ -7,6 +7,7 @@
   import {
     lookupElectionGeography,
     matchingNationalRaces,
+    normalizeDistrictCode,
   } from "$lib/services/electionLookup";
   import {
     abandonAddressSession,
@@ -15,6 +16,7 @@
   } from "$lib/services/googlePlaces";
   import { debounce } from "$lib/utils/debounce";
   import { canonicalStateName } from "$lib/utils/states";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[] = [];
   /** True when the published race list could not be loaded at all. */
@@ -91,6 +93,26 @@
     }
   }, 600);
 
+  $: isDistrictOfColumbia =
+    (canonicalStateName(state) ?? state) === "District of Columbia";
+
+  /**
+   * On a phone the on-screen keyboard covers the lower half of the screen,
+   * so bring the field (and the suggestions under it) to the top.
+   */
+  function handleAddressFocus() {
+    suggestionsOpen = suggestions.length > 0;
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 639px)").matches
+    ) {
+      addressInput?.scrollIntoView({
+        behavior: scrollBehavior(),
+        block: "start",
+      });
+    }
+  }
+
   function handleAddressInput() {
     const request = ++suggestionRequest;
     if (address.trim().length < 5) {
@@ -147,8 +169,10 @@
   function restoreFromGeography(savedState: string, savedDistrict: string) {
     // Shared links may carry a postal code or any case (`?state=AK`).
     const normalizedState = canonicalStateName(savedState) ?? savedState.trim();
-    const normalizedDistrict = savedDistrict.trim().padStart(2, "0");
-    if (!normalizedState || !/^\d{2}$/.test(normalizedDistrict)) return false;
+    // Accept every form earlier links used: "8", "08", "98" (D.C.), "al",
+    // or the Census at-large text.
+    const normalizedDistrict = normalizeDistrictCode(savedDistrict);
+    if (!normalizedState || !normalizedDistrict) return false;
 
     state = normalizedState;
     district = normalizedDistrict;
@@ -168,7 +192,8 @@
     replaceState(url, {});
   }
 
-  function districtLabel(value: string): string {
+  function districtLabel(value: string, dc: boolean): string {
+    if (dc) return "Non-voting delegate district";
     return value === "00"
       ? "At-large congressional district"
       : `U.S. House District ${Number(value)}`;
@@ -178,8 +203,14 @@
     const url = new URL(window.location.href);
     const urlState = url.searchParams.get("state");
     const urlDistrict = url.searchParams.get("district");
-    if (urlState && urlDistrict && restoreFromGeography(urlState, urlDistrict))
-      return;
+    if (urlState && urlDistrict) {
+      if (restoreFromGeography(urlState, urlDistrict)) return;
+      // Unrecognised link: drop the stale parameters instead of leaving them
+      // in a URL that would be shared on.
+      url.searchParams.delete("state");
+      url.searchParams.delete("district");
+      replaceState(url, {});
+    }
 
     try {
       const saved = JSON.parse(readSession() ?? "null") as {
@@ -283,21 +314,25 @@
   {#if !submitted}
     <div
       data-address-search-card
-      class="card relative rounded-2xl p-6 shadow-lg sm:p-10"
+      class="card relative rounded-2xl p-5 shadow-lg sm:p-10"
     >
-      <p class="eyebrow">Address search</p>
+      <p class="eyebrow hidden sm:block">Address search</p>
       <h2
-        class="mt-2 text-2xl font-bold tracking-tight text-content sm:text-3xl"
+        class="text-xl font-bold tracking-tight text-content sm:mt-2 sm:text-3xl"
       >
         Where are you registered to vote?
       </h2>
-      <p class="mt-4 max-w-xl leading-7 text-content-muted">
+      <p class="mt-2 text-sm leading-6 text-content-muted sm:hidden">
+        Enter your full home address to see your House, Senate, and governor
+        races.
+      </p>
+      <p class="mt-4 hidden max-w-xl leading-7 text-content-muted sm:block">
         Enter the full residential address where you are registered. We’ll
         identify your district and show the U.S. House, Senate, and governor
         research available for it.
       </p>
 
-      <form class="mt-7" on:submit|preventDefault={findElections}>
+      <form class="mt-4 sm:mt-7" on:submit|preventDefault={findElections}>
         <label for="home-address" class="text-sm font-semibold text-content"
           >Home address</label
         >
@@ -308,7 +343,7 @@
             bind:value={address}
             on:input={handleAddressInput}
             on:keydown={handleAddressKeydown}
-            on:focus={() => (suggestionsOpen = suggestions.length > 0)}
+            on:focus={handleAddressFocus}
             required
             autocomplete="street-address"
             role="combobox"
@@ -318,8 +353,8 @@
             aria-activedescendant={suggestionsOpen && activeSuggestionIndex >= 0
               ? `address-suggestion-${suggestions[activeSuggestionIndex].id}`
               : undefined}
-            placeholder="1600 Pennsylvania Ave NW, Washington, DC 20500"
-            class="mt-2 min-h-[60px] w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15"
+            placeholder="301 W 2nd St, Austin, TX 78701"
+            class="mt-2 min-h-[60px] scroll-mt-24 w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15"
           />
           {#if suggestionsOpen}
             <div
@@ -408,7 +443,7 @@
       >
         <div>
           <p class="eyebrow">
-            {state} · {districtLabel(district)}
+            {state} · {districtLabel(district, isDistrictOfColumbia)}
           </p>
           <h1
             id="ballot-results-heading"
@@ -432,8 +467,9 @@
               target="_blank"
               rel="noopener noreferrer"
               class="ml-1 font-semibold text-primary-700 hover:underline dark:text-primary-300"
-              >See what's on your full ballot at VOTE411
-              <span class="sr-only"> (opens in a new tab)</span></a
+              >See what's on your full ballot at VOTE411<span class="sr-only">
+                (opens in a new tab)</span
+              ></a
             >.
           </p>
         </div>
@@ -454,6 +490,9 @@
           {#if loadError && races.length === 0}
             We identified your district, but the published election guides
             couldn’t be loaded. Please try again shortly.
+          {:else if isDistrictOfColumbia}
+            D.C. elects a non-voting delegate to the U.S. House; Smarter.Vote
+            doesn’t cover that race yet.
           {:else}
             We identified your district, but no matching Smarter.Vote guide is
             available yet. This does not mean you have no elections.

@@ -13,24 +13,49 @@
 >
   <PolicySection title="Data we handle">
     <p>
-      The public site may receive ordinary technical request data and
-      privacy-preserving traffic measurements. If you email us, Gmail processes
-      the message and related account information. Please send only what is
-      needed for your inquiry.
+      Like any website, our hosting providers (Cloudflare for the site and
+      Google Cloud for our API) receive ordinary technical request data such as
+      your IP address, browser user agent, and the page requested. If you email
+      us, Gmail processes the message and related account information. Please
+      send only what is needed for your inquiry.
+    </p>
+    <p>
+      We measure traffic with Cloudflare Web Analytics, which does not use
+      cookies or track you across sites. Our API keeps request statistics with
+      IP addresses replaced by a keyed one-way hash; it does not store raw IP
+      addresses for analytics.
+    </p>
+    <p>
+      The site remembers your light or dark theme choice in your browser's local
+      storage. It sets no advertising or tracking cookies.
+    </p>
+  </PolicySection>
+  <PolicySection title="Candidate photos and other images">
+    <p>
+      Many candidate photos are loaded directly from the sites that publish
+      them, such as Wikimedia Commons, campaign sites, and government sites.
+      When your browser loads one of those images, that host receives your IP
+      address, browser user agent, and that the request came from smarter.vote,
+      and handles it under its own policies.
     </p>
   </PolicySection>
   <PolicySection title="Address lookup">
     <p>
       If address suggestions are enabled, what you type is sent directly from
       your browser to Google Places. Selecting a suggestion retrieves its
-      formatted address. The completed address is then sent directly from your
-      browser to the U.S. Census Geocoder to identify a state and congressional
-      district. Smarter.Vote does not send the address to its own server, place
-      it in the page URL or analytics, or save it in browser storage. The
-      derived state, district, and matched race IDs are kept in this tab's
-      session storage so results survive a refresh. Google and the Census Bureau
-      handle their parts of the lookup under their own policies. The derived
-      values are cleared when you search another address or close the tab.
+      formatted address. The completed address is then sent to Smarter.Vote's
+      API, which forwards it to the U.S. Census Geocoder to identify a state and
+      congressional district and returns only those two values. Our API does not
+      store or log the address, and it is never placed in the page URL,
+      analytics, or browser storage. Google and the Census Bureau handle their
+      parts of the lookup under their own policies.
+    </p>
+    <p>
+      The derived state, district, and matched race IDs are kept in this tab's
+      session storage so results survive a refresh, and are cleared when you
+      search another address or close the tab. The state and district (not your
+      address) are also added to the My Ballot page URL so the results can be
+      bookmarked or shared; anyone you share that link with can see them.
     </p>
   </PolicySection>
   <PolicySection title="Support payments">
