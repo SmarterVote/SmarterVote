@@ -423,8 +423,7 @@
    */
   function queueItemForRun(runId: string): QueueItem | undefined {
     const run = runs.find((r) => r.run_id === runId) as
-      | RunMetricFields
-      | undefined;
+      RunMetricFields | undefined;
     const chain = new Set<string>([runId, ...(run?.invocation_run_ids ?? [])]);
     const active = queueItems.filter(
       (q) => q.status === "running" || q.status === "pending",

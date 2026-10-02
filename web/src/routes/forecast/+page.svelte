@@ -72,8 +72,7 @@
   $: aggregate = aggregateForecasts(races, activeTab);
 
   $: chamberForecasts = ($page.data.chamberForecasts ?? undefined) as
-    | ChamberForecasts
-    | undefined;
+    ChamberForecasts | undefined;
   $: chamberSummary = chamberForecasts?.chambers?.[activeTab];
   $: chamberNarrative =
     chamberSummary?.narrative || chamberForecasts?.[activeTab] || "";

@@ -11,12 +11,8 @@
   import { browser } from "$app/environment";
 
   export let activeTab:
-    | "dashboard"
-    | "research"
-    | "races"
-    | "runs"
-    | "forecasts"
-    | "costs" = "dashboard";
+    "dashboard" | "research" | "races" | "runs" | "forecasts" | "costs" =
+    "dashboard";
 
   const tabs = [
     { id: "dashboard", label: "Dashboard" },

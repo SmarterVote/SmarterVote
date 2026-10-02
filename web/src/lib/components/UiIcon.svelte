@@ -1,10 +1,6 @@
 <script lang="ts">
   export let name:
-    | "arrow-right"
-    | "arrow-left"
-    | "chevron-down"
-    | "external"
-    | "close";
+    "arrow-right" | "arrow-left" | "chevron-down" | "external" | "close";
   export let size: "sm" | "md" = "md";
 </script>
 

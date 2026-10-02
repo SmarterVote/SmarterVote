@@ -33,12 +33,7 @@ export interface QueueItem {
   id: string;
   race_id: string;
   status:
-    | "pending"
-    | "running"
-    | "completed"
-    | "failed"
-    | "cancelled"
-    | "continued";
+    "pending" | "running" | "completed" | "failed" | "cancelled" | "continued";
   options: Record<string, unknown>;
   run_id?: string;
   created_at: string;

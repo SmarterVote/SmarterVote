@@ -15,12 +15,7 @@ export type ContestStage =
   | "unknown";
 
 export type RosterSourceType =
-  | "official"
-  | "ballotpedia"
-  | "fec"
-  | "news"
-  | "campaign"
-  | "other";
+  "official" | "ballotpedia" | "fec" | "news" | "campaign" | "other";
 
 export type SourceType =
   | "website"
@@ -724,12 +719,7 @@ export interface PipelineRunRecord {
   cheap_mode: boolean;
   enabled_steps?: string[] | null;
   workflow?:
-    | "discovery"
-    | "refresh_core"
-    | "issues"
-    | "targeted"
-    | "full"
-    | "unknown";
+    "discovery" | "refresh_core" | "issues" | "targeted" | "full" | "unknown";
 }
 
 export interface PipelineMetricsSummary {
@@ -771,11 +761,7 @@ export interface GcpCostSummary {
 // ---------------------------------------------------------------------------
 
 export type ResearchResultState =
-  | "waiting"
-  | "stabilizing"
-  | "stable"
-  | "runoff_pending"
-  | "manual_review";
+  "waiting" | "stabilizing" | "stable" | "runoff_pending" | "manual_review";
 
 export interface ResearchManifestEntry {
   race_id: string;

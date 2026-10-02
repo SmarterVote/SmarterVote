@@ -9,8 +9,8 @@
   let expanded = false;
   $: hasAdditionalAnalysis = Boolean(
     chamberSummary?.why_party_favored ||
-      chamberSummary?.opposing_party_path ||
-      chamberSummary?.key_uncertainty,
+    chamberSummary?.opposing_party_path ||
+    chamberSummary?.key_uncertainty,
   );
   // Never invent an outlook: with no bottom line or narrative, say so.
   $: summary = chamberSummary?.bottom_line || chamberNarrative || "";

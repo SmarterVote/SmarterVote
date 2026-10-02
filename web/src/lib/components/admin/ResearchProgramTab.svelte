@@ -163,8 +163,8 @@
     blocker = checkpoint?.blocker ?? "";
     discoveryReviewed = Boolean(
       checkpoint?.result_fingerprint &&
-        checkpoint.last_reviewed_discovery_fingerprint ===
-          checkpoint.result_fingerprint,
+      checkpoint.last_reviewed_discovery_fingerprint ===
+        checkpoint.result_fingerprint,
     );
     const choices = researchEventChoices(row.manifest);
     const saved = choices.find(

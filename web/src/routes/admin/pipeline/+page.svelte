@@ -26,12 +26,8 @@
 
   let apiService: PipelineApiService;
   let activeTab:
-    | "dashboard"
-    | "research"
-    | "races"
-    | "runs"
-    | "forecasts"
-    | "costs" = "dashboard";
+    "dashboard" | "research" | "races" | "runs" | "forecasts" | "costs" =
+    "dashboard";
   let queueItems: QueueItem[] = [];
   let runs: RunHistoryItem[] = [];
   let isRefreshingRuns = false;
@@ -49,11 +45,11 @@
   let racesTab: RacesTab | null = null;
   let authError = "";
   let ForecastsTabComponent:
-    | typeof import("$lib/components/admin/ForecastsTab.svelte").default
-    | null = null;
+    typeof import("$lib/components/admin/ForecastsTab.svelte").default | null =
+    null;
   let CostsTabComponent:
-    | typeof import("$lib/components/admin/CostsTab.svelte").default
-    | null = null;
+    typeof import("$lib/components/admin/CostsTab.svelte").default | null =
+    null;
   let ResearchProgramTabComponent:
     | typeof import("$lib/components/admin/ResearchProgramTab.svelte").default
     | null = null;
