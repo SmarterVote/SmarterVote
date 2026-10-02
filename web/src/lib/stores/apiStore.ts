@@ -158,6 +158,7 @@ async function acquireToken(
     const token = await client.getTokenSilently(
       forceRefresh ? { cacheMode: "off" } : undefined,
     );
+    if (!token) throw new Error("Auth0 returned no access token");
     apiStore.update((state) => ({
       ...state,
       isAuthenticated: true,

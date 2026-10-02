@@ -7,6 +7,8 @@ updates:
     groups:
       python-runtime:
         patterns: ["*"]
+        # Majors arrive as their own PRs so one breaking upgrade cannot block the group.
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /web
     schedule:
@@ -14,6 +16,8 @@ updates:
     groups:
       frontend-runtime:
         patterns: ["*"]
+        # Majors arrive as their own PRs so one breaking upgrade cannot block the group.
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /design-system
     schedule:
@@ -21,6 +25,8 @@ updates:
     groups:
       marketing-design-system:
         patterns: ["*"]
+        # Majors arrive as their own PRs so one breaking upgrade cannot block the group.
+        update-types: ["minor", "patch"]
   - package-ecosystem: terraform
     directory: /infra
     schedule:
