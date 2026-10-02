@@ -74,7 +74,10 @@ class PipelineRunOptions(BaseModel):
         overrides = validate_model_override_keys(value)
         if overrides is None:
             return None
-        return {role: validate_known_model_id(model, field=f"model_overrides[{role!r}]") for role, model in overrides.items()}
+        return {
+            role: validate_known_model_id(model, field=f"model_overrides[{role!r}]") or model
+            for role, model in overrides.items()
+        }
 
     @field_validator("research_model", "claude_model", "gemini_model", "grok_model")
     @classmethod
