@@ -42,6 +42,16 @@ _LEASE_RENEW_SECONDS = max(15, min(int(os.getenv("WORKER_LEASE_RENEW_SECONDS", "
 _MAX_LOCAL_HANDOFFS = max(1, int(os.getenv("WORKER_MAX_HANDOFFS", "50")))
 _RETENTION = RetentionConfig.from_env()
 
+# Queue item ids whose lease heartbeat found the lease gone (cancelled, deleted,
+# or reclaimed by another worker). AgentHandler's cancellation check consults
+# this so the running agent stops spending at the next step boundary.
+_LOST_LEASE_ITEMS: set = set()
+
+
+def lease_lost(item_id: Optional[str]) -> bool:
+    """True when this process's lease heartbeat for ``item_id`` has been lost."""
+    return bool(item_id) and item_id in _LOST_LEASE_ITEMS
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -223,7 +233,62 @@ def claim_local_item(db: Any, item_ref: Any, lease_owner: str) -> Optional[Dict[
     return claim_item(db, item_ref, lease_owner, "local")
 
 
-def _start_lease_heartbeat(db: Any, item_ref: Any, lease_owner: str):
+def _finalize_queue_item(db: Any, item_ref: Any, lease_owner: str, update: Dict[str, Any]) -> str:
+    """Transactionally write a terminal queue-item status.
+
+    Returns ``"ok"`` when written, ``"missing"`` when the item was deleted
+    (admin force-remove), ``"cancelled"`` when an admin cancelled it and
+    ``update`` would overwrite that, ``"lost"`` when another worker now holds
+    the lease, or ``"error"`` when the write itself failed.
+    """
+    from google.cloud import firestore as _fs  # type: ignore
+
+    @_fs.transactional
+    def _finalize(transaction, ref):
+        doc = ref.get(transaction=transaction)
+        if not getattr(doc, "exists", False):
+            return "missing"
+        data = doc.to_dict() or {}
+        if data.get("status") == "cancelled" and update.get("status") != "cancelled":
+            return "cancelled"
+        current_owner = data.get("lease_owner")
+        if current_owner and current_owner != lease_owner:
+            return "lost"
+        transaction.update(ref, update)
+        return "ok"
+
+    item_id = getattr(item_ref, "id", "?")
+    try:
+        outcome = _finalize(db.transaction(), item_ref)
+    except Exception as exc:
+        logger.warning("Terminal update failed for queue item %s: %s", item_id, exc)
+        return "error"
+    if outcome != "ok":
+        logger.warning("Skipped terminal status %r for queue item %s: item is %s", update.get("status"), item_id, outcome)
+    return outcome
+
+
+def _finalize_run_cancelled(db: Any, run_ref: Any, race_id: str, run_id: str, summary: Optional[str]) -> None:
+    """Mark the run record cancelled (used when the queue item was cancelled or removed)."""
+    from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
+
+    run_ref.update(
+        {
+            "status": "cancelled",
+            "completed_at": SERVER_TIMESTAMP,
+            "activity_at": SERVER_TIMESTAMP,
+            "run_health": {
+                "status": RunHealthStatus.FAILED.value,
+                "reasons": [RunFailureReason.CANCELLED.value],
+                "step_failures": [],
+                "summary": summary or None,
+            },
+        }
+    )
+    _set_race_if_current(db, race_id, run_id, {"status": "cancelled", "current_run_id": None})
+
+
+def _start_lease_heartbeat(db: Any, item_ref: Any, lease_owner: str, item_id: Optional[str] = None):
     stop_event = threading.Event()
 
     def _heartbeat() -> None:
@@ -251,7 +316,9 @@ def _start_lease_heartbeat(db: Any, item_ref: Any, lease_owner: str):
 
             try:
                 if not _renew(db.transaction(), item_ref):
-                    logger.warning("Lease lost for queue item %s", getattr(item_ref, "id", "?"))
+                    logger.warning("Lease lost for queue item %s; signalling the agent to stop", getattr(item_ref, "id", "?"))
+                    if item_id:
+                        _LOST_LEASE_ITEMS.add(item_id)
                     return
             except Exception:
                 logger.exception("Failed to renew queue lease")
@@ -311,14 +378,17 @@ async def process_claimed_item(
     item_ref = db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id)
 
     if not race_id:
-        item_ref.update(
+        _finalize_queue_item(
+            db,
+            item_ref,
+            lease_owner,
             {
                 "status": "failed",
                 "error": "Missing race_id",
                 "lease_owner": None,
                 "lease_expires_at": None,
                 "ttl_at": _queue_ttl_at(),
-            }
+            },
         )
         return RunFailureReason.UNKNOWN_ERROR.value
 
@@ -360,7 +430,8 @@ async def process_claimed_item(
     save_artifact_requested = bool(options.get("save_artifact", True))
     run_started_utc = _now().isoformat()
     started_at = _time.perf_counter()
-    lease_stop, lease_thread = _start_lease_heartbeat(db, item_ref, lease_owner)
+    _LOST_LEASE_ITEMS.discard(item_id)
+    lease_stop, lease_thread = _start_lease_heartbeat(db, item_ref, lease_owner, item_id)
     success = False
     error_msg = ""
     handoffs_followed = 0
@@ -407,16 +478,23 @@ async def process_claimed_item(
                 options = dict(cont_data.get("options") or {})
                 options["run_id"] = run_id
                 options["queue_item_id"] = item_id
-                cont_existing_path = cont_data.get("existing_data_gcs_path")
-                existing_data = _load_gcs_json(gcs, bucket_name, cont_existing_path) if cont_existing_path else None
+                # Prefer the handler's in-memory checkpoint: it is the latest data and
+                # survives a failed GCS checkpoint upload, which would otherwise reload
+                # the stale draft and silently drop the completed steps.
+                if isinstance(getattr(exc, "checkpoint_data", None), dict):
+                    existing_data = exc.checkpoint_data
+                else:
+                    cont_existing_path = cont_data.get("existing_data_gcs_path")
+                    existing_data = _load_gcs_json(gcs, bucket_name, cont_existing_path) if cont_existing_path else None
                 try:
                     cont_ref.delete()
                 except Exception:
-                    logger.debug("Could not delete followed continuation item %s", exc.continuation_item_id, exc_info=True)
+                    logger.warning("Could not delete followed continuation item %s", exc.continuation_item_id, exc_info=True)
     except AgentCancelled as exc:
         logger.info("Local run %s cancelled: %s", run_id, exc)
         try:
             from pipeline_client.agent.cost import _cost_ctx, estimate_cost
+            from pipeline_client.agent.cost import search_cost_usd as _search_cost_usd
             from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
 
             acc = _cost_ctx.get() or {}
@@ -425,7 +503,7 @@ async def process_claimed_item(
                 estimate_cost(model, counts.get("prompt_tokens", 0), counts.get("completion_tokens", 0))
                 for model, counts in breakdown.items()
             )
-            search_cost_usd = int(acc.get("serper_calls", 0) or 0) * 0.001
+            search_cost_usd = _search_cost_usd(acc.get("serper_calls"), acc.get("searlo_calls"))
             llm_cost_usd = float(acc.get("provider_cost_usd", 0.0) or 0.0)
             has_exact_cost = int(acc.get("priced_calls", 0) or 0) > 0 and int(acc.get("unpriced_calls", 0) or 0) == 0
             cancelled_metrics = {
@@ -458,29 +536,21 @@ async def process_claimed_item(
             _cost_ctx.set(None)
         except Exception:
             logger.warning("Failed to record metrics for cancelled local run %s", run_id, exc_info=True)
-        item_ref.update(
+        lease_stop.set()
+        outcome = _finalize_queue_item(
+            db,
+            item_ref,
+            lease_owner,
             {
                 "status": "cancelled",
                 "completed_at": _now().isoformat(),
                 "lease_owner": None,
                 "lease_expires_at": None,
                 "ttl_at": _queue_ttl_at(),
-            }
+            },
         )
-        run_ref.update(
-            {
-                "status": "cancelled",
-                "completed_at": SERVER_TIMESTAMP,
-                "activity_at": SERVER_TIMESTAMP,
-                "run_health": {
-                    "status": RunHealthStatus.FAILED.value,
-                    "reasons": [RunFailureReason.CANCELLED.value],
-                    "step_failures": [],
-                    "summary": str(exc) or None,
-                },
-            }
-        )
-        _set_race_if_current(db, race_id, run_id, {"status": "cancelled", "current_run_id": None})
+        if outcome != "lost":
+            _finalize_run_cancelled(db, run_ref, race_id, run_id, str(exc))
         return RunFailureReason.CANCELLED.value
     except Exception as exc:  # noqa: BLE001
         error_msg = f"{type(exc).__name__}: {exc}".rstrip()
@@ -488,6 +558,7 @@ async def process_claimed_item(
         logger.exception("Local run %s failed: %s", run_id, exc)
         try:
             from pipeline_client.agent.cost import _cost_ctx, estimate_cost
+            from pipeline_client.agent.cost import search_cost_usd as _search_cost_usd
             from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
 
             provided_metrics = getattr(exc, "pipeline_agent_metrics", None)
@@ -497,7 +568,7 @@ async def process_claimed_item(
                 estimate_cost(model, counts.get("prompt_tokens", 0), counts.get("completion_tokens", 0))
                 for model, counts in breakdown.items()
             )
-            search_cost_usd = int(acc.get("serper_calls", 0) or 0) * 0.001
+            search_cost_usd = _search_cost_usd(acc.get("serper_calls"), acc.get("searlo_calls"))
             llm_cost_usd = float(acc.get("provider_cost_usd", 0.0) or 0.0)
             has_exact_cost = int(acc.get("priced_calls", 0) or 0) > 0 and int(acc.get("unpriced_calls", 0) or 0) == 0
             failed_metrics = (
@@ -538,6 +609,7 @@ async def process_claimed_item(
     finally:
         lease_stop.set()
         lease_thread.join(timeout=2)
+        _LOST_LEASE_ITEMS.discard(item_id)
 
     if success:
         # run_health is the definitive "did this actually succeed" verdict —
@@ -555,7 +627,10 @@ async def process_claimed_item(
             run_started_utc=run_started_utc,
             save_requested=save_artifact_requested,
         )
-        item_ref.update(
+        outcome = _finalize_queue_item(
+            db,
+            item_ref,
+            lease_owner,
             {
                 "status": "completed",
                 "artifact_id": artifact_id,
@@ -564,8 +639,13 @@ async def process_claimed_item(
                 "lease_owner": None,
                 "lease_expires_at": None,
                 "ttl_at": _queue_ttl_at(),
-            }
+            },
         )
+        if outcome == "lost":
+            return None
+        if outcome in ("missing", "cancelled"):
+            _finalize_run_cancelled(db, run_ref, race_id, run_id, f"Queue item {outcome} before the run finished")
+            return RunFailureReason.CANCELLED.value
         run_update: Dict[str, Any] = {
             "status": "completed",
             "progress": 100,
@@ -608,15 +688,23 @@ async def process_claimed_item(
             "step_failures": [],
             "summary": error_msg or None,
         }
-        item_ref.update(
+        outcome = _finalize_queue_item(
+            db,
+            item_ref,
+            lease_owner,
             {
                 "status": "failed",
                 "error": error_msg or "Unknown error",
                 "lease_owner": None,
                 "lease_expires_at": None,
                 "ttl_at": _queue_ttl_at(),
-            }
+            },
         )
+        if outcome == "lost":
+            return reason.value
+        if outcome in ("missing", "cancelled"):
+            _finalize_run_cancelled(db, run_ref, race_id, run_id, error_msg or f"Queue item {outcome}")
+            return RunFailureReason.CANCELLED.value
         run_ref.update(
             {
                 "status": "failed",
