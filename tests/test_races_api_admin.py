@@ -4663,10 +4663,10 @@ def test_publish_still_updates_catalog_when_summaries_index_fails():
 
     assert single.status_code == 502
     assert single.json()["detail"]["published"] == ["ar-senate-2026"]
-    assert "index conflict" in single.json()["detail"]["summaries_error"]
+    assert "RuntimeError" in single.json()["detail"]["summaries_error"]
     assert batch.status_code == 200
     assert batch.json()["published"] == ["ar-senate-2026"]
-    assert "index conflict" in batch.json()["summaries_error"]
+    assert "RuntimeError" in batch.json()["summaries_error"]
     assert [c.args[1]["status"] for c in mock_update.call_args_list] == ["published", "published"]
     assert mock_clear.call_count == 2
 
