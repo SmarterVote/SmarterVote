@@ -16,37 +16,64 @@
   $: rangeLabel =
     RANGES.find((r) => r.days === selectedDays)?.label ?? `${selectedDays}d`;
 
-  // Serper has no provider-reported price in our metrics, so it is estimated
-  // from call counts. Default ~$1 per 1,000 searches (typical paid tier).
-  let serperPer1k = 1.0;
+  /** Server cap on `GET /pipeline/metrics?limit=` (routers/pipeline.py). */
+  const METRICS_RECORD_LIMIT = 500;
+  /** Serper price the pipeline already folds into cost_usd/estimated_usd. */
+  const SERPER_USD_PER_CALL = 0.001;
+
+  // Records written since the cost split carry llm_cost_usd / search_cost_usd
+  // (pipeline_client/agent/agent.py). cost_usd and estimated_usd ALREADY
+  // include Serper at $0.001/call, so search must never be added on top.
+  type CostRecord = PipelineRunRecord & {
+    llm_cost_usd?: number | null;
+    search_cost_usd?: number | null;
+  };
 
   let summary: PipelineMetricsSummary | null = null;
   let windowSummary: PipelineMetricsSummary | null = null;
-  let records: PipelineRunRecord[] = [];
+  let records: CostRecord[] = [];
+  let recordsError = "";
   let gcp: GcpCostSummary | null = null;
   let loading = true;
   let error = "";
+  let errorDetails: string[] = [];
 
-  function recordCost(r: PipelineRunRecord): number {
+  function recordCost(r: CostRecord): number {
     return r.cost_usd ?? r.estimated_usd ?? 0;
   }
 
-  // Records fall in the selected window for the search-cost estimate + top races.
-  $: windowRecords = (() => {
-    const cutoff = Date.now() - selectedDays * 86400_000;
-    return records.filter((r) => {
-      const t = r.timestamp ? Date.parse(r.timestamp) : NaN;
-      return Number.isFinite(t) ? t >= cutoff : true;
-    });
-  })();
+  function recordSearchCost(r: CostRecord): number {
+    if (typeof r.search_cost_usd === "number") return r.search_cost_usd;
+    return (r.serper_calls ?? 0) * SERPER_USD_PER_CALL;
+  }
+
+  // Records fall in the selected window for the search breakdown + top races.
+  $: windowCutoff = Date.now() - selectedDays * 86400_000;
+  $: windowRecords = records.filter((r) => {
+    const t = r.timestamp ? Date.parse(r.timestamp) : NaN;
+    return Number.isFinite(t) ? t >= windowCutoff : true;
+  });
+  // The metrics endpoint returns at most METRICS_RECORD_LIMIT runs; when the
+  // page is full and does not reach back to the window start, per-run
+  // breakdowns below only cover part of the window.
+  $: oldestRecordMs = records.reduce((oldest, r) => {
+    const t = r.timestamp ? Date.parse(r.timestamp) : NaN;
+    return Number.isFinite(t) ? Math.min(oldest, t) : oldest;
+  }, Infinity);
+  $: recordsTruncated =
+    records.length >= METRICS_RECORD_LIMIT && oldestRecordMs > windowCutoff;
 
   $: serperCalls = windowRecords.reduce((s, r) => s + (r.serper_calls ?? 0), 0);
-  $: serperEstUsd = (serperCalls / 1000) * serperPer1k;
+  $: searloCalls = windowRecords.reduce((s, r) => s + (r.searlo_calls ?? 0), 0);
+  $: searchShareUsd = windowRecords.reduce(
+    (s, r) => s + recordSearchCost(r),
+    0,
+  );
 
-  // LLM spend in window = provider/estimated cost summed (search has no $ in records).
+  // Pipeline spend in window (server-side aggregate; already includes Serper).
   $: pipelineWindowUsd = windowSummary?.total_usd ?? 0;
   $: gcpWindowUsd = gcp?.configured ? (gcp.total_net_usd ?? 0) : 0;
-  $: combinedWindowUsd = pipelineWindowUsd + serperEstUsd + gcpWindowUsd;
+  $: combinedWindowUsd = pipelineWindowUsd + gcpWindowUsd;
 
   $: topRaces = (() => {
     const totals = new Map<string, number>();
@@ -71,27 +98,51 @@
     })}`;
   }
 
+  let loadSeq = 0;
+
+  function reason(result: PromiseSettledResult<unknown>): string {
+    if (result.status !== "rejected") return "";
+    const r = result.reason;
+    return r instanceof Error ? r.message : String(r);
+  }
+
   async function load() {
+    const seq = ++loadSeq;
     loading = true;
     error = "";
+    errorDetails = [];
+    recordsError = "";
     const hours = selectedDays * 24;
     const [allRes, winRes, recRes, gcpRes] = await Promise.allSettled([
       analyticsService.getPipelineMetricsSummary(),
       analyticsService.getPipelineMetricsSummary(hours),
-      analyticsService.getPipelineMetrics(500),
+      analyticsService.getPipelineMetrics(METRICS_RECORD_LIMIT),
       analyticsService.getGcpCosts(selectedDays),
     ]);
-    if (allRes.status === "fulfilled") summary = allRes.value;
-    if (winRes.status === "fulfilled") windowSummary = winRes.value;
-    if (recRes.status === "fulfilled") records = recRes.value.records;
+    if (seq !== loadSeq) return;
+    summary = allRes.status === "fulfilled" ? allRes.value : null;
+    windowSummary = winRes.status === "fulfilled" ? winRes.value : null;
+    if (recRes.status === "fulfilled") {
+      records = recRes.value.records as CostRecord[];
+    } else {
+      records = [];
+      recordsError = reason(recRes);
+    }
     if (gcpRes.status === "fulfilled") gcp = gcpRes.value;
-    else gcp = { configured: false, reason: String(gcpRes.reason) };
+    else gcp = { configured: false, reason: reason(gcpRes) };
 
-    const failed = [allRes, winRes, recRes].filter(
-      (r) => r.status === "rejected",
-    ).length;
-    if (failed > 0)
-      error = `${failed} cost request${failed === 1 ? "" : "s"} failed`;
+    const labelled: Array<[string, PromiseSettledResult<unknown>]> = [
+      ["All-time summary", allRes],
+      [`${rangeLabel} summary`, winRes],
+      ["Run records", recRes],
+    ];
+    errorDetails = labelled
+      .filter(([, r]) => r.status === "rejected")
+      .map(([label, r]) => `${label}: ${reason(r)}`);
+    if (errorDetails.length > 0)
+      error = `${errorDetails.length} cost request${
+        errorDetails.length === 1 ? "" : "s"
+      } failed — totals below may be incomplete`;
     loading = false;
   }
 
@@ -134,10 +185,26 @@
 {:else}
   {#if error}
     <div
-      class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+      class="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/30 dark:text-red-200"
+      role="alert"
     >
-      {error}
+      <p class="font-medium">{error}</p>
+      <ul class="mt-1 list-disc pl-5 text-xs">
+        {#each errorDetails as detail}
+          <li>{detail}</li>
+        {/each}
+      </ul>
     </div>
+  {/if}
+  {#if recordsTruncated}
+    <p
+      class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200"
+      role="status"
+    >
+      Search breakdown and top races cover only the latest {METRICS_RECORD_LIMIT}
+      runs (back to {new Date(oldestRecordMs).toLocaleDateString()}), not the
+      full {rangeLabel} window. Totals above come from the server-side summary.
+    </p>
   {/if}
 
   <!-- Top stat cards -->
@@ -151,16 +218,18 @@
       <p class="mt-1 text-2xl font-bold text-content">
         {usd(combinedWindowUsd)}
       </p>
-      <p class="mt-1 text-xs text-content-faint">LLM + search + GCP</p>
+      <p class="mt-1 text-xs text-content-faint">
+        Pipeline (LLM + Serper) + GCP
+      </p>
     </div>
     <div class="card p-4">
       <p
         class="text-xs font-medium text-content-subtle uppercase tracking-wide"
       >
-        LLM spend ({rangeLabel})
+        Pipeline spend ({rangeLabel})
       </p>
       <p class="mt-1 text-2xl font-bold text-content">
-        {usd(pipelineWindowUsd)}
+        {windowSummary ? usd(pipelineWindowUsd) : "—"}
       </p>
       <p class="mt-1 text-xs text-content-faint">
         {windowSummary?.total_runs ?? 0} runs
@@ -172,10 +241,18 @@
       >
         Web search ({rangeLabel})
       </p>
-      <p class="mt-1 text-2xl font-bold text-content">~{usd(serperEstUsd)}</p>
-      <p class="mt-1 text-xs text-content-faint">
-        {serperCalls.toLocaleString()} searches (est.)
-      </p>
+      {#if recordsError}
+        <p class="mt-1 text-xl font-bold text-content-faint">—</p>
+        <p class="mt-1 text-xs text-content-faint">run records unavailable</p>
+      {:else}
+        <p class="mt-1 text-2xl font-bold text-content">
+          {usd(searchShareUsd)}
+        </p>
+        <p class="mt-1 text-xs text-content-faint">
+          {serperCalls.toLocaleString()} Serper · {searloCalls.toLocaleString()}
+          Searlo calls — included in pipeline spend; Searlo is unpriced
+        </p>
+      {/if}
     </div>
     <div class="card p-4">
       <p
@@ -233,23 +310,11 @@
           </p>
         </div>
       </div>
-      <div class="mt-4 pt-3 border-t border-stroke">
-        <label
-          class="flex items-center justify-between gap-2 text-xs text-content-subtle"
-        >
-          <span>Serper rate ($ / 1,000 searches)</span>
-          <input
-            type="number"
-            min="0"
-            step="0.05"
-            bind:value={serperPer1k}
-            class="w-20 rounded border border-stroke bg-surface px-2 py-1 text-right text-content"
-          />
-        </label>
-        <p class="mt-1 text-xs text-content-faint">
-          Search cost is estimated — adjust to match your Serper plan.
-        </p>
-      </div>
+      <p class="mt-4 pt-3 border-t border-stroke text-xs text-content-faint">
+        Run costs already include Serper search at ${SERPER_USD_PER_CALL.toFixed(
+          3,
+        )}/call; Searlo calls are counted but not priced.
+      </p>
     </div>
 
     <div class="card p-4">

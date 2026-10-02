@@ -31,7 +31,7 @@ test.describe("race detail page", () => {
 
     // Validation grade badge
     await expect(
-      page.getByRole("button", { name: "Automated Research Score: A" }),
+      page.getByRole("button", { name: "Automated research score: A" }),
     ).toBeVisible();
 
     // Forecast section (rating is "tossup" -> renders as "Toss-up" heading)
@@ -69,9 +69,18 @@ test.describe("race detail page", () => {
         name: "Select Senator Jordan Ellsworth to compare",
       })
       .check();
+    // One selection is not a comparison yet: the drawer says so, and the
+    // polite live region announces it.
+    await expect(page.getByText("Select 1 more to compare")).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "1 candidate selected" }),
+    ).toHaveCount(1);
     await page
       .getByRole("checkbox", { name: "Select Casey Whitfield to compare" })
       .check();
+    await expect(
+      page.getByRole("status").filter({ hasText: "2 candidates selected" }),
+    ).toHaveCount(1);
 
     await page.getByRole("link", { name: "Compare Now" }).click();
 
@@ -113,18 +122,36 @@ test.describe("race detail page", () => {
     await expect(page.getByRole("link", { name: "Compare all" })).toHaveCount(
       0,
     );
+    // contest_stage "uncontested": a stage note, and no favorite or odds.
+    await expect(
+      page.getByText("Uncontested race", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Forecast" })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole("checkbox")).toHaveCount(0);
   });
 
-  test("renders an error state gracefully when the race cannot be found", async ({
+  test("shows a friendly not-found state when the race cannot be found", async ({
     page,
   }) => {
     await mockRaceNotFound(page, "e2e-does-not-exist");
     await page.goto("/races/e2e-does-not-exist/");
 
     await expect(
-      page.getByRole("heading", { name: "Error loading race" }),
+      page.getByRole("heading", { name: "Race not found" }),
     ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Browse elections" }),
+    ).toBeVisible();
+    // A 404 is not a transient failure, so there is nothing to retry, and the
+    // page must not be indexed.
+    await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(
+      0,
+    );
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
   });
 });

@@ -19,7 +19,7 @@ describe("ForecastSummaryStats", () => {
 
     expect(screen.getByText("2026 Senate Election Summary")).toBeTruthy();
     expect(screen.getByText(/Republican control projected/)).toBeTruthy();
-    expect(screen.getByText(/\(72%\)/)).toBeTruthy();
+    expect(screen.getByText("72.0%")).toBeTruthy();
     expect(screen.getByText("Includes 50-50 tie-break via VP")).toBeTruthy();
     expect(screen.getByText("51D - 49R")).toBeTruthy();
     expect(screen.getByText(/23\.0% chance of this split/)).toBeTruthy();

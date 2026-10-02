@@ -90,6 +90,8 @@ async function renderDashboard(
     props: { apiService: apiService as PipelineApiService },
   });
   await waitFor(() => expect(analyticsService.getOverview).toHaveBeenCalled());
+  // Let the mount's own load settle so later assertions see fresh calls.
+  for (let i = 0; i < 20; i++) await Promise.resolve();
   return result;
 }
 
@@ -155,6 +157,73 @@ describe("DashboardTab request de-duplication", () => {
     await Promise.all([first, second]);
 
     expect(analyticsService.getOverview).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DashboardTab per-range in-flight keys", () => {
+  it("does not answer a different range with another range's in-flight load", async () => {
+    const { container } = await renderDashboard();
+    analyticsService.getOverview.mockClear();
+    analyticsService.getOverview.mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    await fireEvent.click(rangeButton(container, "6h")!);
+    await fireEvent.click(rangeButton(container, "7d")!);
+
+    await waitFor(() =>
+      expect(analyticsService.getOverview).toHaveBeenCalledWith(168),
+    );
+    expect(analyticsService.getOverview).toHaveBeenCalledWith(6);
+  });
+
+  it("clears a previous error banner when a later load succeeds", async () => {
+    analyticsService.getOverview.mockRejectedValueOnce(new Error("down"));
+    const { container, component } = await renderDashboard();
+    await waitFor(() =>
+      expect(container.textContent).toContain("1 dashboard request failed"),
+    );
+
+    await component.refresh();
+
+    await waitFor(() =>
+      expect(container.textContent).not.toContain("dashboard request failed"),
+    );
+  });
+
+  it("loads discovery-only races once apiService arrives after mount", async () => {
+    const listRaces = vi.fn().mockResolvedValue([]);
+    const { rerender } = await renderDashboard(undefined);
+    expect(listRaces).not.toHaveBeenCalled();
+
+    await rerender({
+      apiService: { listRaces } as unknown as PipelineApiService,
+    });
+
+    await waitFor(() => expect(listRaces).toHaveBeenCalled());
+  });
+});
+
+describe("DashboardTab race listing", () => {
+  it("lists races once on mount, not again when analytics finish", async () => {
+    const listRaces = vi.fn().mockResolvedValue([]);
+    await renderDashboard({ listRaces } as unknown as PipelineApiService);
+    await waitFor(() => expect(listRaces).toHaveBeenCalled());
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+
+    expect(listRaces).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-lists races on an explicit refresh", async () => {
+    const listRaces = vi.fn().mockResolvedValue([]);
+    const { component } = await renderDashboard({
+      listRaces,
+    } as unknown as PipelineApiService);
+    await waitFor(() => expect(listRaces).toHaveBeenCalledTimes(1));
+
+    await component.refresh();
+
+    expect(listRaces).toHaveBeenCalledTimes(2);
   });
 });
 

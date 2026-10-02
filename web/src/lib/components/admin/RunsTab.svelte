@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { createEventDispatcher, onMount, onDestroy, tick } from "svelte";
   import { getStatusClass, getLogClass } from "$lib/utils/pipelineUtils";
   import type {
     RunHistoryItem,
@@ -14,18 +14,22 @@
   } from "$lib/services/pipelineApiService";
   import { analyticsService } from "$lib/services/analyticsService";
   import { MAX_LOG_ENTRIES } from "$lib/config/constants";
+  import { RUN_HISTORY_MAX_LIMIT } from "$lib/services/pipelineApiService";
 
   export let runs: RunHistoryItem[] = [];
   export let queueItems: QueueItem[] = [];
   export let isRefreshing = false;
-  export let isPruning = false;
+  export let isClearingQueue = false;
+  /** True when the server returned a full page and older runs were omitted. */
+  export let historyTruncated = false;
+  export let historyLimit = 0;
   export let runsError = "";
   export let apiService: PipelineApiService | undefined = undefined;
 
   const dispatch = createEventDispatcher<{
     refresh: void;
     "clear-queue": void;
-    "prune-runs": void;
+    "load-more": void;
   }>();
 
   // Date/Time Range Filter
@@ -58,11 +62,25 @@
   let logSearchQuery = "";
   let loadingDrawerDetails = false;
   let drawerError = "";
-  let logPollTimer: ReturnType<typeof setInterval> | null = null;
-  let lastLogCursor: string | null = null;
+  let drawerLogsTruncated = false;
   let logContainer: HTMLDivElement;
+  let drawerEl: HTMLDivElement | null = null;
+  let drawerOpener: HTMLElement | null = null;
   let lastRenderedLogCount = 0;
   let shouldAutoScrollLogs = true;
+  let destroyed = false;
+  // Each drawer open gets its own session so late responses from a previous
+  // run (or a closed drawer) can never write into the current one.
+  type DrawerSession = {
+    runId: string;
+    cursor: string | null;
+    seenLogKeys: Set<string>;
+    timer: ReturnType<typeof setTimeout> | null;
+    inFlight: boolean;
+    active: boolean;
+  };
+  let drawerSession: DrawerSession | null = null;
+  const LOG_POLL_MS = 5000;
 
   // History list filtering
   let runSearchQuery = "";
@@ -70,10 +88,33 @@
   let runModeFilter = "all"; // 'all', 'cheap', 'full'
   let runModelNameFilter = "all";
 
+  $: canLoadMore = historyTruncated && historyLimit < RUN_HISTORY_MAX_LIMIT;
+  $: historyFiltersActive =
+    runSearchQuery.trim() !== "" ||
+    runStatusFilter !== "all" ||
+    runModeFilter !== "all" ||
+    runModelNameFilter !== "all";
+  // Filters over a truncated page would silently miss older matches, so the
+  // first filter use widens the window once (one larger read, not per poll).
+  let autoLoadedForFilters = false;
+  $: if (historyFiltersActive && canLoadMore && !autoLoadedForFilters) {
+    autoLoadedForFilters = true;
+    dispatch("load-more");
+  }
+
   // Actions
-  let cancellingRunId: string | null = null;
+  /** Runs with a cancel request in flight (several can be cancelled at once). */
+  let cancellingRunIds = new Set<string>();
+  /**
+   * Runs the server confirmed cancelled, shown as cancelled immediately while
+   * the follow-up refresh catches up.
+   */
+  let locallyCancelledRunIds = new Set<string>();
+  let followUpRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  const CANCEL_FOLLOW_UP_MS = 3000;
   let downloadingDiagnosticsRunId: string | null = null;
-  let clearingQueue = false;
+  let actionError = "";
+  let actionNotice = "";
 
   type RunMetricFields = RunHistoryItem & {
     estimated_usd?: number;
@@ -108,13 +149,9 @@
     lastRenderedLogCount = filteredDrawerLogs.length;
   }
 
-  // cleared externally resets local clearing state
-  $: if (!pendingQueue.length) clearingQueue = false;
-
   $: selectedMetricsRecord = pipelineRecords.find(
     (r) => r.run_id === selectedRunId,
   );
-  $: _isPruningPlaceholder = isPruning;
 
   // Dynamic list of specific models present in history
   $: uniqueModels = (() => {
@@ -161,97 +198,200 @@
     void fetchMetrics(hours);
   }
 
-  async function openRunDrawer(runId: string, raceId: string | null) {
+  function logKey(log: LogEntry): string {
+    return log.id
+      ? `id:${log.id}`
+      : `${log.timestamp}|${log.level}|${log.message}`;
+  }
+
+  function appendLogs(session: DrawerSession, incoming: LogEntry[]) {
+    const fresh = incoming.filter((log) => {
+      const key = logKey(log);
+      if (session.seenLogKeys.has(key)) return false;
+      session.seenLogKeys.add(key);
+      return true;
+    });
+    if (!fresh.length) return;
+    // A long run polls for hours; without a cap the drawer grows without
+    // bound and the tab eventually stalls.
+    const merged = [...drawerLogs, ...fresh];
+    if (merged.length > MAX_LOG_ENTRIES) {
+      drawerLogsTruncated = true;
+      drawerLogs = merged.slice(-MAX_LOG_ENTRIES);
+      // Keep the dedupe set in step with the trimmed list so it cannot grow
+      // for hours. Forward cursor polling never re-sends trimmed entries.
+      session.seenLogKeys = new Set(drawerLogs.map(logKey));
+    } else {
+      drawerLogs = merged;
+    }
+  }
+
+  function isCurrent(session: DrawerSession): boolean {
+    return (
+      !destroyed &&
+      session.active &&
+      drawerSession === session &&
+      selectedRunId === session.runId
+    );
+  }
+
+  function stopDrawerSession() {
+    if (!drawerSession) return;
+    drawerSession.active = false;
+    if (drawerSession.timer) clearTimeout(drawerSession.timer);
+    drawerSession.timer = null;
+    drawerSession = null;
+  }
+
+  function isActiveStatus(status: string | undefined): boolean {
+    return status === "running" || status === "pending";
+  }
+
+  function schedulePoll(session: DrawerSession) {
+    if (!isCurrent(session)) return;
+    session.timer = setTimeout(() => void pollDrawer(session), LOG_POLL_MS);
+  }
+
+  async function pollDrawer(session: DrawerSession) {
+    session.timer = null;
+    if (!isCurrent(session) || !apiService || session.inFlight) return;
+    session.inFlight = true;
+    let keepPolling = true;
+    try {
+      const detail = await apiService.getRunDetails(session.runId);
+      if (!isCurrent(session)) return;
+      selectedRunDetail = detail;
+      const page = await apiService.getRunLogs(session.runId, session.cursor);
+      if (!isCurrent(session)) return;
+      session.cursor = page.next_cursor ?? session.cursor;
+      appendLogs(session, page.logs || []);
+      // Drain any backlog immediately instead of waiting a full interval.
+      if (page.has_more && (page.logs || []).length) {
+        session.timer = setTimeout(() => void pollDrawer(session), 0);
+        return;
+      }
+      keepPolling = isActiveStatus(detail.status);
+    } catch (err) {
+      console.error("Error polling logs/details:", err);
+    } finally {
+      session.inFlight = false;
+    }
+    if (keepPolling) schedulePoll(session);
+  }
+
+  async function openRunDrawer(
+    runId: string,
+    raceId: string | null,
+    opener?: EventTarget | null,
+  ) {
+    if (!selectedRunId && opener instanceof HTMLElement) drawerOpener = opener;
+    else if (!selectedRunId && typeof document !== "undefined") {
+      drawerOpener =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+    }
+    stopDrawerSession();
+    const session: DrawerSession = {
+      runId,
+      cursor: null,
+      seenLogKeys: new Set(),
+      timer: null,
+      inFlight: true,
+      active: true,
+    };
+    drawerSession = session;
     selectedRunId = runId;
     selectedRunRaceId = raceId;
     selectedRunDetail = null;
     drawerLogs = [];
-    lastLogCursor = null;
+    drawerLogsTruncated = false;
     lastRenderedLogCount = 0;
     shouldAutoScrollLogs = true;
     drawerError = "";
     loadingDrawerDetails = true;
-
-    if (logPollTimer) {
-      clearInterval(logPollTimer);
-      logPollTimer = null;
-    }
+    void tick().then(focusDrawer);
 
     try {
-      if (apiService) {
-        // load initial details
-        selectedRunDetail = await apiService.getRunDetails(runId);
-
-        // load logs
-        const logRes = await apiService.getRunLogs(runId);
-        drawerLogs = (logRes.logs || []).slice(-MAX_LOG_ENTRIES);
-        lastLogCursor = logRes.next_cursor ?? null;
-
-        // If status is running or pending, start polling
-        if (
-          selectedRunDetail.status === "running" ||
-          selectedRunDetail.status === "pending"
-        ) {
-          const currentTimer = setInterval(async () => {
-            if (selectedRunId !== runId) {
-              clearInterval(currentTimer);
-              if (logPollTimer === currentTimer) {
-                logPollTimer = null;
-              }
-              return;
-            }
-            try {
-              if (apiService) {
-                selectedRunDetail = await apiService.getRunDetails(runId);
-                const newLogsRes = await apiService.getRunLogs(
-                  runId,
-                  lastLogCursor,
-                );
-                lastLogCursor = newLogsRes.next_cursor ?? lastLogCursor;
-                if (newLogsRes.logs && newLogsRes.logs.length > 0) {
-                  // A long run polls every 5s for hours; without a cap the
-                  // drawer grows without bound and the tab eventually stalls.
-                  drawerLogs = [...drawerLogs, ...newLogsRes.logs].slice(
-                    -MAX_LOG_ENTRIES,
-                  );
-                }
-
-                if (
-                  selectedRunDetail.status !== "running" &&
-                  selectedRunDetail.status !== "pending"
-                ) {
-                  clearInterval(currentTimer);
-                  if (logPollTimer === currentTimer) {
-                    logPollTimer = null;
-                  }
-                }
-              }
-            } catch (err) {
-              console.error("Error polling logs/details:", err);
-            }
-          }, 5000);
-          logPollTimer = currentTimer;
-        }
-      } else {
+      if (!apiService) {
         drawerError = "API service not available";
+        return;
       }
+      const detail = await apiService.getRunDetails(runId);
+      if (!isCurrent(session)) return;
+      selectedRunDetail = detail;
+
+      // One bounded tail request: the newest entries, oldest-first, plus the
+      // cursor to continue forward polling from.
+      const tail = await apiService.getRunLogsTail(runId, MAX_LOG_ENTRIES);
+      if (!isCurrent(session)) return;
+      session.cursor = tail.next_cursor;
+      drawerLogsTruncated = tail.truncated;
+      appendLogs(session, tail.logs);
     } catch (err) {
-      drawerError = String(err);
+      if (isCurrent(session)) drawerError = String(err);
     } finally {
-      loadingDrawerDetails = false;
+      session.inFlight = false;
+      if (isCurrent(session)) {
+        loadingDrawerDetails = false;
+        if (!drawerError && isActiveStatus(selectedRunDetail?.status)) {
+          schedulePoll(session);
+        }
+      }
     }
   }
 
   function closeRunDrawer() {
+    stopDrawerSession();
     selectedRunId = null;
     selectedRunRaceId = null;
     selectedRunDetail = null;
     drawerLogs = [];
     lastRenderedLogCount = 0;
     shouldAutoScrollLogs = true;
-    if (logPollTimer) {
-      clearInterval(logPollTimer);
-      logPollTimer = null;
+    loadingDrawerDetails = false;
+    const opener = drawerOpener;
+    drawerOpener = null;
+    if (opener && opener.isConnected) void tick().then(() => opener.focus());
+  }
+
+  function focusableIn(root: HTMLElement): HTMLElement[] {
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((el) => !el.hasAttribute("inert"));
+  }
+
+  function focusDrawer() {
+    if (!drawerEl) return;
+    if (drawerEl.contains(document.activeElement)) return;
+    drawerEl.focus();
+  }
+
+  function handleDrawerKeydown(event: KeyboardEvent) {
+    if (!drawerEl) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeRunDrawer();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = focusableIn(drawerEl);
+    if (!items.length) {
+      event.preventDefault();
+      drawerEl.focus();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || active === drawerEl)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
     }
   }
 
@@ -264,37 +404,134 @@
     shouldAutoScrollLogs = distanceFromBottom < 48;
   }
 
-  async function handleClearQueue() {
+  function handleClearQueue() {
+    const ids = pendingQueue.map((q) => q.race_id || q.id);
     if (
       !confirm(
         `Remove all ${pendingQueue.length} pending item${
           pendingQueue.length !== 1 ? "s" : ""
-        } from the queue?`,
+        } from the queue?\n\n${ids.join("\n")}`,
       )
     )
       return;
-    clearingQueue = true;
     dispatch("clear-queue");
   }
 
-  async function handleCancelRun(runId: string, event?: Event) {
-    if (event) event.stopPropagation();
-    if (!confirm(`Are you sure you want to cancel run ${runId}?`)) return;
-    cancellingRunId = runId;
+  /**
+   * Active queue item backing a row: the row's own run, or (for a collapsed
+   * continuation chain) any invocation in that chain or its continuation.
+   */
+  function queueItemForRun(runId: string): QueueItem | undefined {
+    const run = runs.find((r) => r.run_id === runId) as
+      | RunMetricFields
+      | undefined;
+    const chain = new Set<string>([runId, ...(run?.invocation_run_ids ?? [])]);
+    const active = queueItems.filter(
+      (q) => q.status === "running" || q.status === "pending",
+    );
+    return (
+      active.find((q) => q.run_id === runId) ??
+      active.find(
+        (q) =>
+          (q.run_id && chain.has(q.run_id)) ||
+          (q.parent_run_id && chain.has(q.parent_run_id)),
+      )
+    );
+  }
+
+  function httpStatus(err: unknown): number | null {
+    const match = /HTTP (\d{3})/.exec(
+      err instanceof Error ? err.message : String(err),
+    );
+    return match ? Number(match[1]) : null;
+  }
+
+  /** The server's `detail` from an error thrown by the API service. */
+  function serverDetail(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err);
+    const jsonStart = message.indexOf("{");
+    if (jsonStart >= 0) {
+      try {
+        const parsed = JSON.parse(message.slice(jsonStart)) as {
+          detail?: unknown;
+        };
+        if (typeof parsed.detail === "string" && parsed.detail)
+          return parsed.detail;
+      } catch {
+        /* fall through to the raw message */
+      }
+    }
+    return message;
+  }
+
+  function scheduleFollowUpRefresh() {
+    if (followUpRefreshTimer) clearTimeout(followUpRefreshTimer);
+    followUpRefreshTimer = setTimeout(() => {
+      followUpRefreshTimer = null;
+      if (!destroyed) dispatch("refresh");
+    }, CANCEL_FOLLOW_UP_MS);
+  }
+
+  function markCancelledLocally(runId: string) {
+    locallyCancelledRunIds = new Set(locallyCancelledRunIds).add(runId);
+    if (selectedRunId === runId && selectedRunDetail) {
+      selectedRunDetail = { ...selectedRunDetail, status: "cancelled" };
+    }
+  }
+
+  /**
+   * Cancel only — never deletes. Rows that exist only in the queue (no run
+   * doc yet) are cancelled through the queue item endpoint, as are collapsed
+   * continuation rows whose run doc is not written yet (the cancel endpoint
+   * answers 404 for those).
+   */
+  async function handleCancelRun(runId: string) {
+    if (!runId || cancellingRunIds.has(runId)) return;
+    const label = raceIdForRunId(runId);
+    if (!confirm(`Cancel run ${runId}${label ? ` (${label})` : ""}?`)) return;
+    cancellingRunIds = new Set(cancellingRunIds).add(runId);
+    actionError = "";
+    actionNotice = "";
     try {
-      if (apiService) {
-        await apiService.deleteRun(runId);
-        dispatch("refresh");
-        void fetchMetrics();
-        if (selectedRunId === runId) {
-          selectedRunDetail = await apiService.getRunDetails(runId);
+      if (!apiService) throw new Error("API service not available");
+      const hasRunDoc = runs.some((r) => r.run_id === runId);
+      const queueItem = queueItemForRun(runId);
+      if (!hasRunDoc && queueItem) {
+        await apiService.removeQueueItem(queueItem.id);
+      } else {
+        try {
+          await apiService.cancelRun(runId);
+        } catch (err) {
+          if (httpStatus(err) !== 404 || !queueItem) throw err;
+          await apiService.removeQueueItem(queueItem.id);
         }
       }
+      markCancelledLocally(runId);
+      actionNotice = `Cancelled run ${runId}.`;
+      dispatch("refresh");
+      scheduleFollowUpRefresh();
+      void fetchMetrics();
     } catch (err) {
-      alert(`Failed to cancel run: ${err}`);
+      const status = httpStatus(err);
+      const detail = serverDetail(err);
+      actionError =
+        status === 409
+          ? `Run ${runId} was not cancelled: ${detail}`
+          : status === 404
+            ? `Run ${runId} was not found and has no active queue item to cancel.`
+            : `Failed to cancel run: ${detail}`;
+      dispatch("refresh");
     } finally {
-      cancellingRunId = null;
+      const next = new Set(cancellingRunIds);
+      next.delete(runId);
+      cancellingRunIds = next;
     }
+  }
+
+  function raceIdForRunId(runId: string): string {
+    const run = runs.find((r) => r.run_id === runId);
+    if (run) return raceId(run);
+    return queueItems.find((q) => q.run_id === runId)?.race_id ?? "";
   }
 
   async function handleDownloadDiagnostics(runId: string) {
@@ -434,11 +671,36 @@
     return step ? String(step).replaceAll("_", " ") : run.status;
   }
 
+  // Server rows that are no longer active retire the local override.
+  $: if (locallyCancelledRunIds.size) {
+    const stillActive = new Set(
+      runs
+        .filter((r) => r.status === "running" || r.status === "pending")
+        .map((r) => r.run_id),
+    );
+    for (const q of queueItems) {
+      if ((q.status === "running" || q.status === "pending") && q.run_id)
+        stillActive.add(q.run_id);
+    }
+    const kept = [...locallyCancelledRunIds].filter((id) =>
+      stillActive.has(id),
+    );
+    if (kept.length !== locallyCancelledRunIds.size)
+      locallyCancelledRunIds = new Set(kept);
+  }
+  $: displayRuns = locallyCancelledRunIds.size
+    ? runs.map((r) =>
+        locallyCancelledRunIds.has(r.run_id) &&
+        (r.status === "running" || r.status === "pending")
+          ? ({ ...r, status: "cancelled" } as RunHistoryItem)
+          : r,
+      )
+    : runs;
   $: liveRunIds = new Set(
     queueItems
       .filter((q) => q.status === "running" || q.status === "pending")
       .map((q) => q.run_id)
-      .filter(Boolean),
+      .filter((id): id is string => !!id && !locallyCancelledRunIds.has(id)),
   );
   $: continuationParentRunIds = new Set(
     queueItems.map((q) => q.parent_run_id).filter(Boolean),
@@ -446,7 +708,8 @@
   $: activeQueueItems = queueItems.filter(
     (q) =>
       (q.status === "running" || q.status === "pending") &&
-      !continuationParentRunIds.has(q.run_id),
+      !continuationParentRunIds.has(q.run_id) &&
+      !(q.run_id && locallyCancelledRunIds.has(q.run_id)),
   );
 
   $: activeQueueRuns = activeQueueItems
@@ -454,7 +717,7 @@
       (q) =>
         (q.status === "running" || q.status === "pending") &&
         q.run_id &&
-        !runs.some((r) => r.run_id === q.run_id),
+        !displayRuns.some((r) => r.run_id === q.run_id),
     )
     .map(
       (q, idx) =>
@@ -477,7 +740,7 @@
     );
 
   $: activeRuns = [
-    ...runs.filter(
+    ...displayRuns.filter(
       (r) =>
         (r.status === "running" ||
           r.status === "pending" ||
@@ -487,7 +750,7 @@
     ...activeQueueRuns,
   ];
   $: pendingQueue = activeQueueItems.filter((q) => q.status === "pending");
-  $: historicalRuns = runs.filter(
+  $: historicalRuns = displayRuns.filter(
     (r) =>
       r.status !== "running" &&
       r.status !== "pending" &&
@@ -580,13 +843,11 @@
   });
 
   onDestroy(() => {
-    if (logPollTimer) clearInterval(logPollTimer);
+    destroyed = true;
+    if (followUpRefreshTimer) clearTimeout(followUpRefreshTimer);
+    stopDrawerSession();
   });
 </script>
-
-<svelte:window
-  on:keydown={(e) => e.key === "Escape" && selectedRunId && closeRunDrawer()}
-/>
 
 <div class="space-y-6">
   <!-- Header -->
@@ -608,10 +869,10 @@
       {#if pendingQueue.length > 0}
         <button
           on:click={handleClearQueue}
-          disabled={clearingQueue}
+          disabled={isClearingQueue}
           class="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
         >
-          {#if clearingQueue}
+          {#if isClearingQueue}
             <svg
               class="animate-spin h-4 w-4"
               xmlns="http://www.w3.org/2000/svg"
@@ -713,6 +974,57 @@
       >
         Retry
       </button>
+    </div>
+  {/if}
+
+  {#if actionError}
+    <div
+      class="flex items-start justify-between gap-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200"
+      role="alert"
+    >
+      <p>{actionError}</p>
+      <button
+        type="button"
+        class="shrink-0 text-xs underline"
+        on:click={() => (actionError = "")}>Dismiss</button
+      >
+    </div>
+  {:else if actionNotice}
+    <div
+      class="flex items-start justify-between gap-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/30 dark:text-green-200"
+      role="status"
+    >
+      <p>{actionNotice}</p>
+      <button
+        type="button"
+        class="shrink-0 text-xs underline"
+        on:click={() => (actionNotice = "")}>Dismiss</button
+      >
+    </div>
+  {/if}
+
+  {#if historyTruncated}
+    <div
+      class="alert-warn flex flex-wrap items-center justify-between gap-3 text-xs"
+      role="status"
+    >
+      <p>
+        Showing the {historyLimit || runs.length} most recent runs; older runs are
+        not loaded, so history filters and totals below cover only these.
+        {#if !canLoadMore}
+          This is the server's maximum page ({RUN_HISTORY_MAX_LIMIT}).
+        {/if}
+      </p>
+      {#if canLoadMore}
+        <button
+          type="button"
+          class="btn-secondary min-h-0 px-3 py-1.5 text-xs"
+          disabled={isRefreshing}
+          on:click={() => dispatch("load-more")}
+        >
+          Load up to {RUN_HISTORY_MAX_LIMIT} runs
+        </button>
+      {/if}
     </div>
   {/if}
 
@@ -907,19 +1219,18 @@
         {#each filteredActiveRuns as run (run.run_id)}
           {@const m = getRunMetrics(run, metricsByRunId)}
           <div
-            class="px-4 py-3 hover:bg-surface-alt transition-colors cursor-pointer flex items-center justify-between"
-            role="button"
-            tabindex="0"
-            on:click={() => openRunDrawer(run.run_id, raceId(run))}
-            on:keydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                openRunDrawer(run.run_id, raceId(run));
-              }
-            }}
+            class="px-4 py-3 hover:bg-surface-alt transition-colors flex items-center justify-between gap-4"
           >
-            <div class="flex-1 min-w-0 mr-4">
-              <div class="flex items-center gap-3">
+            <!-- The row's open action and Cancel are sibling buttons so neither
+                 swallows the other's keyboard activation. -->
+            <button
+              type="button"
+              class="block flex-1 min-w-0 text-left rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label="Open run details for {raceId(run)}"
+              on:click={(e) =>
+                openRunDrawer(run.run_id, raceId(run), e.currentTarget)}
+            >
+              <span class="flex items-center gap-3">
                 {#if run.status === "running"}
                   <svg
                     class="animate-spin h-4 w-4 text-blue-500 shrink-0"
@@ -959,15 +1270,17 @@
                     run.status,
                   )}">{run.status}</span
                 >
-              </div>
-              <div class="mt-2 grid grid-cols-[1fr_auto] items-center gap-3">
-                <div class="h-1.5 rounded-full bg-surface-alt overflow-hidden">
-                  <div
-                    class="h-full rounded-full bg-blue-500 transition-all duration-500"
+              </span>
+              <span class="mt-2 grid grid-cols-[1fr_auto] items-center gap-3">
+                <span
+                  class="block h-1.5 rounded-full bg-surface-alt overflow-hidden"
+                >
+                  <span
+                    class="block h-full rounded-full bg-blue-500 transition-all duration-500"
                     style="width: {runProgress(run)}%"
-                  ></div>
-                </div>
-                <div
+                  ></span>
+                </span>
+                <span
                   class="text-xs text-content-faint whitespace-nowrap font-mono"
                 >
                   {modelLabel(run)}
@@ -977,16 +1290,17 @@
                     · <span class="font-semibold text-content-muted"
                       >{formatUsd(m.cost)}</span
                     >{/if}
-                </div>
-              </div>
-            </div>
+                </span>
+              </span>
+            </button>
             <button
               type="button"
               class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
-              disabled={cancellingRunId === run.run_id}
-              on:click={(e) => handleCancelRun(run.run_id, e)}
+              disabled={cancellingRunIds.has(run.run_id)}
+              aria-label="Cancel run for {raceId(run)}"
+              on:click={() => handleCancelRun(run.run_id)}
             >
-              {#if cancellingRunId === run.run_id}
+              {#if cancellingRunIds.has(run.run_id)}
                 <svg
                   class="animate-spin h-3 w-3"
                   xmlns="http://www.w3.org/2000/svg"
@@ -1077,6 +1391,7 @@
       <div class="flex-1 min-w-[200px]">
         <input
           type="search"
+          aria-label="Filter run history by race ID or run ID"
           bind:value={runSearchQuery}
           placeholder="Filter history by Race ID or Run ID..."
           class="w-full px-3 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
@@ -1085,6 +1400,7 @@
 
       <!-- Status Dropdown -->
       <select
+        aria-label="Filter run history by status"
         bind:value={runStatusFilter}
         class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
       >
@@ -1096,6 +1412,7 @@
 
       <!-- Mode Dropdown -->
       <select
+        aria-label="Filter run history by mode"
         bind:value={runModeFilter}
         class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
       >
@@ -1107,6 +1424,7 @@
       <!-- Model Name Dropdown -->
       {#if uniqueModels.length > 0}
         <select
+          aria-label="Filter run history by model"
           bind:value={runModelNameFilter}
           class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 font-mono"
         >
@@ -1160,19 +1478,13 @@
       <div class="card p-0 divide-y divide-stroke">
         {#each filteredHistoricalRuns as run}
           {@const metrics = getRunMetrics(run, metricsByRunId)}
-          <div
-            class="px-4 py-3 hover:bg-surface-alt transition-colors cursor-pointer"
-            role="button"
-            tabindex="0"
-            on:click={() => openRunDrawer(run.run_id, raceId(run))}
-            on:keydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                openRunDrawer(run.run_id, raceId(run));
-              }
-            }}
+          <button
+            type="button"
+            class="block w-full text-left px-4 py-3 hover:bg-surface-alt transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            on:click={(e) =>
+              openRunDrawer(run.run_id, raceId(run), e.currentTarget)}
           >
-            <div class="flex items-center gap-3">
+            <span class="flex items-center gap-3">
               <span
                 class="font-mono text-sm font-medium text-content flex-1 truncate"
                 >{raceId(run)}</span
@@ -1182,8 +1494,8 @@
                   run.status,
                 )}">{run.status}</span
               >
-            </div>
-            <div
+            </span>
+            <span
               class="mt-1 flex items-center gap-3 text-xs text-content-faint flex-wrap"
             >
               <span>{timeAgo(run.started_at)}</span>
@@ -1212,8 +1524,8 @@
               {#if run.options?.goal}<span class="text-content-subtle truncate"
                   >· {run.options.goal}</span
                 >{/if}
-            </div>
-          </div>
+            </span>
+          </button>
         {/each}
       </div>
     {/if}
@@ -1222,22 +1534,31 @@
 
 <!-- Logs / Details Side Drawer -->
 {#if selectedRunId}
-  <!-- Backdrop Overlay -->
+  <!-- Backdrop: pointer-only close; keyboard users have Escape and the close button. -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div
-    class="fixed inset-0 bg-black/40 backdrop-blur-xs z-40"
+    class="fixed inset-0 bg-black/45 backdrop-blur-sm z-40"
     on:click={closeRunDrawer}
   ></div>
   <div
-    class="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface border-l border-stroke shadow-2xl z-50 flex flex-col transition-transform duration-300"
+    bind:this={drawerEl}
+    class="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface border-l border-stroke shadow-2xl z-50 flex flex-col transition-transform duration-300 focus:outline-none"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="run-drawer-title"
+    tabindex="-1"
+    on:keydown={handleDrawerKeydown}
   >
     <!-- Drawer Header -->
     <div
       class="p-4 border-b border-stroke flex items-center justify-between bg-surface-alt/20"
     >
       <div>
-        <h3 class="text-md font-bold text-content truncate max-w-md">
+        <h3
+          id="run-drawer-title"
+          class="text-base font-bold text-content truncate max-w-md"
+        >
           Run Logs: {selectedRunId}
         </h3>
         {#if selectedRunRaceId}
@@ -1262,10 +1583,11 @@
           <button
             type="button"
             class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
-            disabled={cancellingRunId === selectedRunId}
+            disabled={selectedRunId !== null &&
+              cancellingRunIds.has(selectedRunId)}
             on:click={() => handleCancelRun(selectedRunId ?? "")}
           >
-            {#if cancellingRunId === selectedRunId}
+            {#if selectedRunId !== null && cancellingRunIds.has(selectedRunId)}
               <svg
                 class="animate-spin h-3 w-3"
                 xmlns="http://www.w3.org/2000/svg"
@@ -1316,7 +1638,7 @@
     <!-- Lineage Graph -->
     {#if lineageRunIds.length > 1}
       <div
-        class="px-4 py-2 bg-surface-alt border-b border-stroke flex items-center gap-1.5 flex-wrap text-[11px] font-mono"
+        class="px-4 py-2 bg-surface-alt border-b border-stroke flex items-center gap-1.5 flex-wrap text-[0.6875rem] font-mono"
       >
         <span class="text-content-faint font-sans">Lineage:</span>
         {#each lineageRunIds as id, idx}
@@ -1332,7 +1654,7 @@
             <button
               type="button"
               class="px-1.5 py-0.5 hover:bg-surface text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 rounded underline decoration-dotted transition-colors"
-              on:click={() => openRunDrawer(id, selectedRunRaceId)}
+              on:click={() => void openRunDrawer(id, selectedRunRaceId)}
             >
               {id}
             </button>
@@ -1439,7 +1761,7 @@
             <div class="col-span-2">
               <span class="text-content-faint">Goal:</span>
               <p
-                class="mt-1 p-2 bg-surface-alt rounded text-content text-[11px] font-mono whitespace-pre-wrap"
+                class="mt-1 p-2 bg-surface-alt rounded text-content text-[0.6875rem] font-mono whitespace-pre-wrap"
               >
                 {selectedRunDetail.options.goal}
               </p>
@@ -1462,7 +1784,7 @@
                     <span class="font-medium capitalize"
                       >{step.label || step.name.replaceAll("_", " ")}</span
                     >
-                    <span class="text-[10px] text-content-faint mt-0.5">
+                    <span class="text-[0.625rem] text-content-faint mt-0.5">
                       {#if step.duration_ms}{formatMs(step.duration_ms)}{/if}
                       {#if step.prompt_tokens || step.completion_tokens}
                         · {formatTokens(step.prompt_tokens)}/{formatTokens(
@@ -1475,13 +1797,13 @@
                     </span>
                   </div>
                   <div class="flex items-center gap-2">
-                    {#if step.progress_pct !== undefined && step.status === "running"}
-                      <span class="text-[10px] text-content-faint"
+                    {#if step.progress_pct != null && step.status === "running"}
+                      <span class="text-[0.625rem] text-content-faint"
                         >{step.progress_pct}%</span
                       >
                     {/if}
                     <span
-                      class="px-1.5 py-0.5 rounded-full text-[10px] border {getStatusClass(
+                      class="px-1.5 py-0.5 rounded-full text-[0.625rem] border {getStatusClass(
                         step.status,
                       )}">{step.status}</span
                     >
@@ -1504,15 +1826,16 @@
           <div class="flex items-center gap-2">
             <!-- Log Search Input -->
             <input
-              type="text"
+              type="search"
+              aria-label="Search logs"
               bind:value={logSearchQuery}
               placeholder="Search logs..."
-              class="text-[10px] px-2 py-0.5 border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 w-32"
+              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 w-32"
             />
             <!-- Level filter -->
             <select
               bind:value={drawerLogFilter}
-              class="text-[10px] px-2 py-0.5 border border-stroke rounded bg-surface text-content"
+              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded bg-surface text-content"
               aria-label="Filter logs by level"
             >
               <option value="all">All Levels</option>
@@ -1524,9 +1847,14 @@
           </div>
         </div>
 
+        {#if drawerLogsTruncated}
+          <p class="mb-1 text-xs text-content-faint" role="status">
+            Showing the newest {MAX_LOG_ENTRIES} log entries; older entries are omitted.
+          </p>
+        {/if}
         <div
           bind:this={logContainer}
-          class="flex-1 overflow-auto rounded-lg bg-surface-alt border border-stroke p-2 font-mono text-[11px] space-y-1"
+          class="flex-1 overflow-auto rounded-lg bg-surface-alt border border-stroke p-2 font-mono text-[0.6875rem] space-y-1"
           role="log"
           on:scroll={handleLogScroll}
         >
@@ -1541,7 +1869,7 @@
                   ? new Date(log.timestamp).toLocaleTimeString()
                   : ""}]</span
               >
-              <span class="font-semibold text-[10px]"
+              <span class="font-semibold text-[0.625rem]"
                 >[{(log.level ?? "info").toUpperCase()}]</span
               >
               {log.message}
@@ -1556,18 +1884,4 @@
       </div>
     </div>
   </div>
-
-  <!-- Overlay Backdrop -->
-  <div
-    class="fixed inset-0 bg-black/45 backdrop-blur-sm z-40"
-    on:click={closeRunDrawer}
-    on:keydown={(e) => {
-      if (e.key === "Escape") {
-        closeRunDrawer();
-      }
-    }}
-    role="button"
-    tabindex="-1"
-    aria-label="Close drawer"
-  ></div>
 {/if}

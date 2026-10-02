@@ -15,7 +15,7 @@ describe("ForecastSeatsBar", () => {
 
     expect(screen.getByText("Majority (51)")).toBeTruthy();
     expect(screen.getByText("50-50 Split")).toBeTruthy();
-    expect(screen.getByText("R: 52")).toBeTruthy();
+    expect(screen.getByText("R 52")).toBeTruthy();
   });
 
   it("omits the Senate marker for other chambers", () => {
@@ -28,5 +28,20 @@ describe("ForecastSeatsBar", () => {
 
     expect(screen.queryByText("50-50 Split")).toBeNull();
     expect(screen.getByText("Majority (218)")).toBeTruthy();
+  });
+
+  it("exposes every count as one accessible image", () => {
+    render(ForecastSeatsBar, {
+      activeTab: "house",
+      projectedSeats: { Democratic: 210, Republican: 224, Other: 1 },
+      totalSeats: 435,
+      threshold: 218,
+    });
+
+    expect(
+      screen.getByRole("img", {
+        name: "Projected seats: Democratic 210, Republican 224, Other 1, of 435, 218 needed for a majority",
+      }),
+    ).toBeTruthy();
   });
 });

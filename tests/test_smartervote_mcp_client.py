@@ -64,7 +64,8 @@ async def test_smartervote_mcp_exposes_lean_tool_surface():
         "list_race_versions",
         "get_race_version",
         "restore_race_version",
-        "cancel_or_delete_run",
+        "cancel_run",
+        "delete_finished_run",
         "get_pipeline_metrics",
         "get_pipeline_metrics_summary",
         "get_gcp_pipeline_costs",
@@ -1353,3 +1354,102 @@ def test_contains_placeholder_only_matches_a_whole_value():
 
     assert not _contains_placeholder({"stance": "Supports a draft treaty on emissions"})
     assert not _contains_placeholder({"summary": "Chaired the committee's XXXI review"})
+
+
+@pytest.mark.asyncio
+async def test_cancel_run_uses_non_destructive_cancel_endpoint(monkeypatch):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = type("Client", (), {"post": AsyncMock(return_value={"message": "Run cancelled"}), "delete": AsyncMock()})()
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    await server.cancel_run("run-1")
+
+    client.post.assert_awaited_once_with("/runs/run-1/cancel")
+    client.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_delete_finished_run_refuses_active_runs(monkeypatch):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = type("Client", (), {"get": AsyncMock(return_value={"status": "running"}), "delete": AsyncMock()})()
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    with pytest.raises(ValueError, match="cancel_run"):
+        await server.delete_finished_run("run-1")
+    client.delete.assert_not_awaited()
+
+    client.get.return_value = {"status": "completed"}
+    await server.delete_finished_run("run-1")
+    client.delete.assert_awaited_once_with("/runs/run-1")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tool_name, args",
+    [
+        ("delete_race", ("x/../../queue/pending",)),
+        ("delete_race", ("..",)),
+        ("delete_race", ("ga-senate-2026\n",)),
+        ("delete_race", ("GA-Senate-2026",)),
+        ("delete_race", ("ga senate",)),
+        ("delete_race", ("ga-senate-2026%2F..",)),
+        ("delete_finished_run", ("x/../../runs",)),
+        ("delete_finished_run", ("abc\n",)),
+        ("get_run", ("..",)),
+        ("get_race_version", ("ga-senate-2026", "../../drafts/ga-senate-2026.json")),
+        ("restore_race_version", ("ga-senate-2026", "20260101T000000Z-draft.json\n")),
+        ("get_race_run", ("ga-senate-2026", "run/../../x")),
+    ],
+)
+async def test_path_ids_reject_traversal_and_malformed_input(monkeypatch, tool_name, args):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.get = AsyncMock(return_value={"status": "completed"})
+    client.post = AsyncMock(return_value={})
+    client.delete = AsyncMock(return_value={})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    with pytest.raises(ValueError, match="Invalid"):
+        await getattr(server, tool_name)(*args)
+
+    client.get.assert_not_awaited()
+    client.post.assert_not_awaited()
+    client.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_path_ids_accept_valid_ids_and_build_expected_paths(monkeypatch):
+    if find_spec("mcp") is None:
+        pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.get = AsyncMock(return_value={"status": "completed"})
+    client.post = AsyncMock(return_value={})
+    client.delete = AsyncMock(return_value={})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    await server.delete_race("ga-senate-2026")
+    client.delete.assert_awaited_with("/api/races/ga-senate-2026")
+
+    run_id = "0f8fad5b-d9cb-469f-a165-70867728950e"
+    await server.delete_finished_run(run_id)
+    client.delete.assert_awaited_with(f"/runs/{run_id}")
+
+    await server.restore_race_version("ga-senate-2026", "20260101T000000Z-draft.json")
+    client.post.assert_awaited_with("/api/races/ga-senate-2026/versions/20260101T000000Z-draft.json/restore")
+
+    assert server._path_id("2026-01-01T00:00:00Z", "run_id") == "2026-01-01T00%3A00%3A00Z"

@@ -3409,3 +3409,23 @@ def test_generic_source_normalization_applies_the_same_timestamp_rule():
     repaired = _normalize_source({"url": "https://example.com/b", "last_accessed": "content"})
     assert repaired["last_accessed"] != "content"
     datetime.fromisoformat(repaired["last_accessed"])
+
+
+def test_get_other_state_candidates_logs_when_firestore_lookup_fails(monkeypatch, caplog):
+    """The contamination guard fails open, but never silently."""
+    import logging
+    from unittest.mock import patch
+
+    from pipeline_client.agent.handlers import _get_other_state_candidates
+    from pipeline_client.backend.settings import settings
+
+    monkeypatch.setattr(settings, "storage_mode", "gcp")
+    monkeypatch.setattr(settings, "firestore_project", "test-project")
+
+    with (
+        patch("google.cloud.firestore.Client", side_effect=RuntimeError("firestore down")),
+        caplog.at_level(logging.WARNING, logger="pipeline"),
+    ):
+        assert _get_other_state_candidates("ga-governor-2026", "Georgia") == set()
+
+    assert any("contamination guard" in r.getMessage() and "firestore down" in r.getMessage() for r in caplog.records)

@@ -63,6 +63,19 @@ test.describe("elections directory", () => {
     ).toHaveCount(0);
   });
 
+  test("the office filter is shareable through the url", async ({ page }) => {
+    await gotoAndSettle(page, "/elections/");
+
+    await page.getByRole("button", { name: "Governor", exact: true }).click();
+    await expect(page).toHaveURL(/office=Governor/);
+
+    await gotoAndSettle(page, "/elections/?office=Governor");
+    await expect(page.getByText("1 race found").first()).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Governor", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   test("shows a graceful empty state when a search matches nothing", async ({
     page,
   }) => {

@@ -146,6 +146,10 @@ export interface ValidationGrade {
   score: number;
   passed: boolean;
   summary: string;
+  /** Reviews that judged the current roster (older grades omit this). */
+  current_review_count?: number;
+  /** Reviews that judged an earlier roster; ignored for the score. */
+  stale_review_count?: number;
 }
 
 export type ForecastRating =
@@ -601,6 +605,8 @@ export interface Artifact {
 }
 
 export interface LogEntry {
+  /** Firestore log document id; stable across polls, used to dedupe lines. */
+  id?: string;
   timestamp: string;
   level: string;
   message: string;
@@ -872,7 +878,12 @@ export type RaceStatusType =
   | "running"
   | "draft"
   | "published"
-  | "failed";
+  | "failed"
+  // Written by races-api when queued/running work is cancelled
+  // (routers/queue.py, routers/races_admin/records.py).
+  | "cancelled"
+  // Written when a pending queue item is cancelled before it started.
+  | "idle";
 
 export interface RaceRecord {
   race_id: string;
@@ -929,6 +940,8 @@ export interface ChamberForecastDetails {
   threshold: number;
   total_seats: number;
   tossup_count: number;
+  /** Seats with no forecast party and no holder evidence; left out of projected_seats. */
+  uncounted_seats?: number;
   competitive_race_count?: number;
   competitive_races: string[];
   method: string;

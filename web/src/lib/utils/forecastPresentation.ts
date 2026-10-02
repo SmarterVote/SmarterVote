@@ -4,12 +4,66 @@ import {
   formatRating,
   getRaceState,
   isRaceInForecastTab,
+  isUncontestedForecastRace,
+  forecastWinnerParty,
   normalizeForecastParty,
   parseSeatDistributionKey,
   type ForecastTab,
 } from "$lib/utils/forecast";
 import { GOVERNOR_HOLDOVERS, SENATE_HOLDOVERS } from "./holdovers";
 import { raceDisplayTitle } from "./raceTitle";
+import { STATE_NAMES_BY_CODE } from "./states";
+
+/**
+ * Compact race label for badges and cards: "AZ-01" for a House district,
+ * "AK-AL" for an at-large seat, and the state code ("TX") otherwise. Parsed
+ * from the stable race id (`az-house-01-2026`), so it never depends on the
+ * free-text jurisdiction. Returns null when the id has no state prefix.
+ */
+export function raceShortLabel(race: {
+  id?: string | null;
+  office?: string | null;
+}): string | null {
+  const id = (race.id ?? "").toLowerCase();
+  const code = id.split("-", 1)[0];
+  if (!code || !STATE_NAMES_BY_CODE[code]) return null;
+  const state = code.toUpperCase();
+  // Both id shapes exist in the catalog: `az-house-01-2026` and `az-01-house-2026`.
+  const house =
+    id.match(/^[a-z]{2}-house(?:-(\d{1,2}|al))?(?:-\d{4})?$/) ??
+    id.match(/^[a-z]{2}-(\d{1,2}|al)-house(?:-\d{4})?$/);
+  if (house) {
+    const district = house[1];
+    if (!district || district === "al") return `${state}-AL`;
+    return `${state}-${district.padStart(2, "0")}`;
+  }
+  return state;
+}
+
+/**
+ * Display name for an office in compact subtitles: the many spellings in the
+ * data ("United States House of Representatives", "U.S. Representative",
+ * "Governor of Ohio") collapse to "U.S. House", "U.S. Senate", "Governor".
+ */
+export function officeDisplayName(office: string | null | undefined): string {
+  const value = (office ?? "").trim();
+  const o = value.toLowerCase();
+  if (!o) return "";
+  if (o.startsWith("state ")) return value;
+  if (o.includes("senate") || o.includes("senator")) return "U.S. Senate";
+  if (o.includes("house") || o.includes("representative")) return "U.S. House";
+  if (o.includes("lieutenant governor")) return "Lieutenant Governor";
+  if (o.includes("governor") || o.includes("gubernatorial")) return "Governor";
+  return value;
+}
+
+/**
+ * Model text sometimes arrives with JSON escapes left in (`\"Medicare for
+ * Y'all\"`). Strip the stray backslashes before rendering.
+ */
+// One display sanitizer for the whole site (unescapes leaked JSON quotes and
+// drops inline "(https://…)" citations); re-exported for existing importers.
+export { cleanDisplayText } from "$lib/utils/racePage";
 
 export function partyClass(party: string): string {
   if (party === "Democratic") return "text-blue-600 dark:text-blue-400";
@@ -23,6 +77,77 @@ export function ratingClass(rating: ForecastRating): string {
   if (rating.endsWith("_r"))
     return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800/60";
   return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-200 dark:border-slate-700/60";
+}
+
+/** Map fill for an in-scope race with no published forecast (distinct from Toss-up). */
+export const NO_FORECAST_FILL = "url(#map-no-forecast)";
+/** Map fill for a state whose two holdover seats are split between parties. */
+export const SPLIT_HOLDOVER_FILL = "url(#map-split-holdover)";
+
+/** "Est. Margin" text that names who the margin favors, or "n/a". */
+export function forecastMarginText(forecast: {
+  margin_estimate?: number | null;
+  predicted_winner_name?: string | null;
+  predicted_winner_party?: string | null;
+  party_probabilities?: Record<string, number> | null;
+}): string {
+  const margin = forecast.margin_estimate;
+  if (margin === undefined || margin === null || !Number.isFinite(margin))
+    return "n/a";
+  const party = forecastWinnerParty(
+    forecast.predicted_winner_party,
+    forecast.party_probabilities,
+  );
+  const partyAbbr =
+    party === "Democratic" ? "D" : party === "Republican" ? "R" : null;
+  const name = forecast.predicted_winner_name?.trim();
+  const leader = name
+    ? partyAbbr
+      ? `${name} (${partyAbbr})`
+      : name
+    : party && party !== "Other"
+      ? party
+      : forecast.predicted_winner_party?.trim() || "Leader";
+  return `${leader} +${Math.abs(margin).toFixed(1)} pts`;
+}
+
+function forecastBadgeClass(rating: ForecastRating): string {
+  return rating.endsWith("_d")
+    ? "!bg-blue-600 !text-white"
+    : rating.endsWith("_r")
+      ? "!bg-red-600 !text-white"
+      : "!bg-slate-500 !text-white";
+}
+
+function forecastDetails(
+  forecast: NonNullable<RaceSummary["forecast"]>,
+  uncontested = false,
+) {
+  if (uncontested) {
+    const name =
+      forecast.predicted_winner_name || forecast.predicted_winner_party;
+    return {
+      lead: [name ? `Uncontested: ${name}` : "Uncontested"],
+      rationale: "",
+    };
+  }
+  const winProbText = forecast.win_probability
+    ? ` (${Math.round(forecast.win_probability * 100)}% prob.)`
+    : "";
+  const projected =
+    forecast.predicted_winner_name ||
+    forecast.predicted_winner_party ||
+    "Not stated";
+  // The forecast page's payload carries the takeaway, not the full rationale.
+  const rationale = forecast.rationale || forecast.takeaway || "";
+  return {
+    lead: [
+      `Projected: ${projected}${winProbText}`,
+      `Est. Margin: ${forecastMarginText(forecast)}`,
+    ],
+    rationale:
+      rationale.length > 90 ? rationale.slice(0, 90) + "..." : rationale,
+  };
 }
 
 export function colorForRating(rating: ForecastRating): string {
@@ -61,6 +186,8 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
     ).length,
     details: sorted.slice(0, 3).map((race) => {
       const forecast = race.forecast!;
+      if (isUncontestedForecastRace(race))
+        return `${raceDisplayTitle(race)}: Uncontested`;
       const party = normalizeForecastParty(
         forecast.predicted_winner_party,
         forecast.party_probabilities,
@@ -80,14 +207,68 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
 
 export function probability(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
-  if (value >= 1) return ">99%";
-  if (value <= 0) return "<1%";
+  // Clamp before rounding: 0.996 must read ">99%", never "100%" (no race is a
+  // certainty), and 0.004 must read "<1%", never "0%".
+  if (value >= 0.995) return ">99%";
+  if (value < 0.005) return "<1%";
   return `${Math.round(value * 100)}%`;
 }
 
 export function probabilityOneDecimal(value?: number | null): string {
   if (value === undefined || value === null) return "n/a";
   return `${(value * 100).toFixed(1)}%`;
+}
+
+/**
+ * A single chamber/control probability for display, to one decimal place so it
+ * matches the model narrative, which quotes control odds to one decimal.
+ *
+ * Do not format the halves of a complementary set (D / R control) one at a
+ * time with this: each side rounds independently, so 0.25% / 99.75% shows as
+ * 0.3% / 99.8%. Use {@link controlProbabilities}, which derives the last value
+ * as the complement of the others.
+ */
+export function controlProbability(value?: number | null): string {
+  if (value === undefined || value === null) return "n/a";
+  if (value >= 0.9995) return ">99.9%";
+  if (value <= 0.0005) return "<0.1%";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatTenths(tenths: number): string {
+  if (tenths <= 0) return "<0.1%";
+  if (tenths >= 1000) return ">99.9%";
+  return `${(tenths / 10).toFixed(1)}%`;
+}
+
+/**
+ * Format a set of probabilities that together cover every outcome (D / R
+ * control, or D / split / R) so the displayed values always add up to 100%.
+ *
+ * Every value but the last is rounded to one decimal; the last is shown as
+ * 100 − (the sum of the displayed others). If the values do not actually sum
+ * to 1 (missing or partial data) each is formatted on its own instead, since a
+ * complement would then invent a number.
+ */
+export function controlProbabilities(
+  values: readonly (number | null | undefined)[],
+): string[] {
+  const numbers = values.map((value) =>
+    typeof value === "number" && Number.isFinite(value) ? value : null,
+  );
+  const total = numbers.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+  if (
+    numbers.length < 2 ||
+    numbers.some((value) => value === null) ||
+    Math.abs(total - 1) > 0.002
+  ) {
+    return numbers.map((value) => controlProbability(value));
+  }
+  const tenths = (numbers as number[])
+    .slice(0, -1)
+    .map((value) => Math.round(value * 1000));
+  const last = 1000 - tenths.reduce((sum, value) => sum + value, 0);
+  return [...tenths, last].map(formatTenths);
 }
 
 export function marketSignalTarget(signal: {
@@ -222,7 +403,7 @@ export function buildSeatOutcomeChart(
 /** Returns a URL's hostname (without a leading "www.") for compact source display. */
 export function getHostname(urlString: string): string {
   try {
-    return new URL(urlString).hostname.replace("www.", "");
+    return new URL(urlString).hostname.replace(/^www\./, "");
   } catch {
     return "Source Link";
   }
@@ -243,7 +424,7 @@ export interface StateMapData {
 
 /**
  * Builds the per-state fill colors and hover tooltips for the electoral map,
- * for a given chamber tab. Handles holdover seats (no 2026 election) as well
+ * for a given chamber tab. Handles holdover seats (no election this cycle) as well
  * as active races with or without a published forecast.
  */
 export function buildStateMapData(
@@ -256,6 +437,7 @@ export function buildStateMapData(
   const noElection = cycleYear
     ? `No election in ${cycleYear}`
     : "No election this cycle";
+  const cyclePrefix = cycleYear ? `${cycleYear} ` : "";
 
   const activeRaces = races.filter((r) => isRaceInForecastTab(r, activeTab));
   const activeStates = new Set(
@@ -272,7 +454,7 @@ export function buildStateMapData(
       tooltips[state] = {
         title: state,
         subtitle: noElection,
-        badge: `${party === "Democratic" ? "Democratic" : "Republican"} Holdover`,
+        badge: `${party === "Democratic" ? "Democratic" : "Republican"} holdover`,
         badgeClass:
           party === "Democratic"
             ? "!bg-blue-600/90 !text-white"
@@ -289,41 +471,25 @@ export function buildStateMapData(
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const winProbText = r.forecast.win_probability
-          ? ` (${Math.round(r.forecast.win_probability * 100)}% prob.)`
-          : "";
-        const marginText =
-          r.forecast.margin_estimate !== undefined &&
-          r.forecast.margin_estimate !== null
-            ? ` +${r.forecast.margin_estimate.toFixed(1)} pts`
-            : "";
-
+        const { lead, rationale } = forecastDetails(
+          r.forecast,
+          isUncontestedForecastRace(r),
+        );
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Governor Race",
-          badge: formatRating(rating),
-          badgeClass: rating.endsWith("_d")
-            ? "!bg-blue-600 !text-white"
-            : rating.endsWith("_r")
-              ? "!bg-red-600 !text-white"
-              : "!bg-slate-500 !text-white",
-          details: [
-            `Projected: ${
-              r.forecast.predicted_winner_name ||
-              r.forecast.predicted_winner_party
-            }${winProbText}`,
-            `Est. Margin: ${marginText || "n/a"}`,
-            r.forecast.rationale.length > 90
-              ? r.forecast.rationale.slice(0, 90) + "..."
-              : r.forecast.rationale,
-          ],
+          subtitle: `${cyclePrefix}Governor Race`,
+          badge: isUncontestedForecastRace(r)
+            ? "Uncontested"
+            : formatRating(rating),
+          badgeClass: forecastBadgeClass(rating),
+          details: rationale ? [...lead, rationale] : lead,
         };
       } else {
-        colors[state] = "var(--color-tossup)";
+        colors[state] = NO_FORECAST_FILL;
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Governor Race",
-          badge: "Unforecasted",
+          subtitle: `${cyclePrefix}Governor Race`,
+          badge: "No forecast yet",
           badgeClass: "!bg-slate-500 !text-white",
           details: ["No published model forecasts yet"],
         };
@@ -345,7 +511,7 @@ export function buildStateMapData(
                 ? "var(--color-holdover-d)"
                 : "var(--color-holdover-r)";
           } else {
-            colors[state] = "var(--color-tossup)";
+            colors[state] = SPLIT_HOLDOVER_FILL;
           }
         } else {
           colors[state] =
@@ -355,12 +521,12 @@ export function buildStateMapData(
         }
 
         const seatStrings = holdoverSeats.map((p) =>
-          p === "Democratic" ? "Democrat" : "Republican",
+          p === "Democratic" ? "Democratic" : "Republican",
         );
         tooltips[state] = {
           title: state,
           subtitle: noElection,
-          badge: `${holdoverSeats.length} Holdover Seat${
+          badge: `${holdoverSeats.length} holdover seat${
             holdoverSeats.length > 1 ? "s" : ""
           }`,
           badgeClass: "!bg-slate-500 !text-white",
@@ -377,63 +543,40 @@ export function buildStateMapData(
       const parties = SENATE_HOLDOVERS[state] || [];
       const holdoverSeat = parties.length > 0 ? parties[0] : null;
 
+      const holdoverDetail = holdoverSeat
+        ? `Holdover seat: ${
+            holdoverSeat === "Democratic" ? "Democratic" : "Republican"
+          }`
+        : null;
+
       if (r.forecast) {
         const rating = r.forecast.rating;
         colors[state] = colorForRating(rating);
-        const winProbText = r.forecast.win_probability
-          ? ` (${Math.round(r.forecast.win_probability * 100)}% prob.)`
-          : "";
-        const marginText =
-          r.forecast.margin_estimate !== undefined &&
-          r.forecast.margin_estimate !== null
-            ? ` +${r.forecast.margin_estimate.toFixed(1)} pts`
-            : "";
-
-        const details = [
-          `Projected: ${
-            r.forecast.predicted_winner_name ||
-            r.forecast.predicted_winner_party
-          }${winProbText}`,
-          `Est. Margin: ${marginText || "n/a"}`,
-        ];
-        if (holdoverSeat) {
-          details.push(
-            `Holdover Seat: ${
-              holdoverSeat === "Democratic" ? "Democrat" : "Republican"
-            }`,
-          );
-        }
-        details.push(
-          r.forecast.rationale.length > 90
-            ? r.forecast.rationale.slice(0, 90) + "..."
-            : r.forecast.rationale,
+        const { lead, rationale } = forecastDetails(
+          r.forecast,
+          isUncontestedForecastRace(r),
         );
+        const details = [...lead];
+        if (holdoverDetail) details.push(holdoverDetail);
+        if (rationale) details.push(rationale);
 
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Senate Election",
-          badge: formatRating(rating),
-          badgeClass: rating.endsWith("_d")
-            ? "!bg-blue-600 !text-white"
-            : rating.endsWith("_r")
-              ? "!bg-red-600 !text-white"
-              : "!bg-slate-500 !text-white",
+          subtitle: `${cyclePrefix}Senate Election`,
+          badge: isUncontestedForecastRace(r)
+            ? "Uncontested"
+            : formatRating(rating),
+          badgeClass: forecastBadgeClass(rating),
           details,
         };
       } else {
-        colors[state] = "var(--color-tossup)";
+        colors[state] = NO_FORECAST_FILL;
         const details = ["No published model forecasts yet"];
-        if (holdoverSeat) {
-          details.push(
-            `Holdover Seat: ${
-              holdoverSeat === "Democratic" ? "Democrat" : "Republican"
-            }`,
-          );
-        }
+        if (holdoverDetail) details.push(holdoverDetail);
         tooltips[state] = {
           title: state,
-          subtitle: "2026 Senate Election",
-          badge: "Unforecasted",
+          subtitle: `${cyclePrefix}Senate Election`,
+          badge: "No forecast yet",
           badgeClass: "!bg-slate-500 !text-white",
           details,
         };
@@ -453,7 +596,7 @@ export function buildStateMapData(
 
       colors[state] = summary.primary?.forecast
         ? colorForRating(summary.primary.forecast.rating)
-        : "var(--color-tossup)";
+        : NO_FORECAST_FILL;
 
       tooltips[state] = {
         title: state,
@@ -461,11 +604,9 @@ export function buildStateMapData(
         badge: summary.primary?.forecast
           ? `Closest race: ${formatRating(summary.primary.forecast.rating)}`
           : `${summary.forecastedCount}/${count} Forecasted`,
-        badgeClass: summary.primary?.forecast?.rating.endsWith("_d")
-          ? "!bg-blue-600 !text-white"
-          : summary.primary?.forecast?.rating.endsWith("_r")
-            ? "!bg-red-600 !text-white"
-            : "!bg-slate-500 !text-white",
+        badgeClass: summary.primary?.forecast
+          ? forecastBadgeClass(summary.primary.forecast.rating)
+          : "!bg-slate-500 !text-white",
         details:
           summary.details.length > 0
             ? [

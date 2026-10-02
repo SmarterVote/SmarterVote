@@ -58,20 +58,27 @@ def _gcs_list_race_ids(prefix: str) -> Optional[List[str]]:
 
 
 def _gcs_get_race_json(race_id: str, prefix: str) -> Optional[Dict[str, Any]]:
-    """Fetch and parse a race JSON blob from GCS."""
+    """Fetch and parse a race JSON blob from GCS.
+
+    Returns None only when the blob is genuinely absent (or holds invalid JSON).
+    Transient provider errors propagate so callers never mistake an outage for
+    a missing draft/published race.
+    """
     if not _GCS_BUCKET:
         return None
     client = _get_gcs_admin()
     if client is None:
         return None
+    bucket = client.bucket(_GCS_BUCKET)
+    blob = bucket.blob(f"{prefix}/{race_id}.json")
     try:
-        bucket = client.bucket(_GCS_BUCKET)
-        blob = bucket.blob(f"{prefix}/{race_id}.json")
         if not blob.exists():
             return None
         return json.loads(blob.download_as_text())
-    except Exception as exc:
-        logging.warning("GCS get %s/%s failed: %s", prefix, race_id, exc)
+    except NotFound:
+        return None
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logging.warning("GCS get %s/%s returned invalid JSON: %s", prefix, race_id, exc)
         return None
 
 
@@ -343,8 +350,51 @@ def _assert_publishable_race(data: Dict[str, Any]) -> None:
         raise ValueError(detail)
 
 
-def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> None:
-    """Archive existing blobs, write new published blob, delete draft, update Firestore."""
+def _gcs_delete_published_draft(race_id: str, data: Dict[str, Any]) -> bool:
+    """Delete drafts/{race_id}.json only if it still holds the content just published.
+
+    The draft generation is pinned when re-read and the delete uses
+    ``if_generation_match``, so a newer draft written concurrently (e.g. by a
+    worker finishing a run) is left in place instead of being destroyed.
+    Returns True when no draft remains, False when a newer draft was kept.
+    Provider errors propagate so the publish is reported as failed.
+    """
+    if not _GCS_BUCKET:
+        return True
+    client = _get_gcs_admin()
+    if client is None:
+        raise RuntimeError("GCS client is unavailable while removing published draft")
+    blob = client.bucket(_GCS_BUCKET).blob(f"drafts/{race_id}.json")
+    try:
+        blob.reload()
+        generation = blob.generation
+        current = json.loads(blob.download_as_text(if_generation_match=generation))
+    except NotFound:
+        return True
+    except PreconditionFailed:
+        logging.info("Draft %s changed during publish; keeping the newer draft", race_id)
+        return False
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        current = None
+    if current != data:
+        logging.info("Draft %s differs from the published content; keeping the newer draft", race_id)
+        return False
+    try:
+        blob.delete(if_generation_match=generation)
+    except NotFound:
+        return True
+    except PreconditionFailed:
+        logging.info("Draft %s changed during publish; keeping the newer draft", race_id)
+        return False
+    return True
+
+
+def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> bool:
+    """Archive existing blobs, write new published blob, delete draft, update Firestore.
+
+    Returns True when the published draft was removed, False when a newer
+    draft written during the publish was preserved.
+    """
     import firestore_helpers  # avoid circular at module load
 
     _assert_publishable_race(data)
@@ -353,19 +403,17 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> None:
     if not _gcs_put_race_json(race_id, "races", data):
         raise RuntimeError(f"Failed to write published race blob for {race_id}")
 
-    # Publish is only considered successful if the source draft is gone.
-    if not _gcs_delete_race_json(race_id, "drafts") and _gcs_get_race_json(race_id, "drafts") is not None:
-        raise RuntimeError(f"Published race {race_id} but failed to remove draft blob")
+    draft_removed = _gcs_delete_published_draft(race_id, data)
 
-    firestore_helpers._fs_update_race(
-        race_id,
-        {
-            "status": "published",
-            "published_at": datetime.now(timezone.utc).isoformat(),
-            "draft_updated_at": None,
-            "current_run_id": None,
-        },
-    )
+    update: Dict[str, Any] = {
+        "status": "published",
+        "published_at": datetime.now(timezone.utc).isoformat(),
+        "current_run_id": None,
+    }
+    if draft_removed:
+        update["draft_updated_at"] = None
+    firestore_helpers._fs_update_race(race_id, update)
+    return draft_removed
 
 
 # Alias used by races_admin router

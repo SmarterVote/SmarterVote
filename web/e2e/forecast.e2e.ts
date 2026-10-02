@@ -36,8 +36,11 @@ test.describe("forecast page", () => {
   }) => {
     await gotoAndSettle(page, "/forecast/");
 
-    await page.getByRole("button", { name: "Senate", exact: true }).click();
+    await page.getByRole("tab", { name: "Senate", exact: true }).click();
     await expect(page).toHaveURL(/tab=senate/);
+    await expect(
+      page.getByRole("tab", { name: "Senate", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByText(/Democrats have a narrow but real path/).first(),
     ).toBeVisible();
@@ -46,14 +49,13 @@ test.describe("forecast page", () => {
     ).toBeVisible();
     await expect(page.getByText("Toss-up").first()).toBeVisible();
 
-    await page.getByRole("button", { name: "Governors", exact: true }).click();
+    await page.getByRole("tab", { name: "Governors", exact: true }).click();
     await expect(page).toHaveURL(/tab=governors/);
     await expect(page.getByText("2026 Nevada Governor Election")).toBeVisible();
+    // Phones show abbreviated tiles; the full rating names stay in the text.
     await expect(
-      page
-        .getByRole("region", { name: "Forecast ratings breakdown" })
-        .getByText("Likely D"),
-    ).toBeVisible();
+      page.getByRole("region", { name: "Forecast ratings breakdown" }),
+    ).toContainText("Likely D");
   });
 
   test("filtering to a rating with no matches shows a graceful empty state", async ({

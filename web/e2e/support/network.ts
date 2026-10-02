@@ -68,35 +68,25 @@ export async function mockRaceNotFound(
 }
 
 /**
- * Stubs the Census geocoder JSONP endpoint used by the my-ballot address
- * lookup (src/lib/services/electionLookup.ts). The endpoint is called via a
- * dynamically inserted `<script>` tag rather than `fetch`, so the callback
- * name must be read from the request URL and invoked in the response body.
+ * Stubs the races-api Census proxy (`POST /geocode/census`) used by the
+ * my-ballot address lookup (src/lib/services/electionLookup.ts).
  */
 export async function mockCensusGeocoder(
   page: Page,
   response: unknown,
 ): Promise<void> {
-  await page.route(
-    "**/geocoder/geographies/onelineaddress**",
-    async (route) => {
-      const url = new URL(route.request().url());
-      const callback = url.searchParams.get("callback") ?? "callback";
-      await route.fulfill({
-        status: 200,
-        contentType: "application/javascript",
-        body: `${callback}(${JSON.stringify(response)});`,
-      });
-    },
-  );
+  await page.route("**/geocode/census", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response),
+    });
+  });
 }
 
-/** Simulates the Census geocoder being unreachable. */
+/** Simulates the address service being unreachable. */
 export async function mockCensusGeocoderError(page: Page): Promise<void> {
-  await page.route(
-    "**/geocoder/geographies/onelineaddress**",
-    async (route) => {
-      await route.abort("failed");
-    },
-  );
+  await page.route("**/geocode/census", async (route) => {
+    await route.abort("failed");
+  });
 }

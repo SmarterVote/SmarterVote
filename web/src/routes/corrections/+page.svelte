@@ -2,12 +2,19 @@
   import PolicySection from "$lib/components/support/PolicySection.svelte";
   import TrustPage from "$lib/components/support/TrustPage.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
+
+  const correctionsEmail = "SmarterDotVote@gmail.com";
+  const correctionsMailto = `mailto:${correctionsEmail}?subject=${encodeURIComponent(
+    "Correction report",
+  )}`;
 </script>
 
 <TrustPage
   title="Corrections"
   description="How to report an error and how Smarter.Vote LLC reviews corrections."
   path="/corrections/"
+  eyebrow="Accountability"
+  updated="2026-10-01"
 >
   <PolicySection title="Report a possible error">
     <p>
@@ -16,17 +23,26 @@
       information.
     </p>
     <p>
-      Correction reports are filed as public GitHub issues so their status and
-      resolution can be reviewed openly. A GitHub account is required.
+      Email the report to
+      <a
+        class="font-medium text-primary underline hover:no-underline"
+        href={correctionsMailto}>{correctionsEmail}</a
+      >, or file it as a public GitHub issue if you want its status and
+      resolution to be reviewable openly (that option needs a GitHub account).
     </p>
-    <a
-      href="https://github.com/SmarterVote/SmarterVote/issues/new/choose"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-    >
-      Report a correction on GitHub <UiIcon name="external" size="sm" />
-    </a>
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <a class="btn-primary w-full sm:w-auto" href={correctionsMailto}
+        >Email a correction</a
+      >
+      <a
+        href="https://github.com/SmarterVote/SmarterVote/issues/new?template=correction.yml"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn-secondary w-full sm:w-auto"
+      >
+        Report a correction on GitHub <UiIcon name="external" size="sm" />
+      </a>
+    </div>
   </PolicySection>
   <PolicySection title="What happens next">
     <p>

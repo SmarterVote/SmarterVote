@@ -1,4 +1,4 @@
-import { candidateSlug } from "$lib/utils/format";
+import { candidateSlug, legacyCandidateSlug } from "$lib/utils/format";
 import type { ChamberForecasts, Race, RaceSummary } from "$lib/types";
 import { publicDataBase as configuredPublicDataBase } from "$lib/config/api";
 
@@ -109,7 +109,13 @@ export async function candidateEntries(): Promise<
   const entries: Array<{ slug: string; candidate: string }> = [];
   for (const race of summaries) {
     for (const candidate of race.candidates ?? []) {
-      entries.push({ slug: race.id, candidate: candidateSlug(candidate.name) });
+      const slug = candidateSlug(candidate.name);
+      entries.push({ slug: race.id, candidate: slug });
+      // Keep pre-accent-folding URLs ("linda-s-nchez") resolving; that page
+      // canonicalises and redirects to the folded slug.
+      const legacy = legacyCandidateSlug(candidate.name);
+      if (legacy && legacy !== slug)
+        entries.push({ slug: race.id, candidate: legacy });
     }
   }
   return entries;
@@ -163,4 +169,52 @@ export async function loadPrerenderChamberForecasts(
     throw new Error(`Failed to fetch chamber forecasts: ${response.status}`);
   }
   return (await response.json()) as ChamberForecasts;
+}
+
+/**
+ * Result of a build-time (prerender) data load. `loadError` is true when the
+ * data could not be read at all, which pages show as an error state rather
+ * than as an honest-looking "nothing published yet".
+ */
+export interface PrerenderedRaces {
+  races: RaceSummary[];
+  loadError: boolean;
+}
+
+/** Build-time read of the published summaries, transformed for one page. */
+export async function loadPrerenderedRaces(
+  transform: (races: RaceSummary[]) => RaceSummary[],
+  fetchFn: typeof fetch = fetch,
+): Promise<PrerenderedRaces> {
+  try {
+    return {
+      races: transform(await loadPrerenderSummaries(fetchFn)),
+      loadError: false,
+    };
+  } catch (error) {
+    console.warn("Could not load race summaries for prerender:", error);
+    return { races: [], loadError: true };
+  }
+}
+
+/**
+ * Client-side refresh of prerendered race data.
+ *
+ * The prerendered HTML already carries the build-time races (serialized from
+ * the page's server load), so the page never has to refetch to render. When a
+ * fresher copy is available it replaces them, but a failed or empty refresh
+ * never wipes good prerendered content: it keeps what was rendered.
+ */
+export async function refreshPrerenderedRaces(
+  prerendered: PrerenderedRaces,
+  transform: (races: RaceSummary[]) => RaceSummary[],
+  fetchFn: typeof fetch = fetch,
+): Promise<PrerenderedRaces> {
+  try {
+    const fresh = transform(await fetchPublishedRaceSummaries(fetchFn));
+    if (fresh.length === 0 && prerendered.races.length > 0) return prerendered;
+    return { races: fresh, loadError: false };
+  } catch {
+    return prerendered;
+  }
 }

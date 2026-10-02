@@ -5,32 +5,59 @@
 
   export let ratingOrder: ForecastRating[];
   export let ratingCounts: Partial<Record<ForecastRating, number>>;
+
+  /** Phone labels, so all nine tiles fit one row without scrolling. */
+  const SHORT_LABELS: Record<ForecastRating, string> = {
+    safe_d: "SD",
+    likely_d: "LD",
+    lean_d: "LnD",
+    tilt_d: "TD",
+    tossup: "TU",
+    tilt_r: "TR",
+    lean_r: "LnR",
+    likely_r: "LR",
+    safe_r: "SR",
+    other: "Oth",
+  };
 </script>
 
 <!-- Ratings Counts Grid Card -->
-<section
-  aria-label="Forecast ratings breakdown"
-  class="bg-surface/60 border border-stroke rounded-2xl p-6 shadow-sm backdrop-blur-md"
->
-  <p
-    class="text-xs font-bold uppercase text-content-subtle tracking-wider mb-4"
+<section aria-label="Forecast ratings breakdown" class="card p-4 sm:p-6">
+  <p class="eyebrow mb-4 text-content-subtle">Forecast Ratings Breakdown</p>
+  <!-- One row from Safe D to Safe R, in order, so the scale always reads left
+       to right and both parties are always on screen. Phones get compact
+       tiles with abbreviated labels (full names stay in the accessible text
+       and in the key below); wider screens show the full labels. -->
+  <ul
+    class="grid gap-1 sm:gap-2"
+    style="grid-template-columns: repeat({ratingOrder.length}, minmax(0, 1fr));"
+    aria-label="Forecast ratings, Safe D to Safe R"
   >
-    Forecast Ratings Breakdown
-  </p>
-  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
     {#each ratingOrder as rating}
-      <div
-        class={`border rounded-xl px-2 py-1.5 text-center transition-all ${ratingClass(
+      <li
+        class={`min-w-0 border rounded-lg sm:rounded-xl px-0.5 py-1.5 sm:px-2 text-center transition-all ${ratingClass(
           rating,
         )}`}
       >
-        <div class="text-[10px] font-bold leading-tight truncate">
-          {formatRating(rating)}
-        </div>
-        <div class="text-lg font-black mt-1 tabular-nums">
-          {ratingCounts[rating] ?? 0}
-        </div>
-      </div>
+        <span
+          class="block text-xs font-bold leading-tight sm:hidden"
+          aria-hidden="true">{SHORT_LABELS[rating]}</span
+        >
+        <span
+          class="sr-only sm:not-sr-only sm:block sm:whitespace-nowrap sm:text-xs sm:font-bold sm:leading-tight"
+          >{formatRating(rating)}</span
+        >
+        <span class="mt-1 block text-base font-bold tabular-nums sm:text-lg"
+          ><span class="sr-only">: </span>{ratingCounts[rating] ?? 0}</span
+        >
+      </li>
     {/each}
-  </div>
+  </ul>
+  <p class="mt-3 text-xs leading-5 text-content-subtle sm:hidden">
+    S = Safe, L = Likely, Ln = Lean, T = Tilt, TU = Toss-up{ratingOrder.includes(
+      "other",
+    )
+      ? ", Oth = Other"
+      : ""}; D = Democratic, R = Republican.
+  </p>
 </section>

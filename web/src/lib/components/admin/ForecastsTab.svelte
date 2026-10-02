@@ -2,6 +2,11 @@
   import { onMount } from "svelte";
   import type { ChamberForecasts } from "$lib/types";
   import type { PipelineApiService } from "$lib/services/pipelineApiService";
+  import {
+    DEFAULT_CHAMBER_FORECAST_MODEL,
+    MODEL_CATALOG,
+    MODEL_LABELS,
+  } from "$lib/config/modelCatalog";
 
   export let apiService: PipelineApiService;
 
@@ -15,6 +20,20 @@
   // Left blank so the API's own default applies. Keeping a copy of the model ID
   // here is what let this control drift onto a stale model.
   let model = "";
+  let publishedError = "";
+  let draftError = "";
+
+  // Only offer models the generated catalog says are currently served.
+  const modelOptions = Object.keys(MODEL_CATALOG)
+    .sort()
+    .map((id) => ({ value: id, label: MODEL_LABELS[id] ?? id }));
+  const defaultModelLabel =
+    MODEL_LABELS[DEFAULT_CHAMBER_FORECAST_MODEL] ??
+    DEFAULT_CHAMBER_FORECAST_MODEL;
+
+  function isNotFound(e: unknown): boolean {
+    return /HTTP 404\b/.test(errorMessage(e));
+  }
 
   function errorMessage(e: unknown): string {
     return e instanceof Error ? e.message : String(e);
@@ -36,6 +55,17 @@
       published =
         publishedResult.status === "fulfilled" ? publishedResult.value : null;
       draft = draftResult.status === "fulfilled" ? draftResult.value : null;
+      // A 404 just means nothing exists yet; any other failure must not be
+      // rendered as "Never".
+      publishedError =
+        publishedResult.status === "rejected" &&
+        !isNotFound(publishedResult.reason)
+          ? errorMessage(publishedResult.reason)
+          : "";
+      draftError =
+        draftResult.status === "rejected" && !isNotFound(draftResult.reason)
+          ? errorMessage(draftResult.reason)
+          : "";
     } catch (e) {
       error = errorMessage(e);
     } finally {
@@ -56,6 +86,7 @@
     try {
       const result = await apiService.generateChamberForecastDraft(model);
       draft = result.forecast;
+      draftError = "";
       setNotice("success", "Generated a new chamber forecast draft.");
     } catch (e) {
       setNotice("error", `Generate failed: ${errorMessage(e)}`);
@@ -106,13 +137,17 @@
           for="model-select"
           class="text-sm text-content-subtle font-medium">Model:</label
         >
-        <input
+        <select
           id="model-select"
-          type="text"
           bind:value={model}
-          placeholder="server default"
-          class="w-60 rounded border border-stroke bg-surface px-3 py-1.5 text-sm text-content focus:ring-1 focus:ring-blue-500 focus:outline-none"
-        />
+          disabled={generating}
+          class="w-64 rounded border border-stroke bg-surface px-3 py-1.5 text-sm text-content focus:ring-1 focus:ring-blue-500 focus:outline-none"
+        >
+          <option value="">Server default ({defaultModelLabel})</option>
+          {#each modelOptions as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
       </div>
       <button
         type="button"
@@ -125,7 +160,8 @@
       <button
         type="button"
         class="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-        disabled={loading || publishing || !draft}
+        disabled={loading || publishing || generating || !draft}
+        title={generating ? "Wait for the new draft to finish generating" : ""}
         on:click={publishDraft}
       >
         {publishing ? "Publishing..." : "Publish Draft"}
@@ -168,6 +204,7 @@
   {#if error}
     <div
       class="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800"
+      role="alert"
     >
       {error}
     </div>
@@ -193,11 +230,17 @@
             >
               Published Forecast
             </span>
-            <span class="text-xs text-content-faint">
-              Updated: {published?.updated_at
-                ? new Date(published.updated_at).toLocaleString()
-                : "Never"}
-            </span>
+            {#if publishedError}
+              <span class="text-xs text-red-700 dark:text-red-300" role="alert"
+                >Failed to load: {publishedError}</span
+              >
+            {:else}
+              <span class="text-xs text-content-faint">
+                Updated: {published?.updated_at
+                  ? new Date(published.updated_at).toLocaleString()
+                  : "Never"}
+              </span>
+            {/if}
           </div>
         </div>
 
@@ -314,11 +357,17 @@
             >
               Draft Forecast
             </span>
-            <span class="text-xs text-content-faint">
-              Generated: {draft?.updated_at
-                ? new Date(draft.updated_at).toLocaleString()
-                : "Never"}
-            </span>
+            {#if draftError}
+              <span class="text-xs text-red-700 dark:text-red-300" role="alert"
+                >Failed to load: {draftError}</span
+              >
+            {:else}
+              <span class="text-xs text-content-faint">
+                Generated: {draft?.updated_at
+                  ? new Date(draft.updated_at).toLocaleString()
+                  : "Never"}
+              </span>
+            {/if}
           </div>
         </div>
 

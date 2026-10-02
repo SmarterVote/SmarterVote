@@ -4,12 +4,29 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from shared.model_catalog import MODEL_CATALOG, normalize_model_id
 from shared.pipeline_config import (
     normalize_model_profile,
     normalize_pipeline_steps,
     normalize_review_providers,
     validate_model_override_keys,
 )
+
+
+def validate_known_model_id(value: Optional[str], *, field: str = "model") -> Optional[str]:
+    """Reject model IDs that are not in ``shared.model_catalog`` (after legacy-alias mapping).
+
+    An unknown slug would otherwise be accepted at queue time and fail only
+    mid-run at OpenRouter, after paid work has already been spent.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        return value  # blank means "no override"; resolution treats it as unset
+    normalized = normalize_model_id(value)
+    if normalized not in MODEL_CATALOG:
+        raise ValueError(f"Unknown {field} {value!r}; must be a model in shared/model_catalog.py")
+    return value
 
 
 class PipelineRunOptions(BaseModel):
@@ -54,7 +71,18 @@ class PipelineRunOptions(BaseModel):
     @field_validator("model_overrides")
     @classmethod
     def validate_model_overrides(cls, value: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
-        return validate_model_override_keys(value)
+        overrides = validate_model_override_keys(value)
+        if overrides is None:
+            return None
+        return {
+            role: validate_known_model_id(model, field=f"model_overrides[{role!r}]") or model
+            for role, model in overrides.items()
+        }
+
+    @field_validator("research_model", "claude_model", "gemini_model", "grok_model")
+    @classmethod
+    def validate_model_ids(cls, value: Optional[str], info) -> Optional[str]:
+        return validate_known_model_id(value, field=info.field_name)
 
     @field_validator("candidate_names")
     @classmethod

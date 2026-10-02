@@ -31,9 +31,10 @@ from typing import Any, Dict, List, Optional
 from shared.pipeline_config import DEFAULT_UPDATE_PIPELINE_STEPS, PIPELINE_STEP_IDS, REVIEW_PROVIDERS, PipelineRuntimeConfig
 from shared.race_cleanup import cleanup_race_data, validate_forecast_evidence
 from shared.run_health import clear_step_failures
+from shared.text_quality import is_placeholder_text as _is_placeholder_text
 
 from .ballotpedia import default_ballotpedia_race_url
-from .cost import _cost_ctx, estimate_cost
+from .cost import _cost_ctx, estimate_cost, search_cost_usd
 from .evidence import preserve_baseline_evidence
 from .handlers import _make_editing_handlers  # noqa: F401 - re-exported for tests
 from .llm import _agent_loop, _call_openrouter, _ensure_dict, _normalize_candidate  # noqa: F401 - re-exported for tests
@@ -162,6 +163,9 @@ def _is_missing_stance_text(stance: str) -> bool:
     """
     normalized = stance.strip()
     if not normalized:
+        return True
+    # "(to be updated)", "[TBD]": brackets around a placeholder are still a placeholder.
+    if _is_placeholder_text(normalized):
         return True
     lowered = normalized.lower()
     if lowered in _MISSING_STANCE_MARKERS or "no public position found" in lowered:
@@ -1269,13 +1273,13 @@ async def run_agent(
     )
     provider_cost = _acc.get("provider_cost_usd", 0.0)
 
-    # Add Serper costs ($0.001 per call) to both estimated and provider costs
+    # Add paid search costs (Serper + Searlo) to both estimated and provider costs
     serper_calls = _acc.get("serper_calls", 0)
     searlo_calls = _acc.get("searlo_calls", 0)
-    serper_cost = serper_calls * 0.001
-    estimated_cost += serper_cost
+    paid_search_cost = search_cost_usd(serper_calls, searlo_calls)
+    estimated_cost += paid_search_cost
     if provider_cost > 0:
-        provider_cost += serper_cost
+        provider_cost += paid_search_cost
 
     has_exact_provider_cost = _acc.get("priced_calls", 0) > 0 and _acc.get("unpriced_calls", 0) == 0
     agent_metrics = {
@@ -1284,8 +1288,8 @@ async def run_agent(
         "prompt_tokens": pt,
         "completion_tokens": ct,
         "total_tokens": total_tokens,
-        "llm_cost_usd": provider_cost - serper_cost if has_exact_provider_cost else None,
-        "search_cost_usd": serper_cost,
+        "llm_cost_usd": provider_cost - paid_search_cost if has_exact_provider_cost else None,
+        "search_cost_usd": paid_search_cost,
         "cost_usd": provider_cost if has_exact_provider_cost else None,
         "cost_source": "provider" if has_exact_provider_cost else "estimated",
         "estimated_usd": round(estimated_cost, 6),

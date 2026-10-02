@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +13,8 @@ from shared.forecast_summary import (
     get_chamber_forecast_system_prompt,
     is_chamber_control_race,
     office_group,
+    race_state,
+    summarize_chamber,
 )
 from shared.race_catalog import build_race_summary_fields
 
@@ -667,3 +671,58 @@ def test_narrative_review_prompt_carries_an_optional_goal():
     assert "lead with the tipping-point races" in with_goal
     # An editorial steer must never be able to override a factual correction.
     assert "which always win" in with_goal
+
+
+def test_named_independent_favorite_is_an_other_seat_not_a_major_party():
+    forecast = build_chamber_forecasts(
+        [
+            {
+                "id": "ne-senate-2026",
+                "title": "Nebraska Senate",
+                "office": "U.S. Senate",
+                "state": "Nebraska",
+                "candidates": [{"name": "Inc", "party": "Republican", "incumbent": True}],
+                "forecast": {
+                    "predicted_winner_party": "Independent",
+                    "win_probability": 0.52,
+                    "rating": "tossup",
+                    "party_probabilities": {"Independent": 0.52, "Republican": 0.48},
+                },
+            }
+        ]
+    )
+    baseline = build_chamber_forecasts([])["chambers"]["senate"]["projected_seats"]
+    senate = forecast["chambers"]["senate"]["projected_seats"]
+
+    assert senate["Other"] == baseline["Other"] + 1
+    assert senate["Republican"] == baseline["Republican"]
+
+
+PARITY_FIXTURE = (
+    Path(__file__).resolve().parents[1] / "web" / "src" / "lib" / "utils" / "__fixtures__" / "forecast_parity.json"
+)
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(PARITY_FIXTURE.read_text(encoding="utf-8"))["cases"],
+    ids=lambda case: case["name"],
+)
+def test_projected_seats_match_the_shared_parity_fixture(case):
+    """The same fixture drives web/src/lib/utils/forecastParity.test.ts, so the
+    API and the forecast page cannot drift apart on party labels, state
+    resolution, incumbent fallbacks or uncounted seats again."""
+    summary = summarize_chamber(case["races"], case["chamber"])
+    seats = dict(summary["projected_seats"])
+    seats["uncounted"] = summary["uncounted_seats"]
+    assert seats == case["expected"]
+
+
+def test_race_state_matches_the_frontend_resolution_order():
+    assert race_state({"state": "virginia"}) == "Virginia"
+    assert race_state({"state": " TX "}) == "Texas"
+    assert race_state({"state": "District 5", "id": "tx-senate-2026"}) == "Texas"
+    assert race_state({"jurisdiction": "WEST VIRGINIA"}) == "West Virginia"
+    assert race_state({"state": "DC"}) is None
+    assert race_state({"id": "dc-house-2026"}) is None
+    assert race_state({"state": "Guam"}) == "Guam"

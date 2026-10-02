@@ -10,12 +10,14 @@ import time
 from typing import Callable
 
 from fastapi import Request, Response
+from rate_limit import client_ip
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("races_api")
 
 # Paths that should not be tracked
-_SKIP_PREFIXES = ("/health", "/docs", "/redoc", "/openapi", "/favicon")
+# /geocode carries a voter's street address and must never be recorded.
+_SKIP_PREFIXES = ("/health", "/docs", "/redoc", "/openapi", "/favicon", "/geocode")
 _PUBLIC_EXACT_PATHS = {"/races", "/races/summaries"}
 _PUBLIC_PREFIXES = ("/races/",)
 
@@ -78,11 +80,10 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
 
         store = getattr(request.app.state, "analytics", None)
         if store is not None:
-            # Cloud Run (and most reverse proxies) forward the real client IP in
-            # X-Forwarded-For. The header may contain a comma-separated chain of
-            # IPs; the leftmost value is the original caller.
-            xff = request.headers.get("x-forwarded-for")
-            client_ip = xff.split(",")[0].strip() if xff else (request.client.host if request.client else None)
+            # Same trusted-hop rule as rate limiting: the right-most
+            # X-Forwarded-For entry appended by Cloud Run's front end, never the
+            # caller-controlled left-most value.
+            ip = client_ip(request)
             referer = request.headers.get("referer")
             # Fire-and-forget — never delay the response
             asyncio.create_task(
@@ -90,7 +91,7 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
                     path=path,
                     status_code=response.status_code,
                     response_ms=elapsed_ms,
-                    client_ip=client_ip,
+                    client_ip=ip,
                     referer=referer,
                 )
             )

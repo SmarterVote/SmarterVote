@@ -24,9 +24,16 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
-def _load_main(monkeypatch, *, pages_project: str | None = None):
+def _load_main(monkeypatch, *, pages_project: str | None = None, production: bool = False):
     """Reload main so the module-level CORS regex is rebuilt from env."""
     monkeypatch.delenv("SKIP_AUTH", raising=False)
+    monkeypatch.delenv("API_DOCS_ENABLED", raising=False)
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ENV", raising=False)
+    if production:
+        monkeypatch.setenv("K_SERVICE", "races-api-dev")
+    else:
+        monkeypatch.delenv("K_SERVICE", raising=False)
     monkeypatch.delenv("GCS_BUCKET_NAME", raising=False)
     if pages_project is None:
         monkeypatch.delenv("CLOUDFLARE_PAGES_PROJECT", raising=False)
@@ -52,6 +59,21 @@ def _preflight_allowed(client: TestClient, origin: str) -> bool:
         },
     )
     return "access-control-allow-origin" in {key.lower() for key in response.headers}
+
+
+@pytest.fixture(autouse=True)
+def _restore_dev_main():
+    """Leave ``main`` configured as non-production for later test modules."""
+    yield
+    saved = {name: os.environ.pop(name, None) for name in ("K_SERVICE", "API_DOCS_ENABLED", "ENVIRONMENT", "ENV")}
+    try:
+        import main as main_mod
+
+        importlib.reload(main_mod)
+    finally:
+        for name, value in saved.items():
+            if value is not None:
+                os.environ[name] = value
 
 
 @pytest.fixture
@@ -132,3 +154,48 @@ def test_blank_pages_project_falls_back_to_default(monkeypatch):
     with TestClient(main_mod.app) as client:
         assert _preflight_allowed(client, "https://smartervote-web.pages.dev")
         assert not _preflight_allowed(client, "https://attacker.pages.dev")
+
+
+LOCAL_ORIGINS = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"]
+
+
+@pytest.mark.parametrize("origin", LOCAL_ORIGINS)
+def test_production_rejects_local_dev_origins(monkeypatch, origin):
+    main_mod = _load_main(monkeypatch, production=True)
+    with TestClient(main_mod.app) as client:
+        assert not _preflight_allowed(client, origin)
+        assert _preflight_allowed(client, "https://smarter.vote")
+        assert _preflight_allowed(client, "https://main.smartervote-web.pages.dev")
+
+
+def test_explicit_production_environment_counts_as_production(monkeypatch):
+    main_mod = _load_main(monkeypatch)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    main_mod = importlib.reload(main_mod)
+    assert main_mod.IS_PRODUCTION is True
+    assert main_mod.API_DOCS_ENABLED is False
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_production_hides_api_docs(monkeypatch, path):
+    main_mod = _load_main(monkeypatch, production=True)
+    with TestClient(main_mod.app) as client:
+        assert client.get(path).status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+def test_dev_keeps_api_docs(monkeypatch, path):
+    main_mod = _load_main(monkeypatch)
+    with TestClient(main_mod.app) as client:
+        assert client.get(path).status_code == 200
+
+
+def test_production_docs_can_be_reenabled_explicitly(monkeypatch):
+    monkeypatch.setenv("K_SERVICE", "races-api-dev")
+    monkeypatch.delenv("SKIP_AUTH", raising=False)
+    monkeypatch.setenv("API_DOCS_ENABLED", "true")
+    import main as main_mod
+
+    main_mod = importlib.reload(main_mod)
+    with TestClient(main_mod.app) as client:
+        assert client.get("/openapi.json").status_code == 200

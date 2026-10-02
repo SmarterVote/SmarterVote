@@ -239,6 +239,25 @@ async def test_text_still_flagged_after_revision_is_recorded():
 
     await _run(race, always_flagging)
     assert race["pipeline_state"]["step_failures"][0]["reason"] == "forecast_text_unverified"
+    # Audit 4: text that still fails its fact-check must not ship. The writer's
+    # prose is replaced by a summary of the panel's numbers.
+    forecast = race["forecast"]
+    assert forecast["takeaway"] != "Shaheen is favored."
+    assert forecast["takeaway"] == "Stefany Shaheen (Democratic) is favored, with a 68% chance of winning."
+    assert "Shaheen starts with a structural edge." not in forecast["rationale"]
+    assert "Lean Democratic" in forecast["rationale"]
+    assert forecast["key_reasons"] and forecast["uncertainty"]
+    assert forecast["method"] == PANEL_METHOD
+    assert forecast["rating"] == "lean_d"
+
+
+@pytest.mark.asyncio
+async def test_text_that_passes_its_check_keeps_the_writers_prose():
+    race = _race()
+    fake, _state = _fake_loop()
+    await _run(race, fake)
+    assert race["forecast"]["takeaway"] == "Shaheen is favored."
+    assert race["forecast"]["rationale"] == "Shaheen starts with a structural edge."
 
 
 def test_unverified_forecast_text_degrades_a_run_rather_than_failing_it():

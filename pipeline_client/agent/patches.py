@@ -220,4 +220,12 @@ def _apply_finance_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: 
                     existing_urls.add(lnk.get("url"))
 
         updated += 1
-    log("info", f"  Finance/voting patch applied — {updated} candidates updated")
+    if updated == 0 and patch:
+        unknown = [str(name) for name in patch if str(name) not in candidates_by_name]
+        log(
+            "warning",
+            f"  Finance/voting patch updated 0 candidates from {len(patch)} entries"
+            + (f" (names not on roster: {', '.join(unknown[:10])})" if unknown else ""),
+        )
+    else:
+        log("info", f"  Finance/voting patch applied — {updated} candidates updated")

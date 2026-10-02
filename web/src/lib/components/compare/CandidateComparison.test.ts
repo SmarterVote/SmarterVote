@@ -3,9 +3,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { Candidate, Race } from "$lib/types";
 import CandidateComparison from "./CandidateComparison.svelte";
 
+// Desktop cells preview whole sentences up to ~240 characters.
 const desktopPreview =
-  "The first sentence explains the position. The second sentence adds context about implementation and likely effects. The third sentence explains funding and accountability for the proposal. The fourth sentence provides further evidence about the expected outcome.";
-const fullStance = `${desktopPreview} The final sentence contains additional detail for voters who want the complete record.`;
+  "The first sentence explains the position. The second sentence adds context about implementation and likely effects. The third sentence explains funding and accountability for the proposal.";
+const fullStance = `${desktopPreview} The fourth sentence provides further evidence about the expected outcome. The final sentence contains additional detail for voters who want the complete record.`;
 
 const candidate: Candidate = {
   name: "Casey Candidate",
@@ -89,13 +90,15 @@ describe("CandidateComparison", () => {
 
     expect(desktop.getByText(desktopPreview)).toBeTruthy();
     const button = desktop.getByRole("button", {
-      name: "Show more for Casey Candidate",
+      name: "Show more of Casey Candidate on Healthcare",
     });
 
     await fireEvent.click(button);
     expect(desktop.getByText(fullStance)).toBeTruthy();
     expect(
-      desktop.getByRole("button", { name: "Show less for Casey Candidate" }),
+      desktop.getByRole("button", {
+        name: "Show less of Casey Candidate on Healthcare",
+      }),
     ).toBeTruthy();
   });
 
@@ -143,7 +146,7 @@ describe("CandidateComparison", () => {
       "[data-desktop-candidate-comparison]",
     )!;
 
-    const label = within(desktop).getByText("Automated Research Score");
+    const label = within(desktop).getByText("Automated research score");
     expect(label.closest(".overflow-x-auto")).toBeNull();
     expect(within(desktop).getByText("95/100")).toBeTruthy();
   });
@@ -216,7 +219,7 @@ describe("CandidateComparison", () => {
     expect(desktop.getByText(longSummary)).toBeTruthy();
   });
 
-  it("does not offset the sticky header inside its scroll container", () => {
+  it("keeps the sticky header outside the horizontal scroller", () => {
     const { container } = render(CandidateComparison, {
       race,
       candidates: [candidate],
@@ -224,10 +227,110 @@ describe("CandidateComparison", () => {
     const table = container.querySelector('[role="table"]')!;
     const header = table.firstElementChild as HTMLElement;
 
-    // A viewport-sized offset here would push the header over the first row,
-    // because the overflow-x wrapper is its scroll container.
+    // The header sticks to the viewport (under the site header), so it must
+    // not sit inside the overflow-x wrapper, which would become its scroll
+    // container and stop it from sticking.
     expect(header.className).toContain("sticky");
-    expect(header.className).toContain("top-0");
-    expect(header.className).not.toContain("site-header-height");
+    expect(header.className).toContain("compare-sticky-header");
+    expect(header.closest(".overflow-x-auto")).toBeNull();
+    expect(within(header).getAllByRole("columnheader").length).toBeGreaterThan(
+      1,
+    );
+  });
+
+  it("does not stick the header in compact mode", () => {
+    const { container } = render(CandidateComparison, {
+      race,
+      candidates: [candidate],
+      compact: true,
+    });
+    const header = container.querySelector('[role="table"]')!
+      .firstElementChild as HTMLElement;
+    expect(header.className).not.toContain("sticky");
+  });
+
+  it("shows the no-position marker without a confidence badge", () => {
+    const quiet = {
+      ...candidate,
+      issues: {
+        Healthcare: {
+          stance: "No public position found",
+          confidence: "low",
+          sources: [],
+        },
+      },
+    } as Candidate;
+    const other = {
+      ...candidate,
+      name: "Other Person",
+      issues: {
+        Healthcare: {
+          stance: "Backs a public option.",
+          confidence: "high",
+          sources: [],
+        },
+      },
+    } as Candidate;
+    const { container } = render(CandidateComparison, {
+      race: { ...race, candidates: [quiet, other] },
+      candidates: [quiet, other],
+    });
+    const desktop = within(
+      container.querySelector("[data-desktop-candidate-comparison]")!,
+    );
+    expect(desktop.getByText("No public position found")).toBeTruthy();
+    expect(desktop.getAllByText("Confidence")).toHaveLength(1);
+  });
+
+  it("collapses issues nobody compared has a position on into one line", () => {
+    const quiet = {
+      ...candidate,
+      issues: {
+        Healthcare: {
+          stance: "No public position found",
+          confidence: "low",
+          sources: [],
+        },
+        Economy: {
+          stance: "No public stance found on taxes.",
+          confidence: "low",
+          sources: [],
+        },
+      },
+    } as Candidate;
+    const { container } = render(CandidateComparison, {
+      race: { ...race, candidates: [quiet] },
+      candidates: [quiet],
+    });
+    const desktop = container.querySelector(
+      "[data-desktop-candidate-comparison]",
+    )!;
+    expect(desktop.querySelector("#compare-issue-healthcare")).toBeNull();
+    expect(desktop.querySelector(".no-position-row")?.textContent).toContain(
+      "No public positions found yet on these issues: Healthcare, Economy",
+    );
+  });
+
+  it("unescapes leaked JSON quotes in stance text", () => {
+    const escaped = {
+      ...candidate,
+      issues: {
+        Healthcare: {
+          stance: 'Backs a public option (\\"Medicare for Y\'all\\").',
+          confidence: "high",
+          sources: [],
+        },
+      },
+    } as Candidate;
+    const { container } = render(CandidateComparison, {
+      race: { ...race, candidates: [escaped] },
+      candidates: [escaped],
+    });
+    const desktop = within(
+      container.querySelector("[data-desktop-candidate-comparison]")!,
+    );
+    expect(
+      desktop.getByText('Backs a public option ("Medicare for Y\'all").'),
+    ).toBeTruthy();
   });
 });

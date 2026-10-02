@@ -40,7 +40,6 @@
   let loading = true;
   let error = "";
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
-  let refreshInFlight: Promise<void> | null = null;
 
   const TIME_RANGES = [
     { label: "1h", value: 1 },
@@ -148,14 +147,24 @@
     },
   };
 
-  async function loadData(hours = selectedHours) {
-    if (refreshInFlight) return refreshInFlight;
-    refreshInFlight = (async () => {
+  // In-flight loads are keyed by range: a 7d request must never be answered
+  // with the promise of a 24h request that happened to be running.
+  const inFlightByHours = new Map<number, Promise<void>>();
+  let latestRequestedHours = selectedHours;
+
+  function loadData(hours = selectedHours): Promise<void> {
+    latestRequestedHours = hours;
+    const existing = inFlightByHours.get(hours);
+    if (existing) return existing;
+    const request = (async () => {
+      error = "";
       try {
         const [overviewRes, trafficRes] = await Promise.allSettled([
           analyticsService.getOverview(hours),
           analyticsService.getTraffic(hours),
         ]);
+        // A newer range was selected while this one loaded; drop the result.
+        if (hours !== latestRequestedHours) return;
 
         if (overviewRes.status === "fulfilled") overview = overviewRes.value;
         if (trafficRes.status === "fulfilled") {
@@ -181,26 +190,57 @@
         const failed = [overviewRes].filter(
           (result) => result.status === "rejected",
         ).length;
-        if (failed > 0)
-          error = `${failed} dashboard request${
-            failed === 1 ? "" : "s"
-          } failed`;
+        error =
+          failed > 0
+            ? `${failed} dashboard request${failed === 1 ? "" : "s"} failed`
+            : "";
 
-        if (apiService) {
-          try {
-            allRaces = await apiService.listRaces();
-          } catch {
-            /* non-critical */
-          }
-        }
+        void loadRaces();
       } catch (e) {
-        error = String(e);
+        if (hours === latestRequestedHours) error = String(e);
       } finally {
-        refreshInFlight = null;
-        loading = false;
+        inFlightByHours.delete(hours);
+        if (hours === latestRequestedHours) loading = false;
       }
     })();
-    return refreshInFlight;
+    inFlightByHours.set(hours, request);
+    return request;
+  }
+
+  let racesLoadedFor: PipelineApiService | undefined = undefined;
+  let racesInFlight: Promise<void> | null = null;
+  let racesLoadedAt = 0;
+  /** Analytics refreshes reuse a recent race list instead of re-listing. */
+  const RACES_FRESH_MS = 60_000;
+
+  function loadRaces(force = false): Promise<void> {
+    if (!apiService) return Promise.resolve();
+    if (racesInFlight) return racesInFlight;
+    if (!force && Date.now() - racesLoadedAt < RACES_FRESH_MS) {
+      return Promise.resolve();
+    }
+    const service = apiService;
+    racesInFlight = (async () => {
+      try {
+        const races = await service.listRaces();
+        if (service === apiService) {
+          allRaces = races;
+          racesLoadedFor = service;
+          racesLoadedAt = Date.now();
+        }
+      } catch {
+        /* non-critical */
+      } finally {
+        racesInFlight = null;
+      }
+    })();
+    return racesInFlight;
+  }
+
+  // Load the race-derived panels once per apiService instance.
+  $: if (apiService && racesLoadedFor !== apiService) {
+    racesLoadedFor = apiService;
+    void loadRaces(true);
   }
 
   async function handleRangeChange(hours: number) {
@@ -211,7 +251,7 @@
 
   export async function refresh() {
     loading = true;
-    await loadData(selectedHours);
+    await Promise.all([loadData(selectedHours), loadRaces(true)]);
   }
 
   const gcpLogsUrl = GCP_PROJECT
@@ -283,8 +323,8 @@
   </div>
   <button
     type="button"
-    class="text-xs text-blue-600 hover:underline"
-    on:click={() => loadData(selectedHours)}>Refresh</button
+    class="text-xs text-primary hover:underline"
+    on:click={() => refresh()}>Refresh</button
   >
 </div>
 

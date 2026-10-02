@@ -56,4 +56,44 @@ describe("ForecastOutlookAnalysis", () => {
     ).toBeTruthy();
     expect(screen.queryByText("The Bottom Line")).toBeNull();
   });
+
+  it("uses neutral wording when the control party is not D or R", async () => {
+    render(ForecastOutlookAnalysis, {
+      activeTab: "governors",
+      chamberSummary: {
+        narrative: "",
+        control_party: "Other",
+        control_probability: 0.5,
+        outcome_probabilities: {},
+        projected_seats: {},
+        expected_seats: {},
+        threshold: 26,
+        total_seats: 50,
+        tossup_count: 3,
+        competitive_races: [],
+        method: "test",
+        bottom_line: "Too close to call.",
+        why_party_favored: "Split map.",
+        opposing_party_path: "Win the toss-ups.",
+      },
+      chamberNarrative: "",
+    });
+    expect(screen.queryByText("Why Republicans Are Favored")).toBeNull();
+    expect(
+      screen.getByText("Why the Projected Leader Is Favored"),
+    ).toBeTruthy();
+    expect(screen.getByText("Trailing Side's Path to Control")).toBeTruthy();
+  });
+
+  it("says no outlook is available instead of inventing one", () => {
+    render(ForecastOutlookAnalysis, {
+      activeTab: "senate",
+      chamberSummary: undefined,
+      chamberNarrative: "",
+    });
+    expect(
+      screen.getByText(/No outlook analysis is available yet/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/highly competitive/)).toBeNull();
+  });
 });

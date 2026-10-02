@@ -5,6 +5,11 @@
 /200/ / 301
 /200.html / 301
 
+# Methodology lives on the About page; the prerendered /methodology/ route
+# remains as a meta-refresh fallback if these rules are ever bypassed.
+/methodology /about/#methodology 301
+/methodology/ /about/#methodology 301
+
 # Candidates removed from the published ballot redirect to their race overview.
 /races/md-governor-2026/ronald-w-abend /races/md-governor-2026/ 301
 /races/md-governor-2026/ronald-w-abend/ /races/md-governor-2026/ 301
@@ -18,3 +23,25 @@
 /races/ks-senate-2026/chase-laporte/ /races/ks-senate-2026/ 301
 /races/nj-senate-2026/robert-lebovics /races/nj-senate-2026/ 301
 /races/nj-senate-2026/robert-lebovics/ /races/nj-senate-2026/ 301
+
+# The race directory lives at /elections/.
+/races /elections/ 301
+/races/ /elections/ 301
+
+# Pre-accent-folding candidate slugs (legacyCandidateSlug) -> current
+# candidateSlug. Pages still accept the old slug client-side; these make the
+# move a single server-side 301 for crawlers and shared links.
+/races/ca-house-29-2026/ang-lica-mar-a-due-as /races/ca-house-29-2026/angelica-maria-duenas/ 301
+/races/ca-house-29-2026/ang-lica-mar-a-due-as/ /races/ca-house-29-2026/angelica-maria-duenas/ 301
+/races/ca-house-41-2026/linda-s-nchez /races/ca-house-41-2026/linda-sanchez/ 301
+/races/ca-house-41-2026/linda-s-nchez/ /races/ca-house-41-2026/linda-sanchez/ 301
+/races/ca-house-44-2026/nanette-barrag-n /races/ca-house-44-2026/nanette-barragan/ 301
+/races/ca-house-44-2026/nanette-barrag-n/ /races/ca-house-44-2026/nanette-barragan/ 301
+/races/in-house-07-2026/andr-carson /races/in-house-07-2026/andre-carson/ 301
+/races/in-house-07-2026/andr-carson/ /races/in-house-07-2026/andre-carson/ 301
+/races/nm-senate-2026/ben-ray-luj-n /races/nm-senate-2026/ben-ray-lujan/ 301
+/races/nm-senate-2026/ben-ray-luj-n/ /races/nm-senate-2026/ben-ray-lujan/ 301
+/races/tn-house-05-2026/miche-l-o-leary /races/tn-house-05-2026/micheal-o-leary/ 301
+/races/tn-house-05-2026/miche-l-o-leary/ /races/tn-house-05-2026/micheal-o-leary/ 301
+/races/tx-house-37-2026/lauren-b-pe-a /races/tx-house-37-2026/lauren-b-pena/ 301
+/races/tx-house-37-2026/lauren-b-pe-a/ /races/tx-house-37-2026/lauren-b-pena/ 301

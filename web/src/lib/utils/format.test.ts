@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { LEGACY_MODEL_ALIASES, MODEL_LABELS } from "$lib/config/modelCatalog";
-import { candidateSlug, formatModelName } from "./format";
+import {
+  candidateSlug,
+  formatModelName,
+  legacyCandidateSlug,
+  matchesCandidateSlug,
+} from "./format";
 
 // modelCatalog.ts is generated from shared/model_catalog.py, so its contents
 // change whenever the roster does. Derive fixtures from the catalog rather than
@@ -88,18 +93,26 @@ describe("candidateSlug", () => {
     expect(candidateSlug("!!!Jane!!!")).toBe("jane");
   });
 
-  it("returns an empty string when nothing survives", () => {
-    expect(candidateSlug("")).toBe("");
-    expect(candidateSlug("!!!")).toBe("");
+  it("never returns an empty slug", () => {
+    expect(candidateSlug("")).toBe("candidate");
+    expect(candidateSlug("!!!")).toBe("c-212121");
+    expect(candidateSlug("李明")).toBe("c-674e660e");
   });
 
-  // Non-ASCII letters become separators rather than being transliterated, so an
-  // accented name fragments: "José Ñuñez" -> "jos-u-ez", not "jose-nunez".
-  // Pinned deliberately — switching to transliteration would change every
-  // existing candidate URL, so it must be a conscious migration, not a drive-by.
-  it("turns non-ASCII characters into separators instead of transliterating", () => {
-    expect(candidateSlug("José Ñuñez")).toBe("jos-u-ez");
-    expect(candidateSlug("Müller")).toBe("m-ller");
+  // Accents fold to their base letters so accented names get readable URLs.
+  // The pre-folding slugs ("jos-u-ez") were published, so they stay matched
+  // via legacyCandidateSlug / matchesCandidateSlug and are still prerendered.
+  it("folds accents instead of fragmenting the name", () => {
+    expect(candidateSlug("José Ñuñez")).toBe("jose-nunez");
+    expect(candidateSlug("Müller")).toBe("muller");
+    expect(candidateSlug("Micheál O'Leary")).toBe("micheal-o-leary");
+  });
+
+  it("keeps matching published pre-folding slugs", () => {
+    expect(legacyCandidateSlug("José Ñuñez")).toBe("jos-u-ez");
+    expect(matchesCandidateSlug("José Ñuñez", "jos-u-ez")).toBe(true);
+    expect(matchesCandidateSlug("José Ñuñez", "jose-nunez")).toBe(true);
+    expect(matchesCandidateSlug("José Ñuñez", "jose")).toBe(false);
   });
 
   it("produces a stable slug for the same name", () => {

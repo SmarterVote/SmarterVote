@@ -1423,6 +1423,8 @@ async def test_run_agent_iteration_continuation_preserves_reviews_and_computes_g
         "score": 95,
         "passed": True,
         "summary": "Validated by 1/1 reviewers with an average score of 95/100.",
+        "current_review_count": 1,
+        "stale_review_count": 0,
     }
     assert result["pipeline_state"]["complete"] is True
 
@@ -2262,6 +2264,8 @@ async def test_polling_step_runs_without_issue_finance_or_refinement():
         "score": 91,
         "passed": True,
         "summary": "Validated by 1/1 reviewers with an average score of 91/100.",
+        "current_review_count": 1,
+        "stale_review_count": 0,
     }
     assert result["pipeline_state"]["complete"] is True
     assert result["pipeline_state"]["remaining_steps"] == []

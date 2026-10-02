@@ -20,4 +20,19 @@ describe("ForecastRatingsBreakdown", () => {
     // Rating with no entry in ratingCounts still renders as 0
     expect(screen.getByText("Lean D")).toBeTruthy();
   });
+
+  it("fits all nine ratings on a phone without a horizontal scroller", () => {
+    const { container } = render(ForecastRatingsBreakdown, {
+      ratingOrder: FORECAST_RATING_ORDER,
+      ratingCounts: {},
+    });
+
+    expect(container.innerHTML).not.toContain("min-w-[44rem]");
+    expect(container.querySelector(".overflow-x-auto")).toBeNull();
+    expect(container.querySelectorAll("li")).toHaveLength(9);
+    // Abbreviated phone labels for both parties, with the full names kept.
+    expect(screen.getByText("SD")).toBeTruthy();
+    expect(screen.getByText("SR")).toBeTruthy();
+    expect(screen.getByText("Safe R")).toBeTruthy();
+  });
 });

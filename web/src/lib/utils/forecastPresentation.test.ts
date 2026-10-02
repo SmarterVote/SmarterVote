@@ -7,9 +7,12 @@ import {
   marketAsOf,
   marketSignalTarget,
   marketSpread,
+  NO_FORECAST_FILL,
   probability,
+  SPLIT_HOLDOVER_FILL,
   summarizeStateForecast,
 } from "./forecastPresentation";
+import { SENATE_HOLDOVERS } from "./holdovers";
 
 describe("forecast presentation utilities", () => {
   it("builds a stable seat-outcome chart including an empty state", () => {
@@ -139,9 +142,59 @@ describe("forecast presentation utilities", () => {
     expect(colors.Texas).toBe("var(--color-safe-r)");
     expect(tooltips.Texas.badge).toBe("Safe R");
     expect(tooltips.Texas.details?.[0]).toContain("Projected: Republican");
+    expect(tooltips.Texas.subtitle).toBe("2026 Governor Race");
+    expect(tooltips.Texas.details?.[1]).toBe(
+      "Est. Margin: Republican +12.0 pts",
+    );
   });
 
-  it("builds a tossup placeholder for house races without a forecast", () => {
+  it("uses the races' cycle year, names the margin's leader, and separates split holdovers", () => {
+    const races: RaceSummary[] = [
+      {
+        id: "ga-senate-2028",
+        title: "Georgia Senate",
+        office: "U.S. Senate",
+        state: "GA",
+        election_date: "2028-11-07",
+        updated_utc: "2028-07-01T00:00:00Z",
+        candidates: [],
+        forecast: {
+          predicted_winner_name: "Jane Doe",
+          predicted_winner_party: "Democratic",
+          party_probabilities: { Democratic: 0.6, Republican: 0.4 },
+          margin_estimate: 3.24,
+          rating: "lean_d",
+          confidence: "medium",
+          rationale: "",
+          key_reasons: [],
+          based_on_poll_count: 1,
+          generated_at: "2028-07-01T00:00:00Z",
+        },
+      } as unknown as RaceSummary,
+      {
+        id: "oh-senate-2028",
+        title: "Ohio Senate",
+        office: "U.S. Senate",
+        state: "Ohio",
+        election_date: "2028-11-07",
+        updated_utc: "2028-07-01T00:00:00Z",
+        candidates: [],
+      },
+    ];
+    const { colors, tooltips } = buildStateMapData(races, "senate");
+    expect(tooltips.Georgia.subtitle).toBe("2028 Senate Election");
+    expect(tooltips.Georgia.details).toContain(
+      "Est. Margin: Jane Doe (D) +3.2 pts",
+    );
+    expect(colors.Ohio).toBe(NO_FORECAST_FILL);
+    expect(tooltips.Ohio.badge).toBe("No forecast yet");
+    const splitState = Object.entries(SENATE_HOLDOVERS).find(
+      ([state, seats]) => seats.length === 2 && seats[0] !== seats[1] && state,
+    )?.[0];
+    if (splitState) expect(colors[splitState]).toBe(SPLIT_HOLDOVER_FILL);
+  });
+
+  it("builds a distinct no-forecast placeholder for house races without a forecast", () => {
     const races: RaceSummary[] = [
       {
         id: "ca-house-01-2026",
@@ -155,7 +208,8 @@ describe("forecast presentation utilities", () => {
     ];
 
     const { colors, tooltips } = buildStateMapData(races, "house");
-    expect(colors.California).toBe("var(--color-tossup)");
+    expect(colors.California).toBe(NO_FORECAST_FILL);
+    expect(colors.California).not.toBe("var(--color-tossup)");
     expect(tooltips.California.badge).toBe("0/1 Forecasted");
   });
 
