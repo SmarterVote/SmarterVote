@@ -396,7 +396,7 @@
               >Forecast sources</span
             >
             <div class="flex flex-wrap gap-1.5">
-              {#each forecast.source_urls as url}
+              {#each forecast.source_urls.filter(isExternalUrl) as url}
                 <a
                   href={url}
                   target="_blank"

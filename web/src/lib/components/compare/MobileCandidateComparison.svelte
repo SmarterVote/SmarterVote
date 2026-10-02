@@ -70,7 +70,7 @@
         }))
         .filter(
           (row): row is { name: string; probability: number } =>
-            row.probability !== undefined,
+            row.probability != null,
         )
     : [];
   $: issueSelectId = `mobile-compare-issue-${race.id}`;

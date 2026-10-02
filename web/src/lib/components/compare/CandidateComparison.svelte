@@ -639,7 +639,7 @@
                   role="cell"
                   class="border-r border-stroke p-5 last:border-none"
                 >
-                  {#if probability !== undefined}
+                  {#if probability != null}
                     <div class="text-2xl font-extrabold text-content">
                       {formatWinProbability(probability)}
                     </div>
