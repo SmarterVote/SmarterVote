@@ -253,7 +253,6 @@ export function forecastWinnerParty(
 export function normalizeForecastParty(
   party?: string | null,
   probs?: Record<string, number> | null,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _candidates?:
     | {
         name?: string;
