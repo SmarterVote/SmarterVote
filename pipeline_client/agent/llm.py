@@ -107,6 +107,10 @@ def _accumulate_usage(resp: Any, model: str) -> None:
 # ---------------------------------------------------------------------------
 
 _openrouter_client: Any = None
+#: Event loop the cached client's connection pool is bound to. httpx pools cannot
+#: cross loops, so a sync caller that wraps each call in ``asyncio.run`` would
+#: otherwise get "Event loop is closed" on every call after the first.
+_openrouter_client_loop: Any = None
 _DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 240.0
 _DEFAULT_LLM_RATE_LIMIT_MAX_RETRIES = 3
 _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS = 60
@@ -114,15 +118,22 @@ _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS = 60
 
 def _get_openrouter_client() -> Any:
     """Return (and lazily create) the shared OpenRouter AsyncOpenAI client."""
-    global _openrouter_client
+    global _openrouter_client, _openrouter_client_loop
     from openai import AsyncOpenAI
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
     existing_key = getattr(_openrouter_client, "api_key", None)
-    if _openrouter_client is None or existing_key != api_key:
+    loop_changed = _openrouter_client_loop is not None and loop is not None and loop is not _openrouter_client_loop
+    if _openrouter_client is None or existing_key != api_key or loop_changed:
+        _openrouter_client_loop = loop
         _openrouter_client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
