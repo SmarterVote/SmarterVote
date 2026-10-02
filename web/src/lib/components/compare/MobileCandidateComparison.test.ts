@@ -30,7 +30,8 @@ const candidate: Candidate = {
   issues: {
     Healthcare: {
       stance:
-        "U.S. Senate candidate supports expanding coverage. More details follow.",
+        "U.S. Senate candidate supports expanding coverage through a public option, lower prescription drug prices, and new funding for rural hospitals statewide. " +
+        "More details follow about how the plan would be financed over the next decade, including payroll changes and federal matching funds for states.",
       confidence: "high",
       sources,
     },
@@ -63,21 +64,24 @@ describe("MobileCandidateComparison", () => {
   it("previews a complete stance and expands its full source list", async () => {
     render(MobileCandidateComparison, { race, candidates: [candidate] });
 
+    // Same sentence-bounded preview as the desktop comparison cells.
     expect(
-      screen.getByText("U.S. Senate candidate supports expanding coverage."),
+      screen.getByText(
+        "U.S. Senate candidate supports expanding coverage through a public option, lower prescription drug prices, and new funding for rural hospitals statewide.",
+      ),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: /First source/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Second source/ })).toBeNull();
 
     await fireEvent.click(
       screen.getByRole("button", {
-        name: "Show 1 more source for Alex Example",
+        name: "Show 1 more source for Alex Example on Healthcare",
       }),
     );
     expect(screen.getByRole("link", { name: /Second source/ })).toBeTruthy();
     expect(
       screen.getByRole("button", {
-        name: "Show fewer sources for Alex Example",
+        name: "Show fewer sources for Alex Example on Healthcare",
       }),
     ).toBeTruthy();
   });
@@ -113,10 +117,29 @@ describe("MobileCandidateComparison", () => {
     expect(screen.queryByRole("link", { name: /First source/ })).toBeNull();
 
     await fireEvent.click(
-      screen.getByRole("button", { name: "Show more for Alex Example" }),
+      screen.getByRole("button", {
+        name: "Show more of Alex Example on Healthcare",
+      }),
     );
 
     expect(screen.getByText(longStance)).toBeTruthy();
     expect(screen.getByRole("link", { name: /First source/ })).toBeTruthy();
+  });
+
+  it("shows each candidate's forecast win probability", () => {
+    const forecastRace = {
+      ...race,
+      forecast: {
+        rating: "tilt_d",
+        win_probability: 0.57,
+        predicted_winner_name: "Alex Example",
+        party_probabilities: {},
+      },
+    } as unknown as Race;
+    render(MobileCandidateComparison, {
+      race: forecastRace,
+      candidates: [candidate],
+    });
+    expect(screen.getByText("57%")).toBeTruthy();
   });
 });

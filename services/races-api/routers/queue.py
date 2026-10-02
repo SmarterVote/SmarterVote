@@ -57,6 +57,15 @@ def _dispatch_if_cloud_run(db: Any, item: Dict[str, Any]) -> Dict[str, Any] | No
         raise RuntimeError(error) from exc
 
 
+def _enqueue_claimed_item(db: Any, item: Dict[str, Any]) -> None:
+    """Write the queue doc for a race already claimed; release the claim on failure."""
+    try:
+        db.collection(FIRESTORE_QUEUE_COLLECTION).document(str(item["id"])).set(item)
+    except Exception:
+        firestore_helpers._settle_race_after_run_stop(db, str(item["race_id"]), str(item["run_id"]), "idle")
+        raise
+
+
 def _current_run_is_terminal_or_missing(db: Any, run_id: str) -> bool:
     try:
         run_doc = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).get()
@@ -242,16 +251,15 @@ def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
             assert_race_admitted(db, race_id, "queue")
             from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
 
-            race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).get()
-            if getattr(race_doc, "exists", False) is True:
-                race_data = race_doc.to_dict() or {}
-                race_data = _self_heal_stale_active_race(db, race_id, race_data)
-                if race_data.get("status") in ("queued", "running"):
-                    errors.append({"race_id": race_id, "error": f"Race is already {race_data.get('status')}"})
-                    continue
-
             item_id = str(uuid.uuid4())
             run_id = str(uuid.uuid4())
+            # Atomic check-and-claim so concurrent requests cannot enqueue duplicate paid runs.
+            blocked = firestore_helpers._claim_race_for_run(
+                db, race_id, run_id, heal=lambda data, rid=race_id: _self_heal_stale_active_race(db, rid, data)
+            )
+            if blocked:
+                errors.append({"race_id": race_id, "error": blocked})
+                continue
             item = {
                 "id": item_id,
                 "race_id": race_id,
@@ -262,8 +270,7 @@ def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
                 "runner": (options or {}).get("runner") or _default_runner(),
                 "created_at": SERVER_TIMESTAMP,
             }
-            db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id).set(item)
-            firestore_helpers._fs_update_race(race_id, {"status": "queued", "current_run_id": run_id})
+            _enqueue_claimed_item(db, item)
             dispatch = _dispatch_if_cloud_run(db, item)
             added.append(
                 {
@@ -296,18 +303,48 @@ def clear_finished_queue() -> Dict[str, Any]:
 
 @router.delete("/api/queue/pending", dependencies=[Depends(verify_token)])
 def clear_pending_queue() -> Dict[str, Any]:
-    """Cancel all pending (not yet started) queue items."""
+    """Cancel all pending (not yet started) queue items.
+
+    Each item is cancelled only if it is still pending at write time (update-time
+    precondition), so an item a worker just claimed is left alone. The race
+    record returns to published/draft when it has those copies, else ``idle``.
+    """
     db = firestore_helpers._get_fs()
     removed = 0
     docs = db.collection(FIRESTORE_QUEUE_COLLECTION).where("status", "==", "pending").limit(500).stream()
+
+    def build(data: Dict[str, Any]) -> Dict[str, Any] | None:
+        if data.get("status") != "pending":
+            return None
+        return {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
+
     for doc in docs:
-        data = doc.to_dict() or {}
-        doc.reference.update({"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()})
+        outcome, data = firestore_helpers._update_with_retry(db, doc.reference, build, snapshot=doc)
+        if outcome != "updated":
+            continue
         removed += 1
-        race_id = data.get("race_id")
+        race_id = (data or {}).get("race_id")
         if race_id:
-            firestore_helpers._fs_update_race(race_id, {"status": "idle", "current_run_id": None})
+            firestore_helpers._settle_race_after_run_stop(db, str(race_id), (data or {}).get("run_id"), "idle")
     return {"removed": removed}
+
+
+def _cancel_queue_item_or_409(db: Any, doc: Any) -> None:
+    """Cancel a still-active queue item; 409 if it finished between read and write."""
+
+    def build(data: Dict[str, Any]) -> Dict[str, Any] | None:
+        if data.get("status") not in _ACTIVE_STATUSES:
+            return None
+        return {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
+
+    outcome, data = firestore_helpers._update_with_retry(db, doc.reference, build, snapshot=doc)
+    if outcome == "missing":
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    if outcome == "skipped":
+        status = (data or {}).get("status")
+        raise HTTPException(status_code=409, detail=f"Queue item is no longer active (status: {status or 'unknown'})")
+    if outcome == "conflict":
+        raise HTTPException(status_code=409, detail="Queue item changed while cancelling; refresh and try again")
 
 
 @router.delete("/api/queue/{item_id}", dependencies=[Depends(verify_token)])
@@ -326,23 +363,25 @@ def remove_queue_item(item_id: str, force: bool = False) -> Dict[str, Any]:
     status = data.get("status", "")
     race_id = data.get("race_id")
 
+    run_id = data.get("run_id")
+
     if force:
         doc.reference.delete()
         if race_id:
-            firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
+            firestore_helpers._settle_race_after_run_stop(db, str(race_id), run_id, "cancelled")
         return {"ok": True, "action": "force_removed", "id": item_id}
 
     if status == "pending":
-        doc.reference.update({"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()})
+        _cancel_queue_item_or_409(db, doc)
         if race_id:
-            firestore_helpers._fs_update_race(race_id, {"status": "idle", "current_run_id": None})
+            firestore_helpers._settle_race_after_run_stop(db, str(race_id), run_id, "idle")
         return {"ok": True, "action": "cancelled", "id": item_id}
     elif status in ("completed", "failed", "cancelled", "continued"):
         doc.reference.delete()
         return {"ok": True, "action": "removed", "id": item_id}
     else:
-        # running — mark cancelled; CF will check at next step boundary
-        doc.reference.update({"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()})
+        # running — mark cancelled; the worker checks at the next step boundary
+        _cancel_queue_item_or_409(db, doc)
         if race_id:
-            firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
+            firestore_helpers._settle_race_after_run_stop(db, str(race_id), run_id, "cancelled")
         return {"ok": True, "action": "cancelled", "id": item_id}

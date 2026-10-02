@@ -335,19 +335,24 @@ def cancel_race(race_id: str) -> Dict[str, Any]:
     race_data = race_doc.to_dict() or {}
     if race_data.get("status") not in ("queued", "running"):
         raise HTTPException(status_code=400, detail="Race is not queued or running")
+
+    def build_queue(d: Dict[str, Any]) -> Dict[str, Any] | None:
+        if d.get("status") not in ("pending", "running"):
+            return None
+        return {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
+
     for doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("race_id", "==", race_id).stream():
-        d = doc.to_dict() or {}
-        if d.get("status") in ("pending", "running"):
-            doc.reference.update(
-                {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
-            )
+        firestore_helpers._update_with_retry(db, doc.reference, build_queue, snapshot=doc)
     run_id = race_data.get("current_run_id")
     if run_id:
         run_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
-        run_doc = run_ref.get()
-        if run_doc.exists and (run_doc.to_dict() or {}).get("status") in ("pending", "running"):
-            run_ref.update({"status": "cancelled"})
-    firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
+        firestore_helpers._update_with_retry(
+            db,
+            run_ref,
+            lambda d: {"status": "cancelled"} if d.get("status") in ("pending", "running") else None,
+        )
+    # Re-reads the race under a precondition and keeps published/draft copies visible.
+    firestore_helpers._settle_race_after_run_stop(db, race_id, run_id, "cancelled")
     return {"message": f"Race {race_id} cancelled"}
 
 
@@ -376,15 +381,14 @@ def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> Dict[s
 
     db = firestore_helpers._get_fs()
     assert_race_admitted(db, race_id, "research")
-    race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).get()
-    if race_doc.exists:
-        race_data = race_doc.to_dict() or {}
-        race_data = _self_heal_stale_active_race(db, race_id, race_data)
-        if race_data.get("status") in ("queued", "running"):
-            raise HTTPException(status_code=409, detail=f"Race is already {race_data.get('status')}")
-
     item_id = str(uuid.uuid4())
     run_id = str(uuid.uuid4())
+    # Atomic check-and-claim so concurrent requests cannot enqueue duplicate paid runs.
+    blocked = firestore_helpers._claim_race_for_run(
+        db, race_id, run_id, heal=lambda data: _self_heal_stale_active_race(db, race_id, data)
+    )
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
     item = {
         "id": item_id,
         "race_id": race_id,
@@ -395,8 +399,11 @@ def run_race_pipeline(race_id: str, options: RunOptions | None = None) -> Dict[s
         "runner": opts.get("runner") or os.getenv("PIPELINE_DEFAULT_RUNNER", "local").strip().lower(),
         "created_at": SERVER_TIMESTAMP,
     }
-    db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id).set(item)
-    firestore_helpers._fs_update_race(race_id, {"status": "queued", "current_run_id": run_id})
+    try:
+        db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id).set(item)
+    except Exception:
+        firestore_helpers._settle_race_after_run_stop(db, race_id, run_id, "idle")
+        raise
     dispatch = None
     if item["runner"] == "cloud_run":
         try:

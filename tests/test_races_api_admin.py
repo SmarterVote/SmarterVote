@@ -5,6 +5,7 @@ Auth is bypassed by patching `verify_token` to return an empty dict.
 """
 
 import asyncio
+import json
 import os
 
 # ---------------------------------------------------------------------------
@@ -1244,6 +1245,8 @@ def test_queue_multiple_races_creates_independent_queue_items():
     def _race_document(race_id):
         ref = MagicMock()
         ref.set.side_effect = lambda data, **_kw: race_updates.__setitem__(race_id, data)
+        # A missing race doc is claimed atomically with create().
+        ref.create.side_effect = lambda data, **_kw: race_updates.__setitem__(race_id, data)
         return ref
 
     coll_races = MagicMock()
@@ -1429,7 +1432,10 @@ def test_queue_allows_requeue_when_running_status_is_stale_terminal_run():
     assert body["errors"] == []
     updates = [c.args for c in mock_update.call_args_list]
     assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "draft" for args in updates)
-    assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "queued" for args in updates)
+    # The queued claim is a conditional (last_update_time) write on the race doc.
+    claim = running_ref.update.call_args
+    assert claim.args[0]["status"] == "queued"
+    assert "option" in claim.kwargs
 
 
 def test_single_race_run_rejects_already_running_race():
@@ -1545,7 +1551,10 @@ def test_single_race_run_allows_when_running_status_is_stale_terminal_run():
     assert resp.json()["status"] == "queued"
     updates = [c.args for c in mock_update.call_args_list]
     assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "draft" for args in updates)
-    assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "queued" for args in updates)
+    # The queued claim is a conditional (last_update_time) write on the race doc.
+    claim = running_ref.update.call_args
+    assert claim.args[0]["status"] == "queued"
+    assert "option" in claim.kwargs
 
 
 def test_run_options_accept_cloud_function_review_fields():
@@ -1556,17 +1565,18 @@ def test_run_options_accept_cloud_function_review_fields():
         cheap_mode=False,
         save_artifact=True,
         enabled_steps=["review", "iteration"],
-        research_model="gpt-test",
-        claude_model="claude-test",
-        gemini_model="gemini-test",
-        grok_model="grok-test",
+        # Model fields are validated against shared/model_catalog.py.
+        research_model="deepseek/deepseek-v4.1-flash",
+        claude_model="anthropic/claude-haiku-4.5",
+        gemini_model="google/gemini-3.5-flash-lite",
+        grok_model="x-ai/grok-4.3",
         review_providers=[" claude ", "gemini", "claude"],
     )
 
     dumped = opts.model_dump(exclude_none=True)
     assert dumped["save_artifact"] is True
-    assert dumped["gemini_model"] == "gemini-test"
-    assert dumped["grok_model"] == "grok-test"
+    assert dumped["gemini_model"] == "google/gemini-3.5-flash-lite"
+    assert dumped["grok_model"] == "x-ai/grok-4.3"
     assert dumped["review_providers"] == ["claude", "gemini"]
 
 
@@ -3178,13 +3188,121 @@ def test_delete_active_run_cancels_matching_queue_item():
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "Run cancelled"
-    run_ref.update.assert_called_with({"status": "cancelled"})
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
     queue_update = queue_doc.reference.update.call_args.args[0]
     assert queue_update["status"] == "cancelled"
     assert queue_update["lease_owner"] is None
     assert queue_update["lease_expires_at"] is None
     assert queue_update["ttl_at"] > datetime.now(timezone.utc)
-    race_ref.set.assert_called()
+    race_update = race_ref.update.call_args
+    assert race_update.args[0]["status"] == "cancelled"
+    assert race_update.args[0]["current_run_id"] is None
+    assert "option" in race_update.kwargs  # last_update_time precondition
+    race_ref.set.assert_not_called()
+
+
+def _run_cancel_client(run_data):
+    """Build a TestClient whose pipeline_runs/pipeline_queue/races collections are mocked."""
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+
+    run_ref = MagicMock()
+    if run_data is None:
+        missing = MagicMock()
+        missing.exists = False
+        run_ref.get.return_value = missing
+    else:
+        run_ref.get.return_value = _make_existing_doc(run_data)
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_doc = MagicMock()
+    queue_doc.to_dict.return_value = {"run_id": "run-x", "status": "pending"}
+    queue_doc.reference = MagicMock()
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.limit.return_value = queue_coll
+    queue_coll.stream.return_value = iter([queue_doc])
+
+    race_ref = MagicMock()
+    race_ref.get.return_value = _make_existing_doc(
+        {"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-x"}
+    )
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: {
+        "pipeline_runs": runs_coll,
+        "pipeline_queue": queue_coll,
+        "races": races_coll,
+    }.get(name, MagicMock())
+    return db, run_ref, queue_doc
+
+
+def _call_run_endpoint(db, method, path):
+    import main as app_module
+
+    firestore_helpers._fs_db = None
+    from fastapi.testclient import TestClient
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+    ):
+        tc = TestClient(app_module.app)
+        return getattr(tc, method)(path)
+
+
+def test_cancel_run_endpoint_cancels_active_run():
+    db, run_ref, queue_doc = _run_cancel_client({"run_id": "run-x", "race_id": "az-senate-2026", "status": "pending"})
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
+    assert queue_doc.reference.update.call_args.args[0]["status"] == "cancelled"
+    db.batch.assert_not_called()
+
+
+@pytest.mark.parametrize("status", ["completed", "failed", "cancelled"])
+def test_cancel_run_endpoint_refuses_finished_runs_without_deleting(status):
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "status": status})
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 409
+    run_ref.update.assert_not_called()
+    run_ref.delete.assert_not_called()
+    db.batch.assert_not_called()
+
+
+def test_cancel_run_endpoint_404_for_missing_run():
+    db, _, _ = _run_cancel_client(None)
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+    assert resp.status_code == 404
+
+
+def test_delete_run_cancel_only_refuses_to_delete_finished_run():
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "status": "completed"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x?cancel_only=true")
+    assert resp.status_code == 409
+    db.batch.assert_not_called()
+    run_ref.delete.assert_not_called()
+
+
+def test_delete_run_cancel_only_still_cancels_active_run():
+    db, run_ref, _ = _run_cancel_client({"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x?cancel_only=true")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run cancelled"
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
+
+
+def test_delete_finished_run_without_cancel_only_still_deletes():
+    db, _, _ = _run_cancel_client({"run_id": "run-x", "status": "completed"})
+    resp = _call_run_endpoint(db, "delete", "/runs/run-x")
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "Run deleted"
+    db.batch.return_value.commit.assert_called()
 
 
 def test_delete_superseded_active_run_does_not_cancel_published_race():
@@ -3243,7 +3361,7 @@ def test_delete_superseded_active_run_does_not_cancel_published_race():
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "Run cancelled"
-    run_ref.update.assert_called_with({"status": "cancelled"})
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
     queue_update = queue_doc.reference.update.call_args.args[0]
     assert queue_update["status"] == "cancelled"
     assert queue_update["lease_owner"] is None
@@ -3270,6 +3388,7 @@ def test_delete_race_scoped_active_run_cancels_matching_queue_item():
 
     queue_coll = MagicMock()
     queue_coll.where.return_value = queue_coll
+    queue_coll.limit.return_value = queue_coll
     queue_coll.stream.return_value = iter([queue_doc])
 
     race_doc = _make_existing_doc({"race_id": "az-senate-2026", "status": "running"})
@@ -3307,11 +3426,12 @@ def test_delete_race_scoped_active_run_cancels_matching_queue_item():
 
     assert resp.status_code == 200
     assert resp.json()["message"] == "Run cancelled"
-    run_ref.update.assert_called_with({"status": "cancelled"})
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
     queue_update = queue_doc.reference.update.call_args.args[0]
     assert queue_update["status"] == "cancelled"
+    assert queue_update["lease_owner"] is None
     assert queue_update["ttl_at"] > datetime.now(timezone.utc)
-    race_ref.set.assert_called()
+    assert race_ref.update.call_args.args[0]["status"] == "cancelled"
 
 
 # ---------------------------------------------------------------------------
@@ -3566,8 +3686,11 @@ def test_cancel_race_cancels_active_queue_item_and_run():
     assert queue_update["lease_expires_at"] is None
     assert queue_update["ttl_at"] > datetime.now(timezone.utc)
 
-    run_ref.update.assert_called_once_with({"status": "cancelled"})
-    mock_update.assert_called_once_with("az-senate-2026", {"status": "cancelled", "current_run_id": None})
+    assert run_ref.update.call_count == 1 and run_ref.update.call_args.args[0] == {"status": "cancelled"}
+    mock_update.assert_not_called()
+    race_update = race_ref.update.call_args.args[0]
+    assert race_update["status"] == "cancelled"
+    assert race_update["current_run_id"] is None
 
 
 def test_cancel_race_rejects_when_not_queued_or_running():
@@ -4108,3 +4231,536 @@ def test_pipeline_metrics_prefers_explicit_option_over_agent_metrics():
     )
 
     assert record["model_profile"] == "premium"
+
+
+# ---------------------------------------------------------------------------
+# Cancel concurrency (update-time preconditions) and race status fallback
+# ---------------------------------------------------------------------------
+
+
+def _precondition_error():
+    from google.api_core import exceptions as gexc
+
+    return gexc.FailedPrecondition("update_time mismatch")
+
+
+def _cancel_world(run_docs, race_data, queue_items=None):
+    """Mock db whose run ref returns ``run_docs`` in order and whose race doc is ``race_data``."""
+    run_ref = MagicMock()
+    run_ref.get.side_effect = [(_make_existing_doc(d) if d is not None else _make_missing_doc_ref().get()) for d in run_docs]
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+
+    queue_docs = []
+    for item in queue_items or []:
+        q = _make_existing_doc(item)
+        q.reference = MagicMock()
+        queue_docs.append(q)
+    queue_coll = MagicMock()
+    queue_coll.where.return_value = queue_coll
+    queue_coll.limit.return_value = queue_coll
+    queue_coll.stream.side_effect = lambda *a, **k: iter(queue_docs)
+    queue_coll.document.return_value = queue_docs[0].reference if queue_docs else _make_missing_doc_ref()
+    if queue_docs:
+        queue_docs[0].reference.get.return_value = queue_docs[0]
+
+    race_ref = MagicMock()
+    race_ref.get.return_value = _make_existing_doc(race_data) if race_data is not None else _make_missing_doc_ref().get()
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: {
+        "pipeline_runs": runs_coll,
+        "pipeline_queue": queue_coll,
+        "races": races_coll,
+    }.get(name, MagicMock())
+    return db, run_ref, race_ref, queue_docs
+
+
+def test_cancel_run_returns_409_when_run_finishes_between_read_and_write():
+    db, run_ref, race_ref, queue_docs = _cancel_world(
+        [
+            {"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"},
+            {"run_id": "run-x", "race_id": "az-senate-2026", "status": "completed"},
+        ],
+        {"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x"},
+        [{"run_id": "run-x", "status": "running"}],
+    )
+    run_ref.update.side_effect = _precondition_error()
+
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+
+    assert resp.status_code == 409
+    assert "completed" in resp.json()["detail"]
+    assert run_ref.update.call_count == 1
+    assert "option" in run_ref.update.call_args.kwargs
+    queue_docs[0].reference.update.assert_not_called()
+    race_ref.update.assert_not_called()
+    race_ref.set.assert_not_called()
+
+
+def test_cancel_run_retries_precondition_while_run_still_active():
+    db, run_ref, race_ref, _ = _cancel_world(
+        [
+            {"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"},
+            {"run_id": "run-x", "race_id": "az-senate-2026", "status": "running", "progress": 40},
+        ],
+        {"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x"},
+    )
+    run_ref.update.side_effect = [_precondition_error(), None]
+
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+
+    assert resp.status_code == 200
+    assert run_ref.update.call_count == 2
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
+
+
+@pytest.mark.parametrize(
+    "race_extra, expected",
+    [
+        ({"published_at": "2026-09-01T00:00:00Z", "draft_updated_at": "2026-09-02T00:00:00Z"}, "published"),
+        ({"draft_updated_at": "2026-09-02T00:00:00Z"}, "draft"),
+        ({}, "cancelled"),
+    ],
+)
+def test_cancel_run_restores_published_or_draft_race_status(race_extra, expected):
+    db, _, race_ref, _ = _cancel_world(
+        [{"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"}],
+        {"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x", **race_extra},
+    )
+
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+
+    assert resp.status_code == 200
+    update = race_ref.update.call_args
+    assert update.args[0]["status"] == expected
+    assert update.args[0]["current_run_id"] is None
+    assert "option" in update.kwargs
+
+
+def test_cancel_run_race_settle_rereads_on_precondition_failure():
+    db, _, race_ref, _ = _cancel_world(
+        [{"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"}],
+        {"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x"},
+    )
+    # Second read: a new run took over the race between our read and write.
+    race_ref.get.side_effect = [
+        _make_existing_doc({"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x"}),
+        _make_existing_doc({"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-new"}),
+    ]
+    race_ref.update.side_effect = _precondition_error()
+
+    resp = _call_run_endpoint(db, "post", "/runs/run-x/cancel")
+
+    assert resp.status_code == 200
+    assert race_ref.update.call_count == 1  # no retry: the race now belongs to run-new
+
+
+@pytest.mark.parametrize(
+    "race_extra, expected",
+    [
+        ({"published_at": "2026-09-01T00:00:00Z"}, "published"),
+        ({"draft_updated_at": "2026-09-02T00:00:00Z"}, "draft"),
+        ({}, "idle"),
+    ],
+)
+def test_clear_pending_queue_restores_race_status(race_extra, expected):
+    db, _, race_ref, queue_docs = _cancel_world(
+        [],
+        {"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-x", **race_extra},
+        [{"id": "q1", "race_id": "az-senate-2026", "run_id": "run-x", "status": "pending"}],
+    )
+
+    resp = _call_run_endpoint(db, "delete", "/api/queue/pending")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"removed": 1}
+    assert queue_docs[0].reference.update.call_args.args[0]["status"] == "cancelled"
+    assert race_ref.update.call_args.args[0]["status"] == expected
+
+
+def test_clear_pending_queue_skips_item_claimed_by_worker():
+    db, _, race_ref, queue_docs = _cancel_world(
+        [],
+        {"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-x"},
+        [{"id": "q1", "race_id": "az-senate-2026", "run_id": "run-x", "status": "pending"}],
+    )
+    queue_docs[0].reference.update.side_effect = _precondition_error()
+    queue_docs[0].reference.get.return_value = _make_existing_doc(
+        {"id": "q1", "race_id": "az-senate-2026", "run_id": "run-x", "status": "running"}
+    )
+
+    resp = _call_run_endpoint(db, "delete", "/api/queue/pending")
+
+    assert resp.json() == {"removed": 0}
+    race_ref.update.assert_not_called()
+
+
+def test_remove_pending_queue_item_restores_published_race_status():
+    db, _, race_ref, _ = _cancel_world(
+        [],
+        {"race_id": "az-senate-2026", "status": "queued", "current_run_id": "run-x", "published_at": "2026-09-01"},
+        [{"id": "q1", "race_id": "az-senate-2026", "run_id": "run-x", "status": "pending"}],
+    )
+
+    resp = _call_run_endpoint(db, "delete", "/api/queue/q1")
+
+    assert resp.status_code == 200
+    assert resp.json()["action"] == "cancelled"
+    assert race_ref.update.call_args.args[0]["status"] == "published"
+
+
+def test_cancel_race_restores_draft_status():
+    db, run_ref, race_ref, _ = _cancel_world(
+        [{"run_id": "run-x", "race_id": "az-senate-2026", "status": "running"}],
+        {"race_id": "az-senate-2026", "status": "running", "current_run_id": "run-x", "draft_updated_at": "2026-09-02"},
+        [{"race_id": "az-senate-2026", "run_id": "run-x", "status": "running"}],
+    )
+
+    resp = _call_run_endpoint(db, "post", "/api/races/az-senate-2026/cancel")
+
+    assert resp.status_code == 200
+    assert run_ref.update.call_args.args[0] == {"status": "cancelled"}
+    assert race_ref.update.call_args.args[0]["status"] == "draft"
+
+
+# ---------------------------------------------------------------------------
+# Log tail mode and run-history read costs
+# ---------------------------------------------------------------------------
+
+
+def _log_world(log_docs):
+    log_query = MagicMock()
+    log_query.limit.return_value = log_query
+    log_query.stream.return_value = iter(log_docs)
+    log_coll = MagicMock()
+    log_coll.order_by.return_value = log_query
+    run_doc_ref = MagicMock()
+    run_doc_ref.collection.return_value = log_coll
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_doc_ref
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: runs_coll if name == "pipeline_runs" else MagicMock()
+    return db, log_coll, log_query
+
+
+def _log_doc(doc_id, message):
+    doc = _make_existing_doc({"level": "info", "message": message})
+    doc.id = doc_id
+    return doc
+
+
+def test_get_run_logs_tail_reads_only_newest_page_in_ascending_order():
+    # Firestore returns newest first for the descending tail query.
+    db, log_coll, log_query = _log_world([_log_doc("0005", "msg 5"), _log_doc("0004", "msg 4"), _log_doc("0003", "msg 3")])
+
+    resp = _call_run_endpoint(db, "get", "/runs/run-abc/logs?tail=true&limit=3")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [entry["message"] for entry in body["logs"]] == ["msg 3", "msg 4", "msg 5"]
+    assert body["next_cursor"] == "0005"  # forward polling resumes after the newest entry
+    assert body["has_more"] is False
+    assert body["truncated"] is True
+    log_coll.order_by.assert_called_once_with("__name__", direction="DESCENDING")
+    log_query.limit.assert_called_once_with(3)
+    log_coll.stream.assert_not_called()  # never a full subcollection scan
+
+
+def test_get_run_logs_tail_short_run_is_not_truncated():
+    db, _, _ = _log_world([_log_doc("0002", "msg 2"), _log_doc("0001", "msg 1")])
+
+    body = _call_run_endpoint(db, "get", "/runs/run-abc/logs?tail=true&limit=10").json()
+
+    assert [entry["id"] for entry in body["logs"]] == ["0001", "0002"]
+    assert body["truncated"] is False
+
+
+def test_get_run_logs_tail_empty_run_has_no_cursor():
+    db, _, _ = _log_world([])
+
+    body = _call_run_endpoint(db, "get", "/runs/run-abc/logs?tail=true").json()
+
+    assert body["logs"] == [] and body["next_cursor"] is None
+
+
+def _runs_list_world(canonical, legacy):
+    calls = {"activity_at": 0, "started_at": 0}
+
+    def _order(field, **_kwargs):
+        calls[field] = calls.get(field, 0) + 1
+        query = MagicMock()
+        query.limit.return_value = query
+        source = canonical if field == "activity_at" else legacy
+        query.stream.side_effect = lambda *a, **k: iter([_make_existing_doc(d) for d in source])
+        return query
+
+    active_query = MagicMock()
+    active_query.limit.return_value = active_query
+    active_query.stream.side_effect = lambda *a, **k: iter([])
+    runs_coll = MagicMock()
+    runs_coll.order_by.side_effect = _order
+    runs_coll.where.return_value = active_query
+    db = _build_empty_firestore_mock()
+    db.collection.side_effect = lambda name: runs_coll if name == "pipeline_runs" else MagicMock()
+    return db, calls
+
+
+def test_list_runs_skips_legacy_query_when_canonical_page_is_full():
+    canonical = [
+        {"run_id": f"run-{i}", "status": "completed", "activity_at": f"2026-09-0{i + 1}T00:00:00+00:00"} for i in range(2)
+    ]
+    db, calls = _runs_list_world(canonical, [])
+
+    body = _call_run_endpoint(db, "get", "/runs?limit=2").json()
+
+    assert len(body["runs"]) == 2
+    assert calls["started_at"] == 0
+
+
+def test_list_runs_caches_static_legacy_run_set_between_polls():
+    from routers import runs as runs_router
+
+    runs_router._invalidate_legacy_runs_cache()
+    canonical = [{"run_id": "run-new", "status": "completed", "activity_at": "2026-09-01T00:00:00+00:00"}]
+    legacy = [
+        {"run_id": "run-new", "status": "completed", "started_at": "2026-08-31T00:00:00+00:00", "activity_at": "x"},
+        {"run_id": "run-legacy", "status": "completed", "started_at": "2026-01-01T00:00:00+00:00"},
+    ]
+    db, calls = _runs_list_world(canonical, legacy)
+
+    first = _call_run_endpoint(db, "get", "/runs?limit=50").json()
+    second = _call_run_endpoint(db, "get", "/runs?limit=50").json()
+
+    assert [r["run_id"] for r in first["runs"]] == ["run-new", "run-legacy"]
+    assert [r["run_id"] for r in second["runs"]] == ["run-new", "run-legacy"]
+    assert calls["started_at"] == 1  # legacy docs read once, not every poll
+    runs_router._invalidate_legacy_runs_cache()
+
+
+# ---------------------------------------------------------------------------
+# Audit regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_race_id_validation_rejects_trailing_newline():
+    from fastapi import HTTPException
+    from pydantic import ValidationError
+    from request_models import RepairPlanRequest, validate_race_id
+
+    validate_race_id("ga-senate-2026")
+    with pytest.raises(HTTPException):
+        validate_race_id("ga-senate-2026\n")
+    with pytest.raises(ValidationError):
+        RepairPlanRequest(race_ids=["ga-senate-2026\nx"])
+    # RepairPlanRequest strips whitespace first, so check the shared regex directly too.
+    from request_models import _RACE_ID_RE
+
+    assert _RACE_ID_RE.fullmatch("ga-senate-2026\n") is None
+
+
+def test_batch_requests_cap_race_id_count():
+    from pydantic import ValidationError
+    from request_models import MAX_BATCH_RACE_IDS, BatchPublishRequest, RaceQueueRequest
+
+    ids = [f"race-{i}" for i in range(MAX_BATCH_RACE_IDS)]
+    assert len(BatchPublishRequest(race_ids=ids).race_ids) == MAX_BATCH_RACE_IDS
+    assert len(RaceQueueRequest(race_ids=ids).race_ids) == MAX_BATCH_RACE_IDS
+    with pytest.raises(ValidationError):
+        BatchPublishRequest(race_ids=ids + ["one-too-many"])
+    with pytest.raises(ValidationError):
+        RaceQueueRequest(race_ids=ids + ["one-too-many"])
+
+
+def _draft_blob_bucket(blob):
+    bucket = MagicMock()
+    bucket.blob.return_value = blob
+    client = MagicMock()
+    client.bucket.return_value = bucket
+    return client
+
+
+def test_publish_draft_delete_is_pinned_to_read_generation(monkeypatch):
+    draft = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    blob = MagicMock()
+    blob.generation = 42
+    blob.download_as_text.return_value = json.dumps(draft)
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is True
+    blob.download_as_text.assert_called_once_with(if_generation_match=42)
+    blob.delete.assert_called_once_with(if_generation_match=42)
+
+
+def test_publish_keeps_newer_draft_written_concurrently(monkeypatch):
+    from google.api_core.exceptions import PreconditionFailed
+
+    draft = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    newer = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}, {"name": "Bob"}]}
+    blob = MagicMock()
+    blob.generation = 7
+    blob.download_as_text.return_value = json.dumps(newer)
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    # Content changed since the publish read it: the newer draft must survive.
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is False
+    blob.delete.assert_not_called()
+
+    # Draft replaced between the re-read and the delete: precondition protects it.
+    blob.download_as_text.return_value = json.dumps(draft)
+    blob.delete.side_effect = PreconditionFailed("generation mismatch")
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is False
+
+    with (
+        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_put_race_json", return_value=True),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        assert gcs_helpers.publish_race_to_gcs("ga-senate-2026", draft) is False
+    assert "draft_updated_at" not in mock_update.call_args.args[1]
+
+
+def test_gcs_get_race_json_only_treats_not_found_as_missing(monkeypatch):
+    from google.api_core.exceptions import NotFound, ServiceUnavailable
+
+    blob = MagicMock()
+    blob.exists.return_value = True
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    blob.download_as_text.side_effect = NotFound("gone")
+    assert gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts") is None
+
+    blob.download_as_text.side_effect = ServiceUnavailable("transient")
+    with pytest.raises(ServiceUnavailable):
+        gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts")
+
+
+def test_publish_still_updates_catalog_when_summaries_index_fails():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    draft_json = {"id": "ar-senate-2026", "title": "Arkansas Senate 2026", "candidates": [{"name": "Alice"}]}
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
+        patch("gcs_helpers._publish_race_gcs", return_value=True),
+        patch("gcs_helpers.update_gcs_summaries_json", side_effect=RuntimeError("index conflict")),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+        patch("routers.races_admin.drafts._clear_public_race_cache") as mock_clear,
+    ):
+        tc = TestClient(app_module.app)
+        single = tc.post("/api/races/ar-senate-2026/publish")
+        batch = tc.post("/api/races/publish", json={"race_ids": ["ar-senate-2026"]})
+
+    assert single.status_code == 502
+    assert single.json()["detail"]["published"] == ["ar-senate-2026"]
+    assert "RuntimeError" in single.json()["detail"]["summaries_error"]
+    assert batch.status_code == 200
+    assert batch.json()["published"] == ["ar-senate-2026"]
+    assert "RuntimeError" in batch.json()["summaries_error"]
+    assert [c.args[1]["status"] for c in mock_update.call_args_list] == ["published", "published"]
+    assert mock_clear.call_count == 2
+
+
+def test_restore_version_keeps_published_race_published():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    version = {"id": "ga-senate-2026", "updated_utc": "2026-05-01T00:00:00Z", "candidates": [{"name": "Alice"}]}
+    source = MagicMock()
+    source.exists.return_value = True
+    source.download_as_text.return_value = json.dumps(version)
+    bucket = MagicMock()
+    bucket.blob.return_value = source
+    client = MagicMock()
+    client.bucket.return_value = bucket
+
+    def fake_get(_race_id, prefix):
+        return {"id": "ga-senate-2026"} if prefix == "races" else None
+
+    with (
+        patch("gcs_helpers._GCS_BUCKET", "bucket"),
+        patch("gcs_helpers._get_gcs_admin", return_value=client),
+        patch("gcs_helpers._gcs_get_race_json", side_effect=fake_get),
+        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_put_race_json", return_value=True),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        resp = TestClient(app_module.app).post("/api/races/ga-senate-2026/versions/20260501T000000Z-published.json/restore")
+
+    assert resp.status_code == 200
+    update = mock_update.call_args.args[1]
+    assert update["status"] == "published"
+    assert "published_at" not in update
+
+
+def test_claim_race_for_run_rejects_concurrent_claim():
+    """Losing a create()/update-time race re-reads and reports the winner's status."""
+    from google.api_core.exceptions import AlreadyExists
+
+    race_ref = MagicMock()
+    race_ref.get.side_effect = [
+        _make_missing_doc_ref().get(),
+        _make_existing_doc({"status": "queued", "current_run_id": "run-other"}),
+    ]
+    race_ref.create.side_effect = AlreadyExists("created concurrently")
+    db = MagicMock()
+    db.collection.return_value.document.return_value = race_ref
+
+    assert firestore_helpers._claim_race_for_run(db, "ga-senate-2026", "run-mine") == "Race is already queued"
+    race_ref.update.assert_not_called()
+
+
+def test_claim_race_for_run_rereads_after_update_time_conflict():
+    from google.api_core.exceptions import FailedPrecondition
+
+    race_ref = MagicMock()
+    race_ref.get.side_effect = [
+        _make_existing_doc({"status": "draft"}),
+        _make_existing_doc({"status": "queued", "current_run_id": "run-other"}),
+    ]
+    race_ref.update.side_effect = FailedPrecondition("update_time mismatch")
+    db = MagicMock()
+    db.collection.return_value.document.return_value = race_ref
+
+    assert firestore_helpers._claim_race_for_run(db, "ga-senate-2026", "run-mine") == "Race is already queued"
+    assert race_ref.update.call_count == 1
+    assert "option" in race_ref.update.call_args.kwargs
+
+
+def test_race_run_endpoints_reject_run_from_another_race():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    run_doc = _make_existing_doc({"run_id": "run-1", "race_id": "ga-senate-2026", "status": "completed"})
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+    races_coll = MagicMock()
+    races_coll.document.return_value.collection.return_value.document.return_value = _make_missing_doc_ref()
+    db = MagicMock()
+    db.collection.side_effect = lambda name: runs_coll if name == "pipeline_runs" else races_coll
+
+    with patch("firestore_helpers._get_fs", return_value=db):
+        tc = TestClient(app_module.app)
+        get_resp = tc.get("/api/races/az-senate-2026/runs/run-1")
+        delete_resp = tc.delete("/api/races/az-senate-2026/runs/run-1")
+
+    assert get_resp.status_code == 404
+    assert delete_resp.status_code == 404
+    run_ref.delete.assert_not_called()

@@ -9,12 +9,17 @@ from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from shared.pipeline_options import PipelineRunOptions
 
-_RACE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,99}$")
+# Always use ``fullmatch``: ``match`` with ``$`` accepts a trailing newline.
+_RACE_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
+
+# Bulk admin requests stay above the full catalog size (~500 races) so
+# whole-catalog publish/queue flows keep working, while bounding request cost.
+MAX_BATCH_RACE_IDS = 1000
 
 
 def validate_race_id(race_id: str) -> None:
     """Raise HTTP 400 if race_id doesn't match the canonical format."""
-    if not _RACE_ID_RE.match(race_id):
+    if not isinstance(race_id, str) or not _RACE_ID_RE.fullmatch(race_id):
         raise HTTPException(status_code=400, detail="Invalid race_id format")
 
 
@@ -23,12 +28,14 @@ class RunOptions(PipelineRunOptions):
 
 
 class RaceQueueRequest(BaseModel):
-    race_ids: List[str]
+    # Each id is validated per item in the endpoint so one bad id is reported, not fatal.
+    race_ids: List[str] = Field(max_length=MAX_BATCH_RACE_IDS)
     options: Optional[RunOptions] = None
 
 
 class BatchPublishRequest(BaseModel):
-    race_ids: List[str]
+    # Each id is validated per item in the endpoint so one bad id is reported, not fatal.
+    race_ids: List[str] = Field(max_length=MAX_BATCH_RACE_IDS)
 
 
 class RepairPlanRequest(BaseModel):
@@ -43,7 +50,7 @@ class RepairPlanRequest(BaseModel):
         if len(normalized) > 200:
             raise ValueError("race_ids cannot contain more than 200 races")
         for race_id in normalized:
-            if not _RACE_ID_RE.match(race_id):
+            if not _RACE_ID_RE.fullmatch(race_id):
                 raise ValueError(f"invalid race_id: {race_id}")
         return normalized
 

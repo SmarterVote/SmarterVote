@@ -6,7 +6,7 @@ import asyncio
 import os
 import re
 from typing import Any, Dict, List, Literal, Tuple
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from mcp.server.fastmcp import FastMCP
 
@@ -14,6 +14,25 @@ from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL
 from smartervote_mcp.client import RacesApiClient, compact_options
 
 mcp = FastMCP("SmarterVote Races")
+
+
+_RACE_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
+_OPAQUE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}")
+_VERSION_FILENAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,194}\.json")
+
+
+def _path_id(value: Any, kind: Literal["race_id", "run_id", "version"] = "race_id") -> str:
+    """Validate a tool argument destined for a URL path segment and percent-encode it.
+
+    httpx resolves ``..`` segments, so an unvalidated ID such as ``x/../../queue/pending``
+    would silently retarget a request (e.g. DELETE /api/queue/pending). IDs arrive from
+    model output that may be steered by web content, so reject anything outside the
+    known ID shapes rather than trying to sanitize it.
+    """
+    pattern = {"race_id": _RACE_ID_RE, "run_id": _OPAQUE_ID_RE, "version": _VERSION_FILENAME_RE}[kind]
+    if not isinstance(value, str) or ".." in value or not pattern.fullmatch(value):
+        raise ValueError(f"Invalid {kind} {value!r}: must match {pattern.pattern} with no '/', '..', or whitespace")
+    return quote(value, safe="")
 
 
 def _client() -> RacesApiClient:
@@ -60,7 +79,7 @@ async def list_race_summaries() -> List[Dict[str, Any]]:
 @mcp.tool(structured_output=False)
 async def get_published_race(race_id: str) -> Dict[str, Any]:
     """Fetch full public RaceJSON for a published race ID."""
-    return await _client().get(f"/races/{race_id}")
+    return await _client().get(f"/races/{_path_id(race_id)}")
 
 
 @mcp.tool(structured_output=False)
@@ -337,7 +356,7 @@ async def scan_catalog(
 @mcp.tool(structured_output=False)
 async def get_race_record(race_id: str) -> Dict[str, Any]:
     """Fetch one admin race record from races-api."""
-    return await _client().get(f"/api/races/{race_id}")
+    return await _client().get(f"/api/races/{_path_id(race_id)}")
 
 
 @mcp.tool(structured_output=False)
@@ -355,7 +374,7 @@ async def list_pipeline_steps() -> Dict[str, Any]:
 @mcp.tool(structured_output=False)
 async def get_race_data(race_id: str, draft: bool = False) -> Dict[str, Any]:
     """Fetch full RaceJSON from published data or drafts."""
-    return await _client().get(f"/api/races/{race_id}/data", params={"draft": draft})
+    return await _client().get(f"/api/races/{_path_id(race_id)}/data", params={"draft": draft})
 
 
 @mcp.tool(structured_output=False)
@@ -380,7 +399,7 @@ async def get_research_program_status(include_rows: bool = True) -> Dict[str, An
 @mcp.tool(structured_output=False)
 async def get_research_result_checkpoint(race_id: str) -> Dict[str, Any]:
     """Read the official-result checkpoint for one race without changing state."""
-    return await _client().get(f"/api/research/checkpoints/{race_id}")
+    return await _client().get(f"/api/research/checkpoints/{_path_id(race_id)}")
 
 
 @mcp.tool(structured_output=False)
@@ -433,7 +452,8 @@ async def record_research_result_checkpoint(
             "active": True,
         }
     return await _client().put(
-        f"/api/research/checkpoints/{race_id}", json={key: value for key, value in payload.items() if value is not None}
+        f"/api/research/checkpoints/{_path_id(race_id)}",
+        json={key: value for key, value in payload.items() if value is not None},
     )
 
 
@@ -484,11 +504,11 @@ async def audit_draft_vs_published(race_ids: List[str]) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
     for race_id in race_ids:
         try:
-            draft = await client.get(f"/api/races/{race_id}/data", params={"draft": True})
+            draft = await client.get(f"/api/races/{_path_id(race_id)}/data", params={"draft": True})
         except Exception:
             draft = None
         try:
-            published = await client.get(f"/races/{race_id}")
+            published = await client.get(f"/races/{_path_id(race_id)}")
         except Exception:
             published = None
 
@@ -841,11 +861,11 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
     for race_id in race_ids:
         try:
-            draft = await client.get(f"/api/races/{race_id}/data", params={"draft": True})
+            draft = await client.get(f"/api/races/{_path_id(race_id)}/data", params={"draft": True})
         except Exception:
             draft = None
         try:
-            published = await client.get(f"/races/{race_id}")
+            published = await client.get(f"/races/{_path_id(race_id)}")
         except Exception:
             published = None
 
@@ -1108,7 +1128,7 @@ async def run_race(
         goal=goal,
         runner=runner,
     )
-    return await _client().post(f"/api/races/{race_id}/run", json=options)
+    return await _client().post(f"/api/races/{_path_id(race_id)}/run", json=options)
 
 
 @mcp.tool(structured_output=False)
@@ -1121,7 +1141,7 @@ async def publish_race(race_id: str) -> Dict[str, Any]:
             "errors": [{"race_id": race_id, "error": "Publish-readiness blockers remain"}],
             "readiness": readiness,
         }
-    result = await _client().post(f"/api/races/{race_id}/publish")
+    result = await _client().post(f"/api/races/{_path_id(race_id)}/publish")
     return {**result, "readiness": readiness}
 
 
@@ -1165,13 +1185,13 @@ async def list_unpublished_drafts() -> List[Dict[str, Any]]:
 @mcp.tool(structured_output=False)
 async def unpublish_race(race_id: str) -> Dict[str, Any]:
     """Remove a race from public published data while keeping its draft."""
-    return await _client().post(f"/api/races/{race_id}/unpublish")
+    return await _client().post(f"/api/races/{_path_id(race_id)}/unpublish")
 
 
 @mcp.tool(structured_output=False)
 async def recheck_race(race_id: str) -> Dict[str, Any]:
     """Reconcile one race status from storage and Firestore state."""
-    return await _client().post(f"/api/races/{race_id}/recheck")
+    return await _client().post(f"/api/races/{_path_id(race_id)}/recheck")
 
 
 @mcp.tool(structured_output=False)
@@ -1320,13 +1340,13 @@ async def delete_race(race_id: str) -> Dict[str, Any]:
     first; the API refuses deletion if archival fails. Use ``unpublish_race``
     instead if you only want to hide a race from public view.
     """
-    return await _client().delete(f"/api/races/{race_id}")
+    return await _client().delete(f"/api/races/{_path_id(race_id)}")
 
 
 @mcp.tool(structured_output=False)
 async def delete_draft(race_id: str) -> Dict[str, Any]:
     """Delete only the draft version of a race from GCS, keeping the published page and Firestore record."""
-    return await _client().delete(f"/api/races/{race_id}/draft")
+    return await _client().delete(f"/api/races/{_path_id(race_id)}/draft")
 
 
 @mcp.tool(structured_output=False)
@@ -1346,7 +1366,7 @@ async def sleep(seconds: float) -> Dict[str, Any]:
 @mcp.tool(structured_output=False)
 async def cancel_race(race_id: str) -> Dict[str, Any]:
     """Cancel a queued or running race."""
-    return await _client().post(f"/api/races/{race_id}/cancel")
+    return await _client().post(f"/api/races/{_path_id(race_id)}/cancel")
 
 
 @mcp.tool(structured_output=False)
@@ -1370,7 +1390,7 @@ async def list_active_runs() -> Dict[str, Any]:
 @mcp.tool(structured_output=False)
 async def get_run(run_id: str) -> Dict[str, Any]:
     """Fetch a pipeline run record."""
-    return await _client().get(f"/runs/{run_id}")
+    return await _client().get(f"/runs/{_path_id(run_id, 'run_id')}")
 
 
 @mcp.tool(structured_output=False)
@@ -1390,49 +1410,67 @@ async def get_run_logs(
         params["cursor"] = cursor
     elif since is not None:
         params["since"] = max(0, since)
-    return await _client().get(f"/runs/{run_id}/logs", params=params)
+    return await _client().get(f"/runs/{_path_id(run_id, 'run_id')}/logs", params=params)
 
 
 @mcp.tool(structured_output=False)
 async def get_run_diagnostics(run_id: str) -> Dict[str, Any]:
     """Return normalized diagnostics and health evidence for one pipeline run."""
-    return await _client().get(f"/runs/{run_id}/diagnostics")
+    return await _client().get(f"/runs/{_path_id(run_id, 'run_id')}/diagnostics")
 
 
 @mcp.tool(structured_output=False)
 async def list_race_runs(race_id: str) -> Dict[str, Any]:
     """List stored run history for one race."""
-    return await _client().get(f"/api/races/{race_id}/runs")
+    return await _client().get(f"/api/races/{_path_id(race_id)}/runs")
 
 
 @mcp.tool(structured_output=False)
 async def get_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
     """Return one race-scoped run record."""
-    return await _client().get(f"/api/races/{race_id}/runs/{run_id}")
+    return await _client().get(f"/api/races/{_path_id(race_id)}/runs/{_path_id(run_id, 'run_id')}")
 
 
 @mcp.tool(structured_output=False)
 async def list_race_versions(race_id: str) -> Dict[str, Any]:
     """List restorable historical RaceJSON versions for one race."""
-    return await _client().get(f"/api/races/{race_id}/versions")
+    return await _client().get(f"/api/races/{_path_id(race_id)}/versions")
 
 
 @mcp.tool(structured_output=False)
 async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
     """Read one historical RaceJSON version without restoring it."""
-    return await _client().get(f"/api/races/{race_id}/versions/{filename}")
+    return await _client().get(f"/api/races/{_path_id(race_id)}/versions/{_path_id(filename, 'version')}")
 
 
 @mcp.tool(structured_output=False)
 async def restore_race_version(race_id: str, filename: str) -> Dict[str, Any]:
     """Restore one historical version as the current draft. This mutates draft state."""
-    return await _client().post(f"/api/races/{race_id}/versions/{filename}/restore")
+    return await _client().post(f"/api/races/{_path_id(race_id)}/versions/{_path_id(filename, 'version')}/restore")
 
 
 @mcp.tool(structured_output=False)
-async def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run or delete a finished run record."""
-    return await _client().delete(f"/runs/{run_id}")
+async def cancel_run(run_id: str) -> Dict[str, Any]:
+    """Cancel an active pipeline run. Never deletes anything.
+
+    Uses POST /runs/{run_id}/cancel, which returns 409 when the run already
+    finished, so a stale cancel can never destroy a completed run's history.
+    """
+    return await _client().post(f"/runs/{_path_id(run_id, 'run_id')}/cancel")
+
+
+@mcp.tool(structured_output=False)
+async def delete_finished_run(run_id: str) -> Dict[str, Any]:
+    """Permanently delete a FINISHED run record and its logs (destructive).
+
+    Refuses active runs; use `cancel_run` for those. Deleted run history and
+    logs cannot be recovered.
+    """
+    run = await _client().get(f"/runs/{_path_id(run_id, 'run_id')}")
+    status = str((run or {}).get("status") or "")
+    if status in {"pending", "running"}:
+        raise ValueError(f"Run {run_id} is still {status}; use cancel_run instead of deleting it")
+    return await _client().delete(f"/runs/{_path_id(run_id, 'run_id')}")
 
 
 @mcp.tool(structured_output=False)
@@ -1486,7 +1524,7 @@ async def summarize_run_costs(run_ids: List[str]) -> Dict[str, Any]:
 
     for run_id in run_ids:
         try:
-            raw = await client.get(f"/runs/{run_id}")
+            raw = await client.get(f"/runs/{_path_id(run_id, 'run_id')}")
         except Exception:
             raw = None
 

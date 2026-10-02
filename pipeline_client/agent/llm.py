@@ -1,6 +1,8 @@
 """OpenRouter client, chat-completions wrapper, agent loop, and data normalisation."""
 
 import asyncio
+import datetime
+import email.utils
 import json
 import logging
 import os
@@ -105,6 +107,10 @@ def _accumulate_usage(resp: Any, model: str) -> None:
 # ---------------------------------------------------------------------------
 
 _openrouter_client: Any = None
+#: Event loop the cached client's connection pool is bound to. httpx pools cannot
+#: cross loops, so a sync caller that wraps each call in ``asyncio.run`` would
+#: otherwise get "Event loop is closed" on every call after the first.
+_openrouter_client_loop: Any = None
 _DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 240.0
 _DEFAULT_LLM_RATE_LIMIT_MAX_RETRIES = 3
 _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS = 60
@@ -112,15 +118,22 @@ _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS = 60
 
 def _get_openrouter_client() -> Any:
     """Return (and lazily create) the shared OpenRouter AsyncOpenAI client."""
-    global _openrouter_client
+    global _openrouter_client, _openrouter_client_loop
     from openai import AsyncOpenAI
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
     existing_key = getattr(_openrouter_client, "api_key", None)
-    if _openrouter_client is None or existing_key != api_key:
+    loop_changed = _openrouter_client_loop is not None and loop is not None and loop is not _openrouter_client_loop
+    if _openrouter_client is None or existing_key != api_key or loop_changed:
+        _openrouter_client_loop = loop
         _openrouter_client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
@@ -199,6 +212,35 @@ async def _await_with_run_budget(
 # ---------------------------------------------------------------------------
 # Chat-completions wrapper with retry
 # ---------------------------------------------------------------------------
+
+
+def _parse_retry_after(value: Any) -> float:
+    """Parse a Retry-After header into non-negative seconds.
+
+    Accepts integer or fractional delta-seconds and HTTP-dates (RFC 9110).
+    Anything unparseable returns 0.0 so the caller falls back to its default
+    backoff instead of crashing the retry path with a ValueError.
+    """
+    if value is None:
+        return 0.0
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    try:
+        seconds = float(text)
+    except ValueError:
+        try:
+            when = email.utils.parsedate_to_datetime(text)
+        except (TypeError, ValueError, IndexError):
+            return 0.0
+        if when is None:
+            return 0.0
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=datetime.timezone.utc)
+        seconds = (when - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+    if seconds != seconds or seconds in (float("inf"), float("-inf")):
+        return 0.0
+    return max(0.0, seconds)
 
 
 async def _call_openrouter(
@@ -311,14 +353,18 @@ async def _call_openrouter(
                 _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS,
                 minimum=1,
             )
-            retry_after = 0
+            retry_after = 0.0
             if exc.response is not None:
-                retry_after = int(exc.response.headers.get("retry-after", 0))
+                retry_after = _parse_retry_after(exc.response.headers.get("retry-after"))
             backoff = min(max_wait, 30 * (2**attempt))
             wait = min(max(retry_after, backoff), max_wait, max(0.0, 90.0 - rate_limit_wait))
             wait = min(wait * random.uniform(0.8, 1.2), max_wait, max(0.0, 90.0 - rate_limit_wait))
             if wait <= 0:
-                raise
+                raise RetryableProviderError(
+                    "OpenRouter rate limit wait budget exhausted",
+                    provider="openrouter",
+                    code="rate_limited",
+                ) from exc
             if run_budget:
                 wait = run_budget.bounded_sleep(wait, operation="OpenRouter rate-limit retry")
             rate_limit_wait += wait
@@ -341,7 +387,11 @@ async def _call_openrouter(
                     ) from exc
                 backoff = min(60.0 - transient_wait, (2 ** (attempt + 1)) * random.uniform(0.8, 1.2))
                 if backoff <= 0:
-                    raise
+                    raise RetryableProviderError(
+                        "OpenRouter endpoint retry wait budget exhausted",
+                        provider="openrouter",
+                        code="provider_unavailable",
+                    ) from exc
                 if run_budget:
                     backoff = run_budget.bounded_sleep(backoff, operation="OpenRouter endpoint retry")
                 transient_wait += backoff
@@ -380,7 +430,11 @@ async def _call_openrouter(
                 ) from exc
             backoff = min(60.0 - transient_wait, (2 ** (attempt + 1)) * random.uniform(0.8, 1.2))
             if backoff <= 0:
-                raise
+                raise RetryableProviderError(
+                    f"OpenRouter HTTP {exc.status_code} retry wait budget exhausted",
+                    provider="openrouter",
+                    code="provider_unavailable",
+                ) from exc
             if run_budget:
                 backoff = run_budget.bounded_sleep(backoff, operation="OpenRouter provider retry")
             transient_wait += backoff
@@ -396,7 +450,11 @@ async def _call_openrouter(
                 ) from exc
             backoff = min(60.0 - transient_wait, (2 ** (attempt + 1)) * random.uniform(0.8, 1.2))
             if backoff <= 0:
-                raise
+                raise RetryableProviderError(
+                    "OpenRouter connection retry wait budget exhausted",
+                    provider="openrouter",
+                    code="connection_failed",
+                ) from exc
             if run_budget:
                 backoff = run_budget.bounded_sleep(backoff, operation="OpenRouter connection retry")
             transient_wait += backoff

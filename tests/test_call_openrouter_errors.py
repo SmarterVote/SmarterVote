@@ -322,3 +322,94 @@ async def test_call_openrouter_server_error_retries_then_succeeds():
 
     assert result is success
     mock_sleep.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Retry-After parsing and out-of-wait-budget classification
+# ---------------------------------------------------------------------------
+
+
+def test_parse_retry_after_handles_fractional_http_date_and_garbage():
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+
+    from pipeline_client.agent.llm import _parse_retry_after
+
+    assert _parse_retry_after("5") == 5.0
+    assert _parse_retry_after("1.5") == 1.5
+    assert _parse_retry_after(None) == 0.0
+    assert _parse_retry_after("") == 0.0
+    assert _parse_retry_after("soon") == 0.0
+    assert _parse_retry_after("-3") == 0.0
+    assert _parse_retry_after("nan") == 0.0
+    future = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=40), usegmt=True)
+    assert 30 <= _parse_retry_after(future) <= 41
+    past = format_datetime(datetime.now(timezone.utc) - timedelta(seconds=40), usegmt=True)
+    assert _parse_retry_after(past) == 0.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("header", ["2.5", "Wed, 21 Oct 2015 07:28:00 GMT", "not-a-date"])
+async def test_call_openrouter_rate_limit_tolerates_nonint_retry_after(header):
+    client = MagicMock()
+    success = _mock_success_response()
+    client.chat.completions.create = AsyncMock(
+        side_effect=[
+            RateLimitError("rate limited", response=_response(429, {"retry-after": header}), body=None),
+            success,
+        ]
+    )
+
+    with (
+        patch("pipeline_client.agent.llm._get_openrouter_client", return_value=client),
+        patch("pipeline_client.agent.llm.random.uniform", return_value=1.0),
+        patch("pipeline_client.agent.llm.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        result = await _call_openrouter([{"role": "user", "content": "hi"}], model="gpt-5.4-mini", max_retries=3)
+
+    assert result is success
+    # Unusable or past headers fall back to the default 30s backoff.
+    mock_sleep.assert_awaited_once_with(30)
+
+
+@pytest.mark.asyncio
+async def test_call_openrouter_rate_limit_wait_budget_exhausted_raises_classified_error(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_RATE_LIMIT_MAX_RETRIES", "5")
+    monkeypatch.setenv("OPENROUTER_RATE_LIMIT_MAX_WAIT_SECONDS", "120")
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(
+        side_effect=RateLimitError("rate limited", response=_response(429, {"retry-after": "90"}), body=None)
+    )
+
+    with (
+        patch("pipeline_client.agent.llm._get_openrouter_client", return_value=client),
+        patch("pipeline_client.agent.llm.random.uniform", return_value=1.0),
+        patch("pipeline_client.agent.llm.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        with pytest.raises(RetryableProviderError) as raised:
+            await _call_openrouter([{"role": "user", "content": "hi"}], model="gpt-5.4-mini", max_retries=4)
+
+    assert raised.value.code == "rate_limited"
+    assert client.chat.completions.create.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_call_openrouter_5xx_wait_budget_exhausted_raises_classified_error():
+    from shared.run_health import RunFailureReason, classify_exception
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=APIStatusError("upstream down", response=_response(503), body=None))
+
+    with (
+        patch("pipeline_client.agent.llm._get_openrouter_client", return_value=client),
+        patch("pipeline_client.agent.llm.random.uniform", return_value=20.0),
+        patch("pipeline_client.agent.llm.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        with pytest.raises(RetryableProviderError) as raised:
+            await _call_openrouter([{"role": "user", "content": "hi"}], model="gpt-5.4-mini", max_retries=5)
+
+    # 40s + 20s backoff spend the 60s transient budget; the third failure must
+    # not surface as a raw openai exception.
+    assert raised.value.code == "provider_unavailable"
+    assert classify_exception(raised.value) == RunFailureReason.PROVIDER_TIMEOUT
+    assert client.chat.completions.create.call_count == 3

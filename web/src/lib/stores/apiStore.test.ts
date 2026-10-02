@@ -11,7 +11,15 @@ vi.mock("$lib/utils/logger", () => ({
   logger: { error: loggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { apiStore, fetchWithAuth, initializeAuth } from "./apiStore";
+import {
+  apiStore,
+  fetchWithAuth,
+  initializeAuth,
+  SessionExpiredError,
+  SignInRequiredError,
+  setSessionExpiredHandler,
+  setSignInRequiredHandler,
+} from "./apiStore";
 
 /** A fetch stub that never settles until its AbortSignal fires. */
 function hangingFetch() {
@@ -31,14 +39,28 @@ function fakeAuth0(token = "tok-123") {
   return { getTokenSilently: vi.fn().mockResolvedValue(token) };
 }
 
+const onExpired = vi.fn();
+
 function resetStore() {
-  apiStore.set({ auth0: null, token: "", isAuthenticated: false });
+  apiStore.set({ auth0: null, isAuthenticated: false, sessionExpired: false });
+}
+
+function withClient(token = "tok") {
+  const auth0 = fakeAuth0(token);
+  apiStore.set({
+    auth0: auth0 as never,
+    isAuthenticated: true,
+    sessionExpired: false,
+  });
+  return auth0;
 }
 
 beforeEach(() => {
   resetStore();
   getAuth0Client.mockReset();
   loggerError.mockReset();
+  onExpired.mockReset();
+  setSessionExpiredHandler(onExpired);
 });
 
 afterEach(() => {
@@ -56,8 +78,8 @@ describe("initializeAuth", () => {
     expect(result).toEqual({ auth0, token: "tok-abc" });
     expect(get(apiStore)).toEqual({
       auth0,
-      token: "tok-abc",
       isAuthenticated: true,
+      sessionExpired: false,
     });
   });
 
@@ -75,19 +97,21 @@ describe("initializeAuth", () => {
 });
 
 describe("fetchWithAuth token handling", () => {
-  it("sends the stored token without re-contacting Auth0", async () => {
-    apiStore.set({ auth0: null, token: "stored-tok", isAuthenticated: true });
+  it("asks the SDK for a token on every request (SDK caches and renews)", async () => {
+    const auth0 = withClient("cached-tok");
     const fetchMock = vi.fn().mockResolvedValue({ ok: true } as Response);
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchWithAuth("https://api.test/races");
+    await fetchWithAuth("https://api.test/races");
 
     expect(getAuth0Client).not.toHaveBeenCalled();
+    expect(auth0.getTokenSilently).toHaveBeenCalledTimes(2);
     const [, init] = fetchMock.mock.calls[0];
-    expect(init.headers.Authorization).toBe("Bearer stored-tok");
+    expect(init.headers.Authorization).toBe("Bearer cached-tok");
   });
 
-  it("acquires a token on cold start and writes it back to the store", async () => {
+  it("constructs the client on cold start and remembers it", async () => {
     const auth0 = fakeAuth0("fresh-tok");
     getAuth0Client.mockResolvedValue(auth0);
     const fetchMock = vi.fn().mockResolvedValue({ ok: true } as Response);
@@ -96,27 +120,76 @@ describe("fetchWithAuth token handling", () => {
     await fetchWithAuth("https://api.test/races");
 
     expect(getAuth0Client).toHaveBeenCalledTimes(1);
-    expect(get(apiStore)).toMatchObject({
-      token: "fresh-tok",
-      isAuthenticated: true,
-    });
+    expect(get(apiStore)).toMatchObject({ auth0, isAuthenticated: true });
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers.Authorization).toBe("Bearer fresh-tok");
   });
 
-  it("reuses an already-stored client rather than constructing a new one", async () => {
-    const auth0 = fakeAuth0("refreshed");
+  it("retries a 401 once with a cache-bypassing token", async () => {
+    const auth0 = {
+      getTokenSilently: vi
+        .fn()
+        .mockResolvedValueOnce("stale")
+        .mockResolvedValueOnce("renewed"),
+    };
     apiStore.set({
       auth0: auth0 as never,
-      token: "",
-      isAuthenticated: false,
+      isAuthenticated: true,
+      sessionExpired: false,
     });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true } as Response));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 401 } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200 } as Response);
+    vi.stubGlobal("fetch", fetchMock);
 
-    await fetchWithAuth("https://api.test/races");
+    const res = await fetchWithAuth("https://api.test/races");
 
-    expect(getAuth0Client).not.toHaveBeenCalled();
-    expect(auth0.getTokenSilently).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(200);
+    expect(auth0.getTokenSilently).toHaveBeenLastCalledWith({
+      cacheMode: "off",
+    });
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe(
+      "Bearer renewed",
+    );
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it("marks the session expired when the retry is also rejected", async () => {
+    withClient("tok");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response),
+    );
+
+    await expect(fetchWithAuth("https://api.test/races")).rejects.toThrow(
+      SessionExpiredError,
+    );
+    expect(get(apiStore).sessionExpired).toBe(true);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats login_required from the SDK as an expired session", async () => {
+    const auth0 = {
+      getTokenSilently: vi.fn().mockRejectedValue(
+        Object.assign(new Error("Login required"), {
+          error: "login_required",
+        }),
+      ),
+    };
+    apiStore.set({
+      auth0: auth0 as never,
+      isAuthenticated: true,
+      sessionExpired: false,
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchWithAuth("https://api.test/races")).rejects.toThrow(
+      "Session expired",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onExpired).toHaveBeenCalled();
   });
 
   it("fails closed with a clear message when refresh fails", async () => {
@@ -136,7 +209,7 @@ describe("fetchWithAuth token handling", () => {
   });
 
   it("merges the Authorization header with caller-supplied headers", async () => {
-    apiStore.set({ auth0: null, token: "tok", isAuthenticated: true });
+    withClient("tok");
     const fetchMock = vi.fn().mockResolvedValue({ ok: true } as Response);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -156,7 +229,7 @@ describe("fetchWithAuth token handling", () => {
 
 describe("fetchWithAuth timeout policy", () => {
   beforeEach(() => {
-    apiStore.set({ auth0: null, token: "tok", isAuthenticated: true });
+    withClient("tok");
   });
 
   it("aborts an ordinary request after the 30s default", async () => {
@@ -185,7 +258,7 @@ describe("fetchWithAuth timeout policy", () => {
 
   // Pipeline work legitimately runs for hours; a 30s abort would kill it.
   it.each([
-    ["https://api.test/runs/run-1", {}],
+    ["https://api.test/runs/run-1/cancel", { method: "POST" }],
     ["https://api.test/api/races/queue", {}],
     ["https://api.test/races/x/continue", {}],
     ["https://api.test/races/x/run", { method: "POST" }],
@@ -206,11 +279,27 @@ describe("fetchWithAuth timeout policy", () => {
     expect(requestInit?.signal?.aborted).toBe(false);
   });
 
+  it("applies the default timeout to a plain GET of run details", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", hangingFetch());
+
+    const pending = fetchWithAuth("https://api.test/runs/run-1");
+    const assertion = expect(pending).rejects.toThrow(
+      "Request timed out after 30 seconds: GET https://api.test/runs/run-1",
+    );
+    await vi.advanceTimersByTimeAsync(30000);
+    await assertion;
+  });
+
   it("treats an explicit timeout as authoritative even for long operations", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", hangingFetch());
 
-    const pending = fetchWithAuth("https://api.test/runs/run-1", {}, 1000);
+    const pending = fetchWithAuth(
+      "https://api.test/runs/run-1/cancel",
+      { method: "POST" },
+      1000,
+    );
     const assertion = expect(pending).rejects.toThrow("Request timed out");
     await vi.advanceTimersByTimeAsync(1000);
     await assertion;
@@ -230,7 +319,7 @@ describe("fetchWithAuth timeout policy", () => {
 
 describe("fetchWithAuth error reporting", () => {
   beforeEach(() => {
-    apiStore.set({ auth0: null, token: "tok", isAuthenticated: true });
+    withClient("tok");
   });
 
   it("labels a network failure with the method and URL", async () => {
@@ -275,23 +364,25 @@ describe("fetchWithAuth error reporting", () => {
 // null timeoutId. These are the branches an ordinary-request test cannot reach.
 describe("fetchWithAuth untimed (long-running) request paths", () => {
   beforeEach(() => {
-    apiStore.set({ auth0: null, token: "tok", isAuthenticated: true });
+    withClient("tok");
   });
 
   it("returns the response when no timer was armed", async () => {
     const response = { ok: true, status: 200 } as Response;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).resolves.toBe(
-      response,
-    );
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).resolves.toBe(response);
   });
 
   it("reports a network failure when no timer was armed", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("socket died")));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).rejects.toThrow(
-      "Network request failed: GET https://api.test/runs/run-1. socket died",
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).rejects.toThrow(
+      "Network request failed: GET https://api.test/api/races/queue. socket died",
     );
   });
 
@@ -300,8 +391,59 @@ describe("fetchWithAuth untimed (long-running) request paths", () => {
     aborted.name = "AbortError";
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(aborted));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).rejects.toThrow(
-      "Request timed out due to abort signal: GET https://api.test/runs/run-1",
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).rejects.toThrow(
+      "Request timed out due to abort signal: GET https://api.test/api/races/queue",
     );
+  });
+});
+
+describe("sign-in required vs session expired", () => {
+  it("routes a never-authenticated page to sign-in instead of 'expired'", async () => {
+    const onSignIn = vi.fn();
+    setSignInRequiredHandler(onSignIn);
+    const auth0 = {
+      getTokenSilently: vi.fn().mockRejectedValue(
+        Object.assign(new Error("Login required"), {
+          error: "login_required",
+        }),
+      ),
+    };
+    // Direct visit: the client exists but no request ever authenticated.
+    apiStore.set({
+      auth0: auth0 as never,
+      isAuthenticated: false,
+      sessionExpired: false,
+    });
+    vi.stubGlobal("fetch", vi.fn());
+
+    const error = await fetchWithAuth("https://api.test/races").catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(SignInRequiredError);
+    expect(onSignIn).toHaveBeenCalledTimes(1);
+    expect(onExpired).not.toHaveBeenCalled();
+    expect(get(apiStore).sessionExpired).toBe(false);
+  });
+
+  it("still reports expiry after a session had authenticated", async () => {
+    const onSignIn = vi.fn();
+    setSignInRequiredHandler(onSignIn);
+    withClient("tok");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response),
+    );
+
+    const error = await fetchWithAuth("https://api.test/races").catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(SessionExpiredError);
+    expect(error).not.toBeInstanceOf(SignInRequiredError);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(onSignIn).not.toHaveBeenCalled();
   });
 });

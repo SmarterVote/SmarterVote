@@ -8,6 +8,7 @@
   title="Partner with Smarter.Vote"
   description="Information for newsrooms, universities, civic organizations, grantmakers, sponsors, and data partners."
   path="/partners/"
+  eyebrow="Get involved"
 >
   <PolicySection title="Ways to collaborate">
     <p>
@@ -26,7 +27,7 @@
     </p>
     <p>
       A machine-readable <a
-        class="text-primary-600 underline dark:text-primary-500"
+        class="text-primary underline hover:no-underline"
         href="/summaries.json">public race index</a
       > is available for coverage discovery. Contact us before bulk republication
       or embedding so we can agree on attribution, update expectations, and any source-specific

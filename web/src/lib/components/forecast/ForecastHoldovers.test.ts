@@ -29,13 +29,13 @@ describe("ForecastHoldovers", () => {
     expect(screen.getByText(/2\s+seats/)).toBeTruthy();
     expect(screen.queryByText("California")).toBeNull();
 
-    await fireEvent.click(screen.getByText("Show List v"));
+    await fireEvent.click(screen.getByText("Show list"));
 
     expect(screen.getByText("California")).toBeTruthy();
     expect(screen.getByText("Texas")).toBeTruthy();
-    expect(screen.getByText("R x2")).toBeTruthy();
+    expect(screen.getByText("R ×2")).toBeTruthy();
 
-    await fireEvent.click(screen.getByText("Hide List ^"));
+    await fireEvent.click(screen.getByText("Hide list"));
     expect(screen.queryByText("California")).toBeNull();
   });
 

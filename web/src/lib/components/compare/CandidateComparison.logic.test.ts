@@ -239,7 +239,8 @@ describe("CandidateComparison avatars", () => {
       candidates: [person],
     });
 
-    expect(container.textContent).toContain("AM");
+    // First and last name, like every other candidate avatar.
+    expect(container.textContent).toContain("AR");
     expect(container.textContent).not.toContain("AMGR");
   });
 
@@ -303,8 +304,8 @@ describe("CandidateComparison forecast probability", () => {
   });
 
   // Anyone who is not the predicted winner falls back to their party's
-  // probability, matched loosely because the two vocabularies disagree
-  // ("Democratic" vs "Democrat" vs "D").
+  // probability, matched by canonical party key because the two vocabularies
+  // disagree ("Democratic" vs "Democrat" vs "D").
   it.each([
     ["a full party name", { Democratic: 0.44 }],
     ["a shorter party key", { Democrat: 0.44 }],
@@ -339,5 +340,81 @@ describe("CandidateComparison forecast probability", () => {
     });
 
     expect(container.textContent).not.toContain("estimated win probability");
+  });
+
+  function renderRace(
+    candidates: Candidate[],
+    overrides: Partial<RaceForecast>,
+  ) {
+    const forecast: RaceForecast = {
+      party_probabilities: {},
+      rating: "tossup",
+      confidence: "medium",
+      rationale: "Test rationale",
+      key_reasons: [],
+      based_on_poll_count: 0,
+      generated_at: "2026-01-01T00:00:00Z",
+      model: "test",
+      source_urls: [],
+      market_signals: [],
+      ...overrides,
+    };
+    return render(CandidateComparison, {
+      race: race({ candidates, forecast }),
+      candidates,
+    });
+  }
+
+  function desktopText(container: HTMLElement): string {
+    return (
+      container.querySelector("[data-desktop-candidate-comparison]")
+        ?.textContent ?? ""
+    );
+  }
+
+  // An empty party used to match every key (`"Democratic".includes("")`).
+  it("gives a candidate with no party no probability", () => {
+    const nobody = candidate("No Party", { party: "" });
+    const { container } = renderRace([nobody], {
+      party_probabilities: { Democratic: 0.61 },
+    });
+
+    expect(desktopText(container)).not.toContain("61%");
+    expect(desktopText(container)).not.toContain("estimated win probability");
+  });
+
+  // A party's chance is not each member's chance: in a same-party race the
+  // party probability would wrongly be shown for every candidate.
+  it("withholds the party probability when two candidates share a party", () => {
+    const a = candidate("Ann Alpha", { party: "Democratic" });
+    const b = candidate("Bea Beta", { party: "Democratic" });
+    const { container } = renderRace([a, b], {
+      party_probabilities: { Democratic: 0.97 },
+    });
+
+    expect(desktopText(container)).not.toContain("97%");
+  });
+
+  it("still credits the named winner in a same-party race", () => {
+    const a = candidate("Ann Alpha", { party: "Democratic" });
+    const b = candidate("Bea Beta", { party: "Democratic" });
+    const { container } = renderRace([a, b], {
+      predicted_winner_name: "Ann Alpha",
+      win_probability: 0.66,
+      party_probabilities: { Democratic: 0.97 },
+    });
+
+    expect(desktopText(container)).toContain("66%");
+    expect(desktopText(container)).not.toContain("97%");
+  });
+
+  it("does not fuzzy-match an unrelated minor party", () => {
+    const minor = candidate("Pat Peace", { party: "Peace and Freedom" });
+    const { container } = renderRace([minor], {
+      party_probabilities: { Peace: 0.12 },
+    });
+
+    expect(desktopText(container)).toContain("Pat Peace");
+    expect(desktopText(container)).not.toContain("12%");
   });
 });

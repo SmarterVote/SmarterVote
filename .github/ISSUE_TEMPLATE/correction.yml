@@ -1,0 +1,61 @@
+name: Correction Request
+description: Report a factual error in published Smarter.Vote research
+title: "[Correction] "
+labels: ["correction"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping keep Smarter.Vote accurate. Correction reports are public, so please
+        do not include sensitive personal information. See the
+        [corrections policy](https://smarter.vote/corrections/) for how reports are reviewed.
+
+        Use the [Missing Candidate Data](https://github.com/SmarterVote/SmarterVote/issues/new?template=missing-data.yml)
+        template instead if information is absent rather than wrong.
+
+  - type: input
+    id: page-url
+    attributes:
+      label: Page URL
+      description: The Smarter.Vote page that contains the error.
+      placeholder: https://smarter.vote/races/pa-senate-2026/
+    validations:
+      required: true
+
+  - type: textarea
+    id: incorrect-statement
+    attributes:
+      label: Incorrect statement
+      description: Quote the specific statement, figure, or label that is wrong, and name the candidate or contest it concerns.
+      placeholder: 'The page says "Jane Smith opposes ..." under Healthcare.'
+    validations:
+      required: true
+
+  - type: textarea
+    id: correct-information
+    attributes:
+      label: Correct information
+      description: What the page should say instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: source-link
+    attributes:
+      label: Source link(s)
+      description: |
+        Reliable sources that support the correction. Primary sources work best: the candidate's
+        official site, official election or government records, voting records, or established news outlets.
+      placeholder: |
+        - https://candidatewebsite.com/issues
+        - https://newssite.com/article-about-candidate
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Anything else that helps us verify the correction.

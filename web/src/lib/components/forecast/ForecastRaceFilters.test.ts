@@ -31,7 +31,7 @@ describe("ForecastRaceFilters", () => {
     await fireEvent.click(screen.getByText("Republican"));
     expect(onFilterPartyChange).toHaveBeenCalledWith("Republican");
 
-    await fireEvent.change(screen.getByLabelText("Sort by:"), {
+    await fireEvent.change(screen.getByLabelText("Sort by"), {
       target: { value: "margin" },
     });
     expect(onSortByChange).toHaveBeenCalledWith("margin");

@@ -31,7 +31,14 @@ vi.mock("$app/stores", async () => {
   pageControl.setUrl = (href: string) => store.set({ url: new URL(href) });
   return { page: store };
 });
-vi.mock("$lib/api", () => ({ getRaceSummaries }));
+// The header loads the compact search index; build it from the mocked
+// summaries so these tests keep exercising the "first search loads data" path.
+vi.mock("$lib/api", async () => {
+  const { buildSearchIndex } = await import("$lib/utils/searchIndex");
+  return {
+    getSearchIndex: async () => buildSearchIndex(await getRaceSummaries()),
+  };
+});
 
 /**
  * On "/" the header adopts the URL's `?q=` only on real navigations
@@ -475,6 +482,156 @@ describe("SiteHeader global shortcuts", () => {
 
     await waitFor(() =>
       expect(container.querySelector("#site-search-results")).toBeNull(),
+    );
+  });
+
+  it("closes the results and mobile search when Enter falls back to the directory", async () => {
+    const { container, getByRole } = renderHeader();
+    await fireEvent.click(getByRole("button", { name: "Open search" }));
+    const input = searchBox(container);
+    await type(input, "Missouri");
+    await waitFor(() =>
+      expect(container.querySelector("#site-search-results")).not.toBeNull(),
+    );
+
+    await fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(goto).toHaveBeenCalledWith("/elections/?q=Missouri");
+    await waitFor(() =>
+      expect(container.querySelector("#site-search-results")).toBeNull(),
+    );
+    expect(
+      getByRole("button", { name: "Open search" }).getAttribute(
+        "aria-expanded",
+      ),
+    ).toBe("false");
+  });
+
+  it("returns focus to the search toggle when Escape closes the mobile panel", async () => {
+    const { container, getByRole } = renderHeader();
+    const toggle = getByRole("button", { name: "Open search" });
+    await fireEvent.click(toggle);
+    const input = searchBox(container);
+    input.focus();
+
+    await fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => expect(document.activeElement).toBe(toggle));
+  });
+
+  it("groups results under labelled listbox groups", async () => {
+    const { container } = renderHeader();
+    await type(searchBox(container), "Missouri");
+    await waitFor(() =>
+      expect(container.querySelector("#site-search-results")).not.toBeNull(),
+    );
+    const groups = container.querySelectorAll(
+      '#site-search-results [role="group"]',
+    );
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) {
+      const labelId = group.getAttribute("aria-labelledby");
+      expect(labelId && document.getElementById(labelId)).toBeTruthy();
+    }
+    expect(container.querySelector("#site-search-results > p")).toBeNull();
+  });
+
+  it("announces search status through one persistent live region", async () => {
+    const { container } = renderHeader();
+    const status = container.querySelector('[role="status"]');
+    expect(status).not.toBeNull();
+    await type(searchBox(container), "zzzz-no-match");
+    await waitFor(() =>
+      expect(status?.textContent).toContain(
+        "No matching elections or candidates.",
+      ),
+    );
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+  });
+
+  it("marks the current section's nav link with aria-current", () => {
+    const { getByRole } = renderHeader();
+    expect(
+      getByRole("link", { name: "Elections" }).getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      getByRole("link", { name: "Forecast" }).getAttribute("aria-current"),
+    ).toBeNull();
+  });
+
+  it("closes the mobile menu after a navigation", async () => {
+    const { getByRole } = renderHeader();
+    await fireEvent.click(
+      getByRole("button", { name: "Open navigation menu" }),
+    );
+    navigateTo("https://smarter.vote/forecast/");
+    await waitFor(() =>
+      expect(
+        getByRole("button", { name: "Open navigation menu" }).getAttribute(
+          "aria-expanded",
+        ),
+      ).toBe("false"),
+    );
+  });
+});
+
+describe("SiteHeader result options", () => {
+  it("ends the results with a 'See all' option linking to the directory", async () => {
+    const { container, getByRole } = renderHeader();
+    await type(searchBox(container), "Missouri");
+
+    const seeAll = await waitFor(() =>
+      getByRole("option", { name: /See all 1 result/ }),
+    );
+    await fireEvent.click(seeAll);
+
+    expect(goto).toHaveBeenCalledWith("/elections/?q=Missouri");
+  });
+
+  it("offers browse and address links when nothing matches", async () => {
+    const { container, getByRole } = renderHeader();
+    await type(searchBox(container), "zzzz-no-match");
+
+    await waitFor(() =>
+      expect(
+        getByRole("link", { name: "Browse all elections" }).getAttribute(
+          "href",
+        ),
+      ).toBe("/elections/"),
+    );
+    expect(
+      getByRole("link", { name: "Find races by address" }).getAttribute("href"),
+    ).toBe("/my-ballot/");
+  });
+
+  it("ranks a state's Senate race ahead of its House seats", async () => {
+    const races = [
+      ...Array.from({ length: 8 }, (_, i) =>
+        race({
+          id: `tx-house-${String(i + 1).padStart(2, "0")}-2026`,
+          title: `Texas House ${i + 1}`,
+          office: "U.S. House",
+          state: "Texas",
+          jurisdiction: "Texas",
+          candidates: [],
+        }),
+      ),
+      race({
+        id: "tx-senate-2026",
+        title: "2026 Texas U.S. Senate Election",
+        office: "U.S. Senate",
+        state: "Texas",
+        jurisdiction: "Texas",
+        candidates: [],
+      }),
+    ];
+    const { container } = renderHeader({ races });
+    await type(searchBox(container), "Texas");
+
+    await waitFor(() =>
+      expect(
+        container.querySelector("#site-search-option-0")?.textContent,
+      ).toContain("Texas U.S. Senate"),
     );
   });
 });

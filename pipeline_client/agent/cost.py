@@ -1,5 +1,7 @@
 """Token cost accounting for the agent pipeline."""
 
+import logging
+import os
 import re
 from contextvars import ContextVar
 from typing import Any, Dict, Optional
@@ -23,6 +25,35 @@ _unit_ctx: ContextVar[str] = ContextVar("_unit_ctx", default="unattributed")
 
 _DEFAULT_INPUT_PER_M = 2.50
 _DEFAULT_OUTPUT_PER_M = 10.00
+
+# Paid web-search pricing, per call.
+SERPER_COST_PER_CALL_USD = 0.001
+# Searlo is the primary search provider, but no per-call price is documented
+# anywhere in the repo. Rather than invent one, read it from the environment;
+# the 0.0 default keeps Searlo calls counted but unpriced until the real
+# contract price is supplied via SEARLO_COST_PER_CALL_USD.
+_SEARLO_COST_ENV = "SEARLO_COST_PER_CALL_USD"
+
+
+def searlo_cost_per_call_usd() -> float:
+    """Return the configured Searlo per-call price (env ``SEARLO_COST_PER_CALL_USD``, default 0.0)."""
+    raw = os.environ.get(_SEARLO_COST_ENV, "").strip()
+    if not raw:
+        return 0.0
+    try:
+        value = float(raw)
+    except ValueError:
+        logging.getLogger("pipeline").warning("Ignoring non-numeric %s=%r", _SEARLO_COST_ENV, raw)
+        return 0.0
+    return value if value >= 0 else 0.0
+
+
+SEARLO_COST_PER_CALL_USD = searlo_cost_per_call_usd()
+
+
+def search_cost_usd(serper_calls: Any, searlo_calls: Any) -> float:
+    """Price paid web-search calls across both providers."""
+    return int(serper_calls or 0) * SERPER_COST_PER_CALL_USD + int(searlo_calls or 0) * searlo_cost_per_call_usd()
 
 
 def phase_family(phase: str) -> str:

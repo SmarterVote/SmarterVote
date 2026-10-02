@@ -81,8 +81,9 @@
               rel="noopener noreferrer"
               class="source-link-btn"
             >
-              {source.title}
+              <span>{source.title}</span>
               <UiIcon name="external" size="sm" />
+              <span class="sr-only">(opens in a new tab)</span>
             </a>
           {/each}
         </div>
@@ -121,12 +122,19 @@
   }
 
   .source-link-btn {
-    @apply inline-flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors;
-    background-color: rgb(var(--sv-primary) / 0.1);
-    color: rgb(var(--sv-primary));
-    border: 1px solid rgb(var(--sv-primary) / 0.3);
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100;
   }
-  .source-link-btn:hover {
+
+  /* Svelte scopes styles, so dark overrides target the global .dark root.
+     blue-700 on blue-50 (light) and blue-400 on the tinted gray-900 surface
+     (dark) both clear WCAG AA 4.5:1. */
+  :global(.dark) .source-link-btn {
+    color: rgb(var(--sv-primary));
+    background-color: rgb(var(--sv-primary) / 0.1);
+    border-color: rgb(var(--sv-primary) / 0.3);
+  }
+
+  :global(.dark) .source-link-btn:hover {
     background-color: rgb(var(--sv-primary) / 0.2);
   }
 </style>

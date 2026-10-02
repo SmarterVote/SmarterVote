@@ -20,6 +20,8 @@ def test_approved_profile_with_many_warnings_stays_publishable():
         "score": 80,
         "passed": True,
         "summary": "Validated by 1/1 reviewers at 80/100 after a 15-point advisory deduction for 9 warning flag(s).",
+        "current_review_count": 1,
+        "stale_review_count": 0,
     }
 
 

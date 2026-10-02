@@ -7,6 +7,7 @@ Logs are stored in the `pipeline_runs/{run_id}/logs` subcollection.
 
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
@@ -259,12 +260,41 @@ def _log_sort_key(entry: Dict[str, Any]) -> tuple[float, str]:
     return (0.0, str(entry.get("id") or ""))
 
 
+# Legacy run documents (written before ``activity_at`` existed) never gain new
+# members: every new run doc carries ``activity_at``. Their set only shrinks
+# (prune/delete), so caching it briefly keeps the admin poll from re-reading up
+# to ``limit`` extra docs on every call while staying correct.
+_LEGACY_RUNS_CACHE_SECONDS = int(os.getenv("LEGACY_RUNS_CACHE_SECONDS", "600"))
+_legacy_runs_cache: Dict[tuple[int, int], tuple[float, Any, list[Dict[str, Any]]]] = {}
+
+
+def _invalidate_legacy_runs_cache() -> None:
+    _legacy_runs_cache.clear()
+
+
+def _legacy_runs_without_activity(db: Any, runs_ref: Any, limit: int) -> list[Dict[str, Any]]:
+    """Return run docs that lack ``activity_at`` (so the canonical query skips them)."""
+    key = (id(db), limit)
+    cached = _legacy_runs_cache.get(key)
+    now = time.monotonic()
+    if cached and cached[1] is db and now - cached[0] < _LEGACY_RUNS_CACHE_SECONDS:
+        return [dict(run) for run in cached[2]]
+    docs = runs_ref.order_by("started_at", direction="DESCENDING").limit(limit).stream()
+    legacy = [r for r in (firestore_helpers._doc_to_plain(d) for d in docs) if r is not None and not r.get("activity_at")]
+    if len(_legacy_runs_cache) > 16:
+        _legacy_runs_cache.clear()
+    _legacy_runs_cache[key] = (now, db, legacy)
+    return [dict(run) for run in legacy]
+
+
 @router.get("/runs", dependencies=[Depends(verify_token)])
 def list_runs(limit: int = 50) -> Dict[str, Any]:
     """List recent pipeline runs from Firestore, newest first.
 
-    New run documents carry one canonical ``activity_at`` timestamp. A single
-    legacy fallback query remains while older retained documents age out.
+    New run documents carry one canonical ``activity_at`` timestamp. Legacy
+    documents without it are only consulted when the canonical query came back
+    short (i.e. every canonical run is already in the page), and that legacy
+    set is cached briefly because it can no longer grow.
     """
 
     limit = max(1, min(limit, 500))
@@ -279,8 +309,7 @@ def list_runs(limit: int = 50) -> Dict[str, Any]:
         runs = []
     if len(runs) < limit:
         try:
-            legacy_docs = runs_ref.order_by("started_at", direction="DESCENDING").limit(limit).stream()
-            runs.extend(r for r in (firestore_helpers._doc_to_plain(d) for d in legacy_docs) if r is not None)
+            runs.extend(_legacy_runs_without_activity(db, runs_ref, limit))
         except Exception:
             logger.exception("Unable to query legacy run timestamps")
 
@@ -357,16 +386,40 @@ def get_run_logs(
     since: int = 0,
     limit: int = 1000,
     cursor: str | None = None,
+    tail: bool = False,
 ) -> Dict[str, Any]:
     """Return logs without re-reading the full subcollection on each poll.
 
     Modern clients pass the opaque ``next_cursor`` returned by the prior call.
     ``since`` remains available for older clients, but requires a full scan when
     it is greater than zero.
+
+    ``tail=true`` returns only the newest ``limit`` entries (one descending
+    query, so it reads at most ``limit`` docs however long the run is). Entries
+    are still returned oldest-first, and ``next_cursor`` points at the newest
+    entry so a client can switch straight to forward ``cursor`` polling.
+    ``truncated`` reports that older entries exist beyond the tail.
     """
     db = firestore_helpers._get_fs()
     logs_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).collection(FIRESTORE_RUN_LOGS_SUBCOLLECTION)
     limit = max(1, min(limit, 5000))
+
+    if tail:
+        docs = list(logs_ref.order_by("__name__", direction="DESCENDING").limit(limit).stream())
+        docs.reverse()
+        entries = []
+        for doc in docs:
+            entry = firestore_helpers._doc_to_plain(doc)
+            if entry is not None:
+                entry.setdefault("id", str(getattr(doc, "id", "")))
+                entries.append(entry)
+        return {
+            "logs": entries,
+            "total": len(entries),
+            "next_cursor": str(getattr(docs[-1], "id", "")) if docs else None,
+            "has_more": False,
+            "truncated": len(docs) == limit,
+        }
 
     if cursor is not None or since == 0:
         query = logs_ref.order_by("__name__")
@@ -433,12 +486,71 @@ def prune_runs() -> Dict[str, Any]:
     if op_count > 0:
         batch.commit()
 
+    _invalidate_legacy_runs_cache()
     return {"message": f"Pruned {run_count} finished runs", "count": run_count}
 
 
+def _cancel_queue_items_for_run(db: Any, run_id: str) -> None:
+    """Cancel the run's still-active queue items, each guarded by a precondition."""
+
+    def build(queue_data: Dict[str, Any]) -> Dict[str, Any] | None:
+        if queue_data.get("status") not in _ACTIVE_STATUSES:
+            return None
+        return {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
+
+    for queue_doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", run_id).limit(20).stream():
+        firestore_helpers._update_with_retry(db, queue_doc.reference, build, snapshot=queue_doc)
+
+
+def _cancel_active_run(db: Any, doc_ref: Any, run_id: str, snapshot: Any = None) -> Dict[str, Any]:
+    """Mark an active run cancelled, release its queue lease, and settle its race record.
+
+    The run status write carries an update-time precondition: if the worker
+    changed the run between our read and write, the run is re-read and the
+    cancel is only retried while it is still active. A run that finished in
+    the meantime yields 409 instead of being overwritten to "cancelled".
+    """
+
+    def build(run_data: Dict[str, Any]) -> Dict[str, Any] | None:
+        if run_data.get("status") not in _ACTIVE_STATUSES:
+            return None
+        return {"status": "cancelled"}
+
+    outcome, data = firestore_helpers._update_with_retry(db, doc_ref, build, snapshot=snapshot)
+    if outcome == "missing":
+        raise HTTPException(status_code=404, detail="Run not found")
+    if outcome == "skipped":
+        status = (data or {}).get("status")
+        raise HTTPException(status_code=409, detail=f"Run is not active (status: {status or 'unknown'})")
+    if outcome == "conflict":
+        raise HTTPException(status_code=409, detail="Run changed while cancelling; refresh and try again")
+
+    _cancel_queue_items_for_run(db, run_id)
+    race_id = (data or {}).get("race_id")
+    if race_id:
+        firestore_helpers._settle_race_after_run_stop(db, str(race_id), run_id, "cancelled")
+    return {"message": "Run cancelled", "run_id": run_id}
+
+
+@router.post("/runs/{run_id}/cancel", dependencies=[Depends(verify_token)])
+def cancel_run(run_id: str) -> Dict[str, Any]:
+    """Cancel an active run. Never deletes anything.
+
+    Returns 409 when the run is already finished so a stale "Cancel" button can
+    never destroy a completed run's history and logs.
+    """
+    db = firestore_helpers._get_fs()
+    doc_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
+    return _cancel_active_run(db, doc_ref, run_id)
+
+
 @router.delete("/runs/{run_id}", dependencies=[Depends(verify_token)])
-def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
-    """Cancel an active run or delete a finished one from Firestore."""
+def cancel_or_delete_run(run_id: str, cancel_only: bool = False) -> Dict[str, Any]:
+    """Cancel an active run or delete a finished one from Firestore.
+
+    With ``cancel_only=true`` a finished run is left untouched and the request
+    fails with 409 instead of deleting the run and its logs.
+    """
     db = firestore_helpers._get_fs()
     doc_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
     doc = doc_ref.get()
@@ -446,34 +558,23 @@ def cancel_or_delete_run(run_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Run not found")
     data = doc.to_dict() or {}
     status = data.get("status", "")
-    if status in ("pending", "running"):
-        doc_ref.update({"status": "cancelled"})
-        for queue_doc in db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", run_id).limit(20).stream():
-            queue_data = queue_doc.to_dict() or {}
-            if queue_data.get("status") in ("pending", "running"):
-                queue_doc.reference.update(
-                    {"status": "cancelled", "lease_owner": None, "lease_expires_at": None, "ttl_at": _queue_ttl_at()}
-                )
-        race_id = data.get("race_id")
-        if race_id:
-            race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(str(race_id)).get()
-            race_data = firestore_helpers._doc_to_plain(race_doc) or {}
-            if race_data.get("status") in ("queued", "running") and race_data.get("current_run_id") == run_id:
-                firestore_helpers._fs_update_race(race_id, {"status": "cancelled", "current_run_id": None})
-        return {"message": "Run cancelled", "run_id": run_id}
-    else:
-        # Delete logs subcollection first
-        batch = db.batch()
-        op_count = 0
-        logs_ref = doc_ref.collection(FIRESTORE_RUN_LOGS_SUBCOLLECTION)
-        log_docs = list(logs_ref.stream())
-        for log_doc in log_docs:
-            batch.delete(log_doc.reference)
-            op_count += 1
-            if op_count >= 500:
-                batch.commit()
-                batch = db.batch()
-                op_count = 0
-        batch.delete(doc_ref)
-        batch.commit()
+    if status in _ACTIVE_STATUSES:
+        return _cancel_active_run(db, doc_ref, run_id, snapshot=doc)
+    if cancel_only:
+        raise HTTPException(status_code=409, detail=f"Run is not active (status: {status or 'unknown'})")
+    # Delete logs subcollection first
+    batch = db.batch()
+    op_count = 0
+    logs_ref = doc_ref.collection(FIRESTORE_RUN_LOGS_SUBCOLLECTION)
+    log_docs = list(logs_ref.stream())
+    for log_doc in log_docs:
+        batch.delete(log_doc.reference)
+        op_count += 1
+        if op_count >= 500:
+            batch.commit()
+            batch = db.batch()
+            op_count = 0
+    batch.delete(doc_ref)
+    batch.commit()
+    _invalidate_legacy_runs_cache()
     return {"message": "Run deleted", "run_id": run_id}

@@ -1,43 +1,61 @@
 <script lang="ts">
   import type { AgentReview } from "$lib/types";
+  import {
+    flagFieldLabel,
+    publicFlags,
+    publicReviews,
+    stripMarkdown,
+  } from "$lib/utils/reviews";
 
   export let reviews: AgentReview[] = [];
+  /** Candidate names in roster order, to label flags like "candidates[1].issues.Healthcare". */
+  export let candidateNames: string[] = [];
+  /** Models that generated the race (and its forecast), shown with the review details. */
+  export let models: string[] = [];
 
-  $: displayReviews = (reviews || []).filter(
-    (r) =>
-      r.model !== "automated-link-validator" &&
-      r.model !== "automated-profile-quality",
-  );
+  // Current reviews first: a stale review judged a roster the race has since
+  // replaced, so it must never read as a current approval. Internal checks and
+  // empty reviews are hidden; only reader-facing warnings and errors show.
+  $: displayReviews = publicReviews(reviews)
+    .map((review) => ({
+      ...review,
+      summary: stripMarkdown(review.summary),
+      flags: publicFlags(review.flags),
+    }))
+    .sort((a, b) => Number(isStale(a)) - Number(isStale(b)));
+  $: staleCount = displayReviews.filter(isStale).length;
+
+  function isStale(review: AgentReview): boolean {
+    return review.stale === true;
+  }
 
   let collapsed = true;
 
-  function verdictColor(verdict: string): string {
-    switch (verdict) {
-      case "approved":
-        return "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200";
-      case "needs_revision":
-        return "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200";
-      case "flagged":
-        return "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200";
-      default:
-        return "bg-surface-alt text-content";
-    }
+  const KNOWN_VERDICTS = new Set(["approved", "needs_revision", "flagged"]);
+
+  /** Semantic verdict style (success / warning / danger), theme-aware. */
+  function verdictClass(verdict: string): string {
+    return KNOWN_VERDICTS.has(verdict)
+      ? `review-verdict--${verdict}`
+      : "review-verdict--neutral";
   }
 
-  function severityIcon(severity: string): string {
-    switch (severity) {
-      case "error":
-        return "🔴";
-      case "warning":
-        return "🟡";
-      default:
-        return "🔵";
-    }
+  type Severity = "error" | "warning" | "info";
+
+  function severityLevel(severity: string): Severity {
+    return severity === "error" || severity === "warning" ? severity : "info";
   }
+
+  const SEVERITY_LABEL: Record<Severity, string> = {
+    error: "Error",
+    warning: "Warning",
+    info: "Note",
+  };
 </script>
 
 <div id="ai-review" class="review-panel">
   <button
+    type="button"
     class="review-title"
     on:click={() => (collapsed = !collapsed)}
     aria-expanded={!collapsed}
@@ -47,6 +65,7 @@
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         stroke-linecap="round"
@@ -60,7 +79,7 @@
       <span class="review-count"
         >{displayReviews.length} review{displayReviews.length !== 1
           ? "s"
-          : ""}</span
+          : ""}{staleCount > 0 ? ` · ${staleCount} stale` : ""}</span
       >
     {/if}
     <svg
@@ -69,6 +88,7 @@
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
+      aria-hidden="true"
     >
       <path
         stroke-linecap="round"
@@ -87,18 +107,34 @@
     {:else}
       <div class="review-cards">
         {#each displayReviews as review}
-          <div class="review-card">
+          <div class="review-card" class:review-card-stale={isStale(review)}>
             <div class="review-header">
               <span class="review-model">{review.model}</span>
               <div class="review-header-right">
                 {#if review.score != null}
                   <span class="review-score">{review.score}/100</span>
                 {/if}
-                <span class="review-verdict {verdictColor(review.verdict)}">
-                  {review.verdict.replace("_", " ")}
-                </span>
+                {#if isStale(review)}
+                  <span
+                    class="review-verdict review-verdict-stale"
+                    title="Reviewed an earlier roster; not a current verdict"
+                  >
+                    Stale · was {review.verdict.replace("_", " ")}
+                  </span>
+                {:else}
+                  <span class="review-verdict {verdictClass(review.verdict)}">
+                    {review.verdict.replace("_", " ")}
+                  </span>
+                {/if}
               </div>
             </div>
+            {#if isStale(review)}
+              <p class="review-stale-note" role="note">
+                This review no longer applies to the current candidate roster{review.stale_reason
+                  ? `: ${review.stale_reason}`
+                  : "."}
+              </p>
+            {/if}
             {#if review.summary}
               <p class="review-summary">{review.summary}</p>
             {/if}
@@ -111,16 +147,29 @@
                 </summary>
                 <ul class="flags-list">
                   {#each review.flags as flag}
+                    {@const fieldLabel = flagFieldLabel(
+                      flag.field,
+                      candidateNames,
+                    )}
                     <li class="flag-item">
-                      <span class="flag-severity"
-                        >{severityIcon(flag.severity)}</span
+                      <span
+                        class="flag-severity flag-severity--{severityLevel(
+                          flag.severity,
+                        )}">{SEVERITY_LABEL[severityLevel(flag.severity)]}</span
                       >
                       <div>
-                        <span class="flag-field">{flag.field}</span>
-                        <span class="flag-concern">{flag.concern}</span>
+                        {#if fieldLabel}
+                          <span class="flag-field">{fieldLabel}</span>
+                        {/if}
+                        <span class="flag-concern"
+                          >{stripMarkdown(flag.concern)}</span
+                        >
                         {#if flag.suggestion}
                           <span class="flag-suggestion"
-                            >💡 {flag.suggestion}</span
+                            ><span class="flag-suggestion-label"
+                              >Suggestion:</span
+                            >
+                            {stripMarkdown(flag.suggestion)}</span
                           >
                         {/if}
                       </div>
@@ -128,7 +177,7 @@
                   {/each}
                 </ul>
               </details>
-            {:else}
+            {:else if !isStale(review)}
               <p class="review-all-clear">No issues flagged in this review.</p>
             {/if}
             <span class="review-date">
@@ -146,6 +195,12 @@
           </div>
         {/each}
       </div>
+    {/if}
+    {#if models.length > 0}
+      <p class="review-models">
+        <span class="font-semibold">Models used to research this race:</span>
+        {models.join(", ")}
+      </p>
     {/if}
   {/if}
 </div>
@@ -172,6 +227,18 @@
     @apply bg-surface rounded-lg border border-stroke p-4;
   }
 
+  .review-card-stale {
+    @apply border-dashed opacity-80;
+  }
+
+  .review-verdict-stale {
+    @apply bg-surface-alt text-content-subtle border border-stroke normal-case;
+  }
+
+  .review-stale-note {
+    @apply mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900;
+  }
+
   .review-header {
     @apply flex items-center justify-between mb-2;
   }
@@ -189,7 +256,22 @@
   }
 
   .review-verdict {
-    @apply px-2 py-1 rounded-full text-xs font-medium capitalize;
+    @apply rounded-full border px-2 py-1 text-xs font-medium capitalize;
+  }
+
+  /* Verdict and severity colors follow the shared alert palette in app.css
+     (alert-error / alert-warn), with a success ramp for approvals. */
+  .review-verdict--approved {
+    @apply border-green-200 bg-green-50 text-green-800;
+  }
+  .review-verdict--needs_revision {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+  .review-verdict--flagged {
+    @apply border-red-200 bg-red-50 text-red-800;
+  }
+  .review-verdict--neutral {
+    @apply border-stroke bg-surface-alt text-content;
   }
 
   .review-summary {
@@ -213,11 +295,24 @@
   }
 
   .flag-severity {
-    @apply flex-shrink-0;
+    @apply flex-shrink-0 rounded border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase leading-none tracking-wide;
+  }
+  .flag-severity--error {
+    @apply border-red-200 bg-red-50 text-red-800;
+  }
+  .flag-severity--warning {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+  .flag-severity--info {
+    @apply border-stroke bg-surface-alt text-content-muted;
   }
 
   .flag-field {
-    @apply font-mono text-content-subtle block;
+    @apply block font-semibold text-content-subtle;
+  }
+
+  .review-models {
+    @apply mt-4 text-xs text-content-subtle;
   }
 
   .flag-concern {
@@ -225,7 +320,11 @@
   }
 
   .flag-suggestion {
-    @apply text-blue-600 block mt-1;
+    @apply mt-1 block text-content-muted;
+  }
+
+  .flag-suggestion-label {
+    @apply font-semibold text-primary-700;
   }
 
   .review-date {
@@ -237,6 +336,33 @@
   }
 
   .review-all-clear {
-    @apply text-sm text-green-600 font-medium mb-2;
+    @apply mb-2 text-sm font-medium text-green-700;
+  }
+
+  /* Dark theme: Svelte scopes styles, so target the global .dark root. These
+     mirror the dark variants of .alert-error / .alert-warn in app.css. */
+  :global(.dark) .review-stale-note,
+  :global(.dark) .review-verdict--needs_revision,
+  :global(.dark) .flag-severity--warning {
+    border-color: rgb(146 64 14 / 0.5); /* amber-800/50 */
+    background-color: rgb(69 26 3 / 0.3); /* amber-950/30 */
+    color: rgb(254 243 199); /* amber-100 */
+  }
+  :global(.dark) .review-verdict--flagged,
+  :global(.dark) .flag-severity--error {
+    border-color: rgb(153 27 27 / 0.6); /* red-800/60 */
+    background-color: rgb(69 10 10 / 0.3); /* red-950/30 */
+    color: rgb(254 202 202); /* red-200 */
+  }
+  :global(.dark) .review-verdict--approved {
+    border-color: rgb(22 101 52 / 0.6); /* green-800/60 */
+    background-color: rgb(5 46 22 / 0.3); /* green-950/30 */
+    color: rgb(187 247 208); /* green-200 */
+  }
+  :global(.dark) .review-all-clear {
+    color: rgb(134 239 172); /* green-300 */
+  }
+  :global(.dark) .flag-suggestion-label {
+    color: rgb(var(--sv-primary));
   }
 </style>

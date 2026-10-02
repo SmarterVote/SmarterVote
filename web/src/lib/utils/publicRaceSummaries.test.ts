@@ -47,9 +47,48 @@ describe("public race summary payloads", () => {
     ]);
   });
 
-  it("keeps forecasts but omits pipeline cost metadata on forecast pages", () => {
-    const [race] = toForecastRaceSummaries([summary]);
-    expect(race.forecast).toEqual(summary.forecast);
+  it("keeps the collapsed-card forecast fields and drops drawer-only and internal data", () => {
+    const [race] = toForecastRaceSummaries([
+      {
+        ...summary,
+        forecast: {
+          ...summary.forecast!,
+          predicted_winner_name: "Alex Example",
+          win_probability: 0.5,
+          margin_estimate: 0.4,
+          key_reasons: ["A reason"],
+          uncertainty: "Some uncertainty",
+          source_urls: ["https://example.com"],
+        },
+      },
+    ]);
+    expect(race.forecast).toEqual({
+      predicted_winner_name: "Alex Example",
+      win_probability: 0.5,
+      party_probabilities: { Democratic: 0.5, Republican: 0.5 },
+      margin_estimate: 0.4,
+      rating: "tossup",
+      // No takeaway was published, so the card's first-sentence fallback is
+      // precomputed from the rationale it no longer carries.
+      takeaway: "A deliberately large forecast explanation.",
+      based_on_poll_count: 0,
+    });
     expect(race).not.toHaveProperty("agent_metrics");
+    expect(race).not.toHaveProperty("quality_grade");
+    expect(race.candidates).toEqual([
+      { name: "Alex Example", party: undefined, incumbent: false },
+    ]);
+  });
+
+  it("keeps a published takeaway and races without a forecast", () => {
+    const [withTakeaway, withoutForecast] = toForecastRaceSummaries([
+      {
+        ...summary,
+        forecast: { ...summary.forecast!, takeaway: "Published takeaway." },
+      },
+      { ...summary, id: "tx-house-01-2026", forecast: null },
+    ]);
+    expect(withTakeaway.forecast?.takeaway).toBe("Published takeaway.");
+    expect(withoutForecast).not.toHaveProperty("forecast");
   });
 });

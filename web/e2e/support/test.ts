@@ -6,8 +6,8 @@ import { test as base, expect, type Page } from "@playwright/test";
  *
  * It wraps the `page` fixture with a blanket network guard: any request to a
  * different origin than the app itself is aborted unless a spec has already
- * stubbed it (e.g. the Census geocoder JSONP endpoint via
- * `mockCensusGeocoder`, registered *after* this guard so it takes priority).
+ * stubbed it (e.g. the races-api Census proxy via `mockCensusGeocoder`,
+ * registered *after* this guard so it takes priority).
  * That makes "no real network calls" a structural guarantee for the whole
  * suite rather than something every spec has to remember to set up.
  */
@@ -20,7 +20,7 @@ export const test = base.extend<{ page: Page }>({
         await route.continue();
         return;
       }
-      // Anything not served by our own dev server (Census geocoder, Google
+      // Anything not served by our own dev server (races API, Google
       // Maps, etc.) is blocked by default. Specs that need one of these must
       // explicitly stub it with a more specific route registered afterward.
       await route.abort("blockedbyclient");

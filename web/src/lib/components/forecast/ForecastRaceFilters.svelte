@@ -1,4 +1,6 @@
 <script lang="ts">
+  import UiIcon from "$lib/components/UiIcon.svelte";
+
   export let filterRating: string;
   export let filterParty: string;
   export let sortBy: string;
@@ -30,13 +32,12 @@
 
 <!-- Filter and Sort Header bar -->
 <div class="px-5 py-5 border-b border-stroke/40 bg-surface-alt/10 space-y-4">
-  <div class="flex flex-col md:flex-row justify-between gap-4">
+  <div class="flex flex-col lg:flex-row justify-between gap-4">
     <!-- Pills Filter block -->
     <div class="space-y-2.5">
       <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="text-xs font-bold text-content-subtle uppercase tracking-wider w-16"
-          >Rating:</span
+        <span class="w-16 text-xs font-semibold text-content-subtle"
+          >Rating</span
         >
         {#each ratingPills as pill}
           <button
@@ -44,8 +45,9 @@
             on:click={() => onFilterRatingChange(pill.id)}
             class="text-xs px-3 py-1.5 rounded-full font-bold transition-all border
             {filterRating === pill.id
-              ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+              ? 'bg-content text-surface border-content'
               : 'bg-surface border-stroke hover:bg-surface-alt/50 text-content-muted'}"
+            aria-pressed={filterRating === pill.id}
           >
             {pill.label}
           </button>
@@ -53,9 +55,8 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="text-xs font-bold text-content-subtle uppercase tracking-wider w-16"
-          >Favored:</span
+        <span class="w-16 text-xs font-semibold text-content-subtle"
+          >Favored</span
         >
         {#each partyPills as pill}
           <button
@@ -64,9 +65,12 @@
             class="text-xs px-3 py-1.5 rounded-full font-bold transition-all border
             {filterParty === pill.id
               ? pill.id === 'Democratic'
-                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-500 dark:border-blue-500'
-                : 'bg-red-600 text-white border-red-600 dark:bg-red-500 dark:border-red-500'
+                ? 'bg-blue-600 text-white border-blue-600 dark:bg-blue-700 dark:border-blue-700'
+                : pill.id === 'Republican'
+                  ? 'bg-red-600 text-white border-red-600 dark:bg-red-700 dark:border-red-700'
+                  : 'bg-content text-surface border-content'
               : 'bg-surface border-stroke hover:bg-surface-alt/50 text-content-muted'}"
+            aria-pressed={filterParty === pill.id}
           >
             {pill.label}
           </button>
@@ -76,19 +80,19 @@
 
     <!-- Sort block -->
     <div
-      class="flex flex-row md:flex-col md:items-end justify-between md:justify-start gap-4"
+      class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:flex-col lg:items-end lg:justify-start"
     >
-      <div class="flex items-center gap-2.5">
+      <div class="flex min-w-0 items-center gap-2.5">
         <label
           for="sort-by"
-          class="text-xs font-bold text-content-subtle uppercase tracking-wider"
-          >Sort by:</label
+          class="w-16 shrink-0 whitespace-nowrap text-xs font-semibold text-content-subtle sm:w-auto"
+          >Sort by</label
         >
         <select
           id="sort-by"
           value={sortBy}
           on:change={handleSortChange}
-          class="text-xs bg-surface border border-stroke/60 rounded-xl px-3 py-1.5 text-content font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
+          class="min-w-0 flex-1 text-xs bg-surface border border-stroke rounded-xl px-3 py-1.5 text-content font-bold focus:outline-none focus:ring-2 focus:ring-primary-500 sm:flex-none"
         >
           <option value="control_relevance"
             >Most likely to decide control</option
@@ -110,16 +114,19 @@
           <button
             type="button"
             on:click={onClearState}
-            class="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-bold bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-xl border border-blue-200/50"
+            class="inline-flex items-center gap-1.5 text-xs text-primary-700 hover:bg-surface-alt dark:text-primary-300 font-bold bg-surface px-2.5 py-1 rounded-xl border border-stroke"
+            aria-label="Clear state filter: {selectedState}"
           >
-            State: {selectedState} x
+            State: {selectedState}
+            <UiIcon name="close" size="sm" />
           </button>
         {/if}
 
         <span
           class="text-xs text-content-subtle font-extrabold bg-surface-alt px-2.5 py-1 rounded-xl border border-stroke/60"
         >
-          {resultCount} races
+          {resultCount}
+          {resultCount === 1 ? "race" : "races"}
         </span>
       </div>
     </div>

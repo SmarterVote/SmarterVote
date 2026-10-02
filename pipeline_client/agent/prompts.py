@@ -64,7 +64,13 @@ RULES (apply to every response):
    - "low": Inferred or unverified. Sources may be empty.
    Never set confidence to "high" or "medium" without providing sources.
 4. Always include source URLs for every claim.
-5. Return ONLY valid JSON – no markdown fences, no extra text."""
+5. Return ONLY valid JSON – no markdown fences, no extra text.
+6. Write every text field for voters, in a neutral voice. Never mention your
+   research process ("search results", "the provided sources", "N/A"); say
+   "available sources" if you must. When no position was found, the stance is
+   exactly "No public position found" — no other wording. Do not describe a
+   candidate or party with loaded labels (far-right, far-left, radical,
+   extremist, fringe, firebrand) unless quoting and attributing a named source."""
 
 # ------------------------------------------------------------------
 # Phase 1: Discovery prompt (enhanced with career & images)

@@ -7,21 +7,14 @@
 
   let isAuthenticated = false;
   let darkMode = false;
-  const cloudflareAnalyticsToken = import.meta.env
-    .VITE_CLOUDFLARE_WEB_ANALYTICS_TOKEN;
+
+  // Cloudflare Web Analytics is injected at the edge by Cloudflare Pages
+  // (verified 2026-10-01: production HTML served to browsers carries the
+  // versioned beacon.min.js/v… script with this site's token). Adding the
+  // beacon here as well loaded it twice and double-counted page views, so the
+  // app does not inject it itself.
 
   onMount(() => {
-    if (cloudflareAnalyticsToken && !$page.url.pathname.startsWith("/admin")) {
-      const script = document.createElement("script");
-      script.defer = true;
-      script.src = "https://static.cloudflareinsights.com/beacon.min.js";
-      script.dataset.cfBeacon = JSON.stringify({
-        token: cloudflareAnalyticsToken,
-        spa: true,
-      });
-      document.head.appendChild(script);
-    }
-
     let saved: string | null = null;
     try {
       saved = localStorage.getItem("darkMode");
@@ -34,17 +27,50 @@
         : window.matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.classList.toggle("dark", darkMode);
 
-    void (async () => {
-      try {
-        const { getAuth0Client, isAuthSkipped } = await import("$lib/auth");
-        isAuthenticated = isAuthSkipped()
-          ? true
-          : await (await getAuth0Client()).isAuthenticated();
-      } catch {
-        isAuthenticated = false;
-      }
-    })();
+    mounted = true;
   });
+
+  let mounted = false;
+  let authChecked = false;
+
+  /**
+   * auth0-spa-js sets `auth0.<clientId>.is.authenticated=true` after a login.
+   * Public visitors never have it, so they never download or initialize the
+   * Auth0 SDK; returning admins still get the header "Admin" link.
+   */
+  function hasAuthSessionHint(): boolean {
+    try {
+      return /(?:^|;\s*)(?:_legacy_)?auth0\.[^=;]*is\.authenticated=true/.test(
+        document.cookie,
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function shouldInitAuth(pathname: string): boolean {
+    return (
+      pathname.startsWith("/admin") ||
+      hasAuthSessionHint() ||
+      (import.meta.env.DEV && import.meta.env.VITE_SKIP_AUTH === "true")
+    );
+  }
+
+  async function checkAuth() {
+    authChecked = true;
+    try {
+      const { getAuth0Client, isAuthSkipped } = await import("$lib/auth");
+      isAuthenticated = isAuthSkipped()
+        ? true
+        : await (await getAuth0Client()).isAuthenticated();
+    } catch {
+      isAuthenticated = false;
+    }
+  }
+
+  $: if (mounted && !authChecked && shouldInitAuth($page.url.pathname)) {
+    void checkAuth();
+  }
 
   function toggleDark() {
     darkMode = !darkMode;
@@ -64,7 +90,7 @@
   Skip to main content
 </a>
 
-<div class="min-h-screen bg-page overflow-x-hidden flex flex-col">
+<div class="min-h-screen bg-page overflow-x-clip flex flex-col">
   {#if $navigating}
     <div class="fixed top-0 left-0 right-0 z-[60] h-0.5 overflow-hidden">
       <div

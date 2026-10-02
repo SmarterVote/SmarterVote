@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ForecastRace } from "$lib/utils/forecast";
 import ForecastRaceCard from "./ForecastRaceCard.svelte";
 
+const { fetchPublishedRace } = vi.hoisted(() => ({
+  fetchPublishedRace: vi.fn(),
+}));
+vi.mock("$lib/prerenderData", () => ({ fetchPublishedRace }));
+
 const race: ForecastRace = {
   id: "mi-senate-2026",
   title: "2026 U.S. Senate election in Michigan",
@@ -69,7 +74,7 @@ describe("ForecastRaceCard", () => {
     expect(screen.getByText("Lean D")).toBeTruthy();
     expect(screen.getByText("Jamie Rivera")).toBeTruthy();
     expect(screen.getByText("63%")).toBeTruthy();
-    expect(screen.getByText("+5.2%")).toBeTruthy();
+    expect(screen.getByText("+5.2 pts")).toBeTruthy();
     expect(
       screen.getByText(
         "Rivera holds a mid-single-digit lead heading into the fall.",
@@ -170,5 +175,77 @@ describe("ForecastRaceCard", () => {
     });
 
     expect(screen.queryByTestId("evidence-lineage")).toBeNull();
+  });
+
+  describe("with a trimmed (page payload) forecast", () => {
+    const {
+      rationale: _rationale,
+      key_reasons: _keyReasons,
+      uncertainty: _uncertainty,
+      source_urls: _sources,
+      market_signals: _markets,
+      ...compact
+    } = race.forecast;
+    const trimmed = { ...race, forecast: compact } as ForecastRace;
+
+    afterEach(() => fetchPublishedRace.mockReset());
+
+    it("does not fetch details while collapsed", () => {
+      render(ForecastRaceCard, {
+        race: trimmed,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+      });
+      expect(fetchPublishedRace).not.toHaveBeenCalled();
+    });
+
+    it("loads the drawer fields from the race file when expanded", async () => {
+      fetchPublishedRace.mockResolvedValue({ forecast: race.forecast });
+      render(ForecastRaceCard, {
+        race: trimmed,
+        isExpanded: true,
+        onToggleExpand: vi.fn(),
+      });
+
+      expect(screen.getByText("Loading analysis…")).toBeTruthy();
+      expect(fetchPublishedRace).toHaveBeenCalledWith("mi-senate-2026");
+      expect(await screen.findByText("Polling advantage")).toBeTruthy();
+      expect(screen.getByText("Full assessment")).toBeTruthy();
+    });
+
+    it("offers a retry when the details request fails", async () => {
+      fetchPublishedRace.mockRejectedValueOnce(new Error("offline"));
+      fetchPublishedRace.mockResolvedValueOnce({ forecast: race.forecast });
+      render(ForecastRaceCard, {
+        race: trimmed,
+        isExpanded: true,
+        onToggleExpand: vi.fn(),
+      });
+
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      await fireEvent.click(retry);
+
+      expect(await screen.findByText("Polling advantage")).toBeTruthy();
+      expect(fetchPublishedRace).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("shows an uncontested race as Uncontested, without odds", () => {
+    render(ForecastRaceCard, {
+      race: {
+        ...race,
+        contest_stage: "uncontested",
+        candidates: [
+          { name: "Jamie Rivera", party: "Democratic", incumbent: true },
+        ],
+      } as ForecastRace,
+      isExpanded: false,
+      onToggleExpand: vi.fn(),
+    });
+
+    expect(screen.getByText("Uncontested")).toBeTruthy();
+    expect(screen.queryByText("Lean D")).toBeNull();
+    expect(screen.queryByText("63%")).toBeNull();
+    expect(screen.queryByText(/Democratic 63%/)).toBeNull();
   });
 });

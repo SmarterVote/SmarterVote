@@ -7,8 +7,10 @@ falls back to SQLite for local development.
 
 import asyncio
 import hashlib
+import hmac
 import logging
 import os
+import secrets
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -28,6 +30,35 @@ def _extract_race_id(path: str) -> Optional[str]:
     if len(parts) >= 2 and parts[0] == "races" and parts[1] and parts[1] != "summaries":
         return parts[1]
     return None
+
+
+# Last-resort per-process secret, used only when no server secret is configured
+# (local development). It is never empty, so IPs are never hashed unsalted.
+_PROCESS_SECRET = secrets.token_bytes(32)
+
+
+def _ip_hash_key(now: Optional[datetime] = None) -> bytes:
+    """Return the HMAC key used to pseudonymise client IPs.
+
+    ``ANALYTICS_IP_HASH_KEY`` (a dedicated secret) is preferred and gives
+    stable hashes, so unique-visitor counts work across multi-day windows.
+    Without it, derive a key that rotates daily from a server secret
+    (``ADMIN_API_KEY``, else a per-process random secret) — an unkeyed SHA-256
+    of an IPv4 address is reversible by enumerating the 2^32 address space.
+    """
+    configured = os.getenv("ANALYTICS_IP_HASH_KEY", "").strip()
+    if configured:
+        return configured.encode("utf-8")
+    server_secret = os.getenv("ADMIN_API_KEY", "").strip().encode("utf-8") or _PROCESS_SECRET
+    day = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    return hmac.new(server_secret, f"analytics-ip-salt:{day}".encode("utf-8"), hashlib.sha256).digest()
+
+
+def hash_client_ip(client_ip: Optional[str], now: Optional[datetime] = None) -> Optional[str]:
+    """Keyed (HMAC-SHA256) pseudonym for a client IP; ``None`` when unknown."""
+    if not client_ip:
+        return None
+    return hmac.new(_ip_hash_key(now), client_ip.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +146,7 @@ class AnalyticsStore:
     ) -> None:
         """Record a single request. Designed for fire-and-forget usage."""
         race_id = _extract_race_id(path)
-        ip_hash = hashlib.sha256((client_ip or "").encode()).hexdigest()[:16] if client_ip else None
+        ip_hash = hash_client_ip(client_ip)
         ts = datetime.now(timezone.utc).isoformat()
 
         if self._client is not None:

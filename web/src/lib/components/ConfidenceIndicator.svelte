@@ -25,10 +25,10 @@
       dot: "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]",
     },
     unknown: {
-      bg: "bg-gray-50/70 dark:bg-gray-800/20",
-      border: "border-gray-200/60 dark:border-gray-700/40",
-      text: "text-gray-500 dark:text-gray-400",
-      dot: "bg-gray-400",
+      bg: "bg-surface-alt",
+      border: "border-stroke",
+      text: "text-content-subtle",
+      dot: "bg-content-faint",
     },
   };
 
@@ -47,9 +47,12 @@
 <span
   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold select-none transition-all duration-300 {style.bg} {style.border} {style.text}"
   title={description}
+  role="img"
   aria-label={description}
 >
-  <span class="w-1.5 h-1.5 rounded-full {style.dot} transition-all duration-300"
+  <span
+    class="w-1.5 h-1.5 rounded-full {style.dot} transition-all duration-300"
+    aria-hidden="true"
   ></span>
-  <span class="capitalize">{confidence}</span>
+  <span class="capitalize" aria-hidden="true">{confidence}</span>
 </span>

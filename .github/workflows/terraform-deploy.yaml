@@ -64,11 +64,16 @@ jobs:
           AUTOMATIC_RUN_ID: ${{ github.event.workflow_run.id }}
           AUTOMATIC_SHA: ${{ github.event.workflow_run.head_sha }}
           AUTOMATIC_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          AUTOMATIC_EVENT: ${{ github.event.workflow_run.event }}
+          AUTOMATIC_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
           REQUESTED_SHA: ${{ github.event.inputs.deploy_sha }}
         run: |
           set -euo pipefail
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             [[ "$AUTOMATIC_CONCLUSION" == "success" ]] || { echo "::error::Triggering CI did not succeed"; exit 1; }
+            # The workflow_run branch filter matches head_branch, which a fork PR can also name "main".
+            [[ "$AUTOMATIC_EVENT" == "push" ]] || { echo "::error::Only main push CI runs may deploy (got $AUTOMATIC_EVENT)"; exit 1; }
+            [[ "$AUTOMATIC_HEAD_REPO" == "${{ github.repository }}" ]] || { echo "::error::Triggering CI ran on $AUTOMATIC_HEAD_REPO, not ${{ github.repository }}"; exit 1; }
             echo "ci_run_id=$AUTOMATIC_RUN_ID" >> "$GITHUB_OUTPUT"
             echo "deploy_sha=$AUTOMATIC_SHA" >> "$GITHUB_OUTPUT"
             exit 0

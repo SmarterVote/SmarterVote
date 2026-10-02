@@ -14,6 +14,8 @@
   export let selectedState: string | null;
   export let chamberSummary: ChamberForecastDetails | undefined;
   export let onClearStateFilter: () => void;
+  /** Anchor the map's "View races" control scrolls to and focuses. */
+  export let sectionId = "forecast-race-list";
 
   let filterRating = "all";
   let filterParty = "all";
@@ -59,7 +61,10 @@
 
 <!-- Active competitive/active races list -->
 <section
-  class="bg-surface border border-stroke rounded-2xl shadow-sm overflow-hidden"
+  id={sectionId}
+  tabindex="-1"
+  aria-label="Race forecasts"
+  class="card overflow-hidden scroll-mt-24 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
 >
   <ForecastRaceFilters
     {filterRating}
@@ -80,11 +85,7 @@
         No forecasts found matching the selected filters.
       </p>
       {#if selectedState || filterRating !== "all" || filterParty !== "all"}
-        <button
-          type="button"
-          on:click={clearAllFilters}
-          class="mt-3 text-xs text-blue-600 hover:underline dark:text-blue-400 font-semibold"
-        >
+        <button type="button" on:click={clearAllFilters} class="btn-ghost mt-3">
           Clear all filters
         </button>
       {/if}
@@ -92,7 +93,7 @@
   {:else}
     <!-- Responsive Card Feed -->
     <div
-      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-surface-alt/10"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-surface-alt/30"
     >
       {#each sortedRaces.slice(0, visibleRaceCount) as race (race.id)}
         <ForecastRaceCard
@@ -103,10 +104,11 @@
       {/each}
     </div>
     {#if sortedRaces.length > visibleRaceCount}
-      <div class="p-5 text-center border-t border-stroke/40 bg-surface-alt/5">
+      <div class="p-5 text-center border-t border-stroke">
         <button
+          type="button"
           on:click={() => (visibleRaceCount += 6)}
-          class="px-5 py-2.5 bg-surface hover:bg-surface-alt border border-stroke/80 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-all shadow-sm"
+          class="btn-secondary"
         >
           Show More Races ({sortedRaces.length - visibleRaceCount} remaining)
         </button>

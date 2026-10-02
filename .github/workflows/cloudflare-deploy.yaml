@@ -70,6 +70,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.verify-release.outputs.deploy_sha }}
+          # Full history so the sitemap's static-page lastmod uses real commit dates.
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -107,6 +109,21 @@ jobs:
           BUCKET_NAME="${{ vars.GCP_PROJECT_ID }}-sv-data-${ENVIRONMENT}"
           echo "Syncing published static files from gs://${BUCKET_NAME}/races/..."
           gcloud storage cp "gs://${BUCKET_NAME}/races/*.json" web/static/
+          # Published race files keep pipeline_state (the pipeline builds on it
+          # with baseline_source="published"), but the public site never reads
+          # it, agent_metrics or run_audit; drop them from the served copies.
+          node -e '
+            const fs = require("fs");
+            const skip = new Set(["summaries.json", "chamber_forecasts.json", "states-10m.json"]);
+            for (const f of fs.readdirSync("web/static")) {
+              if (!f.endsWith(".json") || skip.has(f)) continue;
+              const p = "web/static/" + f;
+              const d = JSON.parse(fs.readFileSync(p, "utf8"));
+              if (!d || typeof d !== "object" || Array.isArray(d)) continue;
+              for (const k of ["pipeline_state", "agent_metrics", "run_audit"]) delete d[k];
+              fs.writeFileSync(p, JSON.stringify(d));
+            }
+          '
 
       - name: Generate SvelteKit files
         run: npx svelte-kit sync
@@ -145,7 +162,6 @@ jobs:
           VITE_AUTH0_DOMAIN: ${{ vars.AUTH0_DOMAIN || 'dev-t37rz-ur.auth0.com' }}
           VITE_AUTH0_CLIENT_ID: ${{ vars.AUTH0_CLIENT_ID || 'KNkBhmyIGEvjkKDthMzyYe6YFevGoJIy' }} # gitleaks:allow
           VITE_AUTH0_AUDIENCE: ${{ vars.AUTH0_AUDIENCE || 'https://smartervote-api-dev/' }}
-          VITE_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ vars.GOOGLE_MAPS_API_KEY }}
           VITE_PAYMENTS_ENABLED: ${{ secrets.STRIPE_SECRET_KEY != '' && secrets.STRIPE_WEBHOOK_SECRET != '' }}
           VITE_PRERENDER_RACES: "true"

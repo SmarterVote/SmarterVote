@@ -1322,3 +1322,219 @@ async def test_check_url_accessible_accepts_an_image_from_the_range_get_fallback
 
     assert accessible is True
     assert final_url == url
+
+
+# ---------------------------------------------------------------------------
+# Audit 4 (#20, #8): thumbnails, byte sniffing, ephemeral and partisan hosts
+# ---------------------------------------------------------------------------
+
+
+class _FakeBodyResponse(_FakeHeadResponse):
+    def __init__(self, status_code, url, content_type=None, content=b""):
+        super().__init__(status_code, url, content_type)
+        self.content = content
+
+
+@pytest.mark.parametrize(
+    "content_type,body,expected",
+    [
+        # CivicEngine serves real headshots as binary/octet-stream: the bytes decide.
+        ("binary/octet-stream", b"\xff\xd8\xff\xe0\x00\x10JFIF", True),
+        ("application/octet-stream", b"\x89PNG\r\n\x1a\n\x00", True),
+        (None, b"RIFF\x00\x00\x00\x00WEBPVP8 ", True),
+        ("binary/octet-stream", b"<!DOCTYPE html><html>", False),
+        ("binary/octet-stream", b"%PDF-1.7", False),
+        # A probe that returns nothing is no evidence either way.
+        ("binary/octet-stream", b"", True),
+    ],
+)
+@pytest.mark.asyncio
+async def test_check_url_accessible_sniffs_bytes_when_the_type_is_undecided(monkeypatch, content_type, body, expected):
+    from pipeline_client.agent.images import _check_url_accessible
+
+    url = "https://cdn.civicengine.com/headshots/jane.jpg"
+    client = _FakeAccessibilityClient(
+        head=_FakeHeadResponse(200, url, content_type),
+        get=_FakeBodyResponse(206, url, content_type, body),
+    )
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, _ = await _check_url_accessible(url)
+
+    assert accessible is expected
+    assert client.get_calls == 1
+
+
+@pytest.mark.parametrize("content_type", ["application/json", "application/pdf", "video/mp4", "image/svg+xml"])
+@pytest.mark.asyncio
+async def test_check_url_accessible_rejects_non_image_types(monkeypatch, content_type):
+    from pipeline_client.agent.images import _check_url_accessible
+
+    url = "https://example.com/photos/jane-doe.jpg"
+    client = _FakeAccessibilityClient(head=_FakeHeadResponse(200, url, content_type))
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, _ = await _check_url_accessible(url)
+
+    assert accessible is False
+    assert client.get_calls == 0, "a declared non-image type needs no byte probe"
+
+
+def test_ephemeral_facebook_hosts_are_never_valid_image_urls():
+    from pipeline_client.agent.images import _is_valid_image_url
+
+    assert not _is_valid_image_url("https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=1&profile_pic.jpg")
+    assert not _is_valid_image_url("https://scontent.xx.fbsbx.com/v/t1/photo.jpg")
+    assert _is_valid_image_url("https://scontent.fbcdn.net/v/t1/photo.jpg")
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://images.ivoterguide.com/candidates/080219.jpg", True),
+        ("https://bluevoterguide.org/candimgs/TX/x.jpg", True),
+        ("https://justicedemocrats.com/wp-content/uploads/2025/10/JD26.jpg", True),
+        ("https://secure.actblue.com/img/jane.jpg", True),
+        ("https://texasgop.org/wp-content/uploads/jane.jpg", True),
+        ("https://www.nhdems.org/wp-content/uploads/jane.png", True),
+        ("https://ballotpedia.s3.amazonaws.com/images/jane.jpg", False),
+        ("https://upload.wikimedia.org/wikipedia/commons/a/ab/Jane_Doe.jpg", False),
+        ("https://janedoeforcongress.com/headshot.jpg", False),
+    ],
+)
+def test_partisan_image_hosts(url, expected):
+    from pipeline_client.agent.images import is_partisan_image_host
+
+    assert is_partisan_image_host(url) is expected
+
+
+def test_wikimedia_thumbnail_url_forms():
+    from pipeline_client.agent.images import wikimedia_thumbnail_url
+
+    original = "https://upload.wikimedia.org/wikipedia/commons/a/ab/Jane_Doe.jpg"
+    thumb = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Jane_Doe.jpg/250px-Jane_Doe.jpg"
+    assert wikimedia_thumbnail_url(original) == thumb
+    assert wikimedia_thumbnail_url(thumb.replace("250px", "1200px")) == thumb
+    assert wikimedia_thumbnail_url("https://upload.wikimedia.org/wikipedia/commons/a/ab/Logo.svg") is None
+    assert wikimedia_thumbnail_url("https://example.com/a/ab/Jane_Doe.jpg") is None
+
+
+@pytest.mark.asyncio
+async def test_resolved_wikimedia_original_is_stored_as_a_thumbnail(monkeypatch):
+    from pipeline_client.agent.images import resolve_candidate_images
+
+    original = "https://upload.wikimedia.org/wikipedia/commons/0/0b/Hill_French_119th_Congress.jpg"
+    thumb = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Hill_French_119th_Congress.jpg/250px-Hill_French_119th_Congress.jpg"
+    race = {"candidates": [{"name": "French Hill", "image_url": original}]}
+
+    async def fake_check(url: str):
+        return url in {original, thumb}, url
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("no search should run")
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+
+    await resolve_candidate_images(race, agent_loop_fn=fail_agent, model="test")
+
+    assert race["candidates"][0]["image_url"] == thumb
+
+
+@pytest.mark.asyncio
+async def test_wikimedia_original_is_kept_when_no_thumbnail_exists(monkeypatch):
+    from pipeline_client.agent.images import resolve_candidate_images
+
+    original = "https://upload.wikimedia.org/wikipedia/commons/0/0b/Hill_French_119th_Congress.jpg"
+    race = {"candidates": [{"name": "French Hill", "image_url": original}]}
+
+    async def fake_check(url: str):
+        return url == original, url
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("no search should run")
+
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+
+    await resolve_candidate_images(race, agent_loop_fn=fail_agent, model="test")
+
+    assert race["candidates"][0]["image_url"] == original
+
+
+def _stub_lookups(monkeypatch, *, ballotpedia=None, wikipedia=None, page=None, serper=None):
+    async def fake_ballotpedia(name, state=None):
+        return ballotpedia
+
+    async def fake_wikipedia(name, context=""):
+        return wikipedia
+
+    async def fake_page(candidate):
+        return page
+
+    async def fake_serper(name, context=None, run_budget=None):
+        return serper
+
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_wikipedia_image", fake_wikipedia)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_known_page_image", fake_page)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_serper_image", fake_serper)
+
+
+@pytest.mark.asyncio
+async def test_partisan_hosted_photo_is_replaced_by_a_neutral_one(monkeypatch):
+    partisan = "https://images.ivoterguide.com/candidates/080219.jpg"
+    neutral = "https://ballotpedia.s3.amazonaws.com/images/thumb/Lynn_Chapman.jpg"
+    candidate = {"name": "Lynn Chapman", "image_url": partisan}
+
+    async def fake_check(url: str):
+        return True, url
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("agent search should not run")
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+    _stub_lookups(monkeypatch, ballotpedia=neutral)
+
+    await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
+
+    assert candidate["image_url"] == neutral
+
+
+@pytest.mark.asyncio
+async def test_partisan_hosted_photo_is_kept_when_nothing_neutral_exists(monkeypatch):
+    partisan = "https://images.ivoterguide.com/candidates/080219.jpg"
+    candidate = {"name": "Lynn Chapman", "image_url": partisan}
+
+    async def fake_check(url: str):
+        return True, url
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("the partisan fallback should be used before a paid agent search")
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+    _stub_lookups(monkeypatch)
+
+    await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
+
+    assert candidate["image_url"] == partisan
+
+
+@pytest.mark.asyncio
+async def test_partisan_serper_hit_does_not_beat_a_later_fallback_order(monkeypatch):
+    """A partisan Serper result is held back; with nothing better it is still used."""
+    partisan = "https://bluevoterguide.org/candimgs/TX/TX_id389694.jpg"
+    candidate = {"name": "Heli Rodriguez Prilliman", "image_url": None}
+
+    async def fake_check(url: str):
+        return True, url
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("agent search should not run")
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+    _stub_lookups(monkeypatch, serper=partisan)
+
+    await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
+
+    assert candidate["image_url"] == partisan

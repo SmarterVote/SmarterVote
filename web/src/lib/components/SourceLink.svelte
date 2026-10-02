@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Source } from "../types";
   import { isExternalUrl } from "$lib/utils/url";
+  import { sourceHostname } from "$lib/utils/racePage";
 
   export let source: Source;
   export let text: string | undefined = undefined;
@@ -8,17 +9,7 @@
   // Only allow valid http/https URLs to prevent javascript: XSS and prerender crawler crashes.
   $: safeUrl = isExternalUrl(source.url) ? source.url.trim() : undefined;
 
-  // Extract domain from URL for display
-  $: domain = getDomain(source.url);
-
-  function getDomain(url: string): string {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname.replace("www.", "");
-    } catch {
-      return url;
-    }
-  }
+  $: domain = sourceHostname(source.url);
 </script>
 
 {#if safeUrl}
@@ -26,12 +17,13 @@
     href={safeUrl}
     target="_blank"
     rel="noopener noreferrer"
-    class="inline-flex min-h-8 items-center gap-1 py-1 text-blue-600 hover:text-blue-500 dark:hover:text-blue-400 text-xs sm:text-sm underline"
+    class="inline-flex min-h-8 items-center gap-1 py-1 text-primary hover:no-underline text-xs sm:text-sm underline"
     title="{source.title || text || domain} - Open in new tab"
   >
     <span>{text || source.title || domain}</span>
     <svg
       class="w-3 h-3 flex-shrink-0"
+      aria-hidden="true"
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"

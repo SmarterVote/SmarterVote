@@ -14,6 +14,8 @@ import {
   parseForecastTab,
   groupSeatDistribution,
   normalizeForecastParty,
+  forecastWinnerParty,
+  getRaceState,
   raceHref,
   resolveControlParty,
   sortForecastRaces,
@@ -39,20 +41,98 @@ describe("forecast utilities", () => {
       normalizeForecastParty(null, { Democratic: 0.45, Republican: 0.55 }),
     ).toBe("Republican");
 
-    // Null party with candidate incumbent fallback
+    // The incumbent's party is not a forecast: with no party or probability
+    // data the winner is unknown, which this display wrapper buckets as Other.
     expect(
       normalizeForecastParty(null, null, [
         { name: "Alice", party: "Democratic", incumbent: true },
       ]),
-    ).toBe("Democratic");
+    ).toBe("Other");
     expect(
       normalizeForecastParty(null, null, [
         { name: "Bob", party: "Republican", incumbent: true },
       ]),
-    ).toBe("Republican");
+    ).toBe("Other");
 
-    // No probabilities, no incumbent, should fallback to Other
     expect(normalizeForecastParty(null)).toBe("Other");
+  });
+
+  it("never folds a favored non-major party into Democratic or Republican", () => {
+    expect(normalizeForecastParty("Independent")).toBe("Other");
+    expect(forecastWinnerParty("Independent")).toBe("Other");
+    expect(
+      forecastWinnerParty(null, {
+        Independent: 0.55,
+        Republican: 0.35,
+        Democratic: 0.1,
+      }),
+    ).toBe("Other");
+    expect(
+      forecastWinnerParty("Unknown", { Democratic: 0.2, Republican: 0.8 }),
+    ).toBe("Republican");
+    expect(forecastWinnerParty(null, null)).toBeNull();
+    expect(
+      forecastWinnerParty("", { Democratic: 0.5, Republican: 0.5 }),
+    ).toBeNull();
+  });
+
+  it("counts a favored independent as Other and credits partyless forecasts to the seat holder", () => {
+    const base = {
+      office: "U.S. Senate",
+      election_date: "2026-11-03",
+      updated_utc: "2026-06-20T00:00:00Z",
+      candidates: [{ name: "Inc", party: "Republican", incumbent: true }],
+    };
+    const aggregate = aggregateForecasts(
+      [
+        {
+          ...base,
+          id: "ne-senate-2026",
+          title: "Nebraska Senate",
+          forecast: {
+            rating: "other",
+            predicted_winner_party: "Independent",
+            party_probabilities: { Independent: 0.52, Republican: 0.48 },
+          },
+        } as unknown as RaceSummary,
+        {
+          ...base,
+          id: "tx-senate-2026",
+          state: "TX",
+          title: "Texas Senate",
+          forecast: { rating: "tossup" },
+        } as unknown as RaceSummary,
+      ],
+      "senate",
+    );
+    const fromHoldovers = aggregateForecasts([], "senate").projected;
+    expect(aggregate.uncountedForecasts).toBe(0);
+    expect(aggregate.races).toHaveLength(2);
+    expect(aggregate.projected.Other).toBe((fromHoldovers.Other ?? 0) + 1);
+    // The Texas toss-up names no party, so — like an unforecasted race and like
+    // shared/forecast_summary.py — the seat counts for its current holder. The
+    // Independent favorite is never folded into the Republican count.
+    expect(aggregate.projected.Republican).toBe(
+      (fromHoldovers.Republican ?? 0) + 1,
+    );
+  });
+
+  it("canonicalizes abbreviated race states", () => {
+    expect(
+      getRaceState({
+        ...baseRace,
+        id: "x",
+        title: "T",
+        state: "TX",
+      } as RaceSummary),
+    ).toBe("Texas");
+    expect(
+      getRaceState({
+        ...baseRace,
+        id: "tx-senate-2026",
+        title: "T",
+      } as RaceSummary),
+    ).toBe("Texas");
   });
 
   it("classifies race offices", () => {
@@ -219,13 +299,34 @@ describe("forecast utilities", () => {
       ).toBe("Democratic");
     });
 
-    it("resolves a Senate 50-50 projection to Republican via VP tie-break", () => {
+    it("resolves a Senate 50-50 projection via the data's VP tie-break party", () => {
+      const tiedAggregate = {
+        ...aggregate,
+        projected: { Democratic: 50, Republican: 50, Other: 0 },
+      };
+      expect(
+        resolveControlParty(
+          "senate",
+          { vp_tiebreak_party: "Democratic" } as never,
+          tiedAggregate,
+        ),
+      ).toBe("Democratic");
+      expect(
+        resolveControlParty(
+          "senate",
+          { vp_tiebreak_party: "Republican" } as never,
+          tiedAggregate,
+        ),
+      ).toBe("Republican");
+    });
+
+    it("leaves a Senate 50-50 undetermined when the tie-break party is unknown", () => {
       const tiedAggregate = {
         ...aggregate,
         projected: { Democratic: 50, Republican: 50, Other: 0 },
       };
       expect(resolveControlParty("senate", undefined, tiedAggregate)).toBe(
-        "Republican",
+        "Other",
       );
     });
 
@@ -640,5 +741,32 @@ describe("forecast utilities", () => {
       );
       expect(sorted).toEqual(FORECAST_RATING_ORDER);
     });
+  });
+});
+
+describe("isUncontestedForecastRace", () => {
+  const base = {
+    candidates: [
+      { name: "A", party: "Democratic", incumbent: true },
+      { name: "B", party: "Republican", incumbent: false },
+    ],
+  };
+  it("flags the uncontested stage and single-candidate generals", async () => {
+    const { isUncontestedForecastRace } = await import("./forecast");
+    expect(
+      isUncontestedForecastRace({ ...base, contest_stage: "uncontested" }),
+    ).toBe(true);
+    expect(
+      isUncontestedForecastRace({
+        candidates: [base.candidates[0]],
+        contest_stage: "post_primary_general",
+      }),
+    ).toBe(true);
+    expect(
+      isUncontestedForecastRace({
+        ...base,
+        contest_stage: "post_primary_general",
+      }),
+    ).toBe(false);
   });
 });
