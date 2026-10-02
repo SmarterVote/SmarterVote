@@ -312,3 +312,21 @@ def test_apply_finance_patch_ignores_falsy_string_fields():
 
     assert race_json["candidates"][0]["donor_summary"] == "existing"
     assert "voting_summary" not in race_json["candidates"][0]
+
+
+def test_apply_finance_patch_warns_when_no_candidate_matches():
+    log = _log()
+    race_json = {"candidates": [{"name": "Jane Doe"}]}
+
+    _apply_finance_patch(race_json, {"Jane Q. Doe": {"donor_summary": "Raised $1M."}}, log)
+
+    assert "donor_summary" not in race_json["candidates"][0]
+    level, message = log.call_args.args
+    assert level == "warning"
+    assert "updated 0 candidates" in message and "Jane Q. Doe" in message
+
+
+def test_apply_finance_patch_logs_info_when_candidates_updated():
+    log = _log()
+    _apply_finance_patch({"candidates": [{"name": "Jane Doe"}]}, {"Jane Doe": {"donor_summary": "x"}}, log)
+    assert log.call_args.args[0] == "info"

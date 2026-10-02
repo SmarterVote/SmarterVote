@@ -12,6 +12,11 @@ from shared.config import FIRESTORE_RACE_RUNS_SUBCOLLECTION, FIRESTORE_RACES_COL
 router = APIRouter()
 
 
+def _run_belongs_to_race(run_data: Dict[str, Any], race_id: str) -> bool:
+    """A canonical pipeline_runs doc is only addressable under its own race's path."""
+    return str(run_data.get("race_id") or "") == race_id
+
+
 @router.get("/api/races/{race_id}/runs", dependencies=[Depends(verify_token)])
 def list_race_runs(race_id: str, limit: int = 20) -> Dict[str, Any]:
     """List archived and canonical runs for a specific race from Firestore."""
@@ -56,7 +61,7 @@ def get_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
     db = firestore_helpers._get_fs()
     doc = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).get()
     data = firestore_helpers._doc_to_plain(doc)
-    if data:
+    if data and _run_belongs_to_race(data, race_id):
         return data
     doc = (
         db.collection(FIRESTORE_RACES_COLLECTION)
@@ -78,7 +83,7 @@ def delete_race_run(race_id: str, run_id: str) -> Dict[str, Any]:
     db = firestore_helpers._get_fs()
     run_ref = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id)
     run_doc = run_ref.get()
-    if run_doc.exists:
+    if run_doc.exists and _run_belongs_to_race(run_doc.to_dict() or {}, race_id):
         status = (run_doc.to_dict() or {}).get("status", "")
         if status in ("pending", "running"):
             from routers.runs import _cancel_active_run

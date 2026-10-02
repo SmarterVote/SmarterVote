@@ -258,7 +258,7 @@ describe("fetchWithAuth timeout policy", () => {
 
   // Pipeline work legitimately runs for hours; a 30s abort would kill it.
   it.each([
-    ["https://api.test/runs/run-1", {}],
+    ["https://api.test/runs/run-1/cancel", { method: "POST" }],
     ["https://api.test/api/races/queue", {}],
     ["https://api.test/races/x/continue", {}],
     ["https://api.test/races/x/run", { method: "POST" }],
@@ -279,11 +279,27 @@ describe("fetchWithAuth timeout policy", () => {
     expect(requestInit?.signal?.aborted).toBe(false);
   });
 
+  it("applies the default timeout to a plain GET of run details", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", hangingFetch());
+
+    const pending = fetchWithAuth("https://api.test/runs/run-1");
+    const assertion = expect(pending).rejects.toThrow(
+      "Request timed out after 30 seconds: GET https://api.test/runs/run-1",
+    );
+    await vi.advanceTimersByTimeAsync(30000);
+    await assertion;
+  });
+
   it("treats an explicit timeout as authoritative even for long operations", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("fetch", hangingFetch());
 
-    const pending = fetchWithAuth("https://api.test/runs/run-1", {}, 1000);
+    const pending = fetchWithAuth(
+      "https://api.test/runs/run-1/cancel",
+      { method: "POST" },
+      1000,
+    );
     const assertion = expect(pending).rejects.toThrow("Request timed out");
     await vi.advanceTimersByTimeAsync(1000);
     await assertion;
@@ -355,16 +371,18 @@ describe("fetchWithAuth untimed (long-running) request paths", () => {
     const response = { ok: true, status: 200 } as Response;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).resolves.toBe(
-      response,
-    );
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).resolves.toBe(response);
   });
 
   it("reports a network failure when no timer was armed", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("socket died")));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).rejects.toThrow(
-      "Network request failed: GET https://api.test/runs/run-1. socket died",
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).rejects.toThrow(
+      "Network request failed: GET https://api.test/api/races/queue. socket died",
     );
   });
 
@@ -373,8 +391,10 @@ describe("fetchWithAuth untimed (long-running) request paths", () => {
     aborted.name = "AbortError";
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(aborted));
 
-    await expect(fetchWithAuth("https://api.test/runs/run-1")).rejects.toThrow(
-      "Request timed out due to abort signal: GET https://api.test/runs/run-1",
+    await expect(
+      fetchWithAuth("https://api.test/api/races/queue"),
+    ).rejects.toThrow(
+      "Request timed out due to abort signal: GET https://api.test/api/races/queue",
     );
   });
 });

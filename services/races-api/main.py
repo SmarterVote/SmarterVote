@@ -215,6 +215,11 @@ def public_race_view(race_data: dict) -> dict:
     return {key: value for key, value in race_data.items() if key not in PUBLIC_RACE_INTERNAL_FIELDS}
 
 
+# These race endpoints require Authorization (verify_token), so shared caches
+# (CDNs, proxies) must never store or replay their responses.
+_AUTHENTICATED_CACHE_CONTROL = "private, no-store"
+
+
 # ---------------------------------------------------------------------------
 # Health endpoints
 # ---------------------------------------------------------------------------
@@ -237,7 +242,7 @@ def readiness():
 @limiter.limit("60/minute")
 def list_races(request: Request, response: Response) -> List[str]:
     """List available race IDs."""
-    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Cache-Control"] = _AUTHENTICATED_CACHE_CONTROL
     return publish_service.get_published_races()
 
 
@@ -245,7 +250,7 @@ def list_races(request: Request, response: Response) -> List[str]:
 @limiter.limit("30/minute")
 def get_race_summaries(request: Request, response: Response) -> List[schemas.RaceSummary]:
     """Get summaries of all races for search and listing."""
-    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Cache-Control"] = _AUTHENTICATED_CACHE_CONTROL
     return publish_service.get_race_summaries()
 
 
@@ -256,7 +261,7 @@ def get_chamber_forecasts(request: Request, response: Response):
     data = publish_service.get_chamber_forecasts_data()
     if not data:
         raise HTTPException(status_code=404, detail="Chamber forecasts not found")
-    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Cache-Control"] = _AUTHENTICATED_CACHE_CONTROL
     return data
 
 
@@ -270,7 +275,7 @@ def get_race(request: Request, response: Response, race_id: str):
     race_data = publish_service.get_race_data(race_id)
     if not race_data:
         raise HTTPException(status_code=404, detail="Race not found")
-    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers["Cache-Control"] = _AUTHENTICATED_CACHE_CONTROL
     return public_race_view(race_data)
 
 

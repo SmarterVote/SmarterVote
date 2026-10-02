@@ -5,6 +5,7 @@ Auth is bypassed by patching `verify_token` to return an empty dict.
 """
 
 import asyncio
+import json
 import os
 
 # ---------------------------------------------------------------------------
@@ -1244,6 +1245,8 @@ def test_queue_multiple_races_creates_independent_queue_items():
     def _race_document(race_id):
         ref = MagicMock()
         ref.set.side_effect = lambda data, **_kw: race_updates.__setitem__(race_id, data)
+        # A missing race doc is claimed atomically with create().
+        ref.create.side_effect = lambda data, **_kw: race_updates.__setitem__(race_id, data)
         return ref
 
     coll_races = MagicMock()
@@ -1429,7 +1432,10 @@ def test_queue_allows_requeue_when_running_status_is_stale_terminal_run():
     assert body["errors"] == []
     updates = [c.args for c in mock_update.call_args_list]
     assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "draft" for args in updates)
-    assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "queued" for args in updates)
+    # The queued claim is a conditional (last_update_time) write on the race doc.
+    claim = running_ref.update.call_args
+    assert claim.args[0]["status"] == "queued"
+    assert "option" in claim.kwargs
 
 
 def test_single_race_run_rejects_already_running_race():
@@ -1545,7 +1551,10 @@ def test_single_race_run_allows_when_running_status_is_stale_terminal_run():
     assert resp.json()["status"] == "queued"
     updates = [c.args for c in mock_update.call_args_list]
     assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "draft" for args in updates)
-    assert any(args[0] == "ar-senate-2026" and args[1].get("status") == "queued" for args in updates)
+    # The queued claim is a conditional (last_update_time) write on the race doc.
+    claim = running_ref.update.call_args
+    assert claim.args[0]["status"] == "queued"
+    assert "option" in claim.kwargs
 
 
 def test_run_options_accept_cloud_function_review_fields():
@@ -1556,17 +1565,18 @@ def test_run_options_accept_cloud_function_review_fields():
         cheap_mode=False,
         save_artifact=True,
         enabled_steps=["review", "iteration"],
-        research_model="gpt-test",
-        claude_model="claude-test",
-        gemini_model="gemini-test",
-        grok_model="grok-test",
+        # Model fields are validated against shared/model_catalog.py.
+        research_model="deepseek/deepseek-v4.1-flash",
+        claude_model="anthropic/claude-haiku-4.5",
+        gemini_model="google/gemini-3.5-flash-lite",
+        grok_model="x-ai/grok-4.3",
         review_providers=[" claude ", "gemini", "claude"],
     )
 
     dumped = opts.model_dump(exclude_none=True)
     assert dumped["save_artifact"] is True
-    assert dumped["gemini_model"] == "gemini-test"
-    assert dumped["grok_model"] == "grok-test"
+    assert dumped["gemini_model"] == "google/gemini-3.5-flash-lite"
+    assert dumped["grok_model"] == "x-ai/grok-4.3"
     assert dumped["review_providers"] == ["claude", "gemini"]
 
 
@@ -4528,3 +4538,229 @@ def test_list_runs_caches_static_legacy_run_set_between_polls():
     assert [r["run_id"] for r in second["runs"]] == ["run-new", "run-legacy"]
     assert calls["started_at"] == 1  # legacy docs read once, not every poll
     runs_router._invalidate_legacy_runs_cache()
+
+
+# ---------------------------------------------------------------------------
+# Audit regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_race_id_validation_rejects_trailing_newline():
+    from fastapi import HTTPException
+    from pydantic import ValidationError
+    from request_models import RepairPlanRequest, validate_race_id
+
+    validate_race_id("ga-senate-2026")
+    with pytest.raises(HTTPException):
+        validate_race_id("ga-senate-2026\n")
+    with pytest.raises(ValidationError):
+        RepairPlanRequest(race_ids=["ga-senate-2026\nx"])
+    # RepairPlanRequest strips whitespace first, so check the shared regex directly too.
+    from request_models import _RACE_ID_RE
+
+    assert _RACE_ID_RE.fullmatch("ga-senate-2026\n") is None
+
+
+def test_batch_requests_cap_race_id_count():
+    from pydantic import ValidationError
+    from request_models import MAX_BATCH_RACE_IDS, BatchPublishRequest, RaceQueueRequest
+
+    ids = [f"race-{i}" for i in range(MAX_BATCH_RACE_IDS)]
+    assert len(BatchPublishRequest(race_ids=ids).race_ids) == MAX_BATCH_RACE_IDS
+    assert len(RaceQueueRequest(race_ids=ids).race_ids) == MAX_BATCH_RACE_IDS
+    with pytest.raises(ValidationError):
+        BatchPublishRequest(race_ids=ids + ["one-too-many"])
+    with pytest.raises(ValidationError):
+        RaceQueueRequest(race_ids=ids + ["one-too-many"])
+
+
+def _draft_blob_bucket(blob):
+    bucket = MagicMock()
+    bucket.blob.return_value = blob
+    client = MagicMock()
+    client.bucket.return_value = bucket
+    return client
+
+
+def test_publish_draft_delete_is_pinned_to_read_generation(monkeypatch):
+    draft = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    blob = MagicMock()
+    blob.generation = 42
+    blob.download_as_text.return_value = json.dumps(draft)
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is True
+    blob.download_as_text.assert_called_once_with(if_generation_match=42)
+    blob.delete.assert_called_once_with(if_generation_match=42)
+
+
+def test_publish_keeps_newer_draft_written_concurrently(monkeypatch):
+    from google.api_core.exceptions import PreconditionFailed
+
+    draft = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    newer = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}, {"name": "Bob"}]}
+    blob = MagicMock()
+    blob.generation = 7
+    blob.download_as_text.return_value = json.dumps(newer)
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    # Content changed since the publish read it: the newer draft must survive.
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is False
+    blob.delete.assert_not_called()
+
+    # Draft replaced between the re-read and the delete: precondition protects it.
+    blob.download_as_text.return_value = json.dumps(draft)
+    blob.delete.side_effect = PreconditionFailed("generation mismatch")
+    assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is False
+
+    with (
+        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_put_race_json", return_value=True),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        assert gcs_helpers.publish_race_to_gcs("ga-senate-2026", draft) is False
+    assert "draft_updated_at" not in mock_update.call_args.args[1]
+
+
+def test_gcs_get_race_json_only_treats_not_found_as_missing(monkeypatch):
+    from google.api_core.exceptions import NotFound, ServiceUnavailable
+
+    blob = MagicMock()
+    blob.exists.return_value = True
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: _draft_blob_bucket(blob))
+
+    blob.download_as_text.side_effect = NotFound("gone")
+    assert gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts") is None
+
+    blob.download_as_text.side_effect = ServiceUnavailable("transient")
+    with pytest.raises(ServiceUnavailable):
+        gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts")
+
+
+def test_publish_still_updates_catalog_when_summaries_index_fails():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    draft_json = {"id": "ar-senate-2026", "title": "Arkansas Senate 2026", "candidates": [{"name": "Alice"}]}
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
+        patch("gcs_helpers._publish_race_gcs", return_value=True),
+        patch("gcs_helpers.update_gcs_summaries_json", side_effect=RuntimeError("index conflict")),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+        patch("routers.races_admin.drafts._clear_public_race_cache") as mock_clear,
+    ):
+        tc = TestClient(app_module.app)
+        single = tc.post("/api/races/ar-senate-2026/publish")
+        batch = tc.post("/api/races/publish", json={"race_ids": ["ar-senate-2026"]})
+
+    assert single.status_code == 502
+    assert single.json()["detail"]["published"] == ["ar-senate-2026"]
+    assert "RuntimeError" in single.json()["detail"]["summaries_error"]
+    assert batch.status_code == 200
+    assert batch.json()["published"] == ["ar-senate-2026"]
+    assert "RuntimeError" in batch.json()["summaries_error"]
+    assert [c.args[1]["status"] for c in mock_update.call_args_list] == ["published", "published"]
+    assert mock_clear.call_count == 2
+
+
+def test_restore_version_keeps_published_race_published():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    version = {"id": "ga-senate-2026", "updated_utc": "2026-05-01T00:00:00Z", "candidates": [{"name": "Alice"}]}
+    source = MagicMock()
+    source.exists.return_value = True
+    source.download_as_text.return_value = json.dumps(version)
+    bucket = MagicMock()
+    bucket.blob.return_value = source
+    client = MagicMock()
+    client.bucket.return_value = bucket
+
+    def fake_get(_race_id, prefix):
+        return {"id": "ga-senate-2026"} if prefix == "races" else None
+
+    with (
+        patch("gcs_helpers._GCS_BUCKET", "bucket"),
+        patch("gcs_helpers._get_gcs_admin", return_value=client),
+        patch("gcs_helpers._gcs_get_race_json", side_effect=fake_get),
+        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_put_race_json", return_value=True),
+        patch("firestore_helpers._fs_update_race") as mock_update,
+    ):
+        resp = TestClient(app_module.app).post("/api/races/ga-senate-2026/versions/20260501T000000Z-published.json/restore")
+
+    assert resp.status_code == 200
+    update = mock_update.call_args.args[1]
+    assert update["status"] == "published"
+    assert "published_at" not in update
+
+
+def test_claim_race_for_run_rejects_concurrent_claim():
+    """Losing a create()/update-time race re-reads and reports the winner's status."""
+    from google.api_core.exceptions import AlreadyExists
+
+    race_ref = MagicMock()
+    race_ref.get.side_effect = [
+        _make_missing_doc_ref().get(),
+        _make_existing_doc({"status": "queued", "current_run_id": "run-other"}),
+    ]
+    race_ref.create.side_effect = AlreadyExists("created concurrently")
+    db = MagicMock()
+    db.collection.return_value.document.return_value = race_ref
+
+    assert firestore_helpers._claim_race_for_run(db, "ga-senate-2026", "run-mine") == "Race is already queued"
+    race_ref.update.assert_not_called()
+
+
+def test_claim_race_for_run_rereads_after_update_time_conflict():
+    from google.api_core.exceptions import FailedPrecondition
+
+    race_ref = MagicMock()
+    race_ref.get.side_effect = [
+        _make_existing_doc({"status": "draft"}),
+        _make_existing_doc({"status": "queued", "current_run_id": "run-other"}),
+    ]
+    race_ref.update.side_effect = FailedPrecondition("update_time mismatch")
+    db = MagicMock()
+    db.collection.return_value.document.return_value = race_ref
+
+    assert firestore_helpers._claim_race_for_run(db, "ga-senate-2026", "run-mine") == "Race is already queued"
+    assert race_ref.update.call_count == 1
+    assert "option" in race_ref.update.call_args.kwargs
+
+
+def test_race_run_endpoints_reject_run_from_another_race():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    run_doc = _make_existing_doc({"run_id": "run-1", "race_id": "ga-senate-2026", "status": "completed"})
+    run_ref = MagicMock()
+    run_ref.get.return_value = run_doc
+    runs_coll = MagicMock()
+    runs_coll.document.return_value = run_ref
+    races_coll = MagicMock()
+    races_coll.document.return_value.collection.return_value.document.return_value = _make_missing_doc_ref()
+    db = MagicMock()
+    db.collection.side_effect = lambda name: runs_coll if name == "pipeline_runs" else races_coll
+
+    with patch("firestore_helpers._get_fs", return_value=db):
+        tc = TestClient(app_module.app)
+        get_resp = tc.get("/api/races/az-senate-2026/runs/run-1")
+        delete_resp = tc.delete("/api/races/az-senate-2026/runs/run-1")
+
+    assert get_resp.status_code == 404
+    assert delete_resp.status_code == 404
+    run_ref.delete.assert_not_called()

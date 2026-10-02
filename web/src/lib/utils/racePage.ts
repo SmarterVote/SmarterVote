@@ -469,7 +469,7 @@ export function candidateForecastProbability(
     forecast.predicted_winner_name &&
     forecast.predicted_winner_name === candidate.name
   ) {
-    return forecast.win_probability;
+    return forecast.win_probability ?? undefined;
   }
   const bucket = partyBucket(candidate.party);
   if (!bucket) return undefined;
