@@ -26,10 +26,19 @@ class HandoffTriggered(Exception):
     one-shot Cloud Run Jobs and the long-lived local Docker worker.
     """
 
-    def __init__(self, continuation_item_id: str, remaining_steps: List[str], continuation_run_id: str | None = None):
+    def __init__(
+        self,
+        continuation_item_id: str,
+        remaining_steps: List[str],
+        continuation_run_id: str | None = None,
+        checkpoint_data: Optional[Dict[str, Any]] = None,
+    ):
         self.continuation_item_id = continuation_item_id
         self.remaining_steps = remaining_steps
         self.continuation_run_id = continuation_run_id
+        # In-memory copy of the handoff checkpoint, so an in-process follower
+        # never loses completed steps when the GCS checkpoint couldn't be written.
+        self.checkpoint_data = checkpoint_data
         super().__init__(f"Handoff to continuation item {continuation_item_id}")
 
 
@@ -266,12 +275,18 @@ class AgentHandler:
                 return
             try:
                 from pipeline_client.backend.firestore_logger import _get_db
+                from pipeline_client.backend.queue_processor import lease_lost
 
+                if lease_lost(queue_item_id):
+                    raise AgentCancelled(f"Run {run_id or ''} for {race_id} lost its queue lease")
                 db = _get_db()
                 if db is None:
                     return
                 doc = db.collection(FIRESTORE_QUEUE_COLLECTION).document(queue_item_id).get()
-                if doc.exists and (doc.to_dict() or {}).get("status") == "cancelled":
+                # A force-removed (deleted) queue item is a cancellation too.
+                if not getattr(doc, "exists", False):
+                    raise AgentCancelled(f"Run {run_id or ''} for {race_id} was removed from the queue")
+                if (doc.to_dict() or {}).get("status") == "cancelled":
                     raise AgentCancelled(f"Run {run_id or ''} for {race_id} was cancelled")
             except AgentCancelled:
                 raise
@@ -556,7 +571,7 @@ class AgentHandler:
             # (race_json is captured from the enclosing scope at handoff time)
             try:
                 gcs_bucket = settings.gcs_bucket
-                if gcs_bucket and race_json_holder:
+                if gcs_bucket and race_json_holder[0] is not None:
                     client = self._get_storage_client()
                     if client:
                         path = f"{GCS_CHECKPOINTS_PREFIX}/{current_run_id}.json"
@@ -642,7 +657,11 @@ class AgentHandler:
             if _fs_logger:
                 _fs_logger.mark_handoff(item_id, duration_ms=int((time.perf_counter() - t0) * 1000))
 
-            raise HandoffTriggered(item_id, remaining, continuation_run_id)
+            if checkpoint_gcs_path is None and race_json_holder[0] is not None:
+                logger.warning(
+                    "Continuation %s has no persisted checkpoint; passing in-memory race data to the follower", item_id
+                )
+            raise HandoffTriggered(item_id, remaining, continuation_run_id, checkpoint_data=race_json_holder[0])
 
         # Mutable holder so _trigger_handoff can read the latest race_json
         # (which is only known after run_agent returns, but we need the ref

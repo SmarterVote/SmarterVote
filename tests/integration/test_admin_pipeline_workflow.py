@@ -28,6 +28,9 @@ def test_admin_queue_failure_retry_and_publish_is_local_only(monkeypatch):
 
     race_ref = MagicMock()
     race_ref.get.side_effect = lambda: _snapshot(race_state or None)
+    # Queueing claims the race with a conditional create()/update() on its doc.
+    race_ref.create.side_effect = lambda fields: race_state.update(fields)
+    race_ref.update.side_effect = lambda fields, **_kw: race_state.update(fields)
 
     def queue_ref_for(_item_id: str) -> MagicMock:
         ref = MagicMock()

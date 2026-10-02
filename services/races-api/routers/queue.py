@@ -57,6 +57,15 @@ def _dispatch_if_cloud_run(db: Any, item: Dict[str, Any]) -> Dict[str, Any] | No
         raise RuntimeError(error) from exc
 
 
+def _enqueue_claimed_item(db: Any, item: Dict[str, Any]) -> None:
+    """Write the queue doc for a race already claimed; release the claim on failure."""
+    try:
+        db.collection(FIRESTORE_QUEUE_COLLECTION).document(str(item["id"])).set(item)
+    except Exception:
+        firestore_helpers._settle_race_after_run_stop(db, str(item["race_id"]), str(item["run_id"]), "idle")
+        raise
+
+
 def _current_run_is_terminal_or_missing(db: Any, run_id: str) -> bool:
     try:
         run_doc = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).get()
@@ -242,16 +251,15 @@ def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
             assert_race_admitted(db, race_id, "queue")
             from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
 
-            race_doc = db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).get()
-            if getattr(race_doc, "exists", False) is True:
-                race_data = race_doc.to_dict() or {}
-                race_data = _self_heal_stale_active_race(db, race_id, race_data)
-                if race_data.get("status") in ("queued", "running"):
-                    errors.append({"race_id": race_id, "error": f"Race is already {race_data.get('status')}"})
-                    continue
-
             item_id = str(uuid.uuid4())
             run_id = str(uuid.uuid4())
+            # Atomic check-and-claim so concurrent requests cannot enqueue duplicate paid runs.
+            blocked = firestore_helpers._claim_race_for_run(
+                db, race_id, run_id, heal=lambda data, rid=race_id: _self_heal_stale_active_race(db, rid, data)
+            )
+            if blocked:
+                errors.append({"race_id": race_id, "error": blocked})
+                continue
             item = {
                 "id": item_id,
                 "race_id": race_id,
@@ -262,8 +270,7 @@ def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
                 "runner": (options or {}).get("runner") or _default_runner(),
                 "created_at": SERVER_TIMESTAMP,
             }
-            db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id).set(item)
-            firestore_helpers._fs_update_race(race_id, {"status": "queued", "current_run_id": run_id})
+            _enqueue_claimed_item(db, item)
             dispatch = _dispatch_if_cloud_run(db, item)
             added.append(
                 {

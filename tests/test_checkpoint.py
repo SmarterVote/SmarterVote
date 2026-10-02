@@ -506,3 +506,69 @@ async def test_no_handoff_when_deadline_in_future():
         result = await handler.handle(payload, options)
 
     assert result["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_handoff_carries_in_memory_checkpoint_when_gcs_upload_fails():
+    """A failed GCS checkpoint upload must not drop completed work for the in-process follower."""
+    from pipeline_client.backend.handlers.agent import AgentHandler
+
+    handler = AgentHandler()
+    latest_race_json = {"id": "az-01-senate-2026", "candidates": [{"name": "Alice"}]}
+    options = {"run_id": "run-ckfail", "deadline_at": time.time() - 10.0, "enabled_steps": ["discovery", "issues"]}
+
+    queue_doc_ref = MagicMock()
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.return_value = queue_doc_ref
+    mock_storage_client = MagicMock()
+    mock_storage_client.bucket.return_value.blob.return_value.upload_from_string.side_effect = RuntimeError("gcs down")
+
+    with (
+        patch(
+            "pipeline_client.agent.agent.run_agent",
+            side_effect=_make_run_agent_calling_tracker("discovery", race_json=latest_race_json),
+        ),
+        patch.object(handler, "_save_draft", new_callable=AsyncMock),
+        patch.object(handler, "_get_storage_client", return_value=mock_storage_client),
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+        patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
+        patch("pipeline_client.backend.settings.settings.gcs_bucket", "test-bucket"),
+    ):
+        with pytest.raises(HandoffTriggered) as exc_info:
+            await handler.handle({"race_id": "az-01-senate-2026"}, options)
+
+    assert queue_doc_ref.set.call_args.args[0]["existing_data_gcs_path"] is None
+    assert exc_info.value.checkpoint_data == latest_race_json
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lost_lease", [False, True])
+async def test_deleted_queue_item_or_lost_lease_cancels_run(lost_lease):
+    """A force-removed queue doc (or a lost worker lease) must stop the agent at the next step."""
+    from pipeline_client.backend import queue_processor as qp
+    from pipeline_client.backend.handlers.agent import AgentCancelled, AgentHandler
+
+    handler = AgentHandler()
+    queue_doc = MagicMock()
+    queue_doc.exists = lost_lease  # deleted doc unless the lease flag is the trigger
+    queue_doc.to_dict.return_value = {"status": "running"}
+    mock_db = MagicMock()
+    mock_db.collection.return_value.document.return_value.get.return_value = queue_doc
+    if lost_lease:
+        qp._LOST_LEASE_ITEMS.add("queue-gone")
+
+    try:
+        with (
+            patch("pipeline_client.agent.agent.run_agent", side_effect=_make_run_agent_calling_tracker("discovery")),
+            patch.object(handler, "_save_draft", new_callable=AsyncMock) as save_draft,
+            patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+            patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
+        ):
+            with pytest.raises(AgentCancelled):
+                await handler.handle(
+                    {"race_id": "az-01-senate-2026"},
+                    {"run_id": "run-gone", "queue_item_id": "queue-gone", "enabled_steps": ["discovery"]},
+                )
+    finally:
+        qp._LOST_LEASE_ITEMS.discard("queue-gone")
+    save_draft.assert_not_called()

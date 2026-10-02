@@ -196,6 +196,22 @@ describe("candidateForecastProbability", () => {
   });
 });
 
+describe("candidateForecastProbability null win probability", () => {
+  it("normalizes a null predicted-winner probability to undefined", () => {
+    const dem = candidate("Ann Alpha", { party: "Democratic" });
+    expect(
+      candidateForecastProbability(
+        dem,
+        forecast({
+          predicted_winner_name: "Ann Alpha",
+          win_probability: null as unknown as number,
+        }),
+        [dem],
+      ),
+    ).toBeUndefined();
+  });
+});
+
 describe("resolveCandidate", () => {
   const race = {
     candidates: [

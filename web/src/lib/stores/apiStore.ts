@@ -203,11 +203,14 @@ async function sendRequest(
   const defaultTimeout = 30000; // 30 seconds for most operations
 
   // Determine if this is a long-running operation that shouldn't timeout
+  // Plain reads (GET run details, logs, diagnostics) get the normal timeout so
+  // a hung poll cannot block forever; only run-mutating calls are exempt.
+  const method = (options.method ?? "GET").toUpperCase();
   const isLongRunningOperation =
-    url.includes("/runs/") || // Pipeline run operations
+    (method !== "GET" && url.includes("/runs/")) || // Pipeline run mutations
     url.includes("/api/races/queue") || // Queueing pipeline work
     url.includes("/continue") || // Pipeline continuation
-    (options.method === "POST" && url.includes("/run")); // Any run operation
+    (method === "POST" && url.includes("/run")); // Any run operation
 
   // Use provided timeout, or no timeout for long operations, or default
   const actualTimeout =

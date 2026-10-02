@@ -1,5 +1,6 @@
 """Draft delete, publish, unpublish, and batch-publish endpoints."""
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -30,6 +31,41 @@ def _assert_publishable_race(data: Dict[str, Any]) -> None:
     remains patchable at ``routers.races_admin._assert_publishable_race``.
     """
     _races_admin_pkg._assert_publishable_race(data)
+
+
+def _published_catalog_update(race_id: str, data: Dict[str, Any], draft_removed: bool) -> Dict[str, Any]:
+    """Firestore catalog fields after publishing; keeps draft fields when a newer draft survived."""
+    update: Dict[str, Any] = {
+        **_published_race_update(),
+        **firestore_helpers._fs_build_published_catalog_fields(race_id, data),
+    }
+    if draft_removed:
+        update.update(
+            {
+                "draft_updated_utc": None,
+                "draft_contest_stage": None,
+                "draft_candidate_count": None,
+                "draft_quality_grade": None,
+                "draft_catalog_health": None,
+            }
+        )
+    else:
+        update.pop("draft_updated_at", None)
+    return update
+
+
+def _update_summaries_index(updates: Dict[str, Any]) -> str | None:
+    """Update races/summaries.json; return an error string instead of raising.
+
+    The race blobs are already live by the time this runs, so a failure here
+    must not skip the catalog/cache updates for races that were written.
+    """
+    try:
+        gcs_helpers.update_gcs_summaries_json(updates)
+    except Exception as exc:
+        logging.exception("races/summaries.json update failed for %s", sorted(updates))
+        return f"summaries.json update failed ({type(exc).__name__}); see server logs"
+    return None
 
 
 @router.delete("/api/races/{race_id}/draft", dependencies=[Depends(verify_token)])
@@ -66,21 +102,19 @@ def publish_race(request: Request, race_id: str) -> Dict[str, Any]:
     if data is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     _assert_publishable_race(data)
-    gcs_helpers._publish_race_gcs(race_id, data)
-    gcs_helpers.update_gcs_summaries_json({race_id: data})
-    firestore_helpers._fs_update_race(
-        race_id,
-        {
-            **_published_race_update(),
-            **firestore_helpers._fs_build_published_catalog_fields(race_id, data),
-            "draft_updated_utc": None,
-            "draft_contest_stage": None,
-            "draft_candidate_count": None,
-            "draft_quality_grade": None,
-            "draft_catalog_health": None,
-        },
-    )
+    draft_removed = gcs_helpers._publish_race_gcs(race_id, data) is not False
+    firestore_helpers._fs_update_race(race_id, _published_catalog_update(race_id, data, draft_removed))
+    summaries_error = _update_summaries_index({race_id: data})
     _clear_public_race_cache(request)
+    if summaries_error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": f"Race {race_id} was published but races/summaries.json was not updated; retry the index update",
+                "published": [race_id],
+                "summaries_error": summaries_error,
+            },
+        )
     return {"message": f"Race {race_id} published", "id": race_id}
 
 
@@ -127,26 +161,18 @@ def batch_publish_races(request: Request, payload: BatchPublishRequest) -> Dict[
                 errors.append({"race_id": race_id, "error": "Draft not found"})
                 continue
             _assert_publishable_race(data)
-            gcs_helpers._publish_race_gcs(race_id, data)
+            draft_removed = gcs_helpers._publish_race_gcs(race_id, data) is not False
             updates_for_gcs[race_id] = data
-            firestore_helpers._fs_update_race(
-                race_id,
-                {
-                    **_published_race_update(),
-                    **firestore_helpers._fs_build_published_catalog_fields(race_id, data),
-                    "draft_updated_utc": None,
-                    "draft_contest_stage": None,
-                    "draft_candidate_count": None,
-                    "draft_quality_grade": None,
-                    "draft_catalog_health": None,
-                },
-            )
+            firestore_helpers._fs_update_race(race_id, _published_catalog_update(race_id, data, draft_removed))
             published.append(race_id)
         except HTTPException as exc:
             errors.append({"race_id": race_id, "error": exc.detail})
         except Exception as exc:
             errors.append({"race_id": race_id, "error": str(exc)})
+    result: Dict[str, Any] = {"published": published, "errors": errors}
     if published:
-        gcs_helpers.update_gcs_summaries_json(updates_for_gcs)
+        summaries_error = _update_summaries_index(updates_for_gcs)
         _clear_public_race_cache(request)
-    return {"published": published, "errors": errors}
+        if summaries_error:
+            result["summaries_error"] = summaries_error
+    return result

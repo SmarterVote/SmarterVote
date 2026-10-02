@@ -40,7 +40,9 @@ def _fs_mock(item_data: dict):
 
     def _tx_update(ref, update):
         if ref is item_ref:
-            state.update(update)
+            # Route transactional writes through item_ref.update so tests can
+            # assert on every queue-item write in one place.
+            item_ref.update(update)
 
     transaction.update.side_effect = _tx_update
     db.transaction.return_value = transaction
@@ -485,3 +487,114 @@ async def test_process_returns_none_for_a_healthy_run():
         reason = await qp.process_claimed_item(db, MagicMock(), "bucket", "item-ok", item, "owner-ok")
 
     assert reason is None
+
+
+@pytest.mark.asyncio
+async def test_process_force_removed_item_finalizes_run_as_cancelled():
+    """A force-deleted queue doc must not crash the worker or leave the run 'running'."""
+    from pipeline_client.backend import queue_processor as qp
+
+    item = {"race_id": "ca-house-01-2026", "run_id": "run-del", "options": {"save_artifact": False}}
+    db, item_ref, run_ref, race_ref = _fs_mock(item)
+
+    async def deleted_mid_run(*_a):
+        item_ref.get.return_value.exists = False
+
+    with patch.object(qp, "_run_agent", side_effect=deleted_mid_run):
+        reason = await qp.process_claimed_item(db, MagicMock(), "bucket", "item-del", item, "owner-1")
+
+    assert reason == "cancelled"
+    item_ref.update.assert_not_called()
+    run_statuses = [c.args[0].get("status") for c in run_ref.update.call_args_list]
+    assert run_statuses == ["cancelled"]
+
+
+@pytest.mark.asyncio
+async def test_process_does_not_overwrite_admin_cancel_with_completed():
+    from pipeline_client.backend import queue_processor as qp
+
+    item = {"race_id": "ca-house-01-2026", "run_id": "run-c", "options": {"save_artifact": False}}
+    db, item_ref, run_ref, race_ref = _fs_mock(item)
+
+    async def cancelled_during_save(*_a):
+        item_ref.update({"status": "cancelled", "lease_owner": None})
+        item_ref.update.reset_mock()
+
+    with patch.object(qp, "_run_agent", side_effect=cancelled_during_save):
+        reason = await qp.process_claimed_item(db, MagicMock(), "bucket", "item-c", item, "owner-1")
+
+    assert reason == "cancelled"
+    assert not any(c.args[0].get("status") == "completed" for c in item_ref.update.call_args_list)
+    run_statuses = [c.args[0].get("status") for c in run_ref.update.call_args_list]
+    assert "completed" not in run_statuses and run_statuses[-1] == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_process_skips_terminal_writes_after_losing_lease():
+    from pipeline_client.backend import queue_processor as qp
+
+    item = {"race_id": "ca-house-01-2026", "run_id": "run-l", "options": {"save_artifact": False}}
+    db, item_ref, run_ref, race_ref = _fs_mock(item)
+
+    async def reclaimed(*_a):
+        item_ref.update({"status": "running", "lease_owner": "other-worker"})
+        item_ref.update.reset_mock()
+        raise RuntimeError("boom")
+
+    with patch.object(qp, "_run_agent", side_effect=reclaimed):
+        await qp.process_claimed_item(db, MagicMock(), "bucket", "item-l", item, "owner-1")
+
+    item_ref.update.assert_not_called()
+    assert not any(c.args[0].get("status") in ("failed", "completed") for c in run_ref.update.call_args_list)
+
+
+def test_lease_heartbeat_flags_lost_lease_for_agent(monkeypatch):
+    from pipeline_client.backend import queue_processor as qp
+
+    item = {"status": "running", "lease_owner": "other-worker"}
+    db, item_ref, _run_ref, _race_ref = _fs_mock(item)
+    monkeypatch.setattr(qp, "_LEASE_RENEW_SECONDS", 0.01)
+
+    stop, thread = qp._start_lease_heartbeat(db, item_ref, "owner-1", "item-hb")
+    thread.join(timeout=2)
+    try:
+        assert qp.lease_lost("item-hb")
+    finally:
+        stop.set()
+        qp._LOST_LEASE_ITEMS.discard("item-hb")
+
+
+@pytest.mark.asyncio
+async def test_process_follows_handoff_with_in_memory_checkpoint_when_gcs_save_failed():
+    """A handoff whose GCS checkpoint failed must resume from the in-memory data, not the stale draft."""
+    from pipeline_client.backend import queue_processor as qp
+    from pipeline_client.backend.handlers.agent import HandoffTriggered
+
+    item = {"race_id": "ca-house-01-2026", "run_id": "run-ck", "options": {"save_artifact": False}}
+    db, item_ref, run_ref, race_ref = _fs_mock(item)
+    cont_doc = MagicMock()
+    cont_doc.exists = True
+    cont_doc.to_dict.return_value = {"options": {"enabled_steps": ["review"]}, "existing_data_gcs_path": None}
+    cont_ref = MagicMock()
+    cont_ref.get.return_value = cont_doc
+
+    def _collection(name):
+        if name == "pipeline_queue":
+            m = MagicMock()
+            m.document.side_effect = lambda doc_id: cont_ref if doc_id == "cont-ck" else item_ref
+            return m
+        return {"pipeline_runs": run_ref, "races": race_ref}[name]
+
+    db.collection.side_effect = _collection
+    checkpoint = {"id": "ca-house-01-2026", "candidates": [{"name": "A", "issues": {"economy": "done"}}]}
+    seen = []
+
+    async def fake_run(race_id, run_id, options, existing_data):
+        seen.append(existing_data)
+        if len(seen) == 1:
+            raise HandoffTriggered("cont-ck", ["review"], run_id, checkpoint_data=checkpoint)
+
+    with patch.object(qp, "_run_agent", side_effect=fake_run):
+        await qp.process_claimed_item(db, MagicMock(), "bucket", "item-ck", item, "owner-1")
+
+    assert seen[1] == checkpoint

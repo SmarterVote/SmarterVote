@@ -1797,7 +1797,7 @@
                     </span>
                   </div>
                   <div class="flex items-center gap-2">
-                    {#if step.progress_pct !== undefined && step.status === "running"}
+                    {#if step.progress_pct != null && step.status === "running"}
                       <span class="text-[0.625rem] text-content-faint"
                         >{step.progress_pct}%</span
                       >
