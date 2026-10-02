@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MODEL_CATALOG } from "$lib/config/modelCatalog";
 import ForecastsTab from "./ForecastsTab.svelte";
 import type { PipelineApiService } from "$lib/services/pipelineApiService";
 
@@ -171,16 +172,29 @@ describe("ForecastsTab draft generation", () => {
 
   it("forwards an explicitly chosen model", async () => {
     const { apiService, container } = await renderLoaded();
-    const input = container.querySelector("#model-select") as HTMLInputElement;
+    const select = container.querySelector(
+      "#model-select",
+    ) as HTMLSelectElement;
+    const chosen = Array.from(select.options).find((o) => o.value)!.value;
 
-    await fireEvent.input(input, { target: { value: "some/model" } });
+    await fireEvent.change(select, { target: { value: chosen } });
     await fireEvent.click(button(container, "Generate")!);
 
     await waitFor(() =>
       expect(apiService.generateChamberForecastDraft).toHaveBeenCalledWith(
-        "some/model",
+        chosen,
       ),
     );
+  });
+
+  it("only offers catalog models plus the server default", async () => {
+    const { container } = await renderLoaded();
+    const select = container.querySelector(
+      "#model-select",
+    ) as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values[0]).toBe("");
+    expect(values.slice(1)).toEqual(Object.keys(MODEL_CATALOG).sort());
   });
 
   it("swaps in the newly generated draft and says so", async () => {
@@ -284,5 +298,58 @@ describe("ForecastsTab publishing", () => {
       expect(container.textContent).toContain("Publish failed"),
     );
     expect(apiService.getPublishedChamberForecasts).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ForecastsTab load and generate safety", () => {
+  it("surfaces a draft load failure instead of showing 'Never'", async () => {
+    const service = makeService({
+      getChamberForecastDraft: vi
+        .fn()
+        .mockRejectedValue(new Error("HTTP 500: storage down")),
+    });
+    const { container } = await renderLoaded(service);
+
+    await waitFor(() =>
+      expect(container.textContent).toContain(
+        "Failed to load: HTTP 500: storage down",
+      ),
+    );
+  });
+
+  it("treats a missing draft (404) as none rather than an error", async () => {
+    const service = makeService({
+      getChamberForecastDraft: vi
+        .fn()
+        .mockRejectedValue(new Error("HTTP 404: no draft")),
+    });
+    const { container } = await renderLoaded(service);
+
+    await waitFor(() => expect(container.textContent).toContain("Never"));
+    expect(container.textContent).not.toContain("Failed to load");
+  });
+
+  it("disables Publish Draft while a generation is in flight", async () => {
+    let finish: (v: unknown) => void = () => {};
+    const service = makeService({
+      generateChamberForecastDraft: vi.fn(
+        () => new Promise((resolve) => (finish = resolve)),
+      ),
+    });
+    const { container } = await renderLoaded(service);
+    await waitFor(() =>
+      expect(
+        (button(container, "Publish Draft") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+
+    await fireEvent.click(button(container, "Generate")!);
+
+    await waitFor(() =>
+      expect(
+        (button(container, "Publish Draft") as HTMLButtonElement).disabled,
+      ).toBe(true),
+    );
+    finish({ forecast: forecasts("generated") });
   });
 });

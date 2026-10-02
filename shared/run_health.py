@@ -134,6 +134,12 @@ PLACEHOLDER_JUNK_MARKERS = frozenset(
         "sample",
         "example",
         "dummy",
+        "tba",
+        "to be updated",
+        "to be added",
+        "to be determined",
+        "to be announced",
+        "coming soon",
     }
 )
 
@@ -147,7 +153,9 @@ def is_placeholder_junk_stance(stance: Any) -> bool:
     """
     if not isinstance(stance, str):
         return False
-    normalized = stance.strip().strip(".").strip().lower()
+    # Brackets and stray punctuation around a marker do not make it a stance:
+    # CA-50 published "(to be updated)" as an Election Policy position.
+    normalized = stance.strip().strip(" .()[]{}<>*-_:;!?\"'").strip().lower()
     return normalized in PLACEHOLDER_JUNK_MARKERS
 
 
@@ -234,23 +242,64 @@ def get_step_failures(race_json: Dict[str, Any]) -> List[StepFailure]:
 # ---------------------------------------------------------------------------
 
 
+def _has_finance_data(candidate: Dict[str, Any]) -> bool:
+    return bool(candidate.get("donor_summary") or candidate.get("voting_summary"))
+
+
+def find_finance_gaps(race_json: Dict[str, Any], candidate_names: Optional[Iterable[str]] = None) -> Dict[str, Any]:
+    """Report per-candidate finance gaps after a finance step.
+
+    Returns ``{"missing": [...], "unmatched": [...], "targeted": int}``:
+
+    * ``missing`` — targeted roster candidates that still have neither a
+      ``donor_summary`` nor a ``voting_summary``. Data carried over from a
+      baseline counts as present, so a rerun that keeps prior finance data is
+      not flagged.
+    * ``unmatched`` — target names that match no roster candidate (a name
+      mismatch means the finance step researched nobody it could write to).
+
+    An empty roster yields no gaps: that is a discovery/roster failure, not a
+    finance-specific one.
+    """
+    gaps: Dict[str, Any] = {"missing": [], "unmatched": [], "targeted": 0}
+    if not isinstance(race_json, dict):
+        return gaps
+    candidates = race_json.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return gaps
+    roster = {str(c.get("name") or "").strip(): c for c in candidates if isinstance(c, dict)}
+    roster.pop("", None)
+    if candidate_names is None:
+        targets = list(roster)
+    else:
+        targets = [str(name or "").strip() for name in candidate_names]
+        targets = [name for name in targets if name]
+    gaps["targeted"] = len(targets)
+    for name in targets:
+        candidate = roster.get(name)
+        if candidate is None:
+            gaps["unmatched"].append(name)
+        elif not _has_finance_data(candidate):
+            gaps["missing"].append(name)
+    return gaps
+
+
 def detect_empty_finance_output(race_json: Dict[str, Any], candidate_names: Optional[Iterable[str]] = None) -> bool:
     """True if the finance step produced no donor/voting data for any target candidate.
 
-    Only fires when there is at least one candidate to check — an empty
-    roster is a different failure (STEP_NO_DATA at the discovery/roster
-    level), not a finance-specific silent failure.
+    Also true when target names were given but none of them matches a roster
+    candidate — the finance step then had nobody to write to. Only fires when
+    there is at least one candidate to check — an empty roster is a different
+    failure (STEP_NO_DATA at the discovery/roster level), not a
+    finance-specific silent failure. Partial gaps are reported by
+    :func:`find_finance_gaps`.
     """
-    if not isinstance(race_json, dict):
+    gaps = find_finance_gaps(race_json, candidate_names)
+    missing, unmatched = gaps["missing"], gaps["unmatched"]
+    if not missing and not unmatched:
         return False
-    candidates = race_json.get("candidates")
-    if not isinstance(candidates, list) or not candidates:
-        return False
-    names = set(candidate_names) if candidate_names is not None else None
-    targeted = [c for c in candidates if isinstance(c, dict) and (names is None or str(c.get("name") or "") in names)]
-    if not targeted:
-        return False
-    return all(not c.get("donor_summary") and not c.get("voting_summary") for c in targeted)
+    # Every target either matched no roster candidate or matched one with no data.
+    return len(missing) + len(unmatched) == gaps["targeted"]
 
 
 # ---------------------------------------------------------------------------

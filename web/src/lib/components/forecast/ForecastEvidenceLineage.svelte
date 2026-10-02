@@ -15,13 +15,13 @@
 {#if stated.length > 0}
   <div class="pt-2 border-t border-stroke/20" data-testid="evidence-lineage">
     <span
-      class="font-bold text-content uppercase tracking-wider text-[9px] block mb-1"
+      class="font-bold text-content uppercase tracking-wider text-xs block mb-1"
       >Evidence behind this forecast</span
     >
     <ul class="grid gap-1.5">
       {#each stated as item}
         <li class="rounded-lg bg-surface border border-stroke/60 px-3 py-2">
-          <p class="text-[11px] leading-snug font-medium text-content-muted">
+          <p class="text-xs leading-snug font-medium text-content-muted">
             {item.claim}
           </p>
           {#if isExternalUrl(item.source_url)}
@@ -29,14 +29,14 @@
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-1 inline-flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
+              class="mt-1 inline-flex items-center gap-1 text-xs text-primary-700 dark:text-primary-300 hover:underline bg-surface border border-stroke px-2 py-0.5 rounded-md truncate max-w-[180px]"
             >
               {getHostname(item.source_url)}
               <UiIcon name="external" size="sm" />
             </a>
           {:else if item.source_url}
             <span
-              class="mt-1 block text-[10px] text-content-subtle truncate max-w-[180px]"
+              class="mt-1 block text-xs text-content-subtle truncate max-w-[180px]"
               >{item.source_url}</span
             >
           {/if}

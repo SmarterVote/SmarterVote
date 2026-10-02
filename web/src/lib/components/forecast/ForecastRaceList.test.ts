@@ -57,7 +57,7 @@ describe("ForecastRaceList", () => {
 
     await fireEvent.click(screen.getByText("Toss-ups"));
 
-    expect(screen.getByText("1 races")).toBeTruthy();
+    expect(screen.getByText("1 race")).toBeTruthy();
     expect(screen.getByText("Nevada race r1")).toBeTruthy();
     expect(screen.queryByText("Alabama race r2")).toBeNull();
   });

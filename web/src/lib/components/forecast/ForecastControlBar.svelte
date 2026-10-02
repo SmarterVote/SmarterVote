@@ -1,25 +1,35 @@
 <script lang="ts">
-  import type { ForecastTab } from "$lib/utils/forecast";
-  import { probability } from "$lib/utils/forecastPresentation";
+  import { partyFromLabel, type ForecastTab } from "$lib/utils/forecast";
+  import {
+    controlProbabilities,
+    controlProbability,
+  } from "$lib/utils/forecastPresentation";
 
   export let activeTab: ForecastTab;
   export let outcomeProbabilities: Record<string, number> | undefined;
   export let projectedSeats: Record<string, number>;
+  /** Party of the vice president, who breaks a 50-50 Senate tie. */
+  export let vpTiebreakParty: string | undefined = undefined;
+
+  $: tiebreakParty = partyFromLabel(vpTiebreakParty);
+  $: tiebreakPartyName =
+    tiebreakParty === "Democratic" || tiebreakParty === "Republican"
+      ? tiebreakParty
+      : null;
 </script>
 
 <div class="space-y-3">
   <div class="flex items-center justify-between">
-    <span
-      class="text-xs font-bold uppercase text-content-subtle tracking-wider font-semibold"
+    <span class="eyebrow text-content-subtle"
       >{activeTab === "governors"
         ? "Control Probabilities"
         : "Chamber Control Probabilities"}</span
     >
     {#if activeTab === "senate" && outcomeProbabilities?.tie_50_50}
       <span
-        class="text-[10px] font-semibold text-content-subtle bg-surface-alt px-2 py-0.5 rounded-md border border-stroke/60"
+        class="text-xs font-semibold text-content-subtle bg-surface-alt px-2 py-0.5 rounded-md border border-stroke/60"
       >
-        50-50 Tie: {probability(outcomeProbabilities.tie_50_50)}
+        50-50 tie: {controlProbability(outcomeProbabilities.tie_50_50)}
       </span>
     {/if}
   </div>
@@ -29,54 +39,75 @@
     {@const gopProb = outcomeProbabilities.Republican ?? 0}
     {@const tieProb = outcomeProbabilities.tie_50_50 ?? 0}
     {@const otherProb = outcomeProbabilities.Other ?? 0}
+    {@const segments = [
+      {
+        key: "dem",
+        label: "Democratic",
+        value: demProb,
+        bar: "bg-blue-600 dark:bg-blue-500",
+        text: "text-blue-700 dark:text-blue-300",
+      },
+      ...(activeTab === "governors" && tieProb > 0
+        ? [
+            {
+              key: "tie",
+              label: "Split",
+              value: tieProb,
+              bar: "bg-slate-400 dark:bg-slate-500",
+              text: "text-content-muted",
+            },
+          ]
+        : []),
+      ...(otherProb > 0
+        ? [
+            {
+              key: "other",
+              label: "Other",
+              value: otherProb,
+              bar: "bg-slate-400 dark:bg-slate-500",
+              text: "text-content-muted",
+            },
+          ]
+        : []),
+      {
+        key: "gop",
+        label: "Republican",
+        value: gopProb,
+        bar: "bg-red-600 dark:bg-red-500",
+        text: "text-red-700 dark:text-red-300",
+      },
+    ]}
+    {@const shown = controlProbabilities(segments.map((s) => s.value))}
+    <!-- `shown` is formatted as one set so the values always add up to 100%. -->
     <div class="space-y-3">
+      <!-- Values sit above the bar rather than inside it, so a small segment
+           never has to fit a label it cannot hold on a phone. -->
       <div
-        class="h-8 rounded-xl overflow-hidden bg-surface-alt flex border border-stroke/60 relative shadow-inner"
+        class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm font-bold tabular-nums"
       >
-        {#if demProb > 0}
-          <div
-            class="bg-blue-600 dark:bg-blue-500 transition-all duration-500 flex items-center justify-center font-black text-white text-xs"
-            style="width: {demProb * 100}%"
-            title="Democratic control probability: {probability(demProb)}"
-          >
-            {#if demProb > 0.15}
-              Democratic {probability(demProb)}
-            {/if}
-          </div>
-        {/if}
-        {#if activeTab === "governors" && tieProb > 0}
-          <div
-            class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center font-black text-white text-xs"
-            style="width: {tieProb * 100}%"
-            title="Split / Tie probability: {probability(tieProb)}"
-          >
-            {#if tieProb > 0.15}
-              Tie {probability(tieProb)}
-            {/if}
-          </div>
-        {/if}
-        {#if otherProb > 0}
-          <div
-            class="bg-slate-400 dark:bg-slate-500 transition-all duration-500 flex items-center justify-center font-black text-white text-xs"
-            style="width: {otherProb * 100}%"
-            title="Other control probability: {probability(otherProb)}"
-          >
-            {#if otherProb > 0.15}
-              Other {probability(otherProb)}
-            {/if}
-          </div>
-        {/if}
-        {#if gopProb > 0}
-          <div
-            class="bg-red-600 dark:bg-red-500 transition-all duration-500 flex items-center justify-center font-black text-white text-xs ml-auto"
-            style="width: {gopProb * 100}%"
-            title="Republican control probability: {probability(gopProb)}"
-          >
-            {#if gopProb > 0.15}
-              Republican {probability(gopProb)}
-            {/if}
-          </div>
-        {/if}
+        {#each segments as segment, index (segment.key)}
+          <span class={segment.text}>
+            {segment.label}
+            {shown[index]}
+          </span>
+        {/each}
+      </div>
+      <div
+        class="h-3 rounded-full overflow-hidden bg-surface-alt flex"
+        role="img"
+        aria-label={segments
+          .map((segment, index) => `${segment.label} ${shown[index]}`)
+          .join(", ")}
+      >
+        {#each segments as segment, index (segment.key)}
+          {#if segment.value > 0}
+            <div
+              class="{segment.bar} transition-all duration-500"
+              style="width: {segment.value * 100}%"
+              title="{segment.label} control probability: {shown[index]}"
+            ></div>
+          {/if}
+        {/each}
       </div>
 
       <!-- Callout Note -->
@@ -85,6 +116,7 @@
           class="bg-surface-alt/40 border border-stroke/60 rounded-xl p-3 flex items-start gap-2.5"
         >
           <svg
+            aria-hidden="true"
             class="w-5 h-5 text-content-subtle shrink-0 mt-0.5"
             fill="none"
             stroke="currentColor"
@@ -96,9 +128,15 @@
             <line x1="12" y1="8" x2="12.01" y2="8" />
           </svg>
           <p class="text-xs text-content-muted leading-relaxed font-medium">
-            A {probability(outcomeProbabilities.tie_50_50)} 50-50 tie probability
-            is counted as Republican control via VP tie-break, contributing to the
-            Republican control advantage shown above.
+            {#if tiebreakPartyName}
+              A 50-50 tie ({controlProbability(outcomeProbabilities.tie_50_50)}
+              chance) counts toward the party of the vice president, who breaks the
+              tie, so it is included in the {tiebreakPartyName} share above.
+            {:else}
+              A 50-50 tie ({controlProbability(outcomeProbabilities.tie_50_50)}
+              chance) is decided by the vice president's tie-breaking vote, so it
+              is included in the vice president's party's share above.
+            {/if}
           </p>
         </div>
       {/if}

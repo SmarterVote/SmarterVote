@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlparse
 import httpx
 
 from shared.models import Candidate, CanonicalIssue, RaceJSON
+from shared.neutrality import is_neutrality_flag, neutrality_flags
 from shared.pipeline_config import REVIEW_PROVIDERS
 
 from .cost import estimate_cost
@@ -76,6 +77,8 @@ PASSING_SCORE = 80
 # passing race's letter grade, but cannot by themselves reverse a passing review
 # average. Error-severity flags remain the publication veto.
 WARNING_SCORE_PENALTY = 3
+#: Highest score a race with loaded wording in the site's own voice can reach (a B).
+NEUTRALITY_SCORE_CAP = 89
 
 
 def build_semantic_review_packet(race_json: Dict[str, Any]) -> Dict[str, Any]:
@@ -991,6 +994,10 @@ def check_profile_quality(race_json: Dict[str, Any], *, issues_step_ran: bool = 
                             "severity": "error",
                         }
                     )
+    # Loaded wording in the site's own voice ("far-right Republican"). Warning
+    # severity, so the iteration pass gets it as an actionable flag and the
+    # grade cannot be an A until it is rewritten (see compute_validation_grade).
+    flags.extend(neutrality_flags(race_json))
     verdict = "flagged" if flags else "approved"
     return {
         "model": "automated-profile-quality",
@@ -1270,7 +1277,12 @@ def compute_validation_grade(
     automated_models = {"automated-link-validator", "automated-profile-quality"}
     eligible_reviews = [r for r in reviews if r.get("model") not in automated_models]
 
-    scores = [r["score"] for r in eligible_reviews if isinstance(r.get("score"), (int, float))]
+    # A review of a roster the race has since replaced only speaks for the race
+    # when nothing current exists.
+    scored_reviews = [r for r in eligible_reviews if not r.get("stale")] or eligible_reviews
+    scores = [r["score"] for r in scored_reviews if isinstance(r.get("score"), (int, float))]
+    if not scores:
+        scores = [r["score"] for r in eligible_reviews if isinstance(r.get("score"), (int, float))]
     if not scores:
         return None
 
@@ -1300,6 +1312,12 @@ def compute_validation_grade(
         warning_penalty = min(requested_warning_penalty, avg - PASSING_SCORE)
     avg = max(0, avg - warning_penalty)
 
+    # Loaded wording in the site's voice is a neutrality defect, not a
+    # quibble: it holds the grade at B however well the race otherwise scored.
+    neutrality_warnings = [flag for flag in warning_flags if is_neutrality_flag(flag)]
+    if neutrality_warnings:
+        avg = min(avg, NEUTRALITY_SCORE_CAP)
+
     if avg >= 90:
         grade = "A"
     elif avg >= 80:
@@ -1312,9 +1330,16 @@ def compute_validation_grade(
         grade = "F"
 
     passed = avg >= PASSING_SCORE
-    verdicts = [r.get("verdict", "") for r in eligible_reviews]
+    # Stale reviews judged a roster the race has since replaced. They still
+    # carry their score (nothing better exists until review re-runs), but the
+    # summary and counts must not present them as a check of today's roster:
+    # 36 races showed "Validated by 3/3 reviewers" with every review stale.
+    current_reviews = [r for r in eligible_reviews if not r.get("stale")]
+    stale_count = len(eligible_reviews) - len(current_reviews)
+    counted_reviews = current_reviews or eligible_reviews
+    verdicts = [r.get("verdict", "") for r in counted_reviews]
     approved_count = sum(1 for v in verdicts if v == "approved")
-    total = len(eligible_reviews)
+    total = len(counted_reviews)
 
     deduction = f"after a {warning_penalty}-point advisory deduction for {len(warning_flags)} warning flag(s)"
     if error_flags:
@@ -1331,4 +1356,21 @@ def compute_validation_grade(
     else:
         summary = f"Below quality threshold - {approved_count}/{total} reviewers approved, average score {avg}/100."
 
-    return {"grade": grade, "score": avg, "passed": passed, "summary": summary}
+    if neutrality_warnings:
+        summary = f"{summary} Held below A: {len(neutrality_warnings)} field(s) use loaded wording in the site's own voice."
+    if eligible_reviews and not current_reviews:
+        summary = (
+            f"Reviews are out of date: all {stale_count} reviewer(s) judged an earlier candidate list, and the current "
+            f"roster has not been re-reviewed. Earlier result: {summary}"
+        )
+    elif stale_count:
+        summary = f"{summary} {stale_count} older review(s) judged an earlier candidate list and are not counted."
+
+    return {
+        "grade": grade,
+        "score": avg,
+        "passed": passed,
+        "summary": summary,
+        "current_review_count": len(current_reviews),
+        "stale_review_count": stale_count,
+    }

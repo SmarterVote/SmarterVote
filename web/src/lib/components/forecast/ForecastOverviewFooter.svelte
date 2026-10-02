@@ -4,13 +4,10 @@
 </script>
 
 <div class="lg:col-span-12 space-y-4 pt-2">
-  <div
-    class="bg-surface-alt/10 border border-stroke/40 rounded-2xl p-5 relative overflow-hidden"
-  >
-    <div
-      class="flex items-center gap-1.5 text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider mb-2.5"
-    >
+  <div class="rounded-xl border border-stroke bg-surface-alt/30 p-4 sm:p-5">
+    <div class="eyebrow mb-2.5 flex items-center gap-1.5">
       <svg
+        aria-hidden="true"
         class="w-3.5 h-3.5"
         fill="none"
         stroke="currentColor"
@@ -25,7 +22,9 @@
       </svg>
       Forecast Overview
     </div>
-    <p class="text-sm font-semibold text-content leading-relaxed">
+    <p
+      class="max-w-prose text-sm font-normal leading-6 text-content-muted sm:text-base sm:leading-7"
+    >
       {narrative ||
         "Projections indicate a highly competitive cycle for this chamber."}
     </p>
@@ -33,13 +32,13 @@
 
   <!-- Clean Updated Footer -->
   <div
-    class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-content-subtle font-semibold px-1"
+    class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-content-subtle px-1"
   >
     <span>AI-generated model projection</span>
     {#if updatedAt}
-      <span class="w-1 h-1 rounded-full bg-stroke/60"></span>
+      <span aria-hidden="true">·</span>
       <span
-        >Last updated <span class="font-bold text-content"
+        >Last updated <span class="font-semibold text-content-muted"
           >{new Date(updatedAt).toLocaleDateString()}</span
         ></span
       >

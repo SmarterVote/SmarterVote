@@ -67,24 +67,24 @@ type Case = {
 const cases: Case[] = [
   // -- Runs -----------------------------------------------------------------
   {
-    name: "loadRunHistory",
-    run: () => svc.loadRunHistory(),
-    path: "/runs",
+    name: "loadRunHistoryPage (poll default)",
+    run: () => svc.loadRunHistoryPage(),
+    path: "/runs?limit=50",
     timeout: API_TIMEOUT_ARTIFACT,
     payload: { runs: [] },
   },
   {
-    name: "pruneRuns",
-    run: () => svc.pruneRuns(),
-    path: "/runs",
-    method: "DELETE",
+    name: "getRunLogsTail",
+    run: () => svc.getRunLogsTail("run-1", 500),
+    path: "/runs/run-1/logs?tail=true&limit=500",
     timeout: API_TIMEOUT_SHORT,
+    payload: { logs: [] },
   },
   {
-    name: "deleteRun",
-    run: () => svc.deleteRun("run-1"),
-    path: "/runs/run-1",
-    method: "DELETE",
+    name: "cancelRun",
+    run: () => svc.cancelRun("run-1"),
+    path: "/runs/run-1/cancel",
+    method: "POST",
     timeout: API_TIMEOUT_SHORT,
   },
   {
@@ -111,13 +111,6 @@ const cases: Case[] = [
     name: "getPublishedRace",
     run: () => svc.getPublishedRace("mo-senate-2024"),
     path: "/races/mo-senate-2024",
-    timeout: API_TIMEOUT_DEFAULT,
-  },
-  {
-    name: "deletePublishedRace",
-    run: () => svc.deletePublishedRace("mo-senate-2024"),
-    path: "/api/races/mo-senate-2024/unpublish",
-    method: "POST",
     timeout: API_TIMEOUT_DEFAULT,
   },
   // -- Drafts ---------------------------------------------------------------
@@ -210,13 +203,6 @@ const cases: Case[] = [
     path: "/api/races/recheck",
     method: "POST",
     timeout: API_TIMEOUT_ARTIFACT,
-  },
-  {
-    name: "runRace",
-    run: () => svc.runRace("mo-senate-2024"),
-    path: "/api/races/mo-senate-2024/run",
-    method: "POST",
-    timeout: undefined,
   },
   {
     name: "publishRace",
@@ -344,12 +330,9 @@ describe("PipelineApiService error propagation", () => {
   // The mutating endpoints append the response body, because "HTTP 400" alone
   // is useless when the API is explaining *why* a publish was refused.
   it.each([
-    ["deleteRun", () => svc.deleteRun("r")],
-    ["pruneRuns", () => svc.pruneRuns()],
-    ["deletePublishedRace", () => svc.deletePublishedRace("r")],
+    ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
-    ["runRace", () => svc.runRace("r")],
     ["publishRace", () => svc.publishRace("r")],
     ["batchPublishRaces", () => svc.batchPublishRaces(["r"])],
     ["unpublishRaceRecord", () => svc.unpublishRaceRecord("r")],
@@ -367,14 +350,11 @@ describe("PipelineApiService error propagation", () => {
   // An unreadable body must still produce a usable error rather than a rejected
   // promise from inside the error path itself.
   it.each([
-    ["deleteRun", () => svc.deleteRun("r")],
-    ["pruneRuns", () => svc.pruneRuns()],
-    ["deletePublishedRace", () => svc.deletePublishedRace("r")],
+    ["cancelRun", () => svc.cancelRun("r")],
     ["unpublishRace", () => svc.unpublishRace("r")],
     ["deleteDraftRace", () => svc.deleteDraftRace("r")],
     ["addToQueue", () => svc.addToQueue(["r"])],
     ["queueRaces", () => svc.queueRaces(["r"])],
-    ["runRace", () => svc.runRace("r")],
     ["publishRace", () => svc.publishRace("r")],
     ["batchPublishRaces", () => svc.batchPublishRaces(["r"])],
     ["unpublishRaceRecord", () => svc.unpublishRaceRecord("r")],
@@ -623,7 +603,7 @@ describe("normalizeRun", () => {
   });
 });
 
-describe("loadRunHistory shaping", () => {
+describe("loadRunHistoryPage shaping", () => {
   it("numbers runs newest-first and derives updated_at", async () => {
     fetchWithAuth.mockResolvedValue(
       jsonResponse({
@@ -634,7 +614,7 @@ describe("loadRunHistory shaping", () => {
       }),
     );
 
-    const history = await svc.loadRunHistory();
+    const history = (await svc.loadRunHistoryPage()).runs;
 
     expect(history.map((h) => h.display_id)).toEqual([2, 1]);
     // completed_at wins when present, else started_at.
@@ -645,6 +625,73 @@ describe("loadRunHistory shaping", () => {
   it("tolerates a response with no runs key", async () => {
     fetchWithAuth.mockResolvedValue(jsonResponse({}));
 
-    await expect(svc.loadRunHistory()).resolves.toEqual([]);
+    await expect(svc.loadRunHistoryPage()).resolves.toMatchObject({
+      runs: [],
+      truncated: false,
+    });
+  });
+});
+
+describe("loadRunHistoryPage truncation", () => {
+  it("requests the server cap and flags a full page as truncated", async () => {
+    const runs = Array.from({ length: 3 }, (_, i) => ({ run_id: `r${i}` }));
+    fetchWithAuth.mockResolvedValue(jsonResponse({ runs }));
+
+    const page = await svc.loadRunHistoryPage(3);
+
+    expect(lastCall().url).toBe(`${BASE}/runs?limit=3`);
+    expect(page.truncated).toBe(true);
+    expect(page.runs).toHaveLength(3);
+  });
+
+  it("clamps oversized limits to the server maximum", async () => {
+    fetchWithAuth.mockResolvedValue(jsonResponse({ runs: [{ run_id: "a" }] }));
+
+    const page = await svc.loadRunHistoryPage(10_000);
+
+    expect(lastCall().url).toBe(`${BASE}/runs?limit=500`);
+    expect(page.truncated).toBe(false);
+  });
+});
+
+describe("getRunLogsTail", () => {
+  const log = (id: string) => ({
+    id,
+    level: "info",
+    message: id,
+    timestamp: "2026-01-01T00:00:00Z",
+  });
+
+  it("reads the newest entries in one bounded tail request", async () => {
+    fetchWithAuth.mockResolvedValueOnce(
+      jsonResponse({
+        logs: [log("8"), log("9"), log("10")],
+        next_cursor: "10",
+        has_more: false,
+        truncated: true,
+      }),
+    );
+
+    const tail = await svc.getRunLogsTail("run-1", 3);
+
+    expect(fetchWithAuth).toHaveBeenCalledTimes(1);
+    expect(fetchWithAuth.mock.calls[0][0]).toBe(
+      `${BASE}/runs/run-1/logs?tail=true&limit=3`,
+    );
+    expect(tail.logs.map((l) => (l as { id?: string }).id)).toEqual([
+      "8",
+      "9",
+      "10",
+    ]);
+    expect(tail.truncated).toBe(true);
+    expect(tail.next_cursor).toBe("10");
+  });
+
+  it("reports an empty run as untruncated with no cursor", async () => {
+    fetchWithAuth.mockResolvedValueOnce(jsonResponse({ logs: [] }));
+
+    const tail = await svc.getRunLogsTail("run-1", 500);
+
+    expect(tail).toEqual({ logs: [], next_cursor: null, truncated: false });
   });
 });

@@ -1,12 +1,13 @@
 <script lang="ts">
   import { replaceState } from "$app/navigation";
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onMount, tick } from "svelte";
   import BallotExplorer from "$lib/components/ballot/BallotExplorer.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { RaceSummary } from "$lib/types";
   import {
     lookupElectionGeography,
     matchingNationalRaces,
+    normalizeDistrictCode,
   } from "$lib/services/electionLookup";
   import {
     abandonAddressSession,
@@ -14,8 +15,12 @@
     type AddressSuggestion,
   } from "$lib/services/googlePlaces";
   import { debounce } from "$lib/utils/debounce";
+  import { canonicalStateName } from "$lib/utils/states";
+  import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[] = [];
+  /** True when the published race list could not be loaded at all. */
+  export let loadError = false;
   const dispatch = createEventDispatcher<{ exploring: boolean }>();
 
   let address = "";
@@ -32,6 +37,46 @@
 
   const SESSION_KEY = "smarterVote.ballot";
 
+  let addressInput: HTMLInputElement | undefined;
+  let resultsHeading: HTMLHeadingElement | undefined;
+  // Persistent polite live region: its text changes, the element never does,
+  // so screen readers reliably announce lookup outcomes.
+  let announcement = "";
+
+  // sessionStorage can throw (privacy modes, blocked site data); the ballot
+  // must keep working without it.
+  function readSession(): string | null {
+    try {
+      return sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeSession(value: string) {
+    try {
+      sessionStorage.setItem(SESSION_KEY, value);
+    } catch {
+      // Ignore: restoring the ballot on reload is a convenience.
+    }
+  }
+
+  function clearSession() {
+    try {
+      sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Ignore.
+    }
+  }
+
+  function resultsAnnouncement(count: number): string {
+    if (loadError && races.length === 0)
+      return "We couldn’t load the published election guides.";
+    return count === 0
+      ? "No matching Smarter.Vote guides are available yet for your district."
+      : `Found ${count} ${count === 1 ? "race" : "races"} for your district.`;
+  }
+
   const updateSuggestions = debounce(async (query: string, request: number) => {
     try {
       const matches = await suggestUsAddresses(query);
@@ -47,6 +92,26 @@
       }
     }
   }, 600);
+
+  $: isDistrictOfColumbia =
+    (canonicalStateName(state) ?? state) === "District of Columbia";
+
+  /**
+   * On a phone the on-screen keyboard covers the lower half of the screen,
+   * so bring the field (and the suggestions under it) to the top.
+   */
+  function handleAddressFocus() {
+    suggestionsOpen = suggestions.length > 0;
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 639px)").matches
+    ) {
+      addressInput?.scrollIntoView({
+        behavior: scrollBehavior(),
+        block: "start",
+      });
+    }
+  }
 
   function handleAddressInput() {
     const request = ++suggestionRequest;
@@ -102,9 +167,12 @@
   }
 
   function restoreFromGeography(savedState: string, savedDistrict: string) {
-    const normalizedState = savedState.trim();
-    const normalizedDistrict = savedDistrict.trim().padStart(2, "0");
-    if (!normalizedState || !/^\d{2}$/.test(normalizedDistrict)) return false;
+    // Shared links may carry a postal code or any case (`?state=AK`).
+    const normalizedState = canonicalStateName(savedState) ?? savedState.trim();
+    // Accept every form earlier links used: "8", "08", "98" (D.C.), "al",
+    // or the Census at-large text.
+    const normalizedDistrict = normalizeDistrictCode(savedDistrict);
+    if (!normalizedState || !normalizedDistrict) return false;
 
     state = normalizedState;
     district = normalizedDistrict;
@@ -124,7 +192,8 @@
     replaceState(url, {});
   }
 
-  function districtLabel(value: string): string {
+  function districtLabel(value: string, dc: boolean): string {
+    if (dc) return "Non-voting delegate district";
     return value === "00"
       ? "At-large congressional district"
       : `U.S. House District ${Number(value)}`;
@@ -134,13 +203,17 @@
     const url = new URL(window.location.href);
     const urlState = url.searchParams.get("state");
     const urlDistrict = url.searchParams.get("district");
-    if (urlState && urlDistrict && restoreFromGeography(urlState, urlDistrict))
-      return;
+    if (urlState && urlDistrict) {
+      if (restoreFromGeography(urlState, urlDistrict)) return;
+      // Unrecognised link: drop the stale parameters instead of leaving them
+      // in a URL that would be shared on.
+      url.searchParams.delete("state");
+      url.searchParams.delete("district");
+      replaceState(url, {});
+    }
 
     try {
-      const saved = JSON.parse(
-        sessionStorage.getItem(SESSION_KEY) ?? "null",
-      ) as {
+      const saved = JSON.parse(readSession() ?? "null") as {
         state?: string;
         district?: string;
         raceIds?: string[];
@@ -159,7 +232,7 @@
       // SvelteKit initializes its router immediately after component mount.
       window.setTimeout(updateShareableUrl);
     } catch {
-      sessionStorage.removeItem(SESSION_KEY);
+      clearSession();
     }
   });
 
@@ -167,11 +240,19 @@
     const query = address.trim();
     if (!query || loading) return;
     loading = true;
+    // Drop any pending or in-flight suggestion lookup so it cannot reopen the
+    // listbox after the voter has submitted.
+    updateSuggestions.cancel();
+    suggestionRequest += 1;
+    suggestions = [];
     suggestionsOpen = false;
+    activeSuggestionIndex = -1;
     abandonAddressSession();
     submitted = false;
     error = "";
     results = [];
+    announcement = "Looking up your district…";
+    let found = false;
     try {
       const geography = await lookupElectionGeography(query);
       state = geography.state;
@@ -179,8 +260,7 @@
       results = matchingNationalRaces(races, geography);
       submitted = true;
       dispatch("exploring", true);
-      sessionStorage.setItem(
-        SESSION_KEY,
+      writeSession(
         JSON.stringify({
           state,
           district,
@@ -189,75 +269,81 @@
       );
       updateShareableUrl();
       address = "";
+      announcement = resultsAnnouncement(results.length);
+      found = true;
     } catch (caught) {
       error =
         caught instanceof Error
           ? caught.message
           : "We could not look up that address.";
+      announcement = "";
     } finally {
       loading = false;
     }
+    if (found) {
+      // Move focus to the new results so keyboard and screen-reader users are
+      // not left on <body> after the form disappears.
+      await tick();
+      resultsHeading?.focus();
+    }
   }
 
-  function searchAnotherAddress() {
+  async function searchAnotherAddress() {
     submitted = false;
     results = [];
     state = "";
     district = "";
     error = "";
-    sessionStorage.removeItem(SESSION_KEY);
+    announcement = "";
+    clearSession();
     const url = new URL(window.location.href);
     url.searchParams.delete("state");
     url.searchParams.delete("district");
     url.searchParams.delete("race");
     replaceState(url, {});
     dispatch("exploring", false);
+    await tick();
+    addressInput?.focus();
   }
 </script>
 
 <div class="min-w-0">
+  <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+    {announcement}
+  </p>
   {#if !submitted}
     <div
       data-address-search-card
-      class="relative rounded-[2rem] border border-blue-100 bg-surface/95 p-6 shadow-2xl shadow-blue-950/10 backdrop-blur sm:p-10 dark:border-blue-900"
+      class="card relative rounded-2xl p-5 shadow-lg sm:p-10"
     >
-      <div
-        class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-700 via-blue-500 to-sky-400"
-        aria-hidden="true"
-      ></div>
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <p
-            class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-          >
-            Address search
-          </p>
-          <h2 class="mt-2 text-3xl font-bold tracking-tight text-content">
-            Where are you registered to vote?
-          </h2>
-        </div>
-        <span
-          class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-          >Free</span
-        >
-      </div>
-      <p class="mt-4 max-w-xl leading-7 text-content-muted">
+      <p class="eyebrow hidden sm:block">Address search</p>
+      <h2
+        class="text-xl font-bold tracking-tight text-content sm:mt-2 sm:text-3xl"
+      >
+        Where are you registered to vote?
+      </h2>
+      <p class="mt-2 text-sm leading-6 text-content-muted sm:hidden">
+        Enter your full home address to see your House, Senate, and governor
+        races.
+      </p>
+      <p class="mt-4 hidden max-w-xl leading-7 text-content-muted sm:block">
         Enter the full residential address where you are registered. We’ll
         identify your district and show the U.S. House, Senate, and governor
         research available for it.
       </p>
 
-      <form class="mt-7" on:submit|preventDefault={findElections}>
+      <form class="mt-4 sm:mt-7" on:submit|preventDefault={findElections}>
         <label for="home-address" class="text-sm font-semibold text-content"
           >Home address</label
         >
         <div class="relative">
           <input
             id="home-address"
+            bind:this={addressInput}
             bind:value={address}
             on:input={handleAddressInput}
             on:keydown={handleAddressKeydown}
-            on:focus={() => (suggestionsOpen = suggestions.length > 0)}
+            on:focus={handleAddressFocus}
             required
             autocomplete="street-address"
             role="combobox"
@@ -267,8 +353,8 @@
             aria-activedescendant={suggestionsOpen && activeSuggestionIndex >= 0
               ? `address-suggestion-${suggestions[activeSuggestionIndex].id}`
               : undefined}
-            placeholder="1600 Pennsylvania Ave NW, Washington, DC 20500"
-            class="mt-2 min-h-[60px] w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-blue-300 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15"
+            placeholder="301 W 2nd St, Austin, TX 78701"
+            class="mt-2 min-h-[60px] scroll-mt-24 w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15"
           />
           {#if suggestionsOpen}
             <div
@@ -290,7 +376,7 @@
                 >
               {/each}
               <p
-                class="border-t border-stroke px-4 py-1.5 text-right text-[10px] font-semibold text-content-subtle"
+                class="border-t border-stroke px-4 py-1.5 text-right text-xs font-semibold text-content-subtle"
               >
                 Powered by Google
               </p>
@@ -300,7 +386,7 @@
         <button
           type="submit"
           disabled={loading || !address.trim()}
-          class="mt-4 inline-flex min-h-[56px] w-full items-center justify-center rounded-xl bg-blue-700 px-6 font-bold text-white shadow-lg shadow-blue-900/10 transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+          class="btn-primary mt-4 min-h-[56px] w-full rounded-xl text-base"
           >{loading ? "Finding your district…" : "Show my elections"}</button
         >
       </form>
@@ -318,16 +404,29 @@
         Senate, and governor research. This is not yet a complete local ballot.
         <a
           href="/elections/"
-          class="ml-1 font-semibold text-blue-600 hover:underline dark:text-blue-400"
+          class="ml-1 font-semibold text-primary-700 hover:underline dark:text-primary-300"
           >Browse national elections</a
         >
       </div>
 
+      {#if loadError && races.length === 0}
+        <div role="alert" class="alert-warn mt-5">
+          <p class="font-semibold">
+            We couldn’t load the published election guides.
+          </p>
+          <p class="mt-1">
+            Address matching needs them. Please check your connection and
+            <a
+              href="/my-ballot/"
+              class="font-semibold underline"
+              data-sveltekit-reload>try again</a
+            >.
+          </p>
+        </div>
+      {/if}
+
       {#if error}
-        <div
-          role="alert"
-          class="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-        >
+        <div role="alert" class="alert-warn mt-5">
           <p class="font-semibold">We couldn’t complete the lookup.</p>
           <p class="mt-1">
             {error} Check the full street, city, state, and ZIP, or browse by state.
@@ -338,18 +437,19 @@
   {/if}
 
   {#if submitted}
-    <section class="py-2 sm:py-4" aria-live="polite">
+    <section class="py-2 sm:py-4" aria-labelledby="ballot-results-heading">
       <div
         class="flex flex-col gap-5 border-b border-stroke pb-6 sm:flex-row sm:items-end sm:justify-between"
       >
         <div>
-          <p
-            class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400"
-          >
-            {state} · {districtLabel(district)}
+          <p class="eyebrow">
+            {state} · {districtLabel(district, isDistrictOfColumbia)}
           </p>
           <h1
-            class="mt-2 text-3xl font-extrabold tracking-tight text-content sm:text-4xl"
+            id="ballot-results-heading"
+            bind:this={resultsHeading}
+            tabindex="-1"
+            class="h-page mt-2 focus:outline-none"
           >
             Your election guide
           </h1>
@@ -366,16 +466,17 @@
               href="https://www.vote411.org/ballot"
               target="_blank"
               rel="noopener noreferrer"
-              class="ml-1 font-semibold text-blue-600 hover:underline dark:text-blue-400"
-              >See what's on your full ballot at VOTE411
-              <span class="sr-only"> (opens in a new tab)</span></a
+              class="ml-1 font-semibold text-primary-700 hover:underline dark:text-primary-300"
+              >See what's on your full ballot at VOTE411<span class="sr-only">
+                (opens in a new tab)</span
+              ></a
             >.
           </p>
         </div>
         <button
           type="button"
           on:click={searchAnotherAddress}
-          class="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border border-stroke bg-surface px-4 text-sm font-bold text-content transition hover:border-blue-400 hover:bg-surface-alt focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="btn-secondary shrink-0"
         >
           <UiIcon name="arrow-left" size="sm" /> Search another address
         </button>
@@ -386,8 +487,16 @@
         <div
           class="mt-5 rounded-xl bg-surface-alt p-4 text-sm text-content-muted"
         >
-          We identified your district, but no matching Smarter.Vote guide is
-          available yet. This does not mean you have no elections.
+          {#if loadError && races.length === 0}
+            We identified your district, but the published election guides
+            couldn’t be loaded. Please try again shortly.
+          {:else if isDistrictOfColumbia}
+            D.C. elects a non-voting delegate to the U.S. House; Smarter.Vote
+            doesn’t cover that race yet.
+          {:else}
+            We identified your district, but no matching Smarter.Vote guide is
+            available yet. This does not mean you have no elections.
+          {/if}
         </div>
       {/if}
     </section>

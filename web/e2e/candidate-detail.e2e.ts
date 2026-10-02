@@ -106,7 +106,11 @@ test.describe("candidate detail page", () => {
       page.getByRole("heading", { name: "Candidate not found" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Back to race overview/ }),
+      page.getByRole("link", { name: /See all candidates in this race/ }),
     ).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
   });
 });

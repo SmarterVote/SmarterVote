@@ -539,6 +539,127 @@ async def _check_forecast_text(ctx: PhaseContext, agent_loop: Callable) -> List[
     return [str(issue).strip() for issue in issues if str(issue).strip()][:_MAX_CHECK_ISSUES]
 
 
+_RATING_LABELS = {
+    "safe": "Safe",
+    "likely": "Likely",
+    "lean": "Lean",
+    "tilt": "Tilt",
+}
+_RATING_PARTIES = {"d": "Democratic", "r": "Republican"}
+
+
+def _rating_label(rating: Any) -> str:
+    """Reader label for a rating: lean_d is "Lean Democratic", tossup is "Toss-up"."""
+    value = str(rating or "").strip().lower()
+    if value == "tossup":
+        return "Toss-up"
+    band, _, side = value.partition("_")
+    if band in _RATING_LABELS and side in _RATING_PARTIES:
+        return f"{_RATING_LABELS[band]} {_RATING_PARTIES[side]}"
+    return "Unrated"
+
+
+def _percent(value: Any) -> Optional[str]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        return None
+    pct = round(float(value) * 100)
+    if pct >= 100:
+        return ">99%"
+    if pct <= 0:
+        return "<1%"
+    return f"{pct}%"
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
+def deterministic_forecast_text(forecast: Dict[str, Any], race_json: Dict[str, Any]) -> Dict[str, Any]:
+    """Plain-language forecast prose built only from the published numbers.
+
+    Used in place of the writer's prose when the fact-check still finds a
+    contradiction after a revision. Audit 4 found fifteen races where that
+    happened and the flagged text shipped anyway (California's governor "18
+    points" against a 25-point poll; Kansas's open Democratic seat described as
+    a Republican hold). These sentences can only repeat the rating, the
+    probability, the leader and the poll count, so they cannot contradict the
+    race the way free prose can.
+    """
+    rating = str(forecast.get("rating") or "")
+    label = _rating_label(rating)
+    probability = _percent(forecast.get("win_probability"))
+    winner_name = str(forecast.get("predicted_winner_name") or "").strip()
+    winner_party = str(forecast.get("predicted_winner_party") or "").strip()
+    if winner_party.casefold() in {"toss-up", "tossup"}:
+        winner_party = ""
+    if winner_name and winner_party:
+        leader = f"{winner_name} ({winner_party})"
+    elif winner_name:
+        leader = winner_name
+    elif winner_party:
+        leader = f"the {winner_party} candidate"
+    else:
+        leader = ""
+    polls = _head_to_head_poll_count(race_json)
+    margin = forecast.get("margin_estimate")
+    margin_text = ""
+    if isinstance(margin, (int, float)) and not isinstance(margin, bool) and margin > 0 and rating != "tossup":
+        margin_text = f", with an estimated margin of about {round(float(margin))} points"
+
+    if rating == "tossup" or not leader:
+        takeaway = "This race is rated a toss-up: neither side is clearly favored."
+        rationale = "The forecast rates this race a toss-up."
+        if rating != "tossup" and label != "Unrated":
+            takeaway = f"This race is rated {label}."
+            rationale = f"The forecast rates this race {label}."
+    else:
+        chance = f", with a {probability} chance of winning" if probability else ""
+        takeaway = f"{leader[0].upper()}{leader[1:]} is favored{chance}."
+        rated = f"rates this race {label} and " if label != "Unrated" else ""
+        odds = probability or "better"
+        rationale = f"The forecast {rated}gives {leader} a {odds} chance of winning{margin_text}."
+    if polls:
+        poll_line = (
+            f"The estimate draws on {_plural(polls, 'public poll')} with a head-to-head matchup between current candidates."
+        )
+    else:
+        poll_line = (
+            "No head-to-head public poll between the current candidates was available, so the estimate rests on "
+            "non-polling evidence."
+        )
+    rationale = f"{rationale} {poll_line}"
+    key_reasons: List[str] = []
+    if label != "Unrated":
+        key_reasons.append(
+            f"Rating: {label}" + (f" ({leader}: {probability} chance of winning)." if leader and probability else ".")
+        )
+    elif leader and probability:
+        key_reasons.append(f"Chance of winning: {leader}, {probability}.")
+    key_reasons.append(f"Polling: {_plural(polls, 'head-to-head poll')} of the current candidates.")
+    members = forecast.get("panel") or []
+    if isinstance(members, list) and members:
+        key_reasons.append(f"Method: the median of {_plural(len(members), 'independent model estimate')}.")
+    uncertainty = "This is an estimate, not a certainty, and it can shift as new polls and information arrive."
+    return {
+        "takeaway": takeaway,
+        "rationale": rationale,
+        "key_reasons": key_reasons,
+        "uncertainty": uncertainty,
+        "based_on_poll_count": polls,
+        # The writer's claims belong to the prose that failed its check.
+        "evidence_lineage": None,
+    }
+
+
+def replace_unverified_forecast_text(race_json: Dict[str, Any]) -> bool:
+    """Swap the forecast's prose for :func:`deterministic_forecast_text`. Returns whether it changed anything."""
+    forecast = race_json.get("forecast")
+    if not isinstance(forecast, dict) or not forecast.get("rating"):
+        return False
+    forecast.update(deterministic_forecast_text(forecast, race_json))
+    return True
+
+
 async def run_forecast_phase(ctx: PhaseContext) -> None:
     """Generate a race forecast from an independent model panel, incorporating Kalshi signals when available."""
     race_json = ctx.race_json
@@ -604,6 +725,7 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
         if writer_model is None:
             raise RuntimeError(f"no forecast writer produced a forecast (tried {', '.join(writer_models)})")
 
+        text_unverified = False
         issues = await _check_forecast_text(ctx, _agent_loop)
         if issues:
             log("warning", f"  Forecast check flagged {len(issues)} issue(s); revising: {issues}")
@@ -613,7 +735,13 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             revised_by = await _write_forecast(ctx, _agent_loop, revision_prompt, handlers, consensus, [writer_model])
             remaining = await _check_forecast_text(ctx, _agent_loop) if revised_by else issues
             if remaining:
-                _record_step_failure(race_json, "forecast", RunFailureReason.FORECAST_TEXT_UNVERIFIED, "; ".join(remaining))
+                text_unverified = True
+                _record_step_failure(
+                    race_json,
+                    "forecast",
+                    RunFailureReason.FORECAST_TEXT_UNVERIFIED,
+                    "; ".join(remaining) + " (written explanation replaced with a plain summary of the numbers)",
+                )
 
         forecast = race_json["forecast"]
         forecast["model"] = writer_model
@@ -639,6 +767,8 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
             forecast["method"] = SINGLE_MODEL_METHOD
             forecast.pop("panel", None)
             forecast.pop("panel_spread", None)
+        if text_unverified and replace_unverified_forecast_text(race_json):
+            log("warning", "  Forecast text failed its fact-check twice; published a plain summary of the numbers instead")
     except RunBudgetExceeded:
         raise
     except Exception as exc:

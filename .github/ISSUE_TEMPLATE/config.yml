@@ -4,7 +4,7 @@ contact_links:
     url: https://smarter.vote/elections
     about: Data is refreshed continuously — confirm the gap still exists on the live page before reporting it.
   - name: How our data is produced
-    url: https://smarter.vote/methodology
+    url: https://smarter.vote/about/#methodology
     about: Candidate data comes from an automated research pipeline. This explains what it does and does not cover.
   - name: Contributing Guidelines
     url: https://github.com/SmarterVote/SmarterVote/blob/main/CONTRIBUTING.md

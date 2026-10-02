@@ -59,6 +59,18 @@ const STATE_NAMES_BY_VALUE = new Map(
   ]),
 );
 
+/**
+ * Canonical full state name for a free-text value — a postal code ("TX", "tx")
+ * or a full name in any case ("texas") — or null when it is not a state.
+ * Use it on anything a user or a shared link supplies (`?state=TX`) before
+ * comparing it with {@link canonicalRaceState}.
+ */
+export function canonicalStateName(
+  value: string | null | undefined,
+): string | null {
+  return canonicalStateValue(value);
+}
+
 function canonicalStateValue(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLocaleLowerCase();
   if (!normalized) return null;

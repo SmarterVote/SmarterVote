@@ -14,14 +14,12 @@
 </script>
 
 {#if races.length > 0}
-  <section
-    class="bg-surface border border-stroke rounded-2xl shadow-sm overflow-hidden opacity-85"
-  >
+  <section class="card overflow-hidden">
     <div
       class="px-5 py-4 border-b border-stroke/40 flex items-center justify-between bg-surface-alt/10"
     >
       <div>
-        <h2 class="text-base font-bold text-content-muted">
+        <h2 class="h-card">
           Unforecasted Races ({races.length})
         </h2>
         <p class="text-xs text-content-subtle">
@@ -47,7 +45,7 @@
               <td class="px-5 py-3">
                 <a
                   href={browser ? raceHref(race.id) : undefined}
-                  class="font-semibold text-content hover:text-blue-600 dark:hover:text-blue-400"
+                  class="font-semibold text-content hover:text-primary-700 dark:hover:text-primary-300"
                 >
                   {raceDisplayTitle(race)}
                 </a>

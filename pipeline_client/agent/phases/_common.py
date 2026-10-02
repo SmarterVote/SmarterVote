@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 from shared.run_health import RunFailureReason  # noqa: F401
 from shared.run_health import classify_exception as _classify_exception  # noqa: F401
 from shared.run_health import detect_empty_finance_output as _detect_empty_finance_output  # noqa: F401
+from shared.run_health import find_finance_gaps as _find_finance_gaps  # noqa: F401
 from shared.run_health import record_step_failure as _record_step_failure  # noqa: F401
 
 from .. import phase_state, roster

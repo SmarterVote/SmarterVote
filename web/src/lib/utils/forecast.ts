@@ -9,6 +9,22 @@ import {
   GOVERNOR_HOLDOVERS,
   SENATE_HOLDOVERS,
 } from "./holdovers";
+import { canonicalRaceState } from "./states";
+import { isUncontestedRace } from "$lib/utils/racePage";
+
+/**
+ * An uncontested race (one active candidate, or a published "uncontested"
+ * stage) has nothing to forecast: show "Uncontested" rather than a rating or
+ * win odds. It still counts toward its party's seat totals.
+ */
+export function isUncontestedForecastRace(
+  race: Pick<RaceSummary, "contest_stage" | "candidates">,
+): boolean {
+  const active = (race.candidates ?? []).filter(
+    (candidate) => !(candidate as { withdrawn?: boolean }).withdrawn,
+  ).length;
+  return isUncontestedRace(race, active);
+}
 
 export type ForecastTab = "house" | "senate" | "governors";
 
@@ -42,6 +58,14 @@ export interface ForecastAggregate {
   races: ForecastRace[];
   missingForecasts: RaceSummary[];
   totalExpected: number;
+  /** Forecasted races whose favored party is unknown (not in `projected`). */
+  uncountedForecasts?: number;
+  /**
+   * Every seat left out of `projected` because neither a forecast nor any
+   * holder evidence names a party — forecasted or not. Matches
+   * `uncounted_seats` in shared/forecast_summary.py.
+   */
+  uncountedSeats?: number;
   holdovers: {
     state: string;
     party: "Democratic" | "Republican" | "Other";
@@ -62,64 +86,21 @@ const RATINGS: ForecastRating[] = [
   "other",
 ];
 
-const ABBR_TO_STATE: Record<string, string> = {
-  al: "Alabama",
-  ak: "Alaska",
-  az: "Arizona",
-  ar: "Arkansas",
-  ca: "California",
-  co: "Colorado",
-  ct: "Connecticut",
-  de: "Delaware",
-  fl: "Florida",
-  ga: "Georgia",
-  hi: "Hawaii",
-  id: "Idaho",
-  il: "Illinois",
-  in: "Indiana",
-  ia: "Iowa",
-  ks: "Kansas",
-  ky: "Kentucky",
-  la: "Louisiana",
-  me: "Maine",
-  md: "Maryland",
-  ma: "Massachusetts",
-  mi: "Michigan",
-  mn: "Minnesota",
-  ms: "Mississippi",
-  mo: "Missouri",
-  mt: "Montana",
-  ne: "Nebraska",
-  nv: "Nevada",
-  nh: "New Hampshire",
-  nj: "New Jersey",
-  nm: "New Mexico",
-  ny: "New York",
-  nc: "North Carolina",
-  nd: "North Dakota",
-  oh: "Ohio",
-  ok: "Oklahoma",
-  or: "Oregon",
-  pa: "Pennsylvania",
-  ri: "Rhode Island",
-  sc: "South Carolina",
-  sd: "South Dakota",
-  tn: "Tennessee",
-  tx: "Texas",
-  ut: "Utah",
-  vt: "Vermont",
-  va: "Virginia",
-  wa: "Washington",
-  wv: "West Virginia",
-  wi: "Wisconsin",
-  wy: "Wyoming",
-};
+const DISTRICT_OF_COLUMBIA = "District of Columbia";
 
+/**
+ * Canonical full state name for a race ("TX", "texas", "tx-senate-2026" all
+ * become "Texas"), so map colouring, holdover counting, and governor-control
+ * checks agree with the holdover tables.
+ *
+ * DC has no voting Senate or House seat and no governor, so it never enters
+ * chamber or map math. `race_state` in shared/forecast_summary.py applies the
+ * same resolution order and the same DC exclusion; the shared parity fixture
+ * (tests/fixtures/forecast_parity.json) holds the two sides together.
+ */
 export function getRaceState(race: RaceSummary): string | null {
-  if (race.state) return race.state;
-  const id = race.id || "";
-  const prefix = id.split("-")[0].toLowerCase();
-  return ABBR_TO_STATE[prefix] || null;
+  const state = canonicalRaceState(race);
+  return state === DISTRICT_OF_COLUMBIA ? null : state;
 }
 
 /**
@@ -182,45 +163,106 @@ export function officeGroup(race: RaceSummary): ForecastTab | null {
   return null;
 }
 
+export type ForecastParty = "Democratic" | "Republican" | "Other";
+
+const UNKNOWN_PARTY_LABELS = new Set([
+  "",
+  "unknown",
+  "none",
+  "n/a",
+  "na",
+  "null",
+  "tbd",
+  "undecided",
+  "tossup",
+  "toss-up",
+  // A bare "Other" winner label is the pipeline's "unspecified" placeholder;
+  // resolve it from the probabilities like shared/forecast_summary.py does.
+  "other",
+]);
+
+const DEMOCRATIC_PARTY_LABELS = new Set(["d", "dem", "dfl"]);
+const REPUBLICAN_PARTY_LABELS = new Set(["r", "rep", "gop"]);
+
+/**
+ * Classify a party label (or party-probability key) as Democratic, Republican,
+ * or a known non-major party ("Other"). Returns null for empty/unknown labels.
+ *
+ * Same vocabulary as `classify_party` in shared/forecast_summary.py — the
+ * shared parity fixture fails if the two drift apart.
+ */
+export function partyFromLabel(label?: string | null): ForecastParty | null {
+  const value = (label || "").trim().toLowerCase();
+  if (UNKNOWN_PARTY_LABELS.has(value)) return null;
+  if (DEMOCRATIC_PARTY_LABELS.has(value) || value.includes("democrat"))
+    return "Democratic";
+  if (REPUBLICAN_PARTY_LABELS.has(value) || value.includes("republican"))
+    return "Republican";
+  return "Other";
+}
+
+/**
+ * The party a forecast actually favors, or null when the forecast carries no
+ * party or probability data to say.
+ *
+ * A favored Independent (or any non-major party) is "Other" — it must never be
+ * folded into a major party's seat count. When neither the predicted party nor
+ * the probabilities say anything, this returns null rather than guessing from
+ * the incumbent: the incumbent's party is not a forecast.
+ */
+export function forecastWinnerParty(
+  party?: string | null,
+  probs?: Record<string, number> | null,
+): ForecastParty | null {
+  const fromParty = partyFromLabel(party);
+  if (fromParty) return fromParty;
+
+  if (probs) {
+    let best: ForecastParty | null = null;
+    let bestProb = -Infinity;
+    let tied = false;
+    const totals = new Map<ForecastParty, number>();
+    for (const [key, raw] of Object.entries(probs)) {
+      const prob = Number(raw);
+      const keyParty =
+        key.trim().toLowerCase() === "other" ? "Other" : partyFromLabel(key);
+      if (!keyParty || !Number.isFinite(prob)) continue;
+      totals.set(keyParty, (totals.get(keyParty) ?? 0) + prob);
+    }
+    for (const [keyParty, prob] of totals) {
+      if (prob > bestProb) {
+        best = keyParty;
+        bestProb = prob;
+        tied = false;
+      } else if (prob === bestProb) {
+        tied = true;
+      }
+    }
+    if (best && !tied && bestProb > 0) return best;
+  }
+
+  return null;
+}
+
+/**
+ * Backward-compatible wrapper around {@link forecastWinnerParty} for display
+ * code that needs a single bucket. Unknown resolves to "Other" (never the
+ * incumbent's party); the `candidates` argument is accepted for compatibility
+ * but deliberately ignored.
+ */
 export function normalizeForecastParty(
   party?: string | null,
   probs?: Record<string, number> | null,
-  candidates?:
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _candidates?:
     | {
         name?: string;
         party?: string;
         incumbent: boolean;
       }[]
     | null,
-): "Democratic" | "Republican" | "Other" {
-  const value = (party || "").toLowerCase();
-  if (value.includes("democrat") || value === "dfl" || value === "d")
-    return "Democratic";
-  if (value.includes("republican") || value === "gop" || value === "r")
-    return "Republican";
-
-  // If party is not D or R (e.g. it is null, or empty, or Independent/Nonpartisan/Other),
-  // but it's a D vs R race, check the win probabilities.
-  if (probs) {
-    const demProb = probs.Democratic ?? probs.Democrat ?? probs.D ?? 0;
-    const repProb = probs.Republican ?? probs.GOP ?? probs.R ?? 0;
-    if (demProb > repProb) return "Democratic";
-    if (repProb > demProb) return "Republican";
-  }
-
-  // Fallback to candidates party count/incumbent
-  if (candidates) {
-    const incumbent = candidates.find((c) => c.incumbent);
-    if (incumbent && incumbent.party) {
-      const incParty = incumbent.party.toLowerCase();
-      if (incParty.includes("democrat") || incParty === "d")
-        return "Democratic";
-      if (incParty.includes("republican") || incParty === "r")
-        return "Republican";
-    }
-  }
-
-  return "Other";
+): ForecastParty {
+  return forecastWinnerParty(party, probs) ?? "Other";
 }
 
 export function ratingSortValue(rating: ForecastRating): number {
@@ -272,27 +314,28 @@ export function isValidGovernorControlRace(race: RaceSummary): boolean {
  * steps come first deliberately — they work for every race, where the per-state
  * table only covers the handful of states someone thought to add.
  *
- * Returns null where Python returns "Other", i.e. nothing in the data supports a
- * guess. Python counts that seat toward "Other"; the page leaves it out of the
- * projection and lists it under unforecasted races instead.
+ * An incumbent from a non-major party (an Independent) holds an "Other" seat;
+ * it is not skipped in favour of the challengers' majority. Returns null — on
+ * both sides — when nothing in the data supports a guess: the seat is left out
+ * of the projection and listed under unforecasted races instead.
  */
 export function fallbackPartyForRace(
   race: RaceSummary,
   tab: ForecastTab,
-): "Democratic" | "Republican" | null {
+): ForecastParty | null {
   const candidates = race.candidates ?? [];
 
   const incumbent = candidates.find((candidate) => candidate.incumbent);
   if (incumbent) {
-    const party = normalizeForecastParty(incumbent.party);
-    if (party !== "Other") return party;
+    const party = partyFromLabel(incumbent.party);
+    if (party) return party;
   }
 
   if (candidates.length > 0) {
     let democratic = 0;
     let republican = 0;
     for (const candidate of candidates) {
-      const party = normalizeForecastParty(candidate.party);
+      const party = partyFromLabel(candidate.party);
       if (party === "Democratic") democratic += 1;
       else if (party === "Republican") republican += 1;
     }
@@ -433,6 +476,8 @@ export function aggregateForecasts(
 
   const forecasted: ForecastRace[] = [];
   const missingForecasts: RaceSummary[] = [];
+  let uncountedForecasts = 0;
+  let uncountedSeats = 0;
 
   for (const race of scoped) {
     if (!race.forecast) {
@@ -440,16 +485,26 @@ export function aggregateForecasts(
       const fallbackParty = fallbackPartyForRace(race, tab);
       if (fallbackParty) {
         projected[fallbackParty] = (projected[fallbackParty] ?? 0) + 1;
+      } else {
+        uncountedSeats += 1;
       }
       continue;
     }
     forecasted.push(race as ForecastRace);
-    const party = normalizeForecastParty(
+    const party = forecastWinnerParty(
       race.forecast.predicted_winner_party,
       race.forecast.party_probabilities,
-      race.candidates,
     );
-    projected[party] = (projected[party] ?? 0) + 1;
+    // A forecast with no party or probability data counts for the seat's
+    // current holder, exactly like an unforecasted race (and like
+    // shared/forecast_summary.py), so the two seat counts agree. Only a seat
+    // with no holder data either goes uncounted.
+    const seatParty = party ?? fallbackPartyForRace(race, tab);
+    if (seatParty) projected[seatParty] = (projected[seatParty] ?? 0) + 1;
+    else {
+      uncountedForecasts += 1;
+      uncountedSeats += 1;
+    }
     ratingCounts[race.forecast.rating] =
       (ratingCounts[race.forecast.rating] ?? 0) + 1;
   }
@@ -515,6 +570,8 @@ export function aggregateForecasts(
     missingForecasts,
     totalExpected: CHAMBER_SEAT_TOTALS[tab],
     holdovers: holdoversList,
+    uncountedForecasts,
+    uncountedSeats,
   };
 }
 
@@ -550,6 +607,8 @@ export interface GroupedSeatBucket {
   label: string;
   probability: number;
   colorClass: string;
+  /** Text colour for a label drawn on `colorClass`; each pair is ≥ 4.5:1. */
+  textClass: string;
   outcomes: SeatOutcome[];
 }
 
@@ -583,9 +642,14 @@ export function groupSeatDistribution(
   type BucketDef = {
     label: string;
     colorClass: string;
+    textClass: string;
     test: (o: SeatOutcome) => boolean;
   };
 
+  // White only reads on the deep fills (blue-600 5.2:1, red-600 4.8:1); the
+  // lighter "narrow" and tie fills take a dark ink of the same hue instead
+  // (≥ 5.8:1), so D and R stay symmetric and every label clears WCAG AA.
+  const STRONG_TEXT = "text-white";
   let bucketDefs: BucketDef[];
 
   if (tab === "senate") {
@@ -593,26 +657,31 @@ export function groupSeatDistribution(
       {
         label: "Strong D (53D+)",
         colorClass: "bg-blue-600 dark:bg-blue-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.dSeats >= 53,
       },
       {
         label: "Narrow D (51-52D)",
-        colorClass: "bg-blue-400 dark:bg-blue-500",
+        colorClass: "bg-blue-400",
+        textClass: "text-blue-950",
         test: (o) => o.dSeats >= 51 && o.dSeats <= 52,
       },
       {
         label: "Tie (50-50)",
-        colorClass: "bg-slate-400 dark:bg-slate-500",
+        colorClass: "bg-slate-400",
+        textClass: "text-slate-950",
         test: (o) => o.dSeats === 50,
       },
       {
         label: "Narrow R (51-52R)",
-        colorClass: "bg-red-400 dark:bg-red-500",
+        colorClass: "bg-red-400",
+        textClass: "text-red-950",
         test: (o) => o.rSeats >= 51 && o.rSeats <= 52,
       },
       {
         label: "Strong R (53R+)",
         colorClass: "bg-red-600 dark:bg-red-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.rSeats >= 53,
       },
     ];
@@ -621,26 +690,31 @@ export function groupSeatDistribution(
       {
         label: "Strong D (28D+)",
         colorClass: "bg-blue-600 dark:bg-blue-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.dSeats >= 28,
       },
       {
         label: "Narrow D (26-27D)",
-        colorClass: "bg-blue-400 dark:bg-blue-500",
+        colorClass: "bg-blue-400",
+        textClass: "text-blue-950",
         test: (o) => o.dSeats >= 26 && o.dSeats <= 27,
       },
       {
         label: "Tie (25-25)",
-        colorClass: "bg-slate-400 dark:bg-slate-500",
+        colorClass: "bg-slate-400",
+        textClass: "text-slate-950",
         test: (o) => o.dSeats === 25,
       },
       {
         label: "Narrow R (26-27R)",
-        colorClass: "bg-red-400 dark:bg-red-500",
+        colorClass: "bg-red-400",
+        textClass: "text-red-950",
         test: (o) => o.rSeats >= 26 && o.rSeats <= 27,
       },
       {
         label: "Strong R (28R+)",
         colorClass: "bg-red-600 dark:bg-red-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.rSeats >= 28,
       },
     ];
@@ -650,26 +724,31 @@ export function groupSeatDistribution(
       {
         label: "Strong D (225D+)",
         colorClass: "bg-blue-600 dark:bg-blue-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.dSeats >= 225,
       },
       {
         label: "Narrow D (218-224D)",
-        colorClass: "bg-blue-400 dark:bg-blue-500",
+        colorClass: "bg-blue-400",
+        textClass: "text-blue-950",
         test: (o) => o.dSeats >= 218 && o.dSeats <= 224,
       },
       {
         label: "Near Tie (212-217D)",
-        colorClass: "bg-slate-400 dark:bg-slate-500",
+        colorClass: "bg-slate-400",
+        textClass: "text-slate-950",
         test: (o) => o.dSeats >= 212 && o.dSeats <= 217,
       },
       {
         label: "Narrow R (218-224R)",
-        colorClass: "bg-red-400 dark:bg-red-500",
+        colorClass: "bg-red-400",
+        textClass: "text-red-950",
         test: (o) => o.rSeats >= 218 && o.rSeats <= 224,
       },
       {
         label: "Strong R (225R+)",
         colorClass: "bg-red-600 dark:bg-red-700",
+        textClass: STRONG_TEXT,
         test: (o) => o.rSeats >= 225,
       },
     ];
@@ -679,6 +758,7 @@ export function groupSeatDistribution(
     label: def.label,
     probability: 0,
     colorClass: def.colorClass,
+    textClass: def.textClass,
     outcomes: [],
   }));
 
@@ -716,13 +796,18 @@ export function getMostLikelySeatOutcome(dist: Record<string, number> = {}): {
 /**
  * Resolves the projected controlling party for a chamber, preferring the
  * chamber forecast summary's own determination and falling back to the
- * aggregate seat projection (with a Senate 50-50 VP tie-break to Republican).
+ * aggregate seat projection.
+ *
+ * A 50-50 Senate is decided by the Vice President, which is data
+ * (`vp_tiebreak_party` on the chamber summary), not a constant: when the
+ * summary does not name it, the tie is reported as undetermined ("Other",
+ * rendered as "No Clear Control") rather than assumed for either party.
  */
 export function resolveControlParty(
   tab: ForecastTab,
   chamberSummary: ChamberForecastDetails | undefined,
   aggregate: ForecastAggregate,
-): "Democratic" | "Republican" | "Other" {
+): ForecastParty {
   if (chamberSummary?.control_party) return chamberSummary.control_party;
 
   if (
@@ -730,7 +815,10 @@ export function resolveControlParty(
     (aggregate.projected.Democratic ?? 0) === 50 &&
     (aggregate.projected.Republican ?? 0) === 50
   ) {
-    return "Republican";
+    const tiebreak = partyFromLabel(chamberSummary?.vp_tiebreak_party);
+    return tiebreak === "Democratic" || tiebreak === "Republican"
+      ? tiebreak
+      : "Other";
   }
   if ((aggregate.projected.Democratic ?? 0) >= aggregate.threshold) {
     return "Democratic";

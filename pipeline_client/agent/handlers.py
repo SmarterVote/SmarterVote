@@ -7,6 +7,7 @@ LLM receives as the tool result.
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from difflib import get_close_matches
@@ -38,6 +39,8 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
+
+logger = logging.getLogger("pipeline")
 
 _CANONICAL_ISSUE_SET = set(CANONICAL_ISSUES)
 
@@ -747,8 +750,15 @@ def _get_other_state_candidates(race_id: str, state: str | None) -> set[str]:
                 for cand in data.get("candidates", []):
                     if isinstance(cand, dict) and cand.get("name") and cand.get("withdrawn") is not True:
                         other_names.add(cand["name"].strip())
-        except Exception:
-            pass
+        except Exception as exc:
+            # Fails open: the cross-race contamination guard runs without
+            # other-race names. Log so a broken Firestore read is visible.
+            logger.warning(
+                "Cross-race contamination guard disabled for %s: could not load other %s races from Firestore: %s",
+                race_id,
+                state,
+                exc,
+            )
     else:
         try:
             from shared.config import FIRESTORE_RACES_COLLECTION, local_paths
@@ -770,10 +780,16 @@ def _get_other_state_candidates(race_id: str, state: str | None) -> set[str]:
                             for cand in data.get("candidates", []):
                                 if isinstance(cand, dict) and cand.get("name") and cand.get("withdrawn") is not True:
                                     other_names.add(cand["name"].strip())
-                    except Exception:
+                    except Exception as exc:
+                        logger.warning("Contamination guard skipped unreadable race file %s: %s", path, exc)
                         continue
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Cross-race contamination guard disabled for %s: could not load other %s races locally: %s",
+                race_id,
+                state,
+                exc,
+            )
 
     return other_names
 
@@ -1525,6 +1541,7 @@ def _make_editing_handlers(
 
     def set_issue_stance(args: Dict[str, Any]) -> str:
         from pipeline_client.agent.agent import _is_missing_stance_text
+        from shared.text_quality import clean_pipeline_language, normalize_no_position_stance
 
         name, issue = args["candidate_name"], args["issue"]
         if issue not in _CANONICAL_ISSUE_SET:
@@ -1535,6 +1552,9 @@ def _make_editing_handlers(
         if not c:
             return f"Candidate '{name}' not found."
         stance_text = str(args["stance"] or "")
+        # "No specific public position was identified on ..." is the marker in
+        # other words; store the exact marker so the frontend recognizes it.
+        stance_text = normalize_no_position_stance(clean_pipeline_language(stance_text))
         if _is_missing_stance_text(stance_text) and "no public position found" not in stance_text.lower():
             log("warning", f"    set_issue_stance({name!r}, {issue!r}) BLOCKED: placeholder stance {stance_text!r}")
             return (
@@ -1559,7 +1579,7 @@ def _make_editing_handlers(
         # research and later review/iteration passes. Models often append their
         # search narrative to this field despite being told to use the exact
         # marker; the research audit is the proper place for that evidence.
-        stored_stance = "No public position found" if is_documented_absence else args["stance"]
+        stored_stance = "No public position found" if is_documented_absence else stance_text
         stored_confidence = "low" if is_documented_absence else args["confidence"]
         stance_data: Dict[str, Any] = {
             "stance": stored_stance,

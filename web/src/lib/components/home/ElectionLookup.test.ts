@@ -127,7 +127,34 @@ describe("ElectionLookup", () => {
     expect(lookupElectionGeography).not.toHaveBeenCalled();
   });
 
-  it("renders Census delegate districts as at-large", async () => {
+  it("restores a shared link that uses a postal code", async () => {
+    window.history.replaceState({}, "", "/my-ballot/?state=AK&district=00");
+
+    render(ElectionLookup, {
+      races: [
+        {
+          id: "ak-house-2026",
+          title: "Alaska's At-Large Congressional District Election, 2026",
+          office: "U.S. House of Representatives",
+          state: "Alaska",
+          election_date: "2099-11-03",
+          updated_utc: "2026-07-01T00:00:00Z",
+          candidates: [],
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Alaska · At-large congressional district/),
+      ).toBeTruthy(),
+    );
+    expect(
+      screen.getByRole("tab", { name: "U.S. House", selected: true }),
+    ).toBeTruthy();
+  });
+
+  it("explains D.C.'s non-voting delegate seat", async () => {
     window.history.replaceState(
       {},
       "",
@@ -137,9 +164,22 @@ describe("ElectionLookup", () => {
     render(ElectionLookup, { races: [] });
 
     await waitFor(() =>
-      expect(screen.getByText(/At-large congressional district/i)).toBeTruthy(),
+      expect(screen.getByText(/Non-voting delegate district/i)).toBeTruthy(),
     );
     expect(screen.queryByText(/House District 0/i)).toBeNull();
+    expect(
+      screen.getByText(
+        /D\.C\. elects a non-voting delegate to the U\.S\. House; Smarter\.Vote doesn.t cover that race yet\./,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("suggests a covered example address and has no stray space after VOTE411", async () => {
+    const { container } = render(ElectionLookup, { races: [] });
+    expect(
+      screen.getByLabelText("Home address").getAttribute("placeholder"),
+    ).toBe("301 W 2nd St, Austin, TX 78701");
+    expect(container.textContent).not.toMatch(/VOTE411\s+\./);
   });
 
   it("supports keyboard navigation and selection in the address combobox", async () => {
@@ -186,5 +226,83 @@ describe("ElectionLookup", () => {
     expect(input.getAttribute("aria-expanded")).toBe("false");
     expect(input.getAttribute("aria-controls")).toBeNull();
     expect(document.getElementById("address-suggestions")).toBeNull();
+  });
+
+  it("moves focus to the results and announces them, then back to the input", async () => {
+    lookupElectionGeography.mockResolvedValue({
+      state: "Maryland",
+      congressionalDistrict: "04",
+    });
+    render(ElectionLookup, { races });
+
+    const status = screen.getByRole("status");
+    const input = screen.getByLabelText("Home address") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "A complete address" } });
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Show my elections" }),
+    );
+
+    const heading = await screen.findByRole("heading", {
+      name: "Your election guide",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    // The same live-region node persists and only its text changes.
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status.textContent).toContain("Found 1 race");
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Search another address" }),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByLabelText("Home address"),
+      ),
+    );
+  });
+
+  it("does not reopen suggestions from a lookup pending at submit", async () => {
+    suggestUsAddresses.mockResolvedValue([
+      { id: "x", text: "Late suggestion", resolveAddress: vi.fn() },
+    ]);
+    lookupElectionGeography.mockRejectedValue(new Error("No match."));
+    vi.useFakeTimers();
+    render(ElectionLookup, { races });
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "1600 Pennsylvania" } });
+    await fireEvent.submit(input.closest("form")!);
+    await vi.advanceTimersByTimeAsync(700);
+    expect(suggestUsAddresses).not.toHaveBeenCalled();
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("keeps working when sessionStorage throws", async () => {
+    const getItem = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+    try {
+      lookupElectionGeography.mockResolvedValue({
+        state: "Maryland",
+        congressionalDistrict: "04",
+      });
+      render(ElectionLookup, { races });
+      const input = screen.getByLabelText("Home address") as HTMLInputElement;
+      await fireEvent.input(input, { target: { value: "A complete address" } });
+      await fireEvent.click(
+        screen.getByRole("button", { name: "Show my elections" }),
+      );
+      expect(
+        await screen.findByRole("heading", { name: "Your election guide" }),
+      ).toBeTruthy();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 });

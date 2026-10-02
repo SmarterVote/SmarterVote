@@ -4,20 +4,35 @@
   import { getAuth0Client } from "$lib/auth";
 
   let authError = "";
+  let sessionExpired = false;
+  /** True once we are handing off to Auth0, so the page isn't blank. */
+  let redirecting = false;
 
   function clearAuthQueryParams() {
     const url = new URL(window.location.href);
-    ["code", "state", "error", "error_description"].forEach((p) =>
-      url.searchParams.delete(p),
+    ["code", "state", "error", "error_description", "session_expired"].forEach(
+      (p) => url.searchParams.delete(p),
     );
     history.replaceState({}, "", `${url.pathname}${url.search}`);
   }
 
   async function startLogin() {
+    redirecting = true;
     const auth0 = await getAuth0Client();
     await auth0.loginWithRedirect({
       authorizationParams: { prompt: "login" },
     });
+  }
+
+  async function retryLogin() {
+    authError = "";
+    try {
+      await startLogin();
+    } catch (error) {
+      console.error("Admin sign-in could not start.", error);
+      redirecting = false;
+      authError = "Sign-in is unavailable right now. Please try again later.";
+    }
   }
 
   onMount(async () => {
@@ -33,6 +48,15 @@
         return;
       }
 
+      if (params.has("session_expired")) {
+        // fetchWithAuth sends us here after the API rejected a refreshed
+        // token. Explain why instead of bouncing straight into a redirect.
+        clearAuthQueryParams();
+        sessionExpired = true;
+        authError = "Your admin session expired. Sign in again to continue.";
+        return;
+      }
+
       if (params.has("code")) {
         try {
           await auth0.handleRedirectCallback();
@@ -41,8 +65,7 @@
           return;
         } catch {
           clearAuthQueryParams();
-          authError =
-            "Authentication callback failed. Please try signing in again.";
+          authError = "Sign-in didn't complete. Please try again.";
           return;
         }
       }
@@ -54,9 +77,14 @@
       }
 
       await startLogin();
-    } catch {
-      authError =
-        "Unable to start login. Please verify Auth0 domain, client id, and audience configuration.";
+    } catch (error) {
+      // Configuration detail is for operators only; visitors get plain copy.
+      console.error(
+        "Admin sign-in could not start. Verify the Auth0 domain, client id, and audience configuration.",
+        error,
+      );
+      redirecting = false;
+      authError = "Sign-in is unavailable right now. Please try again later.";
     }
   });
 </script>
@@ -66,18 +94,30 @@
   <meta name="robots" content="noindex,nofollow" />
 </svelte:head>
 
-{#if authError}
-  <div class="max-w-xl mx-auto mt-16 px-4">
+<div class="page-narrow max-w-xl py-16">
+  <h1 class="h-page">Admin sign-in</h1>
+  <p class="mt-2 text-content-muted">For Smarter.Vote staff.</p>
+
+  {#if authError}
     <div
-      class="rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3 text-sm"
+      class="mt-6 {sessionExpired ? 'alert-warn' : 'alert-error'}"
+      role="alert"
     >
       <p>{authError}</p>
-      <button
-        class="mt-3 inline-flex items-center rounded bg-red-700 px-3 py-1.5 text-white hover:bg-red-800"
-        on:click={() => startLogin()}
-      >
-        Sign in again
-      </button>
     </div>
-  </div>
-{/if}
+    <button type="button" class="btn-primary mt-4" on:click={retryLogin}>
+      {sessionExpired ? "Sign in again" : "Sign in"}
+    </button>
+  {:else}
+    <p
+      class="mt-6 flex items-center gap-2 text-sm text-content-muted"
+      role="status"
+    >
+      <span
+        class="h-4 w-4 animate-spin rounded-full border-2 border-stroke border-t-primary"
+        aria-hidden="true"
+      ></span>
+      {redirecting ? "Redirecting to sign-in…" : "Checking your session…"}
+    </p>
+  {/if}
+</div>

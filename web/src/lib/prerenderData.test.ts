@@ -43,3 +43,68 @@ describe("published data request caches", () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("refreshPrerenderedRaces", () => {
+  const race = (id: string) =>
+    ({
+      id,
+      title: id,
+      office: "U.S. Senate",
+      election_date: "2026-11-03",
+      updated_utc: "2026-07-01T00:00:00Z",
+      candidates: [],
+    }) as import("$lib/types").RaceSummary;
+  const identity = <T>(races: T) => races;
+
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("keeps the prerendered races when the refresh fails", async () => {
+    const { refreshPrerenderedRaces } = await import("./prerenderData");
+    const prerendered = { races: [race("a")], loadError: false };
+    const fetchFn = vi.fn().mockRejectedValue(new Error("offline"));
+
+    await expect(
+      refreshPrerenderedRaces(prerendered, identity, fetchFn),
+    ).resolves.toBe(prerendered);
+  });
+
+  it("keeps the prerendered races when the refresh returns a non-OK status", async () => {
+    const { refreshPrerenderedRaces } = await import("./prerenderData");
+    const prerendered = { races: [race("a")], loadError: false };
+    const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+
+    await expect(
+      refreshPrerenderedRaces(prerendered, identity, fetchFn),
+    ).resolves.toBe(prerendered);
+  });
+
+  it("does not replace good prerendered races with an empty refresh", async () => {
+    const { refreshPrerenderedRaces } = await import("./prerenderData");
+    const prerendered = { races: [race("a")], loadError: false };
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+
+    await expect(
+      refreshPrerenderedRaces(prerendered, identity, fetchFn),
+    ).resolves.toBe(prerendered);
+  });
+
+  it("adopts fresher races and clears a build-time load error", async () => {
+    const { refreshPrerenderedRaces } = await import("./prerenderData");
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([race("a"), race("b")]),
+    });
+
+    const result = await refreshPrerenderedRaces(
+      { races: [], loadError: true },
+      identity,
+      fetchFn,
+    );
+    expect(result.loadError).toBe(false);
+    expect(result.races.map(({ id }) => id)).toEqual(["a", "b"]);
+  });
+});

@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List
 
+from shared.party_labels import normalize_party
 from shared.run_health import RunFailureReason, record_step_failure
+from shared.text_quality import NO_POSITION_MARKER, clean_pipeline_language, is_placeholder_text, normalize_no_position_stance
 
 _TEXT_REPLACEMENTS = {
     " after advanced ": " after advancing ",
@@ -20,6 +22,11 @@ def _clean_text(value: Any) -> Any:
     for old, new in _TEXT_REPLACEMENTS.items():
         padded = padded.replace(old, new)
     return padded.strip()
+
+
+def _clean_prose(value: Any) -> Any:
+    """``_clean_text`` plus rewriting pipeline wording ("in the provided search results")."""
+    return clean_pipeline_language(_clean_text(value))
 
 
 def _dedupe_urls(values: Iterable[Any]) -> List[str]:
@@ -387,7 +394,7 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
 
     for field in ("title", "description", "polling_note"):
         before = race_data.get(field)
-        after = _clean_text(before)
+        after = _clean_text(before) if field == "title" else _clean_prose(before)
         if after != before:
             race_data[field] = after
             text_changes += 1
@@ -408,9 +415,17 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
     for candidate in race_data.get("candidates", []):
         if not isinstance(candidate, dict):
             continue
+        party = candidate.get("party")
+        if isinstance(party, str) and normalize_party(party) != party:
+            candidate["party"] = normalize_party(party)
+            text_changes += 1
         for field in ("name", "summary", "donor_summary", "voting_summary"):
             before = candidate.get(field)
-            after = _clean_text(before)
+            after = _clean_text(before) if field == "name" else _clean_prose(before)
+            if field != "name" and isinstance(after, str) and after and is_placeholder_text(after):
+                # "(to be updated)", "TBD", "N/A": nothing a reader can use.
+                after = "" if field == "summary" else None
+                placeholder_fields_cleared += 1
             if after != before:
                 candidate[field] = after
                 text_changes += 1
@@ -476,13 +491,23 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
 
         issues = candidate.get("issues")
         if isinstance(issues, dict):
-            for issue in issues.values():
+            for issue_key in list(issues):
+                issue = issues[issue_key]
                 if not isinstance(issue, dict):
                     continue
                 before = issue.get("stance")
-                after = _clean_text(before)
+                if isinstance(before, str) and before.strip() and is_placeholder_text(before):
+                    # A placeholder ("(to be updated)", "TBD") is not a stance and
+                    # not a researched absence either; drop it so the slot reads as
+                    # unresearched instead of publishing the placeholder.
+                    del issues[issue_key]
+                    placeholder_fields_cleared += 1
+                    continue
+                after = normalize_no_position_stance(_clean_prose(before))
                 if after != before:
                     issue["stance"] = after
+                    if after == NO_POSITION_MARKER:
+                        issue["confidence"] = "low"
                     text_changes += 1
                 sources = issue.get("sources")
                 deduped = _dedupe_sources(sources)
@@ -494,13 +519,13 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
     if isinstance(forecast, dict):
         for field in ("rationale", "takeaway", "uncertainty"):
             before = forecast.get(field)
-            after = _clean_text(before)
+            after = _clean_prose(before)
             if after != before:
                 forecast[field] = after
                 text_changes += 1
         reasons = forecast.get("key_reasons")
         if isinstance(reasons, list):
-            cleaned_reasons = [_clean_text(reason) for reason in reasons if _clean_text(reason)]
+            cleaned_reasons = [_clean_prose(reason) for reason in reasons if _clean_text(reason)]
             if cleaned_reasons != reasons:
                 forecast["key_reasons"] = cleaned_reasons
                 text_changes += 1

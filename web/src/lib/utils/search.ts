@@ -30,6 +30,16 @@ function matchesTerm(
 ): boolean {
   if (!term) return false;
 
+  // Numbers match whole numbers only ("02" = "2", "2nd"), never a prefix:
+  // "Nebraska 2" must not match every race through the year 2026.
+  if (/^\d+$/.test(term)) {
+    const value = Number(term);
+    return searchableTokens.some((token) => {
+      const number = token.match(/^(\d+)(?:st|nd|rd|th)?$/);
+      return number !== null && Number(number[1]) === value;
+    });
+  }
+
   // 1. Direct word prefix or exact match
   if (searchableTokens.some((token) => token.startsWith(term))) {
     return true;

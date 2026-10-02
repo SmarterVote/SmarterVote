@@ -8,6 +8,8 @@
   title="Terms of use"
   description="The basic terms for using Smarter.Vote's public election research."
   path="/terms/"
+  eyebrow="Policy"
+  updated="2026-08-30"
 >
   <PolicySection title="Informational service">
     <p>

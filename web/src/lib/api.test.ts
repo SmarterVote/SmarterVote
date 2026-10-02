@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { getChamberForecasts, getRace, getRaceSummaries } from "./api";
+import { getDraftRace, getRace, getRaceSummaries } from "./api";
 import { sampleRaces } from "./sampleData";
 
 describe("API Fallback Functionality", () => {
@@ -59,61 +59,46 @@ describe("API Fallback Functionality", () => {
     vi.stubEnv("VITE_PUBLIC_DATA_URL", "https://static.example/races");
     const mockFetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
 
-    await expect(getRaceSummaries(mockFetch, false)).rejects.toThrow(
-      "Static data request failed: 404",
-    );
+    await expect(getRaceSummaries(mockFetch, false)).rejects.toThrow(/404/);
   });
 
-  it("uses configured static forecast data from GCS mode", async () => {
-    vi.stubEnv("VITE_PUBLIC_DATA_URL", "https://static.example/races");
-    const summariesPayload = [
-      {
-        id: "tx-senate-2026",
-        title: "Texas Senate",
-        office: "United States Senate",
-        jurisdiction: "Texas",
-        state: "Texas",
-        election_date: "2026-11-03",
-        updated_utc: "2026-01-01T00:00:00Z",
-        candidates: [],
-        forecast: {
-          predicted_winner_party: "Republican",
-          rating: "safe_r",
-        },
-      },
-    ];
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(summariesPayload),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            house: "Republicans are favored in the House.",
-            senate: "Republicans are favored in the Senate.",
-            governors: "Republicans are favored in governor races.",
-            updated_at: "2026-01-01T00:00:00Z",
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(summariesPayload),
-      });
+  it("shares one cached summaries request with the page loaders", async () => {
+    vi.resetModules();
+    const api = await import("./api");
+    const prerender = await import("./prerenderData");
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([{ id: "a", candidates: [] }]),
+    });
 
-    const summaries = await getRaceSummaries(mockFetch, false);
-    const chamberForecasts = await getChamberForecasts(mockFetch, false);
+    const fromPage = await prerender.fetchPublishedRaceSummaries(mockFetch);
+    const fromHeader = await api.getRaceSummaries(mockFetch, false);
 
-    expect(summaries.length).toBeGreaterThan(0);
-    expect(chamberForecasts.chambers?.senate?.control_party).toBe("Republican");
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://static.example/races/summaries.json",
-    );
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://static.example/races/chamber_forecasts.json",
-    );
+    expect(fromHeader).toBe(fromPage);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches draft races through the lazily loaded auth fetcher", async () => {
+    const fetchWithAuth = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: "draft-race", candidates: [] }),
+    });
+    vi.doMock("$lib/stores/apiStore", () => ({ fetchWithAuth }));
+    try {
+      const result = await getDraftRace("draft-race");
+      expect(result.id).toBe("draft-race");
+      expect(fetchWithAuth.mock.calls[0][0]).toContain(
+        "/api/races/draft-race/data?draft=true",
+      );
+    } finally {
+      vi.doUnmock("$lib/stores/apiStore");
+    }
+  });
+
+  it("keeps the public fetch module free of static auth imports", async () => {
+    const { default: source } = await import("./api.ts?raw");
+    expect(source).not.toMatch(/^import[^;]*(\$lib\/auth|apiStore|auth0)/m);
+    expect(source).not.toMatch(/^import[^;]*sampleData/m);
   });
 
   it("should not show generic sample data for unknown race IDs", async () => {

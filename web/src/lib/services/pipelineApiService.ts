@@ -18,6 +18,7 @@ import type {
   ResearchCheckpoint,
   ResearchCheckpointInput,
   ResearchProgramStatus,
+  LogEntry,
 } from "$lib/types";
 import type {
   ChamberForecastGenerateResponse,
@@ -31,6 +32,24 @@ import type {
   RaceVersion,
   RunsResponse,
 } from "$lib/services/pipelineApiTypes";
+
+/** Server-side cap on `GET /runs?limit=` (services/races-api/routers/runs.py). */
+export const RUN_HISTORY_MAX_LIMIT = 500;
+/**
+ * Page size for background polling of run history. Each `/runs` call reads up
+ * to `limit` Firestore docs, so polls stay small; the full window is fetched
+ * only on an explicit "Load more" (or when a history filter needs it).
+ */
+export const RUN_HISTORY_POLL_LIMIT = 50;
+/** Page size for `GET /runs/{id}/logs` (server caps at 5000). */
+export const RUN_LOG_PAGE_SIZE = 1000;
+
+export type RunLogsPage = {
+  logs: LogEntry[];
+  total: number;
+  next_cursor?: string | null;
+  has_more?: boolean;
+};
 
 export type {
   ChamberForecastGenerateResponse,
@@ -155,10 +174,20 @@ export class PipelineApiService {
    * Load run history from Firestore (via /runs endpoint).
    * Firestore run docs have: run_id, race_id, status, progress, current_step,
    * started_at, completed_at, duration_ms, error, options — but NOT steps[] or logs[].
+   *
+   * The server caps at RUN_HISTORY_MAX_LIMIT. Polls use the small
+   * RUN_HISTORY_POLL_LIMIT page; `truncated` reports a full page (older runs
+   * may exist beyond it).
    */
-  async loadRunHistory(): Promise<RunHistoryItem[]> {
+  async loadRunHistoryPage(
+    limit: number = RUN_HISTORY_POLL_LIMIT,
+  ): Promise<{ runs: RunHistoryItem[]; truncated: boolean; limit: number }> {
+    const effectiveLimit = Math.max(
+      1,
+      Math.min(Math.floor(limit), RUN_HISTORY_MAX_LIMIT),
+    );
     const res = await fetchWithAuth(
-      `${this.apiBase}/runs`,
+      `${this.apiBase}/runs?limit=${effectiveLimit}`,
       {},
       API_TIMEOUT_ARTIFACT,
     );
@@ -166,7 +195,7 @@ export class PipelineApiService {
     const data: RunsResponse = await res.json();
     const runs = data.runs || [];
 
-    return runs.map((r: RunInfo, idx: number) => {
+    const items = runs.map((r: RunInfo, idx: number) => {
       const normalized = this.normalizeRun(r);
       return {
         ...normalized,
@@ -184,30 +213,21 @@ export class PipelineApiService {
         current_step_progress: normalized.current_step_progress,
       } as RunHistoryItem;
     });
+    return {
+      runs: items,
+      truncated: items.length >= effectiveLimit,
+      limit: effectiveLimit,
+    };
   }
 
   /**
-   * Delete a run from history (or cancel if still active)
+   * Cancel an active run. Never deletes: the server answers 409 when the run
+   * has already finished, so a stale Cancel button cannot erase history.
    */
-  async deleteRun(runId: string): Promise<void> {
+  async cancelRun(runId: string): Promise<void> {
     const res = await fetchWithAuth(
-      `${this.apiBase}/runs/${encodeURIComponent(runId)}`,
-      { method: "DELETE" },
-      API_TIMEOUT_SHORT,
-    );
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error");
-      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
-    }
-  }
-
-  /**
-   * Prune all finished runs from Firestore history.
-   */
-  async pruneRuns(): Promise<void> {
-    const res = await fetchWithAuth(
-      `${this.apiBase}/runs`,
-      { method: "DELETE" },
+      `${this.apiBase}/runs/${encodeURIComponent(runId)}/cancel`,
+      { method: "POST" },
       API_TIMEOUT_SHORT,
     );
     if (!res.ok) {
@@ -235,13 +255,9 @@ export class PipelineApiService {
   async getRunLogs(
     runId: string,
     cursor: string | null = null,
-  ): Promise<{
-    logs: import("$lib/types").LogEntry[];
-    total: number;
-    next_cursor?: string | null;
-    has_more?: boolean;
-  }> {
-    const params = new URLSearchParams({ limit: "1000" });
+    limit: number = RUN_LOG_PAGE_SIZE,
+  ): Promise<RunLogsPage> {
+    const params = new URLSearchParams({ limit: String(limit) });
     if (cursor) params.set("cursor", cursor);
     const res = await fetchWithAuth(
       `${this.apiBase}/runs/${encodeURIComponent(runId)}/logs?${params.toString()}`,
@@ -250,6 +266,35 @@ export class PipelineApiService {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
+  }
+
+  /**
+   * Load only the newest `keep` log entries in one bounded request
+   * (`?tail=true`), returned oldest-first, plus the cursor to resume forward
+   * polling from. `truncated` means older entries exist beyond the tail.
+   */
+  async getRunLogsTail(
+    runId: string,
+    keep: number,
+  ): Promise<{
+    logs: LogEntry[];
+    next_cursor: string | null;
+    truncated: boolean;
+  }> {
+    const limit = Math.max(1, Math.min(Math.floor(keep), 5000));
+    const params = new URLSearchParams({ tail: "true", limit: String(limit) });
+    const res = await fetchWithAuth(
+      `${this.apiBase}/runs/${encodeURIComponent(runId)}/logs?${params.toString()}`,
+      {},
+      API_TIMEOUT_SHORT,
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data: RunLogsPage & { truncated?: boolean } = await res.json();
+    return {
+      logs: data.logs || [],
+      next_cursor: data.next_cursor ?? null,
+      truncated: Boolean(data.truncated),
+    };
   }
 
   /**
@@ -289,21 +334,6 @@ export class PipelineApiService {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     return await res.json();
-  }
-
-  /**
-   * Delete a published race
-   */
-  async deletePublishedRace(raceId: string): Promise<void> {
-    const res = await fetchWithAuth(
-      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/unpublish`,
-      { method: "POST" },
-      API_TIMEOUT_DEFAULT,
-    );
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error");
-      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
-    }
   }
 
   // -- Drafts API ---------------------------------------------------------
@@ -425,7 +455,12 @@ export class PipelineApiService {
       { method: "DELETE" },
       API_TIMEOUT_SHORT,
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      throw new Error(
+        `HTTP ${res.status}: ${res.statusText}${errorText ? `. ${errorText}` : ""}`,
+      );
+    }
   }
 
   /**
@@ -551,28 +586,6 @@ export class PipelineApiService {
       API_TIMEOUT_ARTIFACT,
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    return await res.json();
-  }
-
-  /**
-   * Run pipeline for a single race (direct, not queued)
-   */
-  async runRace(
-    raceId: string,
-    options: RunOptions = {},
-  ): Promise<{ run_id: string; status: string; race_id: string }> {
-    const res = await fetchWithAuth(
-      `${this.apiBase}/api/races/${encodeURIComponent(raceId)}/run`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(options),
-      },
-    );
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "Unknown error");
-      throw new Error(`HTTP ${res.status}: ${res.statusText}. ${errorText}`);
-    }
     return await res.json();
   }
 

@@ -5,6 +5,7 @@ development and tests retain the limits library's in-memory backend.
 """
 
 import hashlib
+import ipaddress
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -96,12 +97,55 @@ class FirestoreRateLimitStorage(Storage):
         self._document(key).delete()
 
 
+def _trusted_proxy_hops() -> int:
+    """How many trusted proxies append to X-Forwarded-For (Cloud Run direct: 1)."""
+    try:
+        return max(0, int(os.getenv("TRUSTED_PROXY_HOPS", "1")))
+    except ValueError:
+        return 1
+
+
+def _valid_ip(value: str) -> str | None:
+    candidate = value.strip()
+    try:
+        ipaddress.ip_address(candidate)
+    except ValueError:
+        return None
+    return candidate
+
+
+def client_ip(request: Request) -> str | None:
+    """Return the caller's IP as observed by the trusted front end.
+
+    On Cloud Run, Google's front end *appends* the address of the connecting
+    client to whatever X-Forwarded-For the caller sent, so the right-most entry
+    is the only one a client cannot forge (``TRUSTED_PROXY_HOPS`` counts extra
+    trusted proxies such as a load balancer, each of which appends one more
+    hop). The left-most entry is caller-controlled and must never be used as a
+    rate-limit or analytics key. Without the header (local dev, tests) fall back
+    to the socket peer.
+    """
+    hops = _trusted_proxy_hops()
+    xff = request.headers.get("x-forwarded-for")
+    if hops and xff:
+        entries = [entry.strip() for entry in xff.split(",") if entry.strip()]
+        if len(entries) >= hops:
+            ip = _valid_ip(entries[-hops])
+            if ip:
+                return ip
+    return request.client.host if request.client else None
+
+
 def get_rate_limit_key(request: Request) -> str:
     """Return a client key; no caller-controlled header can disable limits."""
-    return get_remote_address(request)
+    return client_ip(request) or get_remote_address(request)
 
 
 limiter = Limiter(
     key_func=get_rate_limit_key,
     storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://"),
+    # Emit X-RateLimit-Limit / -Remaining / -Reset (and Retry-After on 429).
+    # Every @limiter.limit endpoint must take a ``response: Response`` argument
+    # (or return a Response) for slowapi to attach these.
+    headers_enabled=True,
 )

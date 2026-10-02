@@ -44,9 +44,13 @@ describe("party utilities", () => {
       expect(partyAbbr("l")).toBe("L");
     });
 
-    it("falls back to first letter capitalized for other parties", () => {
-      expect(partyAbbr("Constitution")).toBe("C");
-      expect(partyAbbr("Reform")).toBe("R");
+    // A single letter would read as a known party ("Reform" -> "R" looks
+    // Republican, "Legal Marijuana Now" -> "L" looks Libertarian).
+    it("never collapses other parties to a known party's letter", () => {
+      expect(partyAbbr("Constitution")).toBe("Con");
+      expect(partyAbbr("Reform")).toBe("Ref");
+      expect(partyAbbr("Legal Marijuana Now")).toBe("LMN");
+      expect(partyAbbr("Party for Socialism and Liberation")).toBe("PSL");
     });
   });
 
@@ -155,10 +159,28 @@ describe("party utilities", () => {
       ["Independent", "ind"],
       ["Green", "grn"],
       ["Libertarian", "lib"],
-      ["Nonpartisan", "other"],
+      ["Nonpartisan", "ind"],
+      ["No Party Preference", "ind"],
+      ["Unaffiliated", "ind"],
+      ["Independent Party", "ind"],
+      ["dem", "dem"],
+      ["rep", "rep"],
       ["Undeclared", "other"],
+      // California's American Independent Party is a right-wing party, not a
+      // label for having no party.
+      ["American Independent", "other"],
+      ["American Independent Party", "other"],
+      ["Independence Party", "other"],
     ])("classifies %s as %s", (label, key) => {
       expect(partyKey(label)).toBe(key);
+    });
+
+    it("does not render an American Independent nominee as an independent", () => {
+      expect(partyAbbr("American Independent Party")).toBe("AIP");
+      expect(partyBadgeClass("American Independent Party")).not.toContain(
+        "purple",
+      );
+      expect(partyRing("American Independent Party")).toBe("ring-gray-400");
     });
 
     it("never leaves a recognised party without a ring or avatar colour", () => {

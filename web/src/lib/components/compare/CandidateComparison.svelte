@@ -1,14 +1,31 @@
 <script lang="ts">
   import ConfidenceIndicator from "$lib/components/ConfidenceIndicator.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
+  import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import MobileCandidateComparison from "$lib/components/compare/MobileCandidateComparison.svelte";
   import ReviewScoreInfo from "$lib/components/compare/ReviewScoreInfo.svelte";
   import SourceLink from "$lib/components/SourceLink.svelte";
-  import type { Candidate, Race } from "$lib/types";
+  import type { Candidate, CanonicalIssue, Race } from "$lib/types";
   import { CANONICAL_ISSUES, getIssueDisplayName } from "$lib/types";
+  import {
+    hasPublicPosition,
+    hasStance,
+    neutralCandidateOrder,
+    uniqueCandidatesByName,
+  } from "$lib/utils/candidates";
+  import { formatRating } from "$lib/utils/forecast";
   import { candidateSlug } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
-  import { collapsedPreview, stancePreview } from "$lib/utils/stance";
+  import {
+    candidateForecastProbability,
+    cleanDisplayText,
+    comparePreview,
+    formatWinProbability,
+    isNoPositionStance,
+    isUncontestedRace,
+  } from "$lib/utils/racePage";
+  import { onMount } from "svelte";
+  import { collapsedPreview } from "$lib/utils/stance";
   import { isExternalUrl } from "$lib/utils/url";
 
   export let race: Race;
@@ -17,36 +34,56 @@
   export let collapseText = false;
   export let isDraftPreview = false;
   export let showQuality = false;
+  /** Fewest candidates the toggles may leave selected; checked boxes lock at this floor. */
+  export let minSelected = 1;
   export let onToggle: ((candidateName: string) => void) | undefined =
     undefined;
+  /** Issue shown in the phone comparison; bindable so a page can keep it in the URL. */
+  export let selectedIssue: CanonicalIssue = "Healthcare";
 
   let expandedSources: Record<string, boolean> = {};
-  let expandedStances: Record<string, boolean> = {};
-  let expandedSummaries: Record<string, boolean> = {};
-  let failedImages: Record<string, boolean> = {};
 
-  /** Collapsed previews keep the homepage module short; full pages stay verbatim. */
-  function summaryPreview(summary: string): string {
-    if (!collapseText) return summary;
-    return collapsedPreview(summary);
+  /**
+   * Which layout to keep in the DOM. Server-rendered HTML carries both (CSS
+   * shows the right one, so there is no shift); after mount the hidden one is
+   * dropped, halving the nodes, and it comes back if the viewport crosses the
+   * `lg` breakpoint.
+   */
+  let layout: "both" | "mobile" | "desktop" = "both";
+  onMount(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(min-width: 1024px)");
+    const update = () => (layout = query.matches ? "desktop" : "mobile");
+    update();
+    query.addEventListener?.("change", update);
+    return () => query.removeEventListener?.("change", update);
+  });
+
+  /**
+   * Collapsed text for a cell: a hard-capped preview in dense modules (the
+   * homepage), whole sentences up to `limit` characters on full pages.
+   */
+  function textPreview(text: string, limit = 240): string {
+    return collapseText ? collapsedPreview(text) : comparePreview(text, limit);
   }
 
-  function toggleSummary(candidate: Candidate) {
-    const key = candidate.name;
-    expandedSummaries = {
-      ...expandedSummaries,
-      [key]: !expandedSummaries[key],
-    };
+  let expandedTexts: Record<string, boolean> = {};
+
+  function toggleText(key: string) {
+    expandedTexts = { ...expandedTexts, [key]: !expandedTexts[key] };
   }
 
-  function stanceKey(issue: string, candidate: Candidate): string {
-    return `${issue}:${candidate.name}:stance`;
-  }
-
-  function toggleStance(issue: string, candidate: Candidate) {
-    const key = stanceKey(issue, candidate);
-    expandedStances = { ...expandedStances, [key]: !expandedStances[key] };
-  }
+  // The desktop header lives outside the horizontal scroller so it can stick
+  // to the viewport; it mirrors the scroller's offset to stay aligned. Its
+  // column strip is exactly as wide as the body's candidate columns from the
+  // first paint: the body is max(container, minTableWidth) wide, so the strip
+  // is max(100%, minTableWidth - label) — pure CSS, nothing to measure, no
+  // layout shift.
+  let scrollLeft = 0;
+  $: labelWidth = compact ? 160 : 180;
+  $: columnWidth = compact ? 220 : 240;
+  $: minTableWidth = labelWidth + candidates.length * columnWidth;
+  $: gridColumns = `${labelWidth}px repeat(${candidates.length}, minmax(0, 1fr))`;
 
   function sourcesKey(issue: string, candidate: Candidate): string {
     return `${issue}:${candidate.name}`;
@@ -57,18 +94,6 @@
     expandedSources = { ...expandedSources, [key]: !expandedSources[key] };
   }
 
-  function markImageFailed(candidate: Candidate) {
-    failedImages = { ...failedImages, [candidate.name]: true };
-  }
-
-  function initials(name: string): string {
-    return name
-      .split(" ")
-      .map((part) => part[0])
-      .slice(0, 2)
-      .join("");
-  }
-
   const backgroundRows: Array<{
     label: string;
     summary: "donor_summary" | "voting_summary";
@@ -76,16 +101,16 @@
     link: string;
   }> = [
     {
-      label: "Financial Donors",
+      label: "Top Donors",
       summary: "donor_summary",
       url: "donor_source_url",
-      link: "Open FEC Donor Details",
+      link: "Donor details",
     },
     {
       label: "Voting Record",
       summary: "voting_summary",
       url: "voting_source_url",
-      link: "Open Detailed Voting Source",
+      link: "Voting record source",
     },
   ];
 
@@ -93,56 +118,79 @@
     ? CANONICAL_ISSUES.filter((key) =>
         candidates.some((candidate) => {
           const stance = candidate.issues?.[key];
-          return stance && stance.sources && stance.sources.length > 0;
+          return hasStance(stance) && (stance?.sources?.length ?? 0) > 0;
         }),
       ).slice(0, 1)
-    : CANONICAL_ISSUES;
+    : CANONICAL_ISSUES.filter(
+        (key) =>
+          // Rows where nobody compared states a position collapse into one line.
+          candidates.some((candidate) =>
+            hasPublicPosition(candidate.issues?.[key]),
+          ) ||
+          !candidates.some((candidate) => hasStance(candidate.issues?.[key])),
+      );
+  $: noPositionIssues = compact
+    ? []
+    : CANONICAL_ISSUES.filter((key) => !issueKeys.includes(key)).map(
+        getIssueDisplayName,
+      );
+  $: everyIssueEmpty =
+    !compact &&
+    noPositionIssues.length > 0 &&
+    !CANONICAL_ISSUES.some((key) =>
+      candidates.some((candidate) =>
+        hasPublicPosition(candidate.issues?.[key]),
+      ),
+    );
+
+  $: activeCandidates = neutralCandidateOrder(
+    uniqueCandidatesByName(race.candidates).filter(
+      (candidate) => !candidate.withdrawn,
+    ),
+  );
+  // No forecast for an uncontested race (the race page has none to link to).
+  $: uncontested = isUncontestedRace(race, activeCandidates.length);
 
   function forecastProbability(candidate: Candidate): number | undefined {
-    const forecast = race.forecast;
-    if (!forecast) return undefined;
-    if (forecast.predicted_winner_name === candidate.name)
-      return forecast.win_probability;
-    const party = candidate.party?.toLowerCase() ?? "";
-    const match = Object.entries(forecast.party_probabilities ?? {}).find(
-      ([key]) =>
-        party.includes(key.toLowerCase()) ||
-        key.toLowerCase().includes(party) ||
-        key.toLowerCase() === party.charAt(0),
+    return candidateForecastProbability(
+      candidate,
+      race.forecast,
+      activeCandidates,
     );
-    return match?.[1];
   }
 </script>
 
 {#if onToggle}
-  <div
-    class="mb-5 flex flex-col gap-3 rounded-2xl border border-stroke bg-surface p-4 shadow-sm sm:mb-6 sm:p-5"
-  >
+  <div class="card mb-5 flex flex-col gap-3 p-4 sm:mb-6 sm:p-5">
     <div>
-      <h2 class="text-sm font-extrabold text-content">Choose candidates</h2>
+      <h2 class="text-sm font-semibold text-content">Choose candidates</h2>
       <p class="mt-0.5 text-xs leading-5 text-content-subtle">
         Select who you want to include in the comparison.
       </p>
     </div>
     <div class="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2.5">
-      {#each race.candidates.filter((candidate) => !candidate.withdrawn) as candidate}
+      {#each activeCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
         {@const checked = candidates.some(
           (selected) => selected.name === candidate.name,
         )}
         <label
-          class="inline-flex min-h-12 cursor-pointer select-none items-center gap-3 rounded-xl border px-3.5 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-surface-alt {checked
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+          class="inline-flex min-h-11 cursor-pointer select-none items-center gap-3 rounded-lg border px-3.5 py-2 text-sm font-semibold text-content transition-colors hover:bg-surface-alt {checked
+            ? 'border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-950/40'
             : 'border-stroke bg-surface'}"
         >
           <input
             type="checkbox"
             {checked}
+            disabled={checked && candidates.length <= minSelected}
+            title={checked && candidates.length <= minSelected
+              ? `At least ${minSelected} candidate${minSelected === 1 ? "" : "s"} must stay in the comparison`
+              : undefined}
             on:change={() => onToggle?.(candidate.name)}
-            class="h-5 w-5 cursor-pointer rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
+            class="h-5 w-5 cursor-pointer rounded border-stroke bg-surface text-primary-600 focus:ring-primary-500"
           />
           {candidate.name}
           {#if candidate.party}<span
-              class="ml-auto rounded-md bg-surface-alt px-1.5 py-0.5 text-[10px] font-bold text-content-subtle sm:ml-0"
+              class="ml-auto rounded-md bg-surface-alt px-1.5 py-0.5 text-xs font-bold text-content-subtle sm:ml-0"
               >{partyAbbr(candidate.party)}</span
             >{/if}
         </label>
@@ -151,431 +199,502 @@
   </div>
 {/if}
 
-<MobileCandidateComparison
-  {race}
-  {candidates}
-  {compact}
-  {collapseText}
-  {isDraftPreview}
-  {showQuality}
-/>
+{#if layout !== "desktop"}
+  <MobileCandidateComparison
+    {race}
+    {candidates}
+    {compact}
+    {collapseText}
+    {isDraftPreview}
+    {showQuality}
+    bind:selectedIssue
+  />
+{/if}
 
-<div
-  data-desktop-candidate-comparison
-  class="hidden isolate overflow-hidden rounded-2xl border border-stroke bg-surface shadow-sm lg:block"
->
-  {#if showQuality && race.validation_grade}
-    <div
-      class="flex items-start gap-3 border-b border-stroke bg-emerald-50 px-5 py-3.5 dark:bg-emerald-950/30"
-    >
-      <span
-        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-lg font-extrabold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-        >{race.validation_grade.grade}</span
+{#if layout !== "mobile"}
+  <!-- overflow-clip (not hidden) keeps the rounded corners without turning this
+     box into a scroll container, so the header can stick to the viewport. -->
+  <div
+    data-desktop-candidate-comparison
+    class="relative isolate hidden overflow-clip rounded-xl border border-stroke bg-surface shadow-sm lg:block"
+  >
+    {#if showQuality && race.validation_grade}
+      <div
+        class="flex items-start gap-3 border-b border-stroke bg-emerald-50 px-5 py-3.5 dark:bg-emerald-950/30"
       >
-      <div class="min-w-0 text-sm leading-6 text-content-muted">
         <span
-          class="mr-1.5 text-[10px] font-bold uppercase tracking-wider text-content-subtle"
-          >Automated Research Score</span
+          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-lg font-extrabold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+          >{race.validation_grade.grade}</span
         >
-        <strong class="text-content">{race.validation_grade.score}/100</strong
-        ><ReviewScoreInfo panelId={`desktop-review-score-info-${race.id}`} />
+        <div class="min-w-0 text-sm leading-6 text-content-muted">
+          <span
+            class="mr-1.5 text-xs font-bold uppercase tracking-wider text-content-subtle"
+            >Automated research score</span
+          >
+          <strong class="text-content">{race.validation_grade.score}/100</strong
+          ><ReviewScoreInfo panelId={`desktop-review-score-info-${race.id}`} />
+        </div>
       </div>
-    </div>
-  {/if}
+    {/if}
 
-  <div class="overflow-x-auto custom-scrollbar">
     <div
-      style="min-width: {(compact ? 170 : 220) + candidates.length * 250}px"
       role="table"
       aria-label="Candidate comparison"
       aria-colcount={candidates.length + 1}
     >
-      <!-- The overflow-x wrapper is this header's scroll container, so a
-           viewport-sized top offset would push it down over the first row
-           instead of clearing the site header. -->
+      <!-- Sticky candidate header: stays under the site header while the long
+         comparison scrolls, so every column stays identifiable. -->
       <div
+        role="rowgroup"
         class:sticky={!compact}
-        class:top-0={!compact}
-        class="z-30 w-full border-b border-stroke bg-surface py-4 shadow-sm"
+        class:compare-sticky-header={!compact}
+        class="z-30 border-b border-stroke bg-surface shadow-sm"
       >
-        <div
-          class="grid items-center"
-          role="row"
-          style="grid-template-columns: {compact
-            ? '170px'
-            : '220px'} repeat({candidates.length}, 1fr)"
-        >
+        <div role="row" class="flex">
           <div
             role="columnheader"
-            class="sticky left-0 z-40 flex self-stretch items-center border-r border-stroke bg-surface px-5 text-xs font-bold uppercase tracking-wider text-content-subtle"
+            class="z-10 flex shrink-0 items-center self-stretch border-r border-stroke bg-surface px-5 text-xs font-bold uppercase tracking-wider text-content-subtle"
+            style="width: {labelWidth}px"
           >
-            {compact ? "Compare" : "Candidate comparison"}
+            {compact ? "Compare" : "Candidates"}
           </div>
-          {#each candidates as candidate}
+          <div class="relative min-w-0 flex-1 overflow-hidden">
             <div
-              role="columnheader"
-              class="flex items-center gap-3 border-r border-stroke px-5 last:border-none"
+              class="grid"
+              style="width: max(100%, {minTableWidth -
+                labelWidth}px); grid-template-columns: repeat({candidates.length}, minmax(0, 1fr)); transform: translateX(-{scrollLeft}px)"
             >
-              {#if candidate.image_url && !failedImages[candidate.name]}
-                <img
-                  src={candidate.image_url}
-                  alt=""
-                  class="h-12 w-12 flex-shrink-0 rounded-full border-2 border-stroke object-cover"
-                  on:error={() => markImageFailed(candidate)}
-                />
-              {:else}
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
                 <div
-                  class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                  role="columnheader"
+                  class="flex min-w-0 items-center gap-3 border-r border-stroke px-4 py-3 last:border-none"
                 >
-                  {initials(candidate.name)}
+                  <CandidateAvatar
+                    name={candidate.name}
+                    imageUrl={candidate.image_url}
+                    size={40}
+                    loading="eager"
+                  />
+                  <div class="min-w-0">
+                    <a
+                      href="/races/{race.id}/{candidateSlug(
+                        candidate.name,
+                      )}/{isDraftPreview ? '?draft=true' : ''}"
+                      class="line-clamp-2 text-sm font-bold leading-snug text-content hover:text-primary hover:underline"
+                      title={candidate.name}>{candidate.name}</a
+                    >
+                    <div class="mt-1 flex items-center gap-1.5">
+                      {#if candidate.party}<span
+                          class="rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-xs font-bold leading-none text-content-muted"
+                          title={candidate.party}
+                          >{partyAbbr(candidate.party)}</span
+                        >{/if}
+                      {#if candidate.incumbent}<span
+                          class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
+                          >Incumbent</span
+                        >{/if}
+                    </div>
+                  </div>
                 </div>
-              {/if}
-              <div class="min-w-0">
-                <a
-                  href="/races/{race.id}/{candidateSlug(
-                    candidate.name,
-                  )}/{isDraftPreview ? '?draft=true' : ''}"
-                  class="block truncate text-sm font-extrabold text-content hover:text-blue-600"
-                  >{candidate.name}</a
-                >
-                <div class="mt-0.5 flex items-center gap-1.5">
-                  {#if candidate.party}<span
-                      class="rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-[10px] font-bold leading-none text-content-muted"
-                      >{partyAbbr(candidate.party)}</span
-                    >{/if}
-                  {#if candidate.incumbent}<span
-                      class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[10px] font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
-                      >Incumbent</span
-                    >{/if}
-                </div>
-              </div>
+              {/each}
             </div>
-          {/each}
+          </div>
         </div>
       </div>
 
-      <div class="divide-y divide-stroke">
+      <!-- `relative` makes this scroller the containing block of the sr-only
+         (position:absolute) labels inside it; otherwise they resolve against
+         the page, escape the clip, and widen the whole document. -->
+      <div
+        class="custom-scrollbar relative overflow-x-auto"
+        on:scroll={(event) => (scrollLeft = event.currentTarget.scrollLeft)}
+      >
         <div
-          class="grid"
-          role="row"
-          style="grid-template-columns: {compact
-            ? '170px'
-            : '220px'} repeat({candidates.length}, 1fr)"
+          role="rowgroup"
+          class="divide-y divide-stroke"
+          style="min-width: {minTableWidth}px"
         >
-          <div
-            role="rowheader"
-            class="sticky left-0 z-10 flex items-center border-r border-stroke bg-surface-alt p-5 text-sm font-bold text-content"
-          >
-            Biography & Summary
-          </div>
-          {#each candidates as candidate}
-            {@const isSummaryExpanded =
-              expandedSummaries[candidate.name] ?? false}
-            {@const summaryText = candidate.summary ?? ""}
-            {@const collapsedSummary = summaryPreview(summaryText)}
-            <div
-              role="cell"
-              class="border-r border-stroke {compact
-                ? 'p-4'
-                : 'p-6'} text-sm leading-relaxed text-content-muted last:border-none"
-            >
-              {isSummaryExpanded ? summaryText : collapsedSummary}
-              {#if collapsedSummary !== summaryText.trim()}
-                <button
-                  type="button"
-                  aria-expanded={isSummaryExpanded}
-                  on:click={() => toggleSummary(candidate)}
-                  class="ml-1 inline-flex min-h-6 items-start text-sm font-bold leading-5 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  {isSummaryExpanded ? "Show less" : "Show more"}
-                  <span class="sr-only"> of {candidate.name}'s biography</span>
-                </button>
-              {/if}
-              {#if !compact && isExternalUrl(candidate.website)}<div
-                  class="mt-3"
-                >
-                  <a
-                    href={candidate.website.trim()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                    >Visit campaign website
-                    <UiIcon name="external" size="sm" /></a
-                  >
-                </div>{/if}
-            </div>
-          {/each}
-        </div>
-
-        <div
-          class="grid"
-          role="row"
-          style="grid-template-columns: {compact
-            ? '170px'
-            : '220px'} repeat({candidates.length}, 1fr)"
-        >
-          <div
-            role="columnheader"
-            class="col-span-full sticky left-0 z-10 w-full bg-surface-alt/40 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-content-subtle"
-            style="grid-column: 1 / -1"
-          >
-            Positions on Key Issues
-          </div>
-        </div>
-        {#each issueKeys as issueKey}
           <div
             class="grid"
             role="row"
-            style="grid-template-columns: {compact
-              ? '170px'
-              : '220px'} repeat({candidates.length}, 1fr)"
+            style="grid-template-columns: {gridColumns}"
           >
-            <div
-              role="rowheader"
-              class="sticky left-0 z-10 flex flex-col justify-center border-r border-stroke bg-surface-alt p-5 text-sm font-bold text-content"
-            >
-              {getIssueDisplayName(issueKey)}
-            </div>
-            {#each candidates as candidate}
-              {@const stance = candidate.issues?.[issueKey]}
-              {@const preview = stance
-                ? collapseText
-                  ? collapsedPreview(stance.stance)
-                  : stancePreview(stance.stance, 320, 220)
-                : ""}
-              {@const isStanceExpanded =
-                expandedStances[stanceKey(issueKey, candidate)] ?? false}
+            <div role="rowheader" class="row-label">Biography</div>
+            {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
+              {@const summaryText = cleanDisplayText(candidate.summary)}
+              {@const summaryKey = `summary:${candidate.name}`}
+              {@const isSummaryExpanded = expandedTexts[summaryKey] ?? false}
+              {@const collapsedSummary = textPreview(summaryText, 280)}
               <div
                 role="cell"
-                class="flex flex-col gap-3 border-r border-stroke {compact
+                class="border-r border-stroke {compact
                   ? 'p-4'
-                  : 'p-6'} last:border-none"
+                  : 'p-5'} text-sm leading-relaxed text-content-muted last:border-none"
               >
-                {#if stance}
-                  <div>
-                    <p
-                      class="whitespace-normal text-sm leading-relaxed text-content-muted"
+                {isSummaryExpanded ? summaryText : collapsedSummary}
+                {#if collapsedSummary !== summaryText.trim()}
+                  <button
+                    type="button"
+                    aria-expanded={isSummaryExpanded}
+                    on:click={() => toggleText(summaryKey)}
+                    class="toggle-link ml-1"
+                  >
+                    {isSummaryExpanded ? "Show less" : "Show more"}
+                    <span class="sr-only">
+                      of {candidate.name}'s biography</span
                     >
-                      {isStanceExpanded ? stance.stance : preview}
-                    </p>
-                    {#if preview !== stance.stance.trim()}
-                      <button
-                        type="button"
-                        aria-expanded={isStanceExpanded}
-                        on:click={() => toggleStance(issueKey, candidate)}
-                        class="inline-flex min-h-11 items-start pt-1 text-sm font-bold leading-5 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        {isStanceExpanded ? "Show less" : "Show more"}
-                        <span class="sr-only"> for {candidate.name}</span>
-                      </button>
-                    {/if}
-                  </div>
-                  <div class="flex items-center gap-2 pt-1">
-                    <span
-                      class="text-[10px] font-medium uppercase tracking-wide text-content-subtle"
-                      >Confidence</span
-                    ><ConfidenceIndicator confidence={stance.confidence} />
-                  </div>
-                  {#if stance.sources?.length}
-                    {@const areSourcesExpanded =
-                      expandedSources[sourcesKey(issueKey, candidate)] ?? false}
-                    <div class="border-t border-stroke/40 pt-2">
-                      <div class="flex flex-col items-start gap-2">
-                        {#each areSourcesExpanded ? stance.sources : stance.sources.slice(0, 1) as source}
-                          <SourceLink {source} />
-                        {/each}
-                      </div>
-                      {#if stance.sources.length > 1}
-                        <button
-                          type="button"
-                          aria-expanded={areSourcesExpanded}
-                          on:click={() => toggleSources(issueKey, candidate)}
-                          class="mt-1 inline-flex min-h-11 items-center text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                        >
-                          {areSourcesExpanded
-                            ? "Show fewer sources"
-                            : `Show ${stance.sources.length - 1} more ${stance.sources.length === 2 ? "source" : "sources"}`}
-                          <span class="sr-only"> for {candidate.name}</span>
-                        </button>
-                      {/if}
-                    </div>
-                  {/if}
-                {:else}<span
-                    class="select-none text-xs italic text-content-faint"
-                    >No stance researched yet.</span
-                  >{/if}
+                  </button>
+                {/if}
+                {#if !compact && isExternalUrl(candidate.website)}<div
+                    class="mt-3"
+                  >
+                    <a
+                      href={candidate.website.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-primary hover:underline"
+                      >Campaign website
+                      <UiIcon name="external" size="sm" /></a
+                    >
+                  </div>{/if}
               </div>
             {/each}
           </div>
-        {/each}
 
-        {#if !compact}
           <div
             class="grid"
             role="row"
-            style="grid-template-columns: 220px repeat({candidates.length}, 1fr)"
+            style="grid-template-columns: {gridColumns}"
           >
             <div
               role="columnheader"
-              class="col-span-full sticky left-0 z-10 w-full bg-surface-alt/40 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-content-subtle"
+              class="section-label"
               style="grid-column: 1 / -1"
             >
-              Background & Credentials
+              Positions on Key Issues
             </div>
           </div>
-          <div
-            class="grid"
-            role="row"
-            style="grid-template-columns: 220px repeat({candidates.length}, 1fr)"
-          >
-            <div
-              role="rowheader"
-              class="sticky left-0 z-10 flex items-center border-r border-stroke bg-surface-alt p-5 text-sm font-bold text-content"
-            >
-              Career Timeline
-            </div>
-            {#each candidates as candidate}<div
-                role="cell"
-                class="border-r border-stroke p-6 text-sm text-content-muted last:border-none"
-              >
-                {#if candidate.career_history?.length}<div class="space-y-4">
-                    {#each candidate.career_history as entry}<div
-                        class="border-l-2 border-blue-500/50 py-0.5 pl-3"
-                      >
-                        <div
-                          class="flex flex-wrap items-baseline justify-between gap-2"
-                        >
-                          <span class="text-xs font-semibold text-content"
-                            >{entry.title}</span
-                          >{#if entry.start_year}<span
-                              class="text-[10px] text-content-subtle"
-                              >{entry.start_year}{entry.end_year
-                                ? ` – ${entry.end_year}`
-                                : " – Present"}</span
-                            >{/if}
-                        </div>
-                        {#if entry.organization}<span
-                            class="block text-xs text-content-subtle"
-                            >{entry.organization}</span
-                          >{/if}
-                      </div>{/each}
-                  </div>{:else}<span class="text-xs italic text-content-faint"
-                    >No career records.</span
-                  >{/if}
-              </div>{/each}
-          </div>
-          <div
-            class="grid"
-            role="row"
-            style="grid-template-columns: 220px repeat({candidates.length}, 1fr)"
-          >
-            <div
-              role="rowheader"
-              class="sticky left-0 z-10 flex items-center border-r border-stroke bg-surface-alt p-5 text-sm font-bold text-content"
-            >
-              Education
-            </div>
-            {#each candidates as candidate}<div
-                role="cell"
-                class="border-r border-stroke p-6 text-sm text-content-muted last:border-none"
-              >
-                {#if candidate.education?.length}<div class="space-y-3">
-                    {#each candidate.education as edu}<div>
-                        <span class="block text-xs font-semibold text-content"
-                          >{edu.institution}</span
-                        >{#if edu.degree || edu.field}<span
-                            class="text-[11px] text-content-subtle"
-                            >{[edu.degree, edu.field]
-                              .filter(Boolean)
-                              .join(" in ")}{#if edu.year}
-                              ({edu.year}){/if}</span
-                          >{/if}
-                      </div>{/each}
-                  </div>{:else}<span class="text-xs italic text-content-faint"
-                    >No education records.</span
-                  >{/if}
-              </div>{/each}
-          </div>
-          {#each backgroundRows as row}
+          {#if noPositionIssues.length > 0}
             <div
               class="grid"
               role="row"
-              style="grid-template-columns: 220px repeat({candidates.length}, 1fr)"
+              style="grid-template-columns: {gridColumns}"
             >
               <div
-                role="rowheader"
-                class="sticky left-0 z-10 flex items-center border-r border-stroke bg-surface-alt p-5 text-sm font-bold text-content"
+                role="cell"
+                class="no-position-row"
+                style="grid-column: 1 / -1"
               >
-                {row.label}
+                {#if everyIssueEmpty}
+                  <span class="font-semibold text-content-muted"
+                    >No public positions found yet on these issues:</span
+                  >
+                {:else}
+                  <span class="font-semibold text-content-muted"
+                    >No public position found from anyone compared:</span
+                  >
+                {/if}
+                {noPositionIssues.join(", ")}
               </div>
-              {#each candidates as candidate}{@const summary =
-                  candidate[row.summary]}{@const sourceUrl = candidate[row.url]}
+            </div>
+          {/if}
+          {#each issueKeys as issueKey}
+            <div
+              class="grid issue-row"
+              role="row"
+              id="compare-issue-{candidateSlug(issueKey)}"
+              style="grid-template-columns: {gridColumns}"
+            >
+              <div role="rowheader" class="row-label">
+                {getIssueDisplayName(issueKey)}
+              </div>
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
+                {@const rawStance = candidate.issues?.[issueKey]}
+                {@const stance = hasStance(rawStance) ? rawStance : undefined}
+                {@const stanceText = stance
+                  ? cleanDisplayText(stance.stance)
+                  : ""}
+                {@const noPosition = !!stance && isNoPositionStance(stanceText)}
+                {@const preview = stance ? textPreview(stanceText) : ""}
+                {@const stanceKey = `stance:${issueKey}:${candidate.name}`}
+                {@const isStanceExpanded = expandedTexts[stanceKey] ?? false}
                 <div
                   role="cell"
-                  class="border-r border-stroke p-6 text-sm text-content-muted last:border-none"
+                  class="flex flex-col gap-3 border-r border-stroke {compact
+                    ? 'p-4'
+                    : 'p-5'} last:border-none"
                 >
-                  {#if summary}<p class="mb-3 text-xs leading-relaxed">
-                      {summary}
-                    </p>
-                    {#if sourceUrl && isExternalUrl(sourceUrl)}<a
-                        href={sourceUrl.trim()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400"
-                        >{row.link} <UiIcon name="external" size="sm" /></a
-                      >{/if}{:else}<span
-                      class="text-xs italic text-content-faint"
-                      >No records available.</span
+                  {#if stance && noPosition}
+                    <span class="text-sm italic text-content-subtle"
+                      >No public position found</span
+                    >
+                  {:else if stance}
+                    <div>
+                      <p
+                        class="whitespace-normal text-sm leading-relaxed text-content-muted"
+                      >
+                        {isStanceExpanded ? stanceText : preview}
+                      </p>
+                      {#if preview !== stanceText.trim()}
+                        <button
+                          type="button"
+                          aria-expanded={isStanceExpanded}
+                          on:click={() => toggleText(stanceKey)}
+                          class="toggle-link min-h-8 pt-1"
+                        >
+                          {isStanceExpanded ? "Show less" : "Show more"}
+                          <span class="sr-only">
+                            of {candidate.name} on {getIssueDisplayName(
+                              issueKey,
+                            )}</span
+                          >
+                        </button>
+                      {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="text-xs font-medium uppercase tracking-wide text-content-subtle"
+                        >Confidence</span
+                      ><ConfidenceIndicator confidence={stance.confidence} />
+                    </div>
+                    {#if stance.sources?.length}
+                      {@const areSourcesExpanded =
+                        expandedSources[sourcesKey(issueKey, candidate)] ??
+                        false}
+                      <div class="border-t border-stroke/60 pt-2">
+                        <div class="flex flex-col items-start gap-1">
+                          {#each areSourcesExpanded ? stance.sources : stance.sources.slice(0, 1) as source}
+                            <SourceLink {source} />
+                          {/each}
+                        </div>
+                        {#if stance.sources.length > 1}
+                          <button
+                            type="button"
+                            aria-expanded={areSourcesExpanded}
+                            on:click={() => toggleSources(issueKey, candidate)}
+                            class="toggle-link min-h-10 text-xs"
+                          >
+                            {areSourcesExpanded
+                              ? "Show fewer sources"
+                              : `Show ${stance.sources.length - 1} more ${stance.sources.length === 2 ? "source" : "sources"}`}
+                            <span class="sr-only">
+                              for {candidate.name} on {getIssueDisplayName(
+                                issueKey,
+                              )}</span
+                            >
+                          </button>
+                        {/if}
+                      </div>
+                    {/if}
+                  {:else}<span
+                      class="select-none text-xs italic text-content-faint"
+                      >No stance researched yet.</span
+                    >{/if}
+                </div>
+              {/each}
+            </div>
+          {/each}
+
+          {#if !compact}
+            <div
+              class="grid"
+              role="row"
+              style="grid-template-columns: {gridColumns}"
+            >
+              <div
+                role="columnheader"
+                class="section-label"
+                style="grid-column: 1 / -1"
+              >
+                Background & Credentials
+              </div>
+            </div>
+            <div
+              class="grid"
+              role="row"
+              style="grid-template-columns: {gridColumns}"
+            >
+              <div role="rowheader" class="row-label">Career</div>
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}<div
+                  role="cell"
+                  class="border-r border-stroke p-5 text-sm text-content-muted last:border-none"
+                >
+                  {#if candidate.career_history?.length}<div class="space-y-3">
+                      {#each candidate.career_history as entry}<div
+                          class="border-l-2 border-stroke py-0.5 pl-3"
+                        >
+                          <div
+                            class="flex flex-wrap items-baseline justify-between gap-x-2"
+                          >
+                            <span class="text-xs font-semibold text-content"
+                              >{entry.title}</span
+                            >{#if entry.start_year}<span
+                                class="text-xs text-content-subtle"
+                                >{entry.start_year}{entry.end_year
+                                  ? ` – ${entry.end_year}`
+                                  : " – Present"}</span
+                              >{/if}
+                          </div>
+                          {#if entry.organization}<span
+                              class="block text-xs text-content-subtle"
+                              >{entry.organization}</span
+                            >{/if}
+                        </div>{/each}
+                    </div>{:else}<span class="text-xs italic text-content-faint"
+                      >No career records.</span
                     >{/if}
                 </div>{/each}
             </div>
-          {/each}
-        {/if}
-
-        {#if race.forecast}
-          <div
-            class="grid"
-            role="row"
-            style="grid-template-columns: {compact
-              ? '170px'
-              : '220px'} repeat({candidates.length}, 1fr)"
-          >
             <div
-              role="rowheader"
-              class="sticky left-0 z-10 border-r border-stroke bg-blue-50 p-5 text-sm font-bold text-content dark:bg-blue-950/20"
+              class="grid"
+              role="row"
+              style="grid-template-columns: {gridColumns}"
             >
-              Forecast
-              <span
-                class="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-content-subtle"
-                >Model estimate</span
-              >
+              <div role="rowheader" class="row-label">Education</div>
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}<div
+                  role="cell"
+                  class="border-r border-stroke p-5 text-sm text-content-muted last:border-none"
+                >
+                  {#if candidate.education?.length}<div class="space-y-3">
+                      {#each candidate.education as edu}<div>
+                          <span class="block text-xs font-semibold text-content"
+                            >{edu.institution}</span
+                          >{#if edu.degree || edu.field}<span
+                              class="text-xs text-content-subtle"
+                              >{[edu.degree, edu.field]
+                                .filter(Boolean)
+                                .join(" in ")}{#if edu.year}
+                                ({edu.year}){/if}</span
+                            >{/if}
+                        </div>{/each}
+                    </div>{:else}<span class="text-xs italic text-content-faint"
+                      >No education records.</span
+                    >{/if}
+                </div>{/each}
             </div>
-            {#each candidates as candidate}
-              {@const probability = forecastProbability(candidate)}
+            {#each backgroundRows as row}
               <div
-                role="cell"
-                class="border-r border-stroke bg-blue-50/40 p-5 last:border-none dark:bg-blue-950/10"
+                class="grid"
+                role="row"
+                style="grid-template-columns: {gridColumns}"
               >
-                {#if probability !== undefined}
-                  <div class="text-2xl font-extrabold text-content">
-                    {Math.round(probability * 100)}%
-                  </div>
-                  <p class="mt-1 text-xs text-content-muted">
-                    estimated win probability
-                  </p>
-                {:else}
-                  <p class="text-sm font-semibold capitalize text-content">
-                    {race.forecast.rating.replaceAll("_", " ")}
-                  </p>
-                  <p class="mt-1 text-xs text-content-muted">
-                    race-level rating
-                  </p>
-                {/if}
+                <div role="rowheader" class="row-label">{row.label}</div>
+                {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
+                  {@const summary = cleanDisplayText(candidate[row.summary])}
+                  {@const sourceUrl = candidate[row.url]}
+                  {@const rowKey = `${row.summary}:${candidate.name}`}
+                  {@const rowExpanded = expandedTexts[rowKey] ?? false}
+                  {@const rowPreview = textPreview(summary, 220)}
+                  <div
+                    role="cell"
+                    class="border-r border-stroke p-5 text-sm text-content-muted last:border-none"
+                  >
+                    {#if summary}<p class="text-xs leading-relaxed">
+                        {rowExpanded ? summary : rowPreview}
+                        {#if rowPreview !== summary.trim()}
+                          <button
+                            type="button"
+                            aria-expanded={rowExpanded}
+                            on:click={() => toggleText(rowKey)}
+                            class="toggle-link ml-1 text-xs"
+                          >
+                            {rowExpanded ? "Show less" : "Show more"}
+                            <span class="sr-only">
+                              of {candidate.name}'s {row.label.toLowerCase()}</span
+                            >
+                          </button>
+                        {/if}
+                      </p>
+                      {#if sourceUrl && isExternalUrl(sourceUrl)}<a
+                          href={sourceUrl.trim()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="mt-2 inline-flex min-h-6 items-center gap-1.5 py-1 text-xs font-semibold text-primary hover:underline"
+                          >{row.link} <UiIcon name="external" size="sm" /></a
+                        >{/if}{:else}<span
+                        class="text-xs italic text-content-faint"
+                        >No records available.</span
+                      >{/if}
+                  </div>{/each}
               </div>
             {/each}
-          </div>
-        {/if}
+          {/if}
+
+          {#if race.forecast && !uncontested}
+            <div
+              class="grid"
+              role="row"
+              style="grid-template-columns: {gridColumns}"
+            >
+              <div role="rowheader" class="row-label">
+                Forecast
+                <span
+                  class="mt-1 block text-xs font-medium uppercase tracking-wider text-content-subtle"
+                  >Model estimate</span
+                >
+              </div>
+              {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
+                {@const probability = forecastProbability(candidate)}
+                <div
+                  role="cell"
+                  class="border-r border-stroke p-5 last:border-none"
+                >
+                  {#if probability != null}
+                    <div class="text-2xl font-extrabold text-content">
+                      {formatWinProbability(probability)}
+                    </div>
+                    <p class="mt-1 text-xs text-content-muted">
+                      estimated win probability
+                    </p>
+                  {:else}
+                    <p class="text-sm font-semibold text-content">
+                      {formatRating(race.forecast.rating) ??
+                        race.forecast.rating.replaceAll("_", " ")}
+                    </p>
+                    <p class="mt-1 text-xs text-content-muted">
+                      race-level rating
+                    </p>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
   </div>
-</div>
+{/if}
+
+<style lang="postcss">
+  .compare-sticky-header {
+    top: var(--site-header-height, 0px);
+  }
+
+  .row-label {
+    @apply sticky left-0 z-10 border-r border-stroke bg-surface-alt px-5 py-5 text-sm font-semibold text-content;
+  }
+
+  .section-label {
+    @apply sticky left-0 z-10 w-full bg-surface-alt/40 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-content-subtle;
+  }
+
+  .issue-row {
+    scroll-margin-top: calc(var(--site-header-height, 0px) + 6rem);
+  }
+
+  .no-position-row {
+    @apply px-5 py-3 text-sm leading-6 text-content-subtle;
+  }
+
+  /* On short (zoomed or landscape) viewports the pinned header would cover
+     most of the screen. */
+  @media (max-height: 500px) {
+    .compare-sticky-header {
+      position: static;
+    }
+  }
+
+  .toggle-link {
+    @apply inline-flex items-start text-sm font-semibold leading-5 text-primary hover:underline;
+  }
+</style>

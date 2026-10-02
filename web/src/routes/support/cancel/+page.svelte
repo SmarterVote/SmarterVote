@@ -6,11 +6,12 @@
   title="Checkout cancelled"
   description="Your checkout was cancelled — no payment was taken."
   path="/support/cancel/"
+  noindex
 >
   <p class="text-content-muted">
     No payment was taken. You can <a
       href="/support/"
-      class="text-primary-600 underline hover:text-primary-700 dark:text-primary-400"
+      class="text-primary underline hover:no-underline"
       >return to the support page</a
     > whenever you're ready.
   </p>

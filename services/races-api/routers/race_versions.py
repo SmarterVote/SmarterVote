@@ -77,17 +77,20 @@ def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any]:
         logger.exception("Unable to restore archived race version %s/%s", race_id, filename)
         raise HTTPException(status_code=502, detail="Unable to read archived version") from exc
 
+    # Restoring only replaces the draft; a race whose races/{id}.json is still
+    # live must stay published (status and published_at untouched).
+    is_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
     gcs_helpers._gcs_archive_race(race_id, "drafts", "draft")
     gcs_helpers._gcs_put_race_json(race_id, "drafts", version_data)
-    firestore_helpers._fs_update_race(
-        race_id,
-        {
-            "status": "draft",
-            "published_at": None,
-            "draft_updated_at": datetime.now(timezone.utc).isoformat(),
-            **firestore_helpers._fs_build_draft_catalog_fields(race_id, version_data),
-        },
-    )
+    update: Dict[str, Any] = {
+        "draft_updated_at": datetime.now(timezone.utc).isoformat(),
+        **firestore_helpers._fs_build_draft_catalog_fields(race_id, version_data),
+    }
+    if is_published:
+        update["status"] = "published"
+    else:
+        update.update({"status": "draft", "published_at": None})
+    firestore_helpers._fs_update_race(race_id, update)
     return {
         "message": f"Retired version restored as draft for {race_id}",
         "id": race_id,

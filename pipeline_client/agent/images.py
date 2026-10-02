@@ -15,6 +15,7 @@ from shared.model_catalog import DEFAULT_IMAGE_VISION_MODEL
 
 from .ballotpedia import lookup_candidate_image as _ballotpedia_lookup
 from .ballotpedia import state_name_in_text
+from .image_denylist import is_denied_image
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
@@ -1199,6 +1200,61 @@ async def _lookup_known_page_image(candidate: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+#: Facebook's crawler proxy and CDN redirect shims. ``lookaside.fbsbx.com``
+#: answers ``.../profile_pic.jpg`` with an HTML page, and its URLs expire.
+_EPHEMERAL_IMAGE_HOSTS = ("fbsbx.com",)
+
+#: Partisan voter guides, fundraising platforms and party committees. Their
+#: photos are usually genuine, but a headshot served from iVoterGuide or a
+#: party committee tells the reader whose side the page is on before they
+#: read a word -- audit 4 found seven live. Used only when nothing neutral
+#: (official, campaign, Ballotpedia, Wikimedia, news) can be found.
+_PARTISAN_IMAGE_HOSTS = (
+    "ivoterguide.com",
+    "bluevoterguide.org",
+    "justicedemocrats.com",
+    "actblue.com",
+    "winred.com",
+    "anedot.com",
+    "gop.com",
+    "democrats.org",
+    "dccc.org",
+    "dscc.org",
+    "nrcc.org",
+    "nrsc.org",
+    "dga.net",
+    "rga.org",
+    "lp.org",
+    "gp.org",
+)
+#: State and county party committees: "texasgop.org", "nhdems.org", "ohiodems.org".
+_PARTY_COMMITTEE_HOST = re.compile(r"(?:^|\.)[a-z]*(?:gop|dems|democrats|republicans)\.(?:org|com|net)$")
+
+
+def _image_host(url: str) -> str:
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+
+
+def _host_matches(host: str, domains: Tuple[str, ...]) -> bool:
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def is_partisan_image_host(url: Any) -> bool:
+    """True when *url* is served by a partisan guide, fundraising platform or party committee."""
+    if not isinstance(url, str):
+        return False
+    host = _image_host(url)
+    return bool(host) and (_host_matches(host, _PARTISAN_IMAGE_HOSTS) or bool(_PARTY_COMMITTEE_HOST.search(host)))
+
+
+def is_ephemeral_image_host(url: Any) -> bool:
+    """True for redirect-shim and expiring CDN hosts (``lookaside.fbsbx.com``)."""
+    return isinstance(url, str) and _host_matches(_image_host(url), _EPHEMERAL_IMAGE_HOSTS)
+
+
 def _is_valid_image_url(url: Any) -> bool:
     """Return True only if the URL looks like a direct image file, not a web page.
 
@@ -1212,6 +1268,9 @@ def _is_valid_image_url(url: Any) -> bool:
         parsed = urlparse(url)
         path = parsed.path.lower()
         netloc = parsed.netloc.lower()
+
+        if is_ephemeral_image_host(url):
+            return False
 
         # A headshot is never vector art. SVGs are logos and site icons: one
         # replaced a working candidate photo with a chatbot widget's turtle
@@ -1270,6 +1329,66 @@ def _serves_a_web_page(response: Any) -> bool:
     return content_type.split(";", 1)[0].strip().startswith("text/")
 
 
+_IMAGE_MAGIC = (
+    b"\xff\xd8\xff",  # JPEG
+    b"\x89PNG\r\n\x1a\n",  # PNG
+    b"GIF87a",
+    b"GIF89a",
+    b"BM",  # BMP
+    b"II*\x00",  # TIFF, little-endian
+    b"MM\x00*",  # TIFF, big-endian
+)
+
+
+def sniff_image_bytes(head: bytes) -> Optional[bool]:
+    """Whether the first bytes of a body are an image. None when there are no bytes to judge."""
+    if not head:
+        return None
+    if any(head.startswith(magic) for magic in _IMAGE_MAGIC):
+        return True
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return True
+    # ISO-BMFF images: AVIF and HEIC carry "ftyp" at offset 4.
+    if head[4:8] == b"ftyp" and head[8:12] in {b"avif", b"avis", b"heic", b"heix", b"mif1", b"msf1"}:
+        return True
+    return False
+
+
+def _content_type_verdict(response: Any) -> Optional[bool]:
+    """True for image/*, False for anything that is positively not an image, None when undecided.
+
+    ``binary/octet-stream``, ``application/octet-stream`` and a missing header are
+    undecided: several real image CDNs (CivicEngine among them) serve headshots
+    that way, so the bytes have to decide.
+    """
+    content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if not content_type or content_type in {"binary/octet-stream", "application/octet-stream", "application/binary"}:
+        return None
+    if content_type.startswith("image/"):
+        # SVG is markup, and a headshot is never vector art.
+        return content_type != "image/svg+xml"
+    return False
+
+
+async def _sniff_url_is_image(client: Any, url: str, headers: Dict[str, str]) -> Optional[bool]:
+    """Fetch the first bytes of *url* and sniff them. None when the probe itself fails."""
+    try:
+        resp = await client.get(url, headers={**headers, "Range": "bytes=0-63"})
+        if resp is None or getattr(resp, "status_code", 500) >= 400:
+            return None
+        if _serves_a_web_page(resp):
+            return False
+        content = getattr(resp, "content", b"")
+        if not isinstance(content, (bytes, bytearray)):
+            return None
+        head = bytes(content[:64])
+        if head.lstrip()[:1] == b"<":
+            return False
+        return sniff_image_bytes(head)
+    except Exception:
+        return None
+
+
 async def _check_url_accessible(url: str) -> Tuple[bool, str]:
     """Check whether a URL is accessible *and an image*, returning (accessible, final_url).
 
@@ -1289,13 +1408,25 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
             resp = await client.head(url, headers=headers)
             final_url = str(resp.url)
             if resp.status_code < 400:
-                if _serves_a_web_page(resp):
+                verdict = _content_type_verdict(resp)
+                if verdict is None:
+                    # No usable content-type: let the bytes decide. A probe that
+                    # fails is no evidence either way, so the URL is kept.
+                    verdict = await _sniff_url_is_image(client, final_url, headers)
+                if verdict is False:
                     logger.debug("Rejecting %s: served %s, not an image", url, resp.headers.get("content-type"))
                     return False, url
                 return True, final_url
             if resp.status_code in (405, 501):
-                resp2 = await client.get(url, headers={**headers, "Range": "bytes=0-0"})
+                resp2 = await client.get(url, headers={**headers, "Range": "bytes=0-63"})
                 if resp2.status_code not in (200, 206) or _serves_a_web_page(resp2):
+                    return False, url
+                verdict = _content_type_verdict(resp2)
+                if verdict is None:
+                    content = getattr(resp2, "content", b"")
+                    head = bytes(content[:64]) if isinstance(content, (bytes, bytearray)) else b""
+                    verdict = False if head.lstrip()[:1] == b"<" else sniff_image_bytes(head)
+                if verdict is False:
                     return False, url
                 return True, str(resp2.url)
             return False, url
@@ -1322,6 +1453,58 @@ def _wikimedia_original_image_url(url: str) -> Optional[str]:
     if not original_parts or not original_parts[-1]:
         return None
     return parsed._replace(path="/".join(original_parts), query="", fragment="").geturl()
+
+
+#: Width of the stored Wikimedia thumbnail. 250px is one of Wikimedia's standard
+#: thumbnail steps (cached at the edge) and covers the largest avatar the site
+#: draws at 2x. Originals run to 8 MB: audit 4 measured ~24 MB of headshots on
+#: /elections/ shown at 20-64 px.
+WIKIMEDIA_THUMB_WIDTH = 250
+_WIKIMEDIA_THUMBABLE = (".jpg", ".jpeg", ".png", ".gif")
+
+
+def wikimedia_thumbnail_url(url: Any, width: int = WIKIMEDIA_THUMB_WIDTH) -> Optional[str]:
+    """The ``/thumb/.../{width}px-File`` form of an upload.wikimedia.org original, or None.
+
+    ``https://upload.wikimedia.org/wikipedia/commons/a/ab/Jane_Doe.jpg`` becomes
+    ``https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Jane_Doe.jpg/250px-Jane_Doe.jpg``.
+    A URL that is already a thumbnail is re-sized to *width*; anything else
+    (another host, an SVG, a TIFF) returns None.
+    """
+    if not isinstance(url, str):
+        return None
+    original = _wikimedia_original_image_url(url) or url
+    try:
+        parsed = urlparse(original)
+    except Exception:
+        return None
+    if parsed.netloc.lower() != "upload.wikimedia.org":
+        return None
+    parts = parsed.path.split("/")
+    # /wikipedia/<project>/<a>/<ab>/<File>
+    if len(parts) < 6 or "thumb" in parts:
+        return None
+    filename = parts[-1]
+    if not filename or not filename.lower().endswith(_WIKIMEDIA_THUMBABLE):
+        return None
+    thumb_path = "/".join(parts[:3] + ["thumb"] + parts[3:] + [f"{width}px-{filename}"])
+    return parsed._replace(path=thumb_path, query="", fragment="").geturl()
+
+
+async def _prefer_wikimedia_thumbnail(candidate: Dict[str, Any], log: Callable[[str, str], None]) -> None:
+    """Store a verified 250px thumbnail in place of a full-size Wikimedia original.
+
+    The original stays when the thumbnail does not resolve -- Wikimedia refuses
+    to "thumbnail" a file narrower than the requested width.
+    """
+    url = candidate.get("image_url")
+    thumb = wikimedia_thumbnail_url(url)
+    if not thumb or thumb == url:
+        return
+    accessible, final_url = await _check_url_accessible(thumb)
+    if accessible:
+        candidate["image_url"] = final_url if _is_valid_image_url(final_url) else thumb
+        log("info", f"  [{candidate.get('name', '')}] Stored Wikimedia {WIKIMEDIA_THUMB_WIDTH}px thumbnail")
 
 
 async def _best_accessible_image_url(url: str) -> Optional[str]:
@@ -1495,6 +1678,9 @@ async def _lookup_serper_image(
                 meta_tokens = set(re.findall(r"[a-z0-9]+", meta.lower()))
                 overlap = len(name_tokens & meta_tokens)
                 score = overlap * 10
+                if is_partisan_image_host(img_url):
+                    # Ranked below any neutral hit, so it is chosen only when nothing else resolves.
+                    score -= 100
                 try:
                     width = int(r.get("imageWidth") or 0)
                     height = int(r.get("imageHeight") or 0)
@@ -1605,7 +1791,8 @@ def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
 def _is_rejected_candidate_image(url: str, candidate_name: str) -> bool:
     """Apply both generic and candidate-aware guards to a resolved image URL."""
     return (
-        _looks_like_non_photo(url)
+        is_denied_image(url)
+        or _looks_like_non_photo(url)
         or _is_mismatched_person_filename(url, candidate_name)
         or _is_untrusted_wikimedia_match(url, candidate_name)
     )
@@ -1633,6 +1820,11 @@ async def _resolve_single_image(
     if not current_url:
         candidate["image_url"] = None
 
+    if current_url and is_denied_image(current_url):
+        log("info", f"  [{name}] Existing image was rejected by a human audit - discarding and re-searching")
+        candidate["image_url"] = None
+        current_url = None
+
     if current_url and _looks_like_govtrack_reference_headshot(current_url):
         low_resolution_fallback = current_url
         candidate["image_url"] = None
@@ -1644,6 +1836,13 @@ async def _resolve_single_image(
         candidate["image_url"] = None
         current_url = None
         log("info", f"  [{name}] Existing image is a social profile avatar - searching for a better portrait")
+
+    if current_url and is_partisan_image_host(current_url):
+        # Kept only as a last resort, like a low-resolution reference photo.
+        low_resolution_fallback = low_resolution_fallback or current_url
+        candidate["image_url"] = None
+        current_url = None
+        log("info", f"  [{name}] Existing image is hosted by a partisan guide or party site - searching for a neutral source")
 
     if current_url and _host_names_another_state(current_url, race_id):
         log(
@@ -1732,6 +1931,9 @@ async def _resolve_single_image(
     # bare name can resolve to a namesake's page, so pass the race's state.
     log("info", f"  [{name}] Trying Ballotpedia API lookup...")
     bp_url = await _lookup_ballotpedia_image(name, state=state_name_in_text(jurisdiction))
+    if is_denied_image(bp_url):
+        log("info", f"  [{name}] Ballotpedia returned an audit-rejected image - skipping it")
+        bp_url = None
     if bp_url:
         log("info", f"  [{name}] Ballotpedia API returned: {bp_url[:80]}")
         accessible, final_url = await _check_url_accessible(bp_url)
@@ -1749,6 +1951,9 @@ async def _resolve_single_image(
     # (e.g. "Jeff Wadlin" matching "Jeff Wadlow" the film director).
     log("info", f"  [{name}] Trying Wikipedia API lookup...")
     wiki_url = await _lookup_wikipedia_image(name, context=search_context)
+    if is_denied_image(wiki_url):
+        log("info", f"  [{name}] Wikipedia returned an audit-rejected image - skipping it")
+        wiki_url = None
     if wiki_url:
         log("info", f"  [{name}] Wikipedia API returned: {wiki_url[:80]}")
         best_url = await _best_accessible_image_url(wiki_url)
@@ -1769,6 +1974,12 @@ async def _resolve_single_image(
     # Fast path 3: inspect candidate website/profile pages for image metadata.
     log("info", f"  [{name}] Inspecting known candidate pages for image metadata...")
     page_url = await _lookup_known_page_image(candidate)
+    if is_denied_image(page_url):
+        page_url = None
+    if page_url and is_partisan_image_host(page_url):
+        low_resolution_fallback = low_resolution_fallback or page_url
+        log("info", f"  [{name}] Page image is partisan-hosted - keeping it only as a fallback")
+        page_url = None
     if page_url:
         candidate["image_url"] = page_url
         log("info", f"  [{name}] Candidate page image confirmed -> {page_url[:80]}")
@@ -1778,6 +1989,12 @@ async def _resolve_single_image(
     # Fast path 4: query Serper Images API directly
     log("info", f"  [{name}] Trying Serper Images API lookup...")
     serper_img = await _lookup_serper_image(name, context=search_context, run_budget=run_budget)
+    if is_denied_image(serper_img):
+        serper_img = None
+    if serper_img and is_partisan_image_host(serper_img):
+        low_resolution_fallback = low_resolution_fallback or serper_img
+        log("info", f"  [{name}] Serper image is partisan-hosted - keeping it only as a fallback")
+        serper_img = None
     if serper_img:
         candidate["image_url"] = serper_img
         log("info", f"  [{name}] Serper image confirmed -> {serper_img[:80]}")
@@ -1806,6 +2023,9 @@ async def _resolve_single_image(
             run_budget=run_budget,
         )
         found_url = result.get("image_url")
+        if is_denied_image(found_url):
+            log("info", f"  [{name}] Agent returned an audit-rejected image - no image stored")
+            return
         if not found_url:
             log("info", f"  [{name}] Agent returned null — no image found")
             return
@@ -1977,6 +2197,10 @@ async def resolve_candidate_images(
             await asyncio.wait_for(resolve_call, timeout=timeout)
         else:
             await resolve_call
+        await _prefer_wikimedia_thumbnail(c, log)
+        if is_denied_image(c.get("image_url")):
+            log("info", f"  [{c.get('name', 'unknown')}] Resolved image was rejected by a human audit - clearing")
+            c["image_url"] = None
         if run_budget:
             timeout = run_budget.bounded_timeout(125.0, minimum_seconds=5.0, operation="candidate image inspection")
             try:
