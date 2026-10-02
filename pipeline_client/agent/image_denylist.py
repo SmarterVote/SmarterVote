@@ -16,8 +16,8 @@ DENIED_IMAGE_URLS: Dict[str, str] = {
     "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_Lawler.png": (
         "namesake: an older man, not U.S. Rep. Mike Lawler (NY-17)"
     ),
-    "https://janrvuropqrnptyieksp.supabase.co/storage/v1/object/public/politician-images/robert-quigley-1787319258626.jpg": (
-        "sideways photo of a woman with a dog, not Robert Quigley (KY-06)"
+    "https://kykernel.com/wp-content/uploads/2026/08/Quigley-Ad.png": (
+        "campaign ad with a partisan slogan across it, not a headshot (Robert Quigley, KY-06)"
     ),
     "https://upload.wikimedia.org/wikipedia/commons/7/7a/Jonathan_Kreiss-Tomkins_and_Terry_Gardiner.jpg": (
         "two-person photo; the candidate cannot be identified"
