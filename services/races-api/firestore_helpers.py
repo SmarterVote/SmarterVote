@@ -143,6 +143,43 @@ def _update_with_retry(
     return "conflict", data
 
 
+def _claim_race_for_run(db: Any, race_id: str, run_id: str, heal: Any = None, attempts: int = 3) -> str | None:
+    """Atomically mark ``races/{race_id}`` queued for ``run_id``.
+
+    The "already queued/running?" check and the claiming write are a single
+    conditional write: ``create()`` when the race doc is missing (fails if a
+    concurrent request created it) or an update guarded by the snapshot's
+    ``last_update_time``. Two concurrent queue requests therefore cannot both
+    claim the race and enqueue duplicate paid runs. ``heal(data)`` may return
+    an updated view after clearing stale active state.
+
+    Returns None when claimed, otherwise the reason the race was not claimed.
+    """
+    from google.api_core import exceptions as gexc  # type: ignore
+    from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
+
+    race_ref = db.collection(FIRESTORE_RACES_COLLECTION).document(race_id)
+    fields: Dict[str, Any] = {"status": "queued", "current_run_id": run_id, "updated_at": SERVER_TIMESTAMP}
+    for _ in range(max(1, attempts)):
+        snapshot = race_ref.get()
+        if getattr(snapshot, "exists", False) is not True:
+            try:
+                race_ref.create({**fields, "race_id": race_id})
+                return None
+            except gexc.Conflict:  # AlreadyExists: another request created it first
+                continue
+        data = snapshot.to_dict() or {}
+        if data.get("status") in _ACTIVE_RACE_STATUSES and heal is not None:
+            # A healing write changes update_time, so the guarded update below
+            # fails once and the next attempt re-reads the healed document.
+            data = heal(data)
+        if data.get("status") in _ACTIVE_RACE_STATUSES:
+            return f"Race is already {data.get('status')}"
+        if _update_if_unchanged(db, race_ref, snapshot, fields):
+            return None
+    return "Race changed concurrently; retry"
+
+
 def _settled_race_status(race_data: Dict[str, Any], default: str) -> str:
     """Status a race returns to when its active run stops without finishing.
 

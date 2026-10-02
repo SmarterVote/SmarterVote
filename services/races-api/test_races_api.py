@@ -1151,3 +1151,37 @@ def test_rate_limit_headers_are_emitted(client):
     assert resp.status_code == 200
     assert resp.headers["X-RateLimit-Limit"] == "60"
     assert "X-RateLimit-Remaining" in resp.headers
+
+
+def test_authenticated_race_endpoints_are_not_publicly_cacheable(client):
+    """Responses behind verify_token must never be stored by shared caches."""
+    for path in ("/races", "/races/summaries", "/races/mo-senate-2024"):
+        resp = client.get(path)
+        assert resp.status_code == 200
+        assert resp.headers["Cache-Control"] == "private, no-store"
+
+
+def test_race_cache_write_is_dropped_after_concurrent_clear(tmp_path):
+    """A race fetch in flight during clear_cache() must not repopulate stale data."""
+    service = SimplePublishService.__new__(SimplePublishService)
+    service.data_directory = tmp_path
+    service.cache_ttl = 300
+    service._race_list_cache = None
+    service._race_data_cache = {}
+    service._race_summaries_cache = None
+    service._cache_lock = threading.Lock()
+    service.gcs_client = MagicMock()
+
+    def fetch_then_clear(race_id, _client):
+        service.clear_cache()  # an admin publish clears the cache mid-fetch
+        return {"id": race_id, "title": "stale"}
+
+    service._get_gcs_client = lambda: service.gcs_client
+    service._get_race_data_cloud = fetch_then_clear
+
+    assert service.get_race_data("ga-senate-2026")["title"] == "stale"
+    assert service._cache_get_race("ga-senate-2026") is None
+
+    service._get_race_data_cloud = lambda race_id, _client: {"id": race_id, "title": "fresh"}
+    assert service.get_race_data("ga-senate-2026")["title"] == "fresh"
+    assert service._cache_get_race("ga-senate-2026")["title"] == "fresh"

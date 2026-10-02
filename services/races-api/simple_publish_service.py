@@ -173,11 +173,20 @@ class SimplePublishService:
             del self._race_data_cache[race_id]
             return None
 
-    def _cache_set_race(self, race_id: str, data: Dict) -> None:
+    def _cache_generation_snapshot(self) -> int:
+        self._ensure_singleflight_fields()
+        with self._cache_lock:
+            return self._cache_generation
+
+    def _cache_set_race(self, race_id: str, data: Dict, generation: Optional[int] = None) -> None:
         if self.cache_ttl <= 0:
             return
         self._ensure_singleflight_fields()
         with self._cache_lock:
+            # Mirror the summaries path: a fetch that started before clear_cache()
+            # must not repopulate the cache with data that may now be stale.
+            if generation is not None and self._cache_generation != generation:
+                return
             self._race_data_cache[race_id] = (data, time.monotonic() + self.cache_ttl)
 
     def _cache_get_race_summaries(self) -> Optional[List[Dict]]:
@@ -408,11 +417,12 @@ class SimplePublishService:
         if cached is not None:
             return cached
 
+        fetch_generation = self._cache_generation_snapshot()
         client = self._get_gcs_client()
         if client:
             data = self._get_race_data_cloud(race_id, client)
             if data:
-                self._cache_set_race(race_id, data)
+                self._cache_set_race(race_id, data, generation=fetch_generation)
                 return data
             # GCS miss - fall back to local (e.g. bootstrap data baked into image)
             logger.debug("GCS miss for %s, falling back to local", race_id)
