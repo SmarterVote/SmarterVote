@@ -1,5 +1,8 @@
 # 2026 Midterm Research Plan
 
+> Scheduling superseded on 2026-10-02 by [catalog-operations-plan.md](catalog-operations-plan.md).
+> Stable-result, quality, and spend gates below still apply.
+
 Status: active execution. A catalog-wide core refresh is in progress. Production
 snapshot: 2026-08-25 CT (2026-08-26 00:48 UTC).
 
