@@ -15,6 +15,7 @@ from shared.model_catalog import DEFAULT_IMAGE_VISION_MODEL
 
 from .ballotpedia import lookup_candidate_image as _ballotpedia_lookup
 from .ballotpedia import state_name_in_text
+from .image_denylist import is_denied_image
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
@@ -1790,7 +1791,8 @@ def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
 def _is_rejected_candidate_image(url: str, candidate_name: str) -> bool:
     """Apply both generic and candidate-aware guards to a resolved image URL."""
     return (
-        _looks_like_non_photo(url)
+        is_denied_image(url)
+        or _looks_like_non_photo(url)
         or _is_mismatched_person_filename(url, candidate_name)
         or _is_untrusted_wikimedia_match(url, candidate_name)
     )
@@ -1817,6 +1819,11 @@ async def _resolve_single_image(
     # Normalise empty string to None
     if not current_url:
         candidate["image_url"] = None
+
+    if current_url and is_denied_image(current_url):
+        log("info", f"  [{name}] Existing image was rejected by a human audit - discarding and re-searching")
+        candidate["image_url"] = None
+        current_url = None
 
     if current_url and _looks_like_govtrack_reference_headshot(current_url):
         low_resolution_fallback = current_url
@@ -1924,6 +1931,9 @@ async def _resolve_single_image(
     # bare name can resolve to a namesake's page, so pass the race's state.
     log("info", f"  [{name}] Trying Ballotpedia API lookup...")
     bp_url = await _lookup_ballotpedia_image(name, state=state_name_in_text(jurisdiction))
+    if is_denied_image(bp_url):
+        log("info", f"  [{name}] Ballotpedia returned an audit-rejected image - skipping it")
+        bp_url = None
     if bp_url:
         log("info", f"  [{name}] Ballotpedia API returned: {bp_url[:80]}")
         accessible, final_url = await _check_url_accessible(bp_url)
@@ -1941,6 +1951,9 @@ async def _resolve_single_image(
     # (e.g. "Jeff Wadlin" matching "Jeff Wadlow" the film director).
     log("info", f"  [{name}] Trying Wikipedia API lookup...")
     wiki_url = await _lookup_wikipedia_image(name, context=search_context)
+    if is_denied_image(wiki_url):
+        log("info", f"  [{name}] Wikipedia returned an audit-rejected image - skipping it")
+        wiki_url = None
     if wiki_url:
         log("info", f"  [{name}] Wikipedia API returned: {wiki_url[:80]}")
         best_url = await _best_accessible_image_url(wiki_url)
@@ -1961,6 +1974,8 @@ async def _resolve_single_image(
     # Fast path 3: inspect candidate website/profile pages for image metadata.
     log("info", f"  [{name}] Inspecting known candidate pages for image metadata...")
     page_url = await _lookup_known_page_image(candidate)
+    if is_denied_image(page_url):
+        page_url = None
     if page_url and is_partisan_image_host(page_url):
         low_resolution_fallback = low_resolution_fallback or page_url
         log("info", f"  [{name}] Page image is partisan-hosted - keeping it only as a fallback")
@@ -1974,6 +1989,8 @@ async def _resolve_single_image(
     # Fast path 4: query Serper Images API directly
     log("info", f"  [{name}] Trying Serper Images API lookup...")
     serper_img = await _lookup_serper_image(name, context=search_context, run_budget=run_budget)
+    if is_denied_image(serper_img):
+        serper_img = None
     if serper_img and is_partisan_image_host(serper_img):
         low_resolution_fallback = low_resolution_fallback or serper_img
         log("info", f"  [{name}] Serper image is partisan-hosted - keeping it only as a fallback")
@@ -2006,6 +2023,9 @@ async def _resolve_single_image(
             run_budget=run_budget,
         )
         found_url = result.get("image_url")
+        if is_denied_image(found_url):
+            log("info", f"  [{name}] Agent returned an audit-rejected image - no image stored")
+            return
         if not found_url:
             log("info", f"  [{name}] Agent returned null — no image found")
             return
@@ -2178,6 +2198,9 @@ async def resolve_candidate_images(
         else:
             await resolve_call
         await _prefer_wikimedia_thumbnail(c, log)
+        if is_denied_image(c.get("image_url")):
+            log("info", f"  [{c.get('name', 'unknown')}] Resolved image was rejected by a human audit - clearing")
+            c["image_url"] = None
         if run_budget:
             timeout = run_budget.bounded_timeout(125.0, minimum_seconds=5.0, operation="candidate image inspection")
             try:
