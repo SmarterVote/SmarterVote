@@ -28,24 +28,29 @@ _DEFAULT_OUTPUT_PER_M = 10.00
 
 # Paid web-search pricing, per call.
 SERPER_COST_PER_CALL_USD = 0.001
-# Searlo is the primary search provider, but no per-call price is documented
-# anywhere in the repo. Rather than invent one, read it from the environment;
-# the 0.0 default keeps Searlo calls counted but unpriced until the real
-# contract price is supplied via SEARLO_COST_PER_CALL_USD.
+# Searlo is the primary search provider. Web and image search each cost one
+# credit (https://searlo.tech/docs); credit packs run $0.20-$0.80 per 1,000
+# (https://searlo.tech/pricing). The default is the headline $0.40/1K rate
+# (Builder pack: $29.99 / 75,000 credits); set SEARLO_COST_PER_CALL_USD to
+# match the pack actually purchased.
+DEFAULT_SEARLO_COST_PER_CALL_USD = 0.0004
 _SEARLO_COST_ENV = "SEARLO_COST_PER_CALL_USD"
 
 
 def searlo_cost_per_call_usd() -> float:
-    """Return the configured Searlo per-call price (env ``SEARLO_COST_PER_CALL_USD``, default 0.0)."""
+    """Return the Searlo per-call price (env ``SEARLO_COST_PER_CALL_USD``, else the $0.40/1K default)."""
     raw = os.environ.get(_SEARLO_COST_ENV, "").strip()
     if not raw:
-        return 0.0
+        return DEFAULT_SEARLO_COST_PER_CALL_USD
     try:
         value = float(raw)
     except ValueError:
         logging.getLogger("pipeline").warning("Ignoring non-numeric %s=%r", _SEARLO_COST_ENV, raw)
-        return 0.0
-    return value if value >= 0 else 0.0
+        return DEFAULT_SEARLO_COST_PER_CALL_USD
+    if value < 0:
+        logging.getLogger("pipeline").warning("Ignoring negative %s=%r", _SEARLO_COST_ENV, raw)
+        return DEFAULT_SEARLO_COST_PER_CALL_USD
+    return value
 
 
 SEARLO_COST_PER_CALL_USD = searlo_cost_per_call_usd()

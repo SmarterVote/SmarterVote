@@ -20,6 +20,8 @@
   const METRICS_RECORD_LIMIT = 500;
   /** Serper price the pipeline already folds into cost_usd/estimated_usd. */
   const SERPER_USD_PER_CALL = 0.001;
+  // Mirrors DEFAULT_SEARLO_COST_PER_CALL_USD in pipeline_client/agent/cost.py.
+  const SEARLO_USD_PER_CALL = 0.0004;
 
   // Records written since the cost split carry llm_cost_usd / search_cost_usd
   // (pipeline_client/agent/agent.py). cost_usd and estimated_usd ALREADY
@@ -44,7 +46,10 @@
 
   function recordSearchCost(r: CostRecord): number {
     if (typeof r.search_cost_usd === "number") return r.search_cost_usd;
-    return (r.serper_calls ?? 0) * SERPER_USD_PER_CALL;
+    return (
+      (r.serper_calls ?? 0) * SERPER_USD_PER_CALL +
+      (r.searlo_calls ?? 0) * SEARLO_USD_PER_CALL
+    );
   }
 
   // Records fall in the selected window for the search breakdown + top races.
@@ -250,7 +255,7 @@
         </p>
         <p class="mt-1 text-xs text-content-faint">
           {serperCalls.toLocaleString()} Serper · {searloCalls.toLocaleString()}
-          Searlo calls — included in pipeline spend; Searlo is unpriced
+          Searlo calls — included in pipeline spend
         </p>
       {/if}
     </div>
@@ -311,9 +316,9 @@
         </div>
       </div>
       <p class="mt-4 pt-3 border-t border-stroke text-xs text-content-faint">
-        Run costs already include Serper search at ${SERPER_USD_PER_CALL.toFixed(
+        Run costs already include search: Serper at ${SERPER_USD_PER_CALL.toFixed(
           3,
-        )}/call; Searlo calls are counted but not priced.
+        )}/call, Searlo at ${SEARLO_USD_PER_CALL.toFixed(4)}/call.
       </p>
     </div>
 
