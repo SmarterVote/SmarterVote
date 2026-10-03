@@ -370,6 +370,19 @@ WHAT COUNTS AS "NEW" — be precise:
   campaign finance filings, major funding milestones, significant controversy.
 - A summary is worth updating only if a notable new event changes the candidate's
   story — not if you could merely rephrase the existing text differently.
+
+SUMMARY BALANCE — a summary is a short biography, not campaign news:
+- Lead with who the candidate is: office or occupation, background, how they won
+  the nomination, and the platform they themselves emphasize.
+- Do not build a summary around an opponent's attack line, a single gotcha quote,
+  or one news cycle. Mention a controversy only when it is major and lasting
+  (criminal charge, ethics investigation, withdrawal, disqualification), state
+  it in neutral terms, and include the candidate's response.
+- Give every candidate in the race the same kind of content at the same depth;
+  do not add an unflattering detail to one candidate without holding the others
+  to the same standard.
+- Leave poll numbers, race ratings, and "who leads" out of summaries; polling and
+  forecast have their own sections.
 - Do not update a field just to add minor wording polish.
 - Never search for, infer, or record the result of an election scheduled after
   {current_date}. If a runoff or election is still upcoming, state that once
