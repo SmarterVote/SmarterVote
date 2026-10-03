@@ -280,15 +280,23 @@ def test_continuation_starts_units_fresh_but_keeps_logical_total(cost_accumulato
 
 
 def test_search_cost_prices_serper_and_reads_searlo_price_from_env(monkeypatch):
-    from pipeline_client.agent.cost import SERPER_COST_PER_CALL_USD, search_cost_usd, searlo_cost_per_call_usd
+    from pipeline_client.agent.cost import (
+        DEFAULT_SEARLO_COST_PER_CALL_USD,
+        SERPER_COST_PER_CALL_USD,
+        search_cost_usd,
+        searlo_cost_per_call_usd,
+    )
 
     monkeypatch.delenv("SEARLO_COST_PER_CALL_USD", raising=False)
-    assert searlo_cost_per_call_usd() == 0.0
-    assert search_cost_usd(10, 7) == pytest.approx(10 * SERPER_COST_PER_CALL_USD)
+    assert searlo_cost_per_call_usd() == DEFAULT_SEARLO_COST_PER_CALL_USD == 0.0004
+    assert search_cost_usd(10, 7) == pytest.approx(10 * SERPER_COST_PER_CALL_USD + 7 * 0.0004)
 
     monkeypatch.setenv("SEARLO_COST_PER_CALL_USD", "0.0005")
     assert search_cost_usd(10, 7) == pytest.approx(10 * SERPER_COST_PER_CALL_USD + 7 * 0.0005)
 
+    monkeypatch.setenv("SEARLO_COST_PER_CALL_USD", "0")
+    assert searlo_cost_per_call_usd() == 0.0
+
     for bad in ("abc", "-1"):
         monkeypatch.setenv("SEARLO_COST_PER_CALL_USD", bad)
-        assert searlo_cost_per_call_usd() == 0.0
+        assert searlo_cost_per_call_usd() == DEFAULT_SEARLO_COST_PER_CALL_USD
