@@ -15,6 +15,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("races_api")
 
+# Strong references to in-flight analytics writes (see dispatch()).
+_background_tasks: "set[asyncio.Task[None]]" = set()
+
 # Paths that should not be tracked
 # /geocode carries a voter's street address and must never be recorded.
 _SKIP_PREFIXES = ("/health", "/docs", "/redoc", "/openapi", "/favicon", "/geocode")
@@ -85,8 +88,10 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
             # caller-controlled left-most value.
             ip = client_ip(request)
             referer = request.headers.get("referer")
-            # Fire-and-forget — never delay the response
-            asyncio.create_task(
+            # Fire-and-forget — never delay the response. The event loop keeps
+            # only a weak reference to tasks, so hold a strong one until done or
+            # the write can be garbage-collected mid-flight.
+            task = asyncio.create_task(
                 store.log_request(
                     path=path,
                     status_code=response.status_code,
@@ -95,5 +100,7 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
                     referer=referer,
                 )
             )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
 
         return response

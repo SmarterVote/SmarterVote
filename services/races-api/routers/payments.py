@@ -6,6 +6,7 @@ import re
 from typing import Literal
 
 import stripe
+from config import is_production
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from rate_limit import limiter
@@ -27,14 +28,24 @@ MIN_CUSTOM_CENTS = 100  # $1.00
 MAX_CUSTOM_CENTS = 100_000  # $1,000.00
 
 # Checkout return locations are derived server-side from an exact browser origin.
-_ALLOWED_ORIGINS = {
+_PRODUCTION_ORIGINS = {
     "https://smarter.vote",
     "https://www.smarter.vote",
+}
+# Any local process can claim these origins, so (like CORS in main.py) only a
+# non-production API accepts them as checkout return locations.
+_LOCAL_DEV_ORIGINS = {
     "http://localhost:3000",
     "http://localhost:5173",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
 }
+
+
+def _allowed_origins() -> set[str]:
+    return set(_PRODUCTION_ORIGINS) if is_production() else _PRODUCTION_ORIGINS | _LOCAL_DEV_ORIGINS
+
+
 _CHECKOUT_SESSION_ID = re.compile(r"^cs_(?:test_|live_)?[A-Za-z0-9]+$")
 
 
@@ -68,7 +79,7 @@ def _validate_amount(amount_cents: int) -> None:
 
 def _checkout_origin(request: Request) -> str:
     origin = request.headers.get("origin", "").rstrip("/")
-    if origin not in _ALLOWED_ORIGINS:
+    if origin not in _allowed_origins():
         raise HTTPException(status_code=403, detail="Checkout is not available from this origin.")
     return origin
 

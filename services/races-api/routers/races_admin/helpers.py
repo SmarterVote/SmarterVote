@@ -371,10 +371,10 @@ def _apply_catalog_view(race: Dict[str, Any]) -> Dict[str, Any]:
     return race
 
 
-def _assert_publishable_race(data: Dict[str, Any]) -> None:
+def _assert_publishable_race(data: Dict[str, Any], race_id: str | None = None) -> None:
     """Block publishing drafts that the review gate explicitly failed."""
     try:
-        gcs_helpers._assert_publishable_race(data)
+        gcs_helpers._assert_publishable_race(data, race_id)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc).replace("Race failed", "Draft failed")) from exc
 
@@ -462,6 +462,20 @@ def _pipeline_run_stats(db: Any) -> Dict[str, Dict[str, Any]]:
             item["last_run_id"] = data.get("run_id") or getattr(doc, "id", None)
             item["last_run_status"] = data.get("status")
     return stats
+
+
+def _update_summaries_index(updates: Dict[str, Any]) -> str | None:
+    """Update races/summaries.json; return an error string instead of raising.
+
+    The race blobs are already live by the time this runs, so a failure here
+    must not skip the catalog/cache updates for races that were written.
+    """
+    try:
+        gcs_helpers.update_gcs_summaries_json(updates)
+    except Exception as exc:
+        logging.exception("races/summaries.json update failed for %s", sorted(updates))
+        return f"summaries.json update failed ({type(exc).__name__}); see server logs"
+    return None
 
 
 def _clear_public_race_cache(request: Request) -> None:

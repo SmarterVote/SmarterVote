@@ -22,7 +22,7 @@
   }
 
   /** Office badge text; one calm neutral style for every office. */
-  function getOfficeBadge(office: string | undefined): string {
+  function getOfficeBadge(office: string | null | undefined): string {
     if (!office) return "Race";
     const o = office.toLowerCase();
     if (o.includes("senate")) return "Senate";
@@ -84,7 +84,7 @@
         <li class="flex min-w-0 items-center gap-2">
           <!-- Avatar -->
           <div class="relative flex-shrink-0">
-            {#if candidate.image_url && !imageErrors.has(candidate.name)}
+            {#if avatarSrc(candidate.image_url) && !imageErrors.has(candidate.name)}
               <!-- headshotFallback also catches images that failed before
                    hydration, so a broken headshot still shows initials. -->
               <img

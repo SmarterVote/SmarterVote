@@ -9,10 +9,22 @@ from smartervote_mcp.client import RacesApiClient, compact_options
 from smartervote_mcp.gcp_launcher import _cloud_run_audience, configure_cloud_run_identity_token_from_gcp
 
 
+def _require_mcp_sdk() -> None:
+    """Skip locally when the optional MCP SDK is absent, but fail in CI.
+
+    CI installs requirements-mcp.txt; a silent skip there would hide a broken
+    install and drop every MCP tool test from the gate without anyone noticing.
+    """
+    if find_spec("mcp") is not None:
+        return
+    if os.environ.get("CI", "").strip().lower() not in {"", "0", "false", "no"}:
+        pytest.fail("MCP SDK is missing in CI; install requirements-mcp.txt")
+    pytest.skip("MCP SDK is optional outside the local MCP environment")
+
+
 @pytest.mark.asyncio
 async def test_smartervote_mcp_exposes_lean_tool_surface():
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import mcp
 
@@ -150,8 +162,7 @@ class _StubRacesClient:
 
 @pytest.mark.asyncio
 async def test_audit_draft_vs_published_reports_roster_and_grade_diffs(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -194,8 +205,7 @@ async def test_audit_draft_vs_published_reports_roster_and_grade_diffs(monkeypat
 
 @pytest.mark.asyncio
 async def test_scan_catalog_returns_compact_ranked_health_rows(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -276,8 +286,7 @@ async def test_scan_catalog_returns_compact_ranked_health_rows(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_plan_repairs_forwards_bounded_read_only_request(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -295,8 +304,7 @@ async def test_plan_repairs_forwards_bounded_read_only_request(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_audit_issue_research_readiness_compacts_repair_plans(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -424,8 +432,7 @@ async def test_audit_issue_research_readiness_compacts_repair_plans(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_audit_issue_research_readiness_can_scan_entire_catalog_in_batches(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -471,8 +478,7 @@ async def test_audit_issue_research_readiness_can_scan_entire_catalog_in_batches
 
 @pytest.mark.asyncio
 async def test_audit_issue_research_readiness_orders_equal_ratings_by_observed_demand(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -535,8 +541,7 @@ async def test_audit_issue_research_readiness_orders_equal_ratings_by_observed_d
 
 @pytest.mark.asyncio
 async def test_audit_issue_research_readiness_uses_selected_window_request_field(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -575,8 +580,7 @@ async def test_audit_issue_research_readiness_uses_selected_window_request_field
 
 @pytest.mark.asyncio
 async def test_audit_race_assets_forwards_persistence_controls(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -593,8 +597,7 @@ async def test_audit_race_assets_forwards_persistence_controls(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_refresh_race_core_queues_auditable_standard_step_set(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -620,13 +623,13 @@ async def test_refresh_race_core_queues_auditable_standard_step_set(monkeypatch)
             "refresh candidate summaries, then update polling and the evidence-backed forecast."
         ),
         runner="local",
+        confirm_large_batch=False,
     )
 
 
 @pytest.mark.asyncio
 async def test_refresh_race_core_passes_force_fresh_escape_hatch(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -641,8 +644,7 @@ async def test_refresh_race_core_passes_force_fresh_escape_hatch(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_research_program_status_uses_canonical_endpoint(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -658,8 +660,7 @@ async def test_get_research_program_status_uses_canonical_endpoint(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_record_research_checkpoint_never_queues(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -686,8 +687,7 @@ async def test_record_research_checkpoint_never_queues(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_recheck_all_races_follows_bounded_cursor_pages(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -719,8 +719,7 @@ async def test_recheck_all_races_follows_bounded_cursor_pages(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_assess_publish_readiness_blocks_failed_or_placeholder_drafts(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -743,7 +742,7 @@ async def test_assess_publish_readiness_blocks_failed_or_placeholder_drafts(monk
             "run_health": {"verdict": "failed"},
             "pipeline_state": {"complete": False},
         },
-        "/races/ca-house-02-2026": RuntimeError("not published"),
+        "/races/ca-house-02-2026": RuntimeError("races-api 404 for GET /races/ca-house-02-2026: not found"),
     }
     monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
 
@@ -771,8 +770,7 @@ async def test_assess_publish_readiness_warns_on_roster_removal_without_blocking
     refusing to publish just leaves the previous roster live, which is equally wrong
     when the seat really is uncontested.
     """
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -823,8 +821,7 @@ async def test_assess_publish_readiness_blocks_a_roster_emptied_to_nothing(monke
     nothing to say, as distinct from a one-candidate page describing a seat that
     genuinely went uncontested.
     """
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -854,8 +851,7 @@ async def test_assess_publish_readiness_warns_but_allows_unproven_field_removal(
     because the run could not evidence the removal itself. Blocking these cost a
     repeat discovery run per race and caught nothing in a 12-race audit.
     """
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -888,8 +884,7 @@ async def test_assess_publish_readiness_warns_but_allows_unproven_field_removal(
 @pytest.mark.asyncio
 async def test_assess_publish_readiness_reads_unproven_field_from_roster_research(monkeypatch):
     """The flag also lives in ``pipeline_state.roster_research`` on older drafts."""
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -921,8 +916,7 @@ async def test_assess_publish_readiness_allows_unreviewed_maintenance_draft(monk
     tolerates ``remaining_steps == ["review"]``, so treating a missing grade as a
     blocker made this tool contradict the endpoint it is supposed to predict.
     """
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -959,8 +953,7 @@ async def test_assess_publish_readiness_allows_unreviewed_maintenance_draft(monk
 @pytest.mark.asyncio
 async def test_assess_publish_readiness_blocks_unresolved_error_flags(monkeypatch):
     """The API rejects error-severity review flags even with a passing grade."""
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -982,8 +975,7 @@ async def test_assess_publish_readiness_blocks_unresolved_error_flags(monkeypatc
 
 @pytest.mark.asyncio
 async def test_publish_races_never_posts_when_readiness_is_blocked(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1009,16 +1001,15 @@ async def test_publish_races_never_posts_when_readiness_is_blocked(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_queue_races_and_run_race_forward_debug_mode(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
     client = type("Client", (), {"post": AsyncMock(return_value={"added": []})})()
     monkeypatch.setattr(server, "_client", lambda: client)
 
-    await server.queue_races(["ca-house-05-2026"], debug_mode=True)
-    await server.run_race("ca-house-05-2026", debug_mode=True)
+    await server.queue_races(["ca-house-05-2026"], ["discovery"], debug_mode=True)
+    await server.run_race("ca-house-05-2026", ["discovery"], debug_mode=True)
 
     first_call, second_call = client.post.await_args_list
     assert first_call.kwargs["json"]["options"]["debug_mode"] is True
@@ -1027,8 +1018,7 @@ async def test_queue_races_and_run_race_forward_debug_mode(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_run_logs_forwards_opaque_cursor(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1042,8 +1032,7 @@ async def test_get_run_logs_forwards_opaque_cursor(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_summarize_run_costs_normalizes_nested_and_top_level_fields(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1099,8 +1088,7 @@ async def test_summarize_run_costs_normalizes_nested_and_top_level_fields(monkey
 
 @pytest.mark.asyncio
 async def test_summarize_run_costs_prefers_exact_metrics_record(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1221,8 +1209,7 @@ async def test_races_api_client_error_with_non_json_body_uses_raw_text(monkeypat
 
 
 def test_mcp_pipeline_options_default_to_cheap_mode():
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import _pipeline_options
 
@@ -1238,8 +1225,7 @@ def test_mcp_pipeline_options_default_to_cheap_mode():
 
 
 def test_mcp_pipeline_options_require_explicit_false_for_quality_profile():
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import _pipeline_options
 
@@ -1248,8 +1234,29 @@ def test_mcp_pipeline_options_require_explicit_false_for_quality_profile():
 
     assert _pipeline_options(cheap_mode=False, model_profile="quality") == {
         "cheap_mode": False,
-        "model_profile": "quality",
+        "model_profile": "premium",
     }
+
+
+@pytest.mark.parametrize("profile", [" Premium ", "PREMIUM", "custom", " Quality"])
+def test_mcp_pipeline_options_premium_guard_normalizes_profile_names(profile):
+    _require_mcp_sdk()
+
+    from smartervote_mcp.server import _pipeline_options
+
+    # Case/whitespace variants and retired aliases must not slip past the spend guard.
+    with pytest.raises(ValueError, match="requires explicit cheap_mode=False"):
+        _pipeline_options(model_profile=profile)
+
+
+def test_mcp_pipeline_options_allows_default_profile_variants():
+    _require_mcp_sdk()
+
+    from smartervote_mcp.server import _pipeline_options
+
+    assert _pipeline_options(model_profile=" Default ") == {"cheap_mode": True, "model_profile": "default"}
+    with pytest.raises(ValueError, match="model_profile must be one of"):
+        _pipeline_options(model_profile="ultra")
 
 
 def test_cloud_run_audience_detects_run_app_url(monkeypatch):
@@ -1323,8 +1330,7 @@ def test_contains_placeholder_catches_literal_junk(marker):
     """`assess_publish_readiness` is the gate an operator runs before publishing,
     so anything the pipeline's own junk detector would fail a run for must not
     slip past it. This set had drifted to four markers against run_health's."""
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import _contains_placeholder
 
@@ -1337,8 +1343,7 @@ def test_contains_placeholder_ignores_words_that_are_real_field_values(value):
     stance, so a marker that is plausible as a district, party or title would
     block publication over legitimate data. run_health can afford them because
     it only ever looks at a single stance."""
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import _contains_placeholder
 
@@ -1347,8 +1352,7 @@ def test_contains_placeholder_ignores_words_that_are_real_field_values(value):
 
 def test_contains_placeholder_only_matches_a_whole_value():
     """A real stance that merely mentions a marker word must not be flagged."""
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp.server import _contains_placeholder
 
@@ -1358,8 +1362,7 @@ def test_contains_placeholder_only_matches_a_whole_value():
 
 @pytest.mark.asyncio
 async def test_cancel_run_uses_non_destructive_cancel_endpoint(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1374,8 +1377,7 @@ async def test_cancel_run_uses_non_destructive_cancel_endpoint(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_delete_finished_run_refuses_active_runs(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1410,8 +1412,7 @@ async def test_delete_finished_run_refuses_active_runs(monkeypatch):
     ],
 )
 async def test_path_ids_reject_traversal_and_malformed_input(monkeypatch, tool_name, args):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1422,7 +1423,7 @@ async def test_path_ids_reject_traversal_and_malformed_input(monkeypatch, tool_n
     monkeypatch.setattr(server, "_client", lambda: client)
 
     with pytest.raises(ValueError, match="Invalid"):
-        await getattr(server, tool_name)(*args)
+        await getattr(server, tool_name)(*args, **_confirm_kwargs(tool_name))
 
     client.get.assert_not_awaited()
     client.post.assert_not_awaited()
@@ -1431,8 +1432,7 @@ async def test_path_ids_reject_traversal_and_malformed_input(monkeypatch, tool_n
 
 @pytest.mark.asyncio
 async def test_path_ids_accept_valid_ids_and_build_expected_paths(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
 
     from smartervote_mcp import server
 
@@ -1442,14 +1442,221 @@ async def test_path_ids_accept_valid_ids_and_build_expected_paths(monkeypatch):
     client.delete = AsyncMock(return_value={})
     monkeypatch.setattr(server, "_client", lambda: client)
 
-    await server.delete_race("ga-senate-2026")
+    await server.delete_race("ga-senate-2026", confirm=True)
     client.delete.assert_awaited_with("/api/races/ga-senate-2026")
 
     run_id = "0f8fad5b-d9cb-469f-a165-70867728950e"
     await server.delete_finished_run(run_id)
     client.delete.assert_awaited_with(f"/runs/{run_id}")
 
-    await server.restore_race_version("ga-senate-2026", "20260101T000000Z-draft.json")
+    await server.restore_race_version("ga-senate-2026", "20260101T000000Z-draft.json", confirm=True)
     client.post.assert_awaited_with("/api/races/ga-senate-2026/versions/20260101T000000Z-draft.json/restore")
 
     assert server._path_id("2026-01-01T00:00:00Z", "run_id") == "2026-01-01T00%3A00%3A00Z"
+
+
+_DESTRUCTIVE_TOOLS = {"unpublish_race", "delete_race", "delete_draft", "restore_race_version"}
+
+
+def _confirm_kwargs(tool_name):
+    return {"confirm": True} if tool_name in _DESTRUCTIVE_TOOLS else {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tool_name, args",
+    [
+        ("unpublish_race", ("ga-senate-2026",)),
+        ("delete_race", ("ga-senate-2026",)),
+        ("delete_draft", ("ga-senate-2026",)),
+        ("restore_race_version", ("ga-senate-2026", "20260101T000000Z-draft.json")),
+    ],
+)
+async def test_destructive_tools_require_explicit_confirm(monkeypatch, tool_name, args):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.post = AsyncMock(return_value={})
+    client.delete = AsyncMock(return_value={})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    tool = getattr(server, tool_name)
+    for confirm in (None, False, "yes"):
+        kwargs = {} if confirm is None else {"confirm": confirm}
+        with pytest.raises(ValueError, match="confirm=True"):
+            await tool(*args, **kwargs)
+    client.post.assert_not_awaited()
+    client.delete.assert_not_awaited()
+
+    await tool(*args, confirm=True)
+    assert client.post.await_count + client.delete.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_queue_tools_require_explicit_enabled_steps(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.post = AsyncMock(return_value={"added": []})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    # Omitting steps used to fall back to the API default, which includes paid finance/refinement.
+    with pytest.raises(ValueError, match="refresh_race_core"):
+        await server.queue_races(["ca-house-05-2026"], [])
+    with pytest.raises(ValueError, match="refresh_race_core"):
+        await server.run_race("ca-house-05-2026", None)
+    with pytest.raises(TypeError):
+        await server.queue_races(["ca-house-05-2026"])  # pylint: disable=no-value-for-parameter
+    client.post.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_queue_races_caps_batch_size_without_confirmation(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.post = AsyncMock(return_value={"added": []})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    too_many = [f"xx-house-{i:02d}-2026" for i in range(server.MAX_MCP_QUEUE_BATCH + 1)]
+    with pytest.raises(ValueError, match="confirm_large_batch"):
+        await server.queue_races(too_many, ["discovery"])
+    with pytest.raises(ValueError, match="confirm_large_batch"):
+        await server.refresh_race_core(too_many)
+    client.post.assert_not_awaited()
+
+    await server.queue_races(too_many[: server.MAX_MCP_QUEUE_BATCH], ["discovery"])
+    await server.queue_races(too_many, ["discovery"], confirm_large_batch=True)
+    assert client.post.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_assess_publish_readiness_blocks_when_published_lookup_errors(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+    from smartervote_mcp.client import RacesApiError
+
+    draft = {
+        "candidates": [{"name": "A"}],
+        "validation_grade": {"passed": True},
+        "run_health": {"status": "healthy"},
+        "pipeline_state": {"complete": True},
+    }
+    responses = {
+        "/api/races/ok-house-01-2026/data": draft,
+        "/races/ok-house-01-2026": RacesApiError("races-api 500 for GET /races/ok-house-01-2026: boom", status_code=500),
+        "/api/races/ok-house-02-2026/data": draft,
+        "/races/ok-house-02-2026": RacesApiError("races-api 404 for GET /races/ok-house-02-2026: nope", status_code=404),
+        "/api/races/ok-house-03-2026/data": RacesApiError("races-api 401 for GET: unauthorized", status_code=401),
+        "/races/ok-house-03-2026": RacesApiError("races-api 401 for GET: unauthorized", status_code=401),
+    }
+    monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
+
+    result = await server.assess_publish_readiness(["ok-house-01-2026", "ok-house-02-2026", "ok-house-03-2026"])
+    errored, absent, unauthorized = result["rows"]
+
+    # A 500 says nothing about whether a published page exists; it must not read as a first publication.
+    assert "published_lookup_failed" in errored["blockers"]
+    assert "first_publication" not in errored["warnings"]
+    assert absent["ready"] is True
+    assert "first_publication" in absent["warnings"]
+    assert {"draft_lookup_failed", "published_lookup_failed", "draft_missing"} <= set(unauthorized["blockers"])
+
+
+@pytest.mark.asyncio
+async def test_assess_publish_readiness_reports_stance_and_finance_quality(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    base = {
+        "validation_grade": {"passed": True},
+        "run_health": {"status": "healthy"},
+        "pipeline_state": {"complete": True},
+    }
+    responses = {
+        "/api/races/qa-house-01-2026/data": {
+            **base,
+            "candidates": [
+                {
+                    "name": "A",
+                    "donor_summary": "Raised $1M.",
+                    "voting_summary": "No legislative record.",
+                    "issues": {
+                        "Economy": {"stance": "TODO: summarize tax plan"},
+                        "Healthcare": {"stance": "No public position found"},
+                        "Education": {"stance": "No public position found"},
+                        "Climate/Energy": {"stance": "Backs a draft bill on grid upgrades."},
+                    },
+                },
+                {"name": "B", "issues": {"Economy": {"stance": "Supports tariffs."}}},
+            ],
+        },
+        "/races/qa-house-01-2026": {"candidates": [{"name": "A"}, {"name": "B"}]},
+        "/api/races/qa-house-02-2026/data": {**base, "candidates": [{"name": "New Candidate"}]},
+        "/races/qa-house-02-2026": RuntimeError("races-api 404 for GET /races/qa-house-02-2026: not found"),
+    }
+    monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
+
+    result = await server.assess_publish_readiness(["qa-house-01-2026", "qa-house-02-2026"])
+    full, discovery_only = result["rows"]
+
+    assert full["ready"] is True  # warnings only
+    assert full["placeholder_stances"] == ["A:Economy"]  # lower-case "draft bill" is ordinary prose
+    assert full["finance_missing_candidates"] == ["B"]
+    assert full["no_position_count"] == 2 and full["stance_count"] == 5
+    assert full["no_position_ratio"] == 0.4
+    assert {"stance_placeholder_text", "finance_summaries_missing"} <= set(full["warnings"])
+    assert "mostly_no_public_position" not in full["warnings"]
+    # A discovery-only draft never ran finance, so empty summaries are expected there.
+    assert discovery_only["finance_missing_candidates"] == []
+    assert "finance_summaries_missing" not in discovery_only["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_client_error_detail_handles_non_dict_json_and_non_json_success():
+    def handler(request):
+        if request.url.path == "/list-error":
+            return httpx.Response(422, json=[{"loc": ["body"], "msg": "bad"}])
+        return httpx.Response(200, content=b"<html>login</html>", headers={"content-type": "text/html"})
+
+    transport = httpx.MockTransport(handler)
+    original = httpx.AsyncClient
+
+    def _client_factory(**kwargs):
+        return original(transport=transport, **kwargs)
+
+    from unittest.mock import patch
+
+    from smartervote_mcp.client import RacesApiError
+
+    with patch("smartervote_mcp.client.httpx.AsyncClient", side_effect=_client_factory):
+        client = RacesApiClient(base_url="http://races-api.test")
+        with pytest.raises(RacesApiError, match="races-api 422 for GET /list-error: .*bad") as list_exc:
+            await client.get("/list-error")
+        assert list_exc.value.status_code == 422
+        with pytest.raises(RacesApiError, match="non-JSON body") as html_exc:
+            await client.get("/html")
+        assert html_exc.value.status_code == 200
+
+
+def test_require_mcp_sdk_fails_in_ci_but_skips_locally(monkeypatch):
+    import sys
+
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "find_spec", lambda name: None)
+
+    monkeypatch.setenv("CI", "true")
+    with pytest.raises(pytest.fail.Exception, match="missing in CI"):
+        _require_mcp_sdk()
+
+    monkeypatch.delenv("CI")
+    with pytest.raises(pytest.skip.Exception):
+        _require_mcp_sdk()

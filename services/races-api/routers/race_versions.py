@@ -80,8 +80,14 @@ def restore_version_as_draft(race_id: str, filename: str) -> Dict[str, Any]:
     # Restoring only replaces the draft; a race whose races/{id}.json is still
     # live must stay published (status and published_at untouched).
     is_published = gcs_helpers._gcs_get_race_json(race_id, "races") is not None
-    gcs_helpers._gcs_archive_race(race_id, "drafts", "draft")
-    gcs_helpers._gcs_put_race_json(race_id, "drafts", version_data)
+    try:
+        # Strict archive: never overwrite the current draft without a retired copy.
+        gcs_helpers._gcs_archive_active_if_present(race_id, "drafts", "draft")
+    except RuntimeError as exc:
+        logger.exception("Unable to archive current draft before restoring %s/%s", race_id, filename)
+        raise HTTPException(status_code=503, detail="Could not archive the current draft; nothing was restored") from exc
+    if not gcs_helpers._gcs_put_race_json(race_id, "drafts", version_data):
+        raise HTTPException(status_code=502, detail="Failed to write the restored draft; nothing was restored")
     update: Dict[str, Any] = {
         "draft_updated_at": datetime.now(timezone.utc).isoformat(),
         **firestore_helpers._fs_build_draft_catalog_fields(race_id, version_data),

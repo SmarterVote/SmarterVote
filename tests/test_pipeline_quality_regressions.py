@@ -191,7 +191,8 @@ def test_automated_warnings_deduct_without_becoming_a_veto():
                     "verdict": "flagged",
                     "flags": [{"severity": "warning", "field": f"candidate.field_{i}"} for i in range(warning_count)],
                 },
-            ]
+            ],
+            min_reviews=1,
         )
 
     # A strong review absorbs a couple of advisory flags.

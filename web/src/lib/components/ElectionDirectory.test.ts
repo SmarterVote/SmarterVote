@@ -33,7 +33,7 @@ function navigateTo(href: string) {
 }
 
 /**
- * The embedded USMap fetches /states-10m.json in onMount with no try/catch, so
+ * The embedded USMap fetches the bundled us-atlas states-10m.json asset in onMount with no try/catch, so
  * an unstubbed fetch produces an unhandled rejection that has nothing to do
  * with the directory. An empty-but-valid topology lets the map mount and settle
  * without drawing anything.

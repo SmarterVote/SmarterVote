@@ -50,8 +50,11 @@ class AgentCancelled(Exception):
     """Raised when a running queue item has been cancelled by an admin."""
 
 
-# Default deadline: 55 minutes (gives 5-min buffer before CF's 60-min hard limit)
+# Deadline used only when a caller does not inject ``deadline_at`` (the local
+# debug runner). The queue processor always injects its own.
 DEFAULT_DEADLINE_SECONDS: int = 3300
+# Minimum seconds between Firestore cancellation reads for one run.
+CANCEL_CHECK_INTERVAL_SECONDS: float = 10.0
 _PLACEHOLDER_CANDIDATE_NAMES = {"", "unknown", "tbd", "to be determined", "n/a", "na", "none"}
 
 
@@ -145,9 +148,7 @@ class AgentHandler:
         elif options.get("force_fresh"):
             existing_data = {}
         else:
-            existing_data = await self._load_existing_from_gcs(
-                race_id, baseline_source=options.get("baseline_source", "latest")
-            )
+            existing_data = await self._load_baseline(race_id, baseline_source=options.get("baseline_source", "latest"))
 
         # Resolve enabled steps only after baseline loading so an unspecified
         # step list can distinguish a genuine update from new research.
@@ -205,10 +206,9 @@ class AgentHandler:
             from pipeline_client.backend.pipeline_runner import _safe_broadcast
             from pipeline_client.backend.run_manager import run_manager as _run_manager
 
-            if not run_id:
-                # Fallback: pick the first active run (legacy path)
-                active = next(iter(_run_manager.list_active_runs()), None)
-                run_id = active.run_id if active else None
+            # No "first active run" fallback: every caller (queue processor, local
+            # pipeline runner) passes run_id, and guessing attached progress,
+            # logs and handoffs to whichever unrelated run happened to be active.
         except Exception as _e:
             logger.debug("Failed to resolve run context: %s", _e)
 
@@ -270,7 +270,16 @@ class AgentHandler:
             if run_id and _safe_broadcast:
                 _safe_broadcast({"type": "run_progress", "run_id": run_id, "progress": pct, "message": label})
 
-        def _raise_if_cancelled() -> None:
+        last_cancel_check = [float("-inf")]
+
+        def _raise_if_cancelled(force: bool = False) -> None:
+            """Stop the run when its queue item was cancelled, removed or lost its lease.
+
+            Runs synchronously inside progress/log callbacks on the event loop, so
+            the Firestore read is throttled to once per CANCEL_CHECK_INTERVAL_SECONDS
+            (the in-memory lease check still runs every time). A blocking GET per
+            progress tick stalled every concurrent coroutine in the worker.
+            """
             if not queue_item_id:
                 return
             try:
@@ -279,6 +288,10 @@ class AgentHandler:
 
                 if lease_lost(queue_item_id):
                     raise AgentCancelled(f"Run {run_id or ''} for {race_id} lost its queue lease")
+                now = time.monotonic()
+                if not force and now - last_cancel_check[0] < CANCEL_CHECK_INTERVAL_SECONDS:
+                    return
+                last_cancel_check[0] = now
                 db = _get_db()
                 if db is None:
                     return
@@ -298,7 +311,7 @@ class AgentHandler:
             nonlocal _handoff_started
             if _handoff_started or not run_id or (not force and time.time() <= deadline_at):
                 return
-            _raise_if_cancelled()
+            _raise_if_cancelled(force=True)
             active_step = step or _current_step
             remaining = [s for s in enabled_steps if s not in _completed_steps]
             if not remaining:
@@ -505,9 +518,11 @@ class AgentHandler:
                     race_json_holder[0] = latest_race_json
                 _maybe_handoff("during progress callback", step=step, pct=pct)
 
-                # Update per-step progress
+                # Update per-step progress. Only in-process runs have live step
+                # state; get_run() falls back to a synchronous Firestore read for
+                # queued runs, which mutated a throwaway copy on every tick.
                 if _run_manager:
-                    run_info = _run_manager.get_run(run_id)
+                    run_info = (getattr(_run_manager, "active_runs", None) or {}).get(run_id)
                     if run_info:
                         for s in run_info.steps:
                             if s.name == step:
@@ -632,6 +647,9 @@ class AgentHandler:
                         "page_fetches": cost_snapshot.get("page_fetches", 0),
                         "fetched_chars": cost_snapshot.get("fetched_chars", 0),
                         "page_budget_blocked": cost_snapshot.get("page_budget_blocked", 0),
+                        # Per-unit token/search spend, so a continuation cannot
+                        # hand a unit that hit its ceiling a fresh allowance.
+                        "unit_budget": json.loads(json.dumps(cost_snapshot.get("unit_budget", {}), default=str)),
                     }
                 db.collection(FIRESTORE_QUEUE_COLLECTION).document(item_id).set(
                     {
@@ -736,8 +754,13 @@ class AgentHandler:
                 run_budget=run_budget,
             )
         except (RunBudgetExceeded, PipelineWorkRemaining) as exc:
-            from pipeline_client.agent.cost import record_retry_metric
+            from pipeline_client.agent.cost import TokenBudgetExceeded, record_retry_metric
 
+            if isinstance(exc, TokenBudgetExceeded):
+                # More time cannot fix a spent token budget; a continuation would
+                # resume with the same totals and fail again. Fail the run.
+                logger.error("Run token hard limit exceeded: %s", exc)
+                raise
             if isinstance(exc, RunBudgetExceeded):
                 record_retry_metric("deadline_exits")
                 logger.warning("Run budget exhausted: %s", exc)
@@ -969,7 +992,10 @@ class AgentHandler:
         """Upload race JSON to Google Cloud Storage under the given prefix.
 
         Runs in both cloud and local environments — if a bucket env var is set
-        (e.g. via .env), the pipeline always pushes to GCS.
+        (e.g. via .env), the pipeline always pushes to GCS. When a bucket is
+        configured, a missing client or a failed upload raises: GCS is the
+        source of truth, so a run whose draft never reached it must fail rather
+        than report success (and let the catalog sync a stale GCS draft).
         """
         logger = logging.getLogger("pipeline")
         from pipeline_client.backend.settings import settings
@@ -978,16 +1004,18 @@ class AgentHandler:
         if not gcs_bucket:
             return
 
+        client = self._get_storage_client()
+        if client is None:
+            raise RuntimeError(
+                f"GCS bucket '{gcs_bucket}' is configured but no storage client is available; draft not uploaded"
+            )
         try:
-            client = self._get_storage_client()
-            if client is None:
-                return
             bucket = client.bucket(gcs_bucket)
             blob = bucket.blob(f"{prefix}/{race_id}.json")
             blob.upload_from_string(json_str, content_type="application/json")
-            logger.info(f"Uploaded {race_id} to GCS: gs://{gcs_bucket}/{prefix}/{race_id}.json")
         except Exception as e:
-            logger.warning(f"Failed to upload {race_id} to GCS {prefix}/: {e}")
+            raise RuntimeError(f"Failed to upload {race_id} to GCS {prefix}/: {e}") from e
+        logger.info(f"Uploaded {race_id} to GCS: gs://{gcs_bucket}/{prefix}/{race_id}.json")
 
     async def _load_existing_from_gcs(self, race_id: str, *, baseline_source: str = "latest") -> Dict[str, Any] | None:
         """Load existing race data from GCS so deployed containers use update mode.
@@ -995,7 +1023,10 @@ class AgentHandler:
         ``latest`` checks drafts/ first (most recent agent output), then falls
         back to races/ (published). ``published`` reads only races/, which lets
         targeted repair runs ignore an unrelated or defective draft. Returns
-        *None* when GCS is not configured or the race doesn't exist.
+        *None* when GCS is not configured or the race doesn't exist. Storage
+        errors (no client, permission, network, corrupt JSON) raise instead of
+        masquerading as "not found", which would silently turn an update run
+        into a fresh run or a stale local-disk baseline.
         """
         logger = logging.getLogger("pipeline")
         from pipeline_client.backend.settings import settings
@@ -1004,10 +1035,10 @@ class AgentHandler:
         if not gcs_bucket:
             return None
 
+        client = self._get_storage_client()
+        if client is None:
+            raise RuntimeError(f"GCS bucket '{gcs_bucket}' is configured but no storage client is available")
         try:
-            client = self._get_storage_client()
-            if client is None:
-                return None
             bucket = client.bucket(gcs_bucket)
 
             prefixes = ("races",) if baseline_source == "published" else ("drafts", "races")
@@ -1016,15 +1047,34 @@ class AgentHandler:
                 if not blob.exists():
                     continue
                 data = json.loads(blob.download_as_text())
-                if not isinstance(data.get("candidates"), list) or len(data["candidates"]) == 0:
-                    logger.warning(
-                        f"Existing GCS file {prefix}/{race_id} has no candidates " f"(keys: {list(data.keys())}) — skipping"
-                    )
+                if not isinstance(data, dict) or not isinstance(data.get("candidates"), list) or len(data["candidates"]) == 0:
+                    keys = list(data.keys()) if isinstance(data, dict) else type(data).__name__
+                    logger.warning(f"Existing GCS file {prefix}/{race_id} has no candidates (keys: {keys}) — skipping")
                     continue
                 logger.info(f"Loaded existing {race_id} from GCS {prefix}/ for update mode")
                 return data
 
             return None
         except Exception as e:
-            logger.warning(f"Failed to load existing {race_id} from GCS: {e}")
-            return None
+            raise RuntimeError(f"Failed to load existing {race_id} from GCS: {e}") from e
+
+    async def _load_baseline(self, race_id: str, *, baseline_source: str = "latest") -> Dict[str, Any]:
+        """Resolve the baseline race data for a non-continuation, non-fresh run.
+
+        With a GCS bucket configured (gcp storage mode), GCS is authoritative:
+        a missing object means "no baseline" and the run starts fresh — it never
+        falls back to container-local ``data/drafts`` (which could be stale, or
+        a draft when ``baseline_source="published"`` asked to ignore drafts).
+        Without a bucket, local files are read honoring ``baseline_source``.
+        Always returns a dict (empty when there is no baseline) so
+        ``run_agent`` does not apply its own local-disk fallback.
+        """
+        from pipeline_client.backend.settings import settings
+
+        data = await self._load_existing_from_gcs(race_id, baseline_source=baseline_source)
+        if data is not None or settings.gcs_bucket:
+            return data or {}
+
+        from pipeline_client.agent.agent import _load_existing
+
+        return _load_existing(race_id, baseline_source=baseline_source) or {}

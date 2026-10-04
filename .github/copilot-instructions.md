@@ -7,7 +7,8 @@ AI-powered electoral analysis platform. A multi-phase research agent (OpenRouter
 ```
 pipeline_client/           # Local runner + AI research agent
   agent/                   # Agent loop, prompts, search cache, review, tools
-  backend/                 # Local FastAPI runner, Cloud Function handler, run managers
+  backend/                 # Local-only FastAPI debug runner, AgentHandler, queue processor, run managers
+  worker.py                # Pipeline worker: local Docker (default runner) or one-shot Cloud Run Job
 services/races-api/        # Production public/admin FastAPI API
 web/                       # SvelteKit frontend (static adapter → Cloudflare Pages)
 shared/                    # Pydantic models shared across Python services
@@ -23,25 +24,26 @@ See `docs/architecture.md` for full details, endpoints, and cloud topology.
 ## Build & Test
 
 ```bash
-# Python pipeline tests (API admin and Cloud Function suites run separately in CI)
+# Python pipeline tests (the races-api admin suite runs separately in CI).
+# Paid live-LLM tests are skipped unless RUN_LIVE_LLM_TESTS=1 and OPENROUTER_API_KEY are both set.
 PYTHONPATH=. python -m pytest tests -v --ignore=tests/test_races_api_admin.py
 
 # Python formatting checks
-python -m black --check shared smartervote_mcp services/races-api tests pipeline_client functions scripts
-python -m isort --check-only shared smartervote_mcp services/races-api tests pipeline_client functions scripts
+python -m black --check shared smartervote_mcp services/races-api tests pipeline_client scripts
+python -m isort --check-only shared smartervote_mcp services/races-api tests pipeline_client scripts
 
 # Frontend (always npm ci first)
-cd web && npm ci && npm run check && npm run lint && npm run build && npm run test:unit -- --run
+cd web && npm ci && npm run check && npm run lint && npm run build && npm run test:e2e && npm run test:unit -- --run
 
 # Terraform
 cd infra && terraform fmt -check -recursive && terraform init -backend=false && terraform validate
 ```
 
-CI (`.github/workflows/ci.yaml`) runs on push/PR. Infrastructure CD deploys through `.github/workflows/terraform-deploy.yaml`; the static web frontend deploys through `.github/workflows/cloudflare-deploy.yaml`.
+CI (`.github/workflows/ci.yaml`) runs on push/PR. `CLAUDE.md` holds the authoritative, current validation commands. Infrastructure CD deploys through `.github/workflows/terraform-deploy.yaml`; the static web frontend deploys through `.github/workflows/cloudflare-deploy.yaml`.
 
 ## Python Conventions
 
-- **Black** (line-length 127, py310) + **isort** (profile "black") — config in `pyproject.toml`
+- **Black** (line-length 127, py311) + **isort** (profile "black") — config in `pyproject.toml`
 - **Pydantic v2 only** — use `model_dump()` / `model_validate()`, never v1 `.dict()` / `.parse_obj()`
 - **Imports** — use established package-relative imports inside a package; use absolute imports across package boundaries (for example, `from shared.models import RaceJSON`)
 - **Lazy imports in handlers** to break circular dependencies — import inside functions, not at module top

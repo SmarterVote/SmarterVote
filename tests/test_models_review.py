@@ -7,6 +7,20 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def hermetic_dns(monkeypatch):
+    """Resolve test hostnames to a public address so the SSRF guard never needs real DNS."""
+    import socket
+
+    from pipeline_client.agent import web_tools
+
+    monkeypatch.setattr(
+        web_tools,
+        "_getaddrinfo",
+        lambda hostname: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))],
+    )
+
+
 def _valid_review_profile():
     from shared.models import CanonicalIssue
 

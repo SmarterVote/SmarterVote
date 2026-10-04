@@ -203,10 +203,20 @@ def test_check_model_detects_optionality_mismatch_both_directions():
 
 
 def test_check_model_passes_for_a_correct_mirror():
-    ts_source = cts._strip_comments("export interface Widget {\n  name: string;\n  count: number;\n  label?: string;\n}\n")
+    ts_source = cts._strip_comments(
+        "export interface Widget {\n  name: string;\n  count: number;\n  label?: string | null;\n}\n"
+    )
     interfaces = cts.parse_ts_interfaces(ts_source)
     violations = cts.check_model("Widget", _Widget, interfaces)
     assert violations == []
+
+
+def test_check_model_flags_optional_field_missing_null():
+    # Pydantic dumps an unset Optional as null, so `label?: string` lies to TS.
+    ts_source = cts._strip_comments("export interface Widget {\n  name: string;\n  count: number;\n  label?: string;\n}\n")
+    interfaces = cts.parse_ts_interfaces(ts_source)
+    violations = cts.check_model("Widget", _Widget, interfaces)
+    assert any("Widget.label" in v and "nullability" in v for v in violations)
 
 
 def test_check_enums_detects_member_drift():

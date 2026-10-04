@@ -48,11 +48,11 @@ from analytics_middleware import AnalyticsMiddleware
 from analytics_store import AnalyticsStore
 from auth import verify_token
 from cloudflare_analytics import CloudflareAnalytics
-from config import DATA_DIR
+from config import DATA_DIR, is_production
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from rate_limit import limiter
+from rate_limit import limiter, offload_rate_limit_check
 from routers import geocode as geocode_router_module
 from routers import payments as payments_router_module
 from routers import pipeline as pipeline_router_module
@@ -101,15 +101,8 @@ async def lifespan(app: FastAPI):
 
 
 def _is_production() -> bool:
-    """True on the deployed service.
-
-    The deployed stack's ``ENVIRONMENT`` is currently ``dev`` (resource names
-    carry it), so the reliable production signal is ``K_SERVICE``, which Cloud
-    Run sets on every revision. An explicit ``ENVIRONMENT``/``ENV`` of
-    ``prod``/``production`` also counts.
-    """
-    env = (os.getenv("ENVIRONMENT") or os.getenv("ENV") or "").strip().lower()
-    return env in {"prod", "production"} or bool(os.getenv("K_SERVICE"))
+    """True on the deployed service (see ``config.is_production``)."""
+    return is_production()
 
 
 def _env_flag(name: str) -> bool | None:
@@ -225,10 +218,15 @@ _AUTHENTICATED_CACHE_CONTROL = "private, no-store"
 # ---------------------------------------------------------------------------
 
 
+# Build identifier of the running image (the deploy's app_version / git SHA),
+# so a deploy can assert the new revision is the one serving traffic.
+APP_VERSION = os.getenv("APP_VERSION", "").strip() or "unknown"
+
+
 @app.get("/health", include_in_schema=False)
 def health():
     """Liveness probe - always returns OK if the process is up."""
-    return {"status": "ok"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.get("/health/ready", include_in_schema=False)
@@ -296,7 +294,7 @@ def clear_cache(request: Request, response: Response, _auth: None = Depends(_req
     return {"message": "Cache cleared", "cache_ttl_seconds": publish_service.cache_ttl}
 
 
-@app.get("/analytics/overview")
+@app.get("/analytics/overview", dependencies=[Depends(offload_rate_limit_check)])
 @limiter.limit("20/minute")
 async def analytics_overview(
     request: Request,
@@ -308,7 +306,7 @@ async def analytics_overview(
     return await request.app.state.analytics.get_overview(hours=hours)
 
 
-@app.get("/analytics/traffic")
+@app.get("/analytics/traffic", dependencies=[Depends(offload_rate_limit_check)])
 @limiter.limit("20/minute")
 async def analytics_traffic(
     request: Request,
@@ -320,7 +318,7 @@ async def analytics_traffic(
     return await request.app.state.cloudflare_analytics.get_summary(hours=hours)
 
 
-@app.get("/analytics/races")
+@app.get("/analytics/races", dependencies=[Depends(offload_rate_limit_check)])
 @limiter.limit("20/minute")
 async def analytics_races(
     request: Request,
@@ -343,7 +341,7 @@ async def analytics_races(
     return {"races": stats, "hours": hours}
 
 
-@app.get("/analytics/timeseries")
+@app.get("/analytics/timeseries", dependencies=[Depends(offload_rate_limit_check)])
 @limiter.limit("20/minute")
 async def analytics_timeseries(
     request: Request,
@@ -363,4 +361,6 @@ async def analytics_timeseries(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    # Loopback by default for local runs; the container sets its bind address
+    # in the Dockerfile CMD, and HOST=0.0.0.0 opts a local run into exposure.
+    uvicorn.run(app, host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "8080")))

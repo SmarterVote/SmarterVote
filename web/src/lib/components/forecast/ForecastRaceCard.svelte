@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
   import { fetchPublishedRace } from "$lib/prerenderData";
   import type { RaceForecast } from "$lib/types";
   import { isExternalUrl } from "$lib/utils/url";
@@ -119,13 +118,13 @@
     <div class="flex flex-col gap-1.5">
       <div class="flex items-start justify-between gap-2">
         <a
-          href={browser ? raceHref(race.id) : undefined}
+          href={raceHref(race.id)}
           class="text-base font-bold text-content hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
         >
           {title}
         </a>
         <a
-          href={browser ? raceHref(race.id) : undefined}
+          href={raceHref(race.id)}
           class="btn-secondary hidden min-h-11 shrink-0 self-start whitespace-nowrap px-3 text-xs xl:inline-flex"
         >
           View race <UiIcon name="arrow-right" size="sm" />

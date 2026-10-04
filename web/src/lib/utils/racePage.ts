@@ -205,7 +205,7 @@ export function isUncontestedRace(
 }
 
 /** Federal offices that Maine elects by ranked choice in the general election. */
-function isFederalOffice(office: string | undefined): boolean {
+function isFederalOffice(office: string | null | undefined): boolean {
   return /senate|house|representative|congress/i.test(office ?? "");
 }
 
@@ -445,7 +445,7 @@ export function partyProbabilityAriaLabel(
     .join(", ")}`;
 }
 
-function partyBucket(party: string | undefined): string | null {
+function partyBucket(party: string | null | undefined): string | null {
   const trimmed = (party ?? "").trim();
   if (!trimmed) return null;
   const key = partyKey(trimmed);
@@ -603,7 +603,9 @@ export function raceJsonLd(race: Race): Record<string, unknown> {
 }
 
 /** Formal party name for structured data, or null for independents and blanks. */
-export function politicalPartyName(party: string | undefined): string | null {
+export function politicalPartyName(
+  party: string | null | undefined,
+): string | null {
   const trimmed = (party ?? "").trim();
   if (!trimmed) return null;
   const key = partyKey(trimmed);

@@ -122,6 +122,43 @@ jobs:
           python -m black --check shared smartervote_mcp services/races-api tests pipeline_client scripts
           python -m isort --check-only shared smartervote_mcp services/races-api tests pipeline_client scripts
 
+  # The release containers (services/races-api/Dockerfile and
+  # pipeline_client/Dockerfile.worker) run python:3.14-slim, while the gated
+  # test jobs above run 3.11. This job runs the same suites on the production
+  # interpreter so a 3.14-only break (stdlib/typing changes, wheels) fails CI
+  # instead of the deployed image. Coverage, formatting and mypy stay on the
+  # 3.11 jobs.
+  test-runtime-python:
+    name: Test on Runtime Python (3.14)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c requirements-constraints.txt -r pipeline_client/backend/requirements.txt
+          pip install -c requirements-constraints.txt -r services/races-api/requirements.txt
+          pip install -c requirements-constraints.txt -r services/races-api/test-requirements.txt
+          pip install -c requirements-constraints.txt -r requirements-mcp.txt
+          pip install -c requirements-constraints.txt pytest pytest-asyncio httpx
+
+      - name: Run pipeline tests
+        run: |
+          PYTHONPATH=. python -m pytest tests -q --ignore=tests/test_races_api_admin.py
+
+      - name: Run races API tests
+        run: |
+          cd services/races-api
+          PYTHONPATH=../.. python -m pytest . ../../tests/test_races_api_admin.py -q
+
   type-sync:
     name: Frontend/Backend Type Sync
     runs-on: ubuntu-latest
@@ -290,7 +327,7 @@ jobs:
   release-artifacts:
     name: Build and Scan Release Containers
     runs-on: ubuntu-latest
-    needs: [test-pipeline, test-apis]
+    needs: [test-pipeline, test-apis, test-runtime-python]
     strategy:
       matrix:
         include:
@@ -331,6 +368,7 @@ jobs:
         security,
         dependency-audit,
         test-pipeline,
+        test-runtime-python,
         type-sync,
         test-apis,
         test-web,
@@ -347,6 +385,7 @@ jobs:
           SECURITY_RESULT: ${{ needs.security.result }}
           DEPENDENCY_RESULT: ${{ needs.dependency-audit.result }}
           PIPELINE_RESULT: ${{ needs.test-pipeline.result }}
+          RUNTIME_PYTHON_RESULT: ${{ needs.test-runtime-python.result }}
           TYPE_SYNC_RESULT: ${{ needs.type-sync.result }}
           APIS_RESULT: ${{ needs.test-apis.result }}
           WEB_RESULT: ${{ needs.test-web.result }}
@@ -358,6 +397,7 @@ jobs:
           echo "security:            $SECURITY_RESULT"
           echo "dependency-audit:    $DEPENDENCY_RESULT"
           echo "test-pipeline:       $PIPELINE_RESULT"
+          echo "runtime-python:      $RUNTIME_PYTHON_RESULT"
           echo "type-sync:           $TYPE_SYNC_RESULT"
           echo "test-apis:           $APIS_RESULT"
           echo "test-web:            $WEB_RESULT"
@@ -365,7 +405,7 @@ jobs:
           echo "terraform-validate:  $TERRAFORM_RESULT"
           echo "codeql:              $CODEQL_RESULT"
           echo "release-artifacts:   $ARTIFACT_RESULT"
-          if [[ "$SECURITY_RESULT" != "success" || "$DEPENDENCY_RESULT" != "success" || "$PIPELINE_RESULT" != "success" || "$TYPE_SYNC_RESULT" != "success" || "$APIS_RESULT" != "success" || "$WEB_RESULT" != "success" || "$DESIGN_SYSTEM_RESULT" != "success" || "$TERRAFORM_RESULT" != "success" || "$CODEQL_RESULT" != "success" || "$ARTIFACT_RESULT" != "success" ]]; then
+          if [[ "$SECURITY_RESULT" != "success" || "$DEPENDENCY_RESULT" != "success" || "$PIPELINE_RESULT" != "success" || "$RUNTIME_PYTHON_RESULT" != "success" || "$TYPE_SYNC_RESULT" != "success" || "$APIS_RESULT" != "success" || "$WEB_RESULT" != "success" || "$DESIGN_SYSTEM_RESULT" != "success" || "$TERRAFORM_RESULT" != "success" || "$CODEQL_RESULT" != "success" || "$ARTIFACT_RESULT" != "success" ]]; then
             echo "❌ One or more CI gates failed"
             exit 1
           fi

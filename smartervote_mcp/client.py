@@ -13,6 +13,14 @@ def _clean_base_url(value: str) -> str:
     return value.rstrip("/") or "http://127.0.0.1:8080"
 
 
+class RacesApiError(RuntimeError):
+    """A races-api call failed; ``status_code`` is the HTTP status (``None`` if unknown)."""
+
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 @dataclass(frozen=True)
 class RacesApiClient:
     """Small async wrapper around the production-shaped races-api."""
@@ -79,13 +87,29 @@ class RacesApiClient:
             detail = response.text
             try:
                 parsed = response.json()
-                detail = str(parsed.get("detail", parsed))
             except ValueError:
                 pass
-            raise RuntimeError(f"races-api {response.status_code} for {method} {path}: {detail}") from exc
+            else:
+                # FastAPI errors are {"detail": ...}, but a proxy or validation
+                # layer can return a bare list or string; never let formatting
+                # the error raise a different, misleading one.
+                detail = str(parsed.get("detail", parsed)) if isinstance(parsed, dict) else str(parsed)
+            raise RacesApiError(
+                f"races-api {response.status_code} for {method} {path}: {detail}",
+                status_code=response.status_code,
+            ) from exc
         if not response.content:
             return None
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as exc:
+            # A 2xx that is not JSON (an HTML login page from a proxy, a truncated
+            # body) is an API failure, not a decoding bug in the caller.
+            snippet = response.text[:200]
+            raise RacesApiError(
+                f"races-api {response.status_code} for {method} {path} returned non-JSON body: {snippet}",
+                status_code=response.status_code,
+            ) from exc
 
     async def get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
         return await self.request("GET", path, params=params)

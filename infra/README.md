@@ -47,8 +47,8 @@ CI builds and scans the `races-api` and `pipeline-worker` containers. The deploy
 
 ```bash
 terraform init
-terraform plan -var-file=secrets.tfvars
-terraform apply -var-file=secrets.tfvars
+terraform plan -var-file=secrets.tfvars -var "app_version=<commit SHA published by CI>" -out=tfplan
+terraform apply tfplan
 ```
 
 ### 4. Validate
@@ -72,7 +72,15 @@ Queue a race through the admin UI or `races-api`; the queue document should rece
 
 ## Monitoring / Alerts
 
-All alert policies below (`infra/monitoring.tf`) are created only when `alert_email` is set — leave it empty to disable them entirely. Each fires to the single `google_monitoring_notification_channel.email` channel and auto-closes after 7 days if not manually resolved.
+All alert policies below (`infra/monitoring.tf`) are created only when `alert_email` is set — leave it empty to disable them entirely. The deploy workflow passes these optional GitHub repository variables (unset arrives as `""`, which means disabled, and the workflow emits a `::warning::` while `ALERT_EMAIL` is empty):
+
+| GitHub variable           | Terraform variable      | Effect / prerequisite                                                                                                                                                    |
+| ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ALERT_EMAIL`             | `alert_email`           | Creates the email channel, alert policies, log metrics and the queue-backlog Cloud Scheduler job. Deploy identity needs `roles/monitoring.editor` and `roles/cloudscheduler.admin` (plus the `roles/logging.admin` Terraform already grants). |
+| `GCP_BILLING_ACCOUNT_ID`  | `billing_account_id`    | Creates the $10 project budget. Deploy identity needs `roles/billing.costsManager` **on the billing account** (project roles are not enough).                              |
+| `ENABLE_BILLING_EXPORT`   | `enable_billing_export` | `true` creates the `billing_export` BigQuery dataset + races-api read access. Deploy identity needs BigQuery dataset create (e.g. `roles/bigquery.admin`).                |
+
+The queue-backlog scheduler authenticates with `X-Admin-Key`, so the admin key is stored in the Cloud Scheduler job definition (and Terraform state). races-api's `verify_token` accepts only Auth0 JWTs or that key; switching the scheduler to an OIDC token needs API-side support for Google-signed ID tokens first. Each fires to the single `google_monitoring_notification_channel.email` channel and auto-closes after 7 days if not manually resolved.
 
 | Alert                                | Signal                                                                                                        | Notes                                                                                                    |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -112,6 +120,21 @@ Terraform protects the remote-state bucket, production data bucket, Cloud Run
 API service, and Firestore database with lifecycle deletion safeguards. Remove
 those safeguards only as an explicit, separately reviewed decommissioning
 change.
+
+## Deploy Identity And IAM
+
+GitHub Actions authenticates as `vars.GCP_DEPLOY_SERVICE_ACCOUNT` (Workload Identity Federation) or, during migration, the `GCP_SA_KEY` secret. Terraform also defines a `github-actions-<env>` service account in `secrets.tf`, but its granted roles cannot create secrets or project IAM bindings, both of which every apply does — so the identity actually applying Terraform holds additional roles granted outside Terraform. Confirm which account it is before changing deploy IAM.
+
+Recommended narrowing, deliberately **not** applied automatically because every push to `main` runs `terraform apply` with that identity and a mid-apply permission loss would strand the deploy:
+
+- Replace project-wide `roles/iam.serviceAccountUser` with `roles/iam.serviceAccountUser` bound only on the `races-api-<env>` and `pipeline-job-<env>` service accounts (the only identities Cloud Run resources run as). Land the SA-level bindings in one deploy and remove the project binding in a later one.
+- Replace `roles/storage.admin` with bucket-scoped roles on the data and state buckets, and `roles/datastore.owner` with `roles/datastore.indexAdmin` once `create_firestore_database` is permanently false.
+- Replace project-wide `roles/secretmanager.secretAccessor` with per-secret grants (the deploy workflow reads each secret it syncs).
+- Retire `GCP_SA_KEY` once WIF is confirmed working and delete the key.
+
+The pipeline Cloud Run Job's `roles/storage.objectAdmin` is also bucket-wide; scoping it to prefixes needs IAM Conditions and is left as-is.
+
+Releases deploy only by immutable commit SHA: `app_version` has no default and rejects `latest`. Use the "Deploy Infrastructure" workflow (`action=apply`, `deploy_sha=<sha>`); `infra/deploy.sh` / `deploy.ps1` are break-glass and require the same SHA. Artifact Registry keeps at least the 20 most recent versions of each image so rollbacks have an image to deploy.
 
 ## Cleanup
 

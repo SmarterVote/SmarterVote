@@ -187,27 +187,33 @@ def _apply_refine_patch(
 
 def _apply_finance_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: Any) -> None:
     """Merge finance/voting research results into race_json candidates in-place."""
+    from shared.run_health import is_substantive_text
+
+    # Models echo names with different capitalization ("JOHN SMITH", "John smith");
+    # an exact-key match silently dropped their whole finance result.
     candidates_by_name = {
-        str(c.get("name")).strip(): c
+        str(c.get("name")).strip().casefold(): c
         for c in race_json.get("candidates", [])
         if isinstance(c, dict) and str(c.get("name") or "").strip()
     }
     updated = 0
     for cand_name, data in patch.items():
-        if not isinstance(data, dict) or cand_name not in candidates_by_name:
+        key = str(cand_name or "").strip().casefold()
+        if not isinstance(data, dict) or key not in candidates_by_name:
             continue
-        candidate = candidates_by_name[cand_name]
+        candidate = candidates_by_name[key]
 
-        if data.get("donor_summary"):
-            candidate["donor_summary"] = data["donor_summary"]
-        if data.get("donor_source_url"):
-            candidate["donor_source_url"] = data["donor_source_url"]
+        # Only real strings land: a dict, list, number, whitespace or "DRAFT"
+        # placeholder would otherwise pass as populated finance data.
+        for field in ("donor_summary", "voting_summary"):
+            if is_substantive_text(data.get(field)):
+                candidate[field] = data[field].strip()
+        for field in ("donor_source_url", "voting_source_url"):
+            value = data.get(field)
+            if isinstance(value, str) and value.strip():
+                candidate[field] = value.strip()
         if isinstance(data.get("donor_sources"), list):
             candidate["donor_sources"] = merge_source_lists(data["donor_sources"], candidate.get("donor_sources"))
-        if data.get("voting_summary"):
-            candidate["voting_summary"] = data["voting_summary"]
-        if data.get("voting_source_url"):
-            candidate["voting_source_url"] = data["voting_source_url"]
         if isinstance(data.get("voting_sources"), list):
             candidate["voting_sources"] = merge_source_lists(data["voting_sources"], candidate.get("voting_sources"))
 
@@ -221,7 +227,7 @@ def _apply_finance_patch(race_json: Dict[str, Any], patch: Dict[str, Any], log: 
 
         updated += 1
     if updated == 0 and patch:
-        unknown = [str(name) for name in patch if str(name) not in candidates_by_name]
+        unknown = [str(name) for name in patch if str(name or "").strip().casefold() not in candidates_by_name]
         log(
             "warning",
             f"  Finance/voting patch updated 0 candidates from {len(patch)} entries"

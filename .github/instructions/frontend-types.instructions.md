@@ -12,7 +12,7 @@ When modifying this file, also update `shared/models.py` (and vice versa):
 
 - **Enums**: Every `export const enum` or `export type` union here maps to a `class MyEnum(str, Enum)` in Python
 - **Interfaces**: Every `interface` maps to a Pydantic `BaseModel`
-- **Optional fields**: `field?: Type` ↔ `field: Optional[Type] = None`
+- **Optional fields**: `field?: Type | null` ↔ `field: Optional[Type] = None` (Pydantic dumps unset Optionals as `null`; `scripts/check_type_sync.py` enforces the `| null`)
 - **Canonical issues**: `CanonicalIssue` enum values must exactly match `shared/models.py` (12 issues, exact strings)
 
 ## Canonical Issues (current)

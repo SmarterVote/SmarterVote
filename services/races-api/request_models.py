@@ -7,6 +7,7 @@ from typing import List, Literal, Optional
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
+from shared.config import NON_RACE_CATALOG_IDS
 from shared.pipeline_options import PipelineRunOptions
 
 # Always use ``fullmatch``: ``match`` with ``$`` accepts a trailing newline.
@@ -17,9 +18,19 @@ _RACE_ID_RE = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
 MAX_BATCH_RACE_IDS = 1000
 
 
+def is_valid_race_id(race_id: object) -> bool:
+    """True for a canonical race ID that does not name a reserved aggregate blob."""
+    return isinstance(race_id, str) and bool(_RACE_ID_RE.fullmatch(race_id)) and race_id not in NON_RACE_CATALOG_IDS
+
+
 def validate_race_id(race_id: str) -> None:
-    """Raise HTTP 400 if race_id doesn't match the canonical format."""
-    if not isinstance(race_id, str) or not _RACE_ID_RE.fullmatch(race_id):
+    """Raise HTTP 400 if race_id doesn't match the canonical format or is reserved.
+
+    Reserved stems (``summaries``, ``chamber_forecasts``) share the race blob
+    prefixes, so e.g. unpublishing race ``summaries`` would delete the public
+    races/summaries.json index.
+    """
+    if not is_valid_race_id(race_id):
         raise HTTPException(status_code=400, detail="Invalid race_id format")
 
 
@@ -50,7 +61,7 @@ class RepairPlanRequest(BaseModel):
         if len(normalized) > 200:
             raise ValueError("race_ids cannot contain more than 200 races")
         for race_id in normalized:
-            if not _RACE_ID_RE.fullmatch(race_id):
+            if not is_valid_race_id(race_id):
                 raise ValueError(f"invalid race_id: {race_id}")
         return normalized
 

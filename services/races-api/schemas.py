@@ -35,6 +35,10 @@ class RaceForecastSummary(BaseModel):
     model: str | None = None
     source_urls: list[str] = Field(default_factory=list)
     market_signals: list[dict] = Field(default_factory=list)
+    # Forecast-panel provenance emitted by shared.race_catalog.build_forecast_summary.
+    method: str | None = None
+    panel: list[dict] | None = None
+    panel_spread: float | None = None
 
 
 class RaceSummary(BaseModel):

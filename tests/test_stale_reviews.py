@@ -126,5 +126,5 @@ def test_stale_error_flags_no_longer_pin_the_grade_below_passing():
     race["reviews"][0]["roster_fingerprint"] = roster_fingerprint(_race(["Cindy Burbank", "Mike Marvin"]))
     invalidate_stale_reviews(race)
 
-    cleared = compute_validation_grade(race["reviews"], race)
+    cleared = compute_validation_grade(race["reviews"], race, min_reviews=1)
     assert cleared["passed"] is True

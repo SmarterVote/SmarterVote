@@ -1,4 +1,4 @@
-import type { RaceForecast, RaceSummary } from "$lib/types";
+import type { RaceForecastSummary, RaceSummary } from "$lib/types";
 
 /**
  * Keep directory and ballot payloads limited to fields their cards, filters,
@@ -20,7 +20,7 @@ export function toDirectoryRaceSummaries(races: RaceSummary[]): RaceSummary[] {
 }
 
 /** First sentence of a rationale, the collapsed card's fallback takeaway. */
-function firstSentence(text: string | undefined): string | undefined {
+function firstSentence(text: string | null | undefined): string | undefined {
   const sentence = text?.split(/[.!?]/)[0]?.trim();
   return sentence ? `${sentence}.` : undefined;
 }
@@ -33,10 +33,10 @@ function firstSentence(text: string | undefined): string | undefined {
  * stay out of the page's serialized data.
  */
 export function toForecastSummary(
-  forecast: RaceForecast | null | undefined,
-): RaceForecast | null | undefined {
+  forecast: RaceForecastSummary | null | undefined,
+): RaceForecastSummary | null | undefined {
   if (!forecast) return forecast;
-  const compact: Partial<RaceForecast> = {
+  const compact: RaceForecastSummary = {
     predicted_winner_name: forecast.predicted_winner_name,
     predicted_winner_party: forecast.predicted_winner_party,
     win_probability: forecast.win_probability,
@@ -49,7 +49,7 @@ export function toForecastSummary(
   // Drop absent keys so the payload carries no `undefined` placeholders.
   return Object.fromEntries(
     Object.entries(compact).filter(([, value]) => value !== undefined),
-  ) as unknown as RaceForecast;
+  ) as RaceForecastSummary;
 }
 
 /**

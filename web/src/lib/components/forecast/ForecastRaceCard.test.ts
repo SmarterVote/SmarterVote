@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ForecastEvidence, RaceForecast } from "$lib/types";
 import type { ForecastRace } from "$lib/utils/forecast";
 import ForecastRaceCard from "./ForecastRaceCard.svelte";
 
@@ -7,6 +8,18 @@ const { fetchPublishedRace } = vi.hoisted(() => ({
   fetchPublishedRace: vi.fn(),
 }));
 vi.mock("$lib/prerenderData", () => ({ fetchPublishedRace }));
+
+// Summary forecasts never carry evidence_lineage (the drawer fetches it), but
+// the card renders it from whichever forecast it has; these fixtures add it.
+type RaceWithFullForecast = ForecastRace & {
+  forecast: Pick<RaceForecast, "evidence_lineage">;
+};
+
+function withEvidence(
+  evidence_lineage: ForecastEvidence[],
+): RaceWithFullForecast {
+  return { ...race, forecast: { ...race.forecast, evidence_lineage } };
+}
 
 const race: ForecastRace = {
   id: "mi-senate-2026",
@@ -36,27 +49,21 @@ const race: ForecastRace = {
   },
 };
 
-const withLineage: ForecastRace = {
-  ...race,
-  forecast: {
-    ...race.forecast,
-    evidence_lineage: [
-      {
-        claim:
-          "Prediction markets imply roughly an 87% Democratic win probability in NV-3",
-        source_url: "https://kalshi.com/markets/HOUSENV3-26-D",
-        kind: "market",
-        inferred: false,
-      },
-      {
-        claim: "Finance input used by the forecast",
-        source_url: "https://www.fec.gov/data/candidate/H6NV03204/",
-        kind: "finance",
-        inferred: true,
-      },
-    ],
+const withLineage = withEvidence([
+  {
+    claim:
+      "Prediction markets imply roughly an 87% Democratic win probability in NV-3",
+    source_url: "https://kalshi.com/markets/HOUSENV3-26-D",
+    kind: "market",
+    inferred: false,
   },
-};
+  {
+    claim: "Finance input used by the forecast",
+    source_url: "https://www.fec.gov/data/candidate/H6NV03204/",
+    kind: "finance",
+    inferred: true,
+  },
+]);
 
 describe("ForecastRaceCard", () => {
   afterEach(cleanup);
@@ -139,7 +146,7 @@ describe("ForecastRaceCard", () => {
     cleanup();
 
     render(ForecastRaceCard, {
-      race: { ...race, forecast: { ...race.forecast, evidence_lineage: [] } },
+      race: withEvidence([]),
       isExpanded: true,
       onToggleExpand: vi.fn(),
     });
@@ -147,20 +154,14 @@ describe("ForecastRaceCard", () => {
     cleanup();
 
     render(ForecastRaceCard, {
-      race: {
-        ...race,
-        forecast: {
-          ...race.forecast,
-          evidence_lineage: [
-            {
-              claim: "Finance input used by the forecast",
-              source_url: "https://www.fec.gov/data/candidate/H6NV03204/",
-              kind: "finance",
-              inferred: true,
-            },
-          ],
+      race: withEvidence([
+        {
+          claim: "Finance input used by the forecast",
+          source_url: "https://www.fec.gov/data/candidate/H6NV03204/",
+          kind: "finance",
+          inferred: true,
         },
-      },
+      ]),
       isExpanded: true,
       onToggleExpand: vi.fn(),
     });

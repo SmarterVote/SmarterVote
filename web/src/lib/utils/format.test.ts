@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { LEGACY_MODEL_ALIASES, MODEL_LABELS } from "$lib/config/modelCatalog";
 import {
   candidateSlug,
+  careerYears,
   formatModelName,
   legacyCandidateSlug,
   matchesCandidateSlug,
@@ -117,5 +118,21 @@ describe("candidateSlug", () => {
 
   it("produces a stable slug for the same name", () => {
     expect(candidateSlug("Jane Doe")).toBe(candidateSlug("Jane  Doe"));
+  });
+});
+
+describe("careerYears", () => {
+  it("formats closed, open-ended, end-only and unknown ranges", () => {
+    expect(careerYears({ start_year: 2010, end_year: 2020 })).toBe(
+      "2010 – 2020",
+    );
+    expect(careerYears({ start_year: 2010, end_year: null })).toBe(
+      "2010 – Present",
+    );
+    expect(careerYears({ start_year: null, end_year: 2020 })).toBe(
+      "Until 2020",
+    );
+    expect(careerYears({ start_year: null, end_year: null })).toBe("");
+    expect(careerYears({})).toBe("");
   });
 });

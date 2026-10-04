@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { getAuth0Client } from "$lib/auth";
+  import { authErrorMessage } from "$lib/utils/authErrors";
 
   let authError = "";
   let sessionExpired = false;
@@ -16,18 +17,23 @@
     history.replaceState({}, "", `${url.pathname}${url.search}`);
   }
 
-  async function startLogin() {
+  /**
+   * A first visit lets Auth0 reuse an existing SSO session (no prompt). Only
+   * a retry after an error or an expired session forces the login screen, so
+   * the user can re-enter credentials or switch to an admin account.
+   */
+  async function startLogin(forcePrompt = false) {
     redirecting = true;
     const auth0 = await getAuth0Client();
-    await auth0.loginWithRedirect({
-      authorizationParams: { prompt: "login" },
-    });
+    await auth0.loginWithRedirect(
+      forcePrompt ? { authorizationParams: { prompt: "login" } } : undefined,
+    );
   }
 
   async function retryLogin() {
     authError = "";
     try {
-      await startLogin();
+      await startLogin(true);
     } catch (error) {
       console.error("Admin sign-in could not start.", error);
       redirecting = false;
@@ -41,10 +47,10 @@
       const params = new URLSearchParams(window.location.search);
 
       if (params.has("error")) {
-        const description =
-          params.get("error_description") || "Access denied by Auth0.";
+        // Never echo error_description: it is attacker-controllable text.
+        const code = params.get("error");
         clearAuthQueryParams();
-        authError = decodeURIComponent(description.replace(/\+/g, " "));
+        authError = authErrorMessage(code);
         return;
       }
 

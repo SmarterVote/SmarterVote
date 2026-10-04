@@ -15,6 +15,7 @@ from fastapi import Request
 from limits.storage import Storage
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.concurrency import run_in_threadpool
 
 from shared.config import FIRESTORE_RATE_LIMITS_COLLECTION
 
@@ -149,3 +150,21 @@ limiter = Limiter(
     # (or return a Response) for slowapi to attach these.
     headers_enabled=True,
 )
+
+
+async def offload_rate_limit_check(request: Request) -> None:
+    """Run an async route's slowapi check in the threadpool.
+
+    slowapi checks limits synchronously inside its async wrapper, i.e. on the
+    event loop, and the production storage is a blocking Firestore transaction.
+    Declare this as a route dependency on ``async def`` endpoints decorated with
+    ``@limiter.limit``: it performs the same check off the loop and marks the
+    request done, so slowapi's wrapper skips its inline check (it still injects
+    the rate-limit headers from the stored result). A 429 propagates as
+    ``RateLimitExceeded`` exactly as before.
+    """
+    endpoint = request.scope.get("endpoint")
+    if endpoint is None or not limiter.enabled or getattr(request.state, "_rate_limiting_complete", False):
+        return
+    await run_in_threadpool(limiter._check_request_limit, request, endpoint, False)
+    request.state._rate_limiting_complete = True

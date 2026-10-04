@@ -22,7 +22,7 @@ type TitleRace = Pick<Race | RaceSummary, "id"> &
     district?: string | null;
     candidates?: {
       name: string;
-      party?: string;
+      party?: string | null;
       withdrawn?: boolean;
       incumbent?: boolean;
     }[];
@@ -251,7 +251,7 @@ export function comparePageTitle(race: TitleRace | null | undefined): string {
 }
 
 /** Party in a sentence: "Democratic", "Republican", "independent", or the label as written. */
-function partyPhrase(party: string | undefined): string {
+function partyPhrase(party: string | null | undefined): string {
   const key = partyKey(party);
   if (key === "dem") return "Democratic";
   if (key === "rep") return "Republican";
@@ -261,7 +261,10 @@ function partyPhrase(party: string | undefined): string {
   return (party ?? "").trim().replace(/\s+party$/i, "");
 }
 
-function nameWithParty(candidate: { name: string; party?: string }): string {
+function nameWithParty(candidate: {
+  name: string;
+  party?: string | null;
+}): string {
   return candidate.party
     ? `${candidate.name} (${partyAbbr(candidate.party)})`
     : candidate.name;

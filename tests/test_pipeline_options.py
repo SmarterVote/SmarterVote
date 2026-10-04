@@ -155,6 +155,20 @@ def test_pipeline_run_options_accepts_iteration_with_review():
     assert options.enabled_steps == ["review", "iteration"]
 
 
+@pytest.mark.parametrize("steps", [["issues"], ["discovery", "issues", "finance"]])
+def test_pipeline_run_options_rejects_issues_without_review(steps):
+    # Issue stances that never see review can't be published: an issues-only run is pure spend.
+    with pytest.raises(ValidationError, match="'issues' requires 'review'"):
+        PipelineRunOptions(enabled_steps=steps)
+    with pytest.raises(ValidationError, match="'issues' requires 'review'"):
+        ResolvedPipelineRunOptions(enabled_steps=steps)
+
+
+def test_pipeline_run_options_accepts_combined_issue_research_run():
+    steps = ["issues", "finance", "refinement", "polling", "forecast", "voter_resources", "review", "iteration"]
+    assert PipelineRunOptions(enabled_steps=steps).enabled_steps == steps
+
+
 def test_pipeline_run_options_rejects_unknown_enabled_step():
     with pytest.raises(ValidationError, match="Unknown enabled_steps"):
         PipelineRunOptions(enabled_steps=["not-a-real-step"])

@@ -19,8 +19,9 @@ You are a specialized agent for editing the SmarterVote AI research pipeline. Yo
 
 | File                                      | Purpose                                          |
 | ----------------------------------------- | ------------------------------------------------ |
-| `pipeline_client/agent/agent.py`          | Entry point — calls `_run_fresh` / `_run_update` |
-| `pipeline_client/agent/phases.py`         | All phase implementations (DISCOVERY → ITERATION) |
+| `pipeline_client/agent/agent.py`          | Entry point (`run_agent`) — dispatches to `_run_fresh` / `_run_update` |
+| `pipeline_client/agent/phases/`           | Phase package: one module per phase (`discovery.py`, `issues.py`, `finance.py`, …) plus `fresh_run.py` / `update_run.py` orchestration |
+| `pipeline_client/agent/roster_adjudicator.py` | LLM adjudication of roster evidence claims |
 | `pipeline_client/agent/llm.py`            | LLM request loop (`_agent_loop`)                 |
 | `pipeline_client/agent/prompts.py`        | All LLM prompt templates                         |
 | `pipeline_client/agent/tools.py`          | Tool definitions fed to the LLM                  |
@@ -48,12 +49,13 @@ You are a specialized agent for editing the SmarterVote AI research pipeline. Yo
 ## Agent Phases (reference)
 
 ```
-DISCOVERY (12%) → IMAGES (5%) → ISSUES ×12 per-candidate (30%)
-→ FINANCE (8%) → REFINEMENT (10%) → POLLING (5%) → FORECAST (5%)
+DISCOVERY (12%) → IMAGES (4%) → ISSUES ×12 per-candidate (28%)
+→ FINANCE (9%) → REFINEMENT (11%) → POLLING (7%) → FORECAST (4%)
 → VOTER_RESOURCES (5%) → REVIEW (12%, optional) → ITERATION (8%)
 ```
 
-Progress percentages are passed to the run_manager — keep them summing to 100%.
+Weights come from `PIPELINE_STEP_WEIGHTS` in `shared/pipeline_config.py` (the source of truth) and must sum to 100.
+`issues` cannot be enabled without `review` (enforced in `shared/pipeline_options.py`).
 
 ## Workflow
 

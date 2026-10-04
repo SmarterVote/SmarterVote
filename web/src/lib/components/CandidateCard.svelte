@@ -5,7 +5,7 @@
   import TabButton from "./TabButton.svelte";
   import Card from "./Card.svelte";
   import type { Candidate } from "$lib/types";
-  import { candidateSlug } from "$lib/utils/format";
+  import { candidateSlug, careerYears } from "$lib/utils/format";
   import { partyBadgeClass } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
   import CandidateAvatar from "./CandidateAvatar.svelte";
@@ -211,11 +211,9 @@
                     <div class="timeline-entry">
                       <div class="timeline-header">
                         <span class="timeline-title">{entry.title}</span>
-                        {#if entry.start_year}
+                        {#if careerYears(entry)}
                           <span class="timeline-years">
-                            {entry.start_year}{entry.end_year
-                              ? ` – ${entry.end_year}`
-                              : " – Present"}
+                            {careerYears(entry)}
                           </span>
                         {/if}
                       </div>

@@ -5,17 +5,23 @@ resource "google_storage_bucket" "sv_data" {
   project  = var.project_id
 
   uniform_bucket_level_access = true
-  force_destroy               = !(var.environment == "prod" && var.prevent_destroy_prod)
+
+  # The bucket holds private drafts alongside published data. Nothing reads it
+  # anonymously: the public site is built from copies the Cloudflare deploy
+  # workflow fetches with the deploy identity, and the races API reads it with
+  # its own service account. Enforced prevention blocks any future allUsers /
+  # allAuthenticatedUsers grant (which would also expose drafts/). Serve
+  # public static data from a separate bucket if VITE_PUBLIC_DATA_URL is ever
+  # needed. No CORS policy for the same reason: no browser reads this bucket.
+  public_access_prevention = "enforced"
+
+  # The deployed environment is named "dev", so the previous
+  # `environment == "prod"` test left force_destroy on for the only real data
+  # bucket. Key it on the protection flag alone.
+  force_destroy = !var.prevent_destroy_prod
 
   versioning {
     enabled = true
-  }
-
-  cors {
-    origin          = ["*"]
-    method          = ["GET", "OPTIONS"]
-    response_header = ["*"]
-    max_age_seconds = 3600
   }
 
   lifecycle_rule {

@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 from shared.pipeline_config import PipelineRuntimeConfig
 
 from .model_registry import MODEL_CATALOG, normalize_model_id
+from .run_budget import RunBudgetExceeded
 
 # ContextVar holds the live accumulator for the current run (async-safe).
 # Shape: {"prompt_tokens": int, "completion_tokens": int,
@@ -254,6 +255,55 @@ def total_token_budget_reached() -> bool:
     unit = _unit_entry(acc)
     unit_used = int(unit.get("prompt_tokens", 0) or 0) + int(unit.get("completion_tokens", 0) or 0)
     return used >= config.max_total_tokens or unit_used >= config.max_unit_tokens
+
+
+# The run token ceiling is soft at first: the agent loop nudges the model to
+# finalize. Some calls (reviews, forced finalization turns, other phases) keep
+# spending after the nudge, so past this multiple of the ceiling every further
+# model call is refused outright.
+TOKEN_HARD_LIMIT_MULTIPLIER = 1.25
+
+
+class TokenBudgetExceeded(RunBudgetExceeded):
+    """Raised when a run has spent well past its token ceiling.
+
+    Subclasses ``RunBudgetExceeded`` so every phase that already lets budget
+    exhaustion propagate does so here too. Unlike a deadline, waiting does not
+    help, so the handler fails the run instead of handing off a continuation.
+    """
+
+
+def enforce_total_token_hard_limit() -> None:
+    """Raise ``TokenBudgetExceeded`` once run tokens exceed the hard multiple of the ceiling."""
+    acc = _cost_ctx.get()
+    if acc is None:
+        return
+    used = int(acc.get("prompt_tokens", 0) or 0) + int(acc.get("completion_tokens", 0) or 0)
+    ceiling = PipelineRuntimeConfig.from_env().max_total_tokens
+    hard_limit = int(ceiling * TOKEN_HARD_LIMIT_MULTIPLIER)
+    if used > hard_limit:
+        raise TokenBudgetExceeded(
+            f"Run used {used:,} tokens, over the hard limit of {hard_limit:,} "
+            f"({TOKEN_HARD_LIMIT_MULTIPLIER}x the {ceiling:,}-token ceiling); refusing further model calls"
+        )
+
+
+_MAX_UNOBSERVED_CITATIONS = 50
+
+
+def record_unobserved_citation(entry: str) -> None:
+    """Note a stance citation the model never fetched or saw in search results this run."""
+    acc = _cost_ctx.get()
+    if acc is None:
+        return
+    entries = acc.setdefault("unobserved_citations", [])
+    if len(entries) < _MAX_UNOBSERVED_CITATIONS and entry not in entries:
+        entries.append(entry)
+
+
+def unobserved_citations() -> list:
+    acc = _cost_ctx.get()
+    return list(acc.get("unobserved_citations", [])) if acc is not None else []
 
 
 def record_token_budget_nudge() -> None:

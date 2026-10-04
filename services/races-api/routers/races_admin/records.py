@@ -37,6 +37,7 @@ from .helpers import (
     _race_summary,
     _recheck_race_status,
     _self_heal_stale_active_race,
+    _update_summaries_index,
 )
 
 router = APIRouter()
@@ -210,6 +211,12 @@ async def _host_resolves_public(url: str) -> bool:
     return bool(resolved) and all(ipaddress.ip_address(address).is_global for address in resolved)
 
 
+# Upper bound on concurrent outbound probes for one audit request. A request
+# may name up to 200 races x 300 URLs; probing a race's URLs all at once opened
+# up to 300 simultaneous connections from the API instance.
+_ASSET_PROBE_CONCURRENCY = 16
+
+
 async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[str, Any]:
     if not _safe_public_asset_url(url) or not await _host_resolves_public(url):
         return {"kind": kind, "url": url, "status": "blocked", "reachable": False}
@@ -257,19 +264,30 @@ async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[s
 @router.post("/api/races/asset-audit", dependencies=[Depends(verify_token)])
 async def audit_race_assets(request: AssetAuditRequest) -> Dict[str, Any]:
     """Probe bounded race assets without downloading their bodies; optionally persist results."""
-    db = firestore_helpers._get_fs()
+    # Storage and Firestore clients are synchronous; keep them off the event loop.
+    db = await asyncio.to_thread(firestore_helpers._get_fs)
     audited_at = datetime.now(timezone.utc).isoformat()
     results = []
+    semaphore = asyncio.Semaphore(_ASSET_PROBE_CONCURRENCY)
+
+    async def bounded_probe(client: httpx.AsyncClient, kind: str, url: str) -> Dict[str, Any]:
+        async with semaphore:
+            return await _probe_asset(client, kind, url)
+
+    def load_race(race_id: str) -> Any:
+        race_data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
+        if not isinstance(race_data, dict):
+            race_data = gcs_helpers._gcs_get_race_json(race_id, "races")
+        return race_data
+
     async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "SmarterVote asset auditor/1.0"}) as client:
         for race_id in request.race_ids:
-            race_data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
-            if not isinstance(race_data, dict):
-                race_data = gcs_helpers._gcs_get_race_json(race_id, "races")
+            race_data = await asyncio.to_thread(load_race, race_id)
             if not isinstance(race_data, dict):
                 results.append({"race_id": race_id, "missing": True})
                 continue
             assets = _asset_urls(race_data)[: request.max_urls_per_race]
-            probes = await asyncio.gather(*(_probe_asset(client, kind, url) for kind, url in assets))
+            probes = await asyncio.gather(*(bounded_probe(client, kind, url) for kind, url in assets))
             result = {
                 "race_id": race_id,
                 "audited_at": audited_at,
@@ -282,7 +300,8 @@ async def audit_race_assets(request: AssetAuditRequest) -> Dict[str, Any]:
             }
             results.append(result)
             if request.persist:
-                db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).set(
+                await asyncio.to_thread(
+                    db.collection(FIRESTORE_RACES_COLLECTION).document(race_id).set,
                     {"asset_audit": result, "asset_audited_at": audited_at},
                     merge=True,
                 )
@@ -315,12 +334,23 @@ def delete_race_record(request: Request, race_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail=f"Could not archive active artifact; race was not deleted: {exc}") from exc
     gcs_helpers._gcs_delete_race_json(race_id, "races")
     gcs_helpers._gcs_delete_race_json(race_id, "drafts")
-    gcs_helpers.update_gcs_summaries_json({race_id: None})
+    # The blobs are already gone: an index failure must not skip the catalog
+    # delete or cache clear. Delete is idempotent, so a retry repairs the index.
+    summaries_error = _update_summaries_index({race_id: None})
     try:
         firestore_helpers._get_fs().collection(FIRESTORE_RACES_COLLECTION).document(race_id).delete()
     except Exception as exc:
         logging.warning("Firestore delete race %s failed: %s", race_id, exc)
     _clear_public_race_cache(request)
+    if summaries_error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": f"Race {race_id} was deleted but races/summaries.json was not updated; retry the delete",
+                "deleted": [race_id],
+                "summaries_error": summaries_error,
+            },
+        )
     return {"message": f"Race {race_id} deleted", "id": race_id}
 
 

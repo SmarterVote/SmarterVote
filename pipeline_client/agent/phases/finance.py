@@ -4,13 +4,13 @@ import time
 
 from ..patches import _apply_finance_patch  # noqa: F401 — re-exported for backward compat
 from ..prompts import FINANCE_VOTING_SYSTEM, FINANCE_VOTING_USER, cycle_kwargs
-from ..run_budget import RunBudgetExceeded
 from ..selection import _scale_iterations
 from ._common import (
     RunFailureReason,
     _classify_exception,
     _detect_empty_finance_output,
     _find_finance_gaps,
+    _is_control_flow_exception,
     _race_identity_context,
     _record_step_failure,
 )
@@ -67,9 +67,9 @@ async def run_finance_phase(ctx: PhaseContext) -> None:
             _record_step_failure(
                 race_json, "finance", RunFailureReason.STEP_NO_DATA, "finance phase returned a non-dict response"
             )
-    except RunBudgetExceeded:
-        raise
     except Exception as exc:
+        if _is_control_flow_exception(exc):
+            raise
         log("warning", f"  Finance/voting phase failed: {exc} — continuing without")
         _record_step_failure(race_json, "finance", _classify_exception(exc), str(exc))
     if _detect_empty_finance_output(race_json, candidate_names):

@@ -4,9 +4,8 @@ import time
 
 from ..handlers import _make_editing_handlers
 from ..prompts import VOTER_RESOURCES_SYSTEM, VOTER_RESOURCES_USER
-from ..run_budget import RunBudgetExceeded
 from ..tools import READ_PROFILE_TOOL, VOTER_RESOURCE_TOOLS
-from ._common import _classify_exception, _record_step_failure
+from ._common import _classify_exception, _is_control_flow_exception, _record_step_failure
 from .context import PhaseContext
 
 
@@ -53,9 +52,9 @@ async def run_voter_resources_phase(ctx: PhaseContext) -> None:
             tools_mode=True,
             run_budget=run_budget,
         )
-    except RunBudgetExceeded:
-        raise
     except Exception as exc:
+        if _is_control_flow_exception(exc):
+            raise
         log("warning", f"  Voter resources phase failed: {exc}")
         _record_step_failure(race_json, "voter_resources", _classify_exception(exc), str(exc))
     track(

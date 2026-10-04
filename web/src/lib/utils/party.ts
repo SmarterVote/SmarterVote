@@ -34,7 +34,7 @@ const INDEPENDENT_LABELS = new Set([
   "non-partisan",
 ]);
 
-export function partyKey(party: string | undefined): PartyKey {
+export function partyKey(party: string | null | undefined): PartyKey {
   const p = (party || "").toLowerCase().trim().replace(/\s+/g, " ");
   if (!p) return "other";
   if (p.includes("democrat") || p === "d" || p === "dem" || p === "dfl")
@@ -106,7 +106,7 @@ const RING_CLASS: Record<PartyKey, string> = {
 };
 
 /** Tailwind ring color for avatar borders. */
-export function partyRing(party: string | undefined): string {
+export function partyRing(party: string | null | undefined): string {
   // An absent party is not the same as an unrecognised one: nothing is claimed,
   // so the avatar stays lighter than a party we simply have no colour for.
   if (!party) return "ring-gray-300";

@@ -59,6 +59,29 @@ _HEARTBEAT_SECONDS = max(30, int(os.getenv("WORKER_HEARTBEAT_SECONDS", "300")))
 # how long it waits before probing the provider again. See _AuthFailureGate.
 _AUTH_HALT_THRESHOLD = max(0, int(os.getenv("WORKER_AUTH_FAILURE_HALT_THRESHOLD", "3")))
 _AUTH_HALT_COOLDOWN_SECONDS = max(60, int(os.getenv("WORKER_AUTH_FAILURE_COOLDOWN_SECONDS", "900")))
+# Staleness of the long-lived local worker: its baked WORKER_GIT_COMMIT is
+# compared against the latest commit on GitHub main (the container has no .git,
+# so a local `git rev-parse` cannot work). Re-checked periodically, not just at
+# startup, because a worker started current goes stale the moment a fix merges.
+_VERSION_CHECK_SECONDS = max(60, int(os.getenv("WORKER_VERSION_CHECK_SECONDS", "1800")))
+_STOP_CLAIMING_WHEN_STALE = os.getenv("WORKER_STOP_CLAIMING_WHEN_STALE", "true").strip().lower() not in {
+    "0",
+    "false",
+    "no",
+    "off",
+}
+_GITHUB_REPO = os.getenv("WORKER_GITHUB_REPO", "SmarterVote/SmarterVote").strip()
+_GITHUB_BRANCH = os.getenv("WORKER_GITHUB_BRANCH", "main").strip()
+_GITHUB_TIMEOUT_SECONDS = 10.0
+# Only changes under these paths can alter what the worker does. A worker that is
+# behind main by docs/web/infra commits alone is not stale.
+_WORKER_CODE_PATH_PREFIXES = (
+    "pipeline_client/",
+    "shared/",
+    "requirements",
+    "pyproject.toml",
+    "docker-compose.worker.yml",
+)
 _cloud_logger: Any = None
 _cloud_logger_init_failed = False
 
@@ -204,6 +227,145 @@ class _AuthFailureGate:
         return True
 
 
+def _github_headers() -> dict:
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "smartervote-pipeline-worker"}
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+async def _fetch_latest_main_commit() -> Optional[str]:
+    """Latest commit SHA on the configured GitHub branch, or None if unknowable."""
+    import httpx
+
+    url = f"https://api.github.com/repos/{_GITHUB_REPO}/commits/{_GITHUB_BRANCH}"
+    try:
+        async with httpx.AsyncClient(timeout=_GITHUB_TIMEOUT_SECONDS) as client:
+            resp = await client.get(url, headers=_github_headers())
+        if resp.status_code != 200:
+            logger.warning("Worker version check: GitHub returned HTTP %s for %s", resp.status_code, url)
+            return None
+        sha = (resp.json() or {}).get("sha")
+        return sha if isinstance(sha, str) and sha else None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Worker version check: could not reach GitHub: %s", exc)
+        return None
+
+
+async def _worker_code_changed(base: str, head: str) -> Optional[bool]:
+    """Whether worker-relevant files changed between two commits (None if unknown)."""
+    import httpx
+
+    url = f"https://api.github.com/repos/{_GITHUB_REPO}/compare/{base}...{head}"
+    try:
+        async with httpx.AsyncClient(timeout=_GITHUB_TIMEOUT_SECONDS) as client:
+            resp = await client.get(url, headers=_github_headers())
+        if resp.status_code != 200:
+            return None
+        payload = resp.json() or {}
+        files = payload.get("files")
+        if not isinstance(files, list) or len(files) >= 300:
+            return None  # missing or truncated file list — cannot rule out a code change
+        return any(
+            isinstance(entry, dict) and str(entry.get("filename") or "").startswith(_WORKER_CODE_PATH_PREFIXES)
+            for entry in files
+        )
+    except Exception:  # noqa: BLE001
+        return None
+
+
+class _VersionGate:
+    """Stops the long-lived local worker leasing new races once its image is stale.
+
+    The local Docker worker never auto-updates: after a fix merges it keeps running
+    the old code indefinitely with no error. This gate compares the baked
+    ``WORKER_GIT_COMMIT`` against GitHub main every ``interval`` seconds. When the
+    image is confirmed behind main on worker code, it logs an ERROR and (unless
+    ``WORKER_STOP_CLAIMING_WHEN_STALE=false``) stops claiming new work; races
+    already in flight finish. Network failures read as unknown, never stale.
+    """
+
+    def __init__(
+        self,
+        runner: str = _RUNNER,
+        interval: float = _VERSION_CHECK_SECONDS,
+        stop_claiming: bool = _STOP_CLAIMING_WHEN_STALE,
+        clock: Any = time.monotonic,
+    ) -> None:
+        self._runner = runner
+        self._interval = interval
+        self._stop_claiming = stop_claiming
+        self._clock = clock
+        self._last_check: Optional[float] = None
+        self.is_stale: Optional[bool] = None
+
+    async def refresh(self, force: bool = False) -> None:
+        if self._runner != "local":
+            self.is_stale = False
+            return
+        now = self._clock()
+        if not force and self._last_check is not None and now - self._last_check < self._interval:
+            return
+        self._last_check = now
+
+        from shared.run_health import check_worker_version_staleness
+
+        worker_commit = (os.getenv("WORKER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or "").strip()
+        if not worker_commit:
+            result = check_worker_version_staleness(runner=self._runner)
+            logger.error("WORKER VERSION UNKNOWN: %s", result.get("warning"))
+            self.is_stale = None
+            return
+
+        latest = await _fetch_latest_main_commit()
+        if not latest:
+            logger.warning(
+                "WORKER VERSION WARNING: built from commit %s; latest %s commit unavailable, staleness unknown",
+                worker_commit[:7],
+                _GITHUB_BRANCH,
+            )
+            self.is_stale = None
+            return
+        result = check_worker_version_staleness(runner=self._runner, worker_commit=worker_commit, repo_commit=latest)
+        if result.get("is_stale") is True:
+            changed = await _worker_code_changed(worker_commit, latest)
+            if changed is False:
+                logger.info(
+                    "Worker commit %s is behind %s %s, but no worker code changed in between",
+                    worker_commit[:7],
+                    _GITHUB_BRANCH,
+                    latest[:7],
+                )
+                self.is_stale = False
+                return
+        self.is_stale = result.get("is_stale")
+        if self.is_stale is True:
+            logger.error(
+                "STALE WORKER: %s%s",
+                result.get("warning"),
+                " No new races will be leased until the worker is rebuilt (in-flight races finish)."
+                if self._stop_claiming
+                else " WORKER_STOP_CLAIMING_WHEN_STALE=false, so leasing continues on old code.",
+            )
+        elif self.is_stale is None:
+            logger.warning("WORKER VERSION WARNING: %s", result.get("warning"))
+        else:
+            logger.info("Worker built from commit %s (current with %s)", worker_commit[:7], _GITHUB_BRANCH)
+
+    def leasing_blocked(self) -> bool:
+        return bool(self._stop_claiming and self.is_stale is True)
+
+
+def _poll_window(capacity: int) -> int:
+    """How many queue docs to read per poll so client-side FIFO ordering is meaningful.
+
+    Firestore returns equality-filtered docs in document-id order (random ids), so
+    reading only ``capacity`` docs picked arbitrary items and could starve old ones.
+    """
+    return max(capacity * 10, 50)
+
+
 def _pending_items(db: Any, runner: str, limit: int = 50):
     """Return pending and recoverable expired-lease items, oldest first.
 
@@ -285,16 +447,8 @@ async def run_worker() -> None:
         bucket or "-",
     )
 
-    from shared.run_health import check_worker_version_staleness
-
-    version_check = check_worker_version_staleness(runner=_RUNNER)
-    # is_stale is None when the image did not report its build commit, which is
-    # just as actionable as a confirmed mismatch — a worker whose provenance is
-    # unknown may predate merged fixes and will corrupt data silently.
-    if version_check.get("is_stale") is not False and version_check.get("warning"):
-        logger.warning("WORKER VERSION WARNING: %s", version_check.get("warning"))
-    elif version_check.get("worker_commit"):
-        logger.info("Worker built from commit %s", version_check["worker_commit"])
+    version_gate = _VersionGate()
+    await version_gate.refresh(force=True)
 
     stop = asyncio.Event()
 
@@ -324,9 +478,11 @@ async def run_worker() -> None:
         if emit_heartbeats and (time.monotonic() - last_heartbeat) >= _HEARTBEAT_SECONDS:
             _emit_heartbeat()
             last_heartbeat = time.monotonic()
+        if not _ONCE:
+            await version_gate.refresh()
         try:
             capacity = _CONCURRENCY - len(in_flight)
-            if auth_gate.leasing_blocked():
+            if auth_gate.leasing_blocked() or version_gate.leasing_blocked():
                 capacity = 0
             queue_item_id = os.getenv("QUEUE_ITEM_ID", "").strip()
             if _ONCE and queue_item_id:
@@ -334,7 +490,7 @@ async def run_worker() -> None:
                 data = doc.to_dict() if getattr(doc, "exists", False) else None
                 items = [(queue_item_id, data)] if isinstance(data, dict) and capacity > 0 else []
             else:
-                items = _pending_items(db, _RUNNER, limit=max(capacity, 1)) if capacity > 0 else []
+                items = _pending_items(db, _RUNNER, limit=_poll_window(capacity))[:capacity] if capacity > 0 else []
         except Exception:  # noqa: BLE001
             logger.exception("Failed to poll pipeline_queue")
             items = []

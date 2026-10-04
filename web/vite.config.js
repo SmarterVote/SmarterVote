@@ -1,9 +1,15 @@
 import { sveltekit } from "@sveltejs/kit/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+import { cspHeadersPlugin } from "./scripts/csp-headers.mjs";
 
-export default defineConfig({
-  plugins: [sveltekit(), svelteTesting()],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    sveltekit(),
+    svelteTesting(),
+    // Must follow sveltekit(): rewrites build/_headers after the adapter runs.
+    cspHeadersPlugin({ env: { ...loadEnv(mode, process.cwd(), "VITE_") } }),
+  ],
   server: {
     port: 3000,
     host: true,
@@ -40,4 +46,4 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
     },
   },
-});
+}));

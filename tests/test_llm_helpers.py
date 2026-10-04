@@ -373,3 +373,15 @@ def test_both_last_accessed_write_paths_share_one_validator():
 
     assert _iso_timestamp_or_now("2026-08-29T16:12:06Z") == iso_timestamp_or_now("2026-08-29T16:12:06Z")
     assert _iso_timestamp_or_now("content") != "content"
+
+
+def test_temperature_support_strips_provider_prefix():
+    from pipeline_client.agent.llm import _model_supports_temperature
+
+    assert _model_supports_temperature("openai/o3-mini") is False
+    assert _model_supports_temperature("openai/o4-mini-high") is False
+    assert _model_supports_temperature("o1") is False
+    assert _model_supports_temperature("openai/gpt-5-nano") is False
+    assert _model_supports_temperature("openai/gpt-5-mini") is True
+    assert _model_supports_temperature("anthropic/claude-sonnet-4.5") is True
+    assert _model_supports_temperature("x-ai/grok-4.3") is True

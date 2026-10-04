@@ -38,8 +38,8 @@ This document describes the Auth0 authentication implementation for the SmarterV
 #### 4. Infrastructure (Terraform)
 
 - **Location**: `infra/races-api.tf`
-- **Environment Variables**: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`, `ALLOWED_ORIGINS`
-- **CORS Configuration**: Supports credentials for auth headers
+- **Environment Variables**: `AUTH0_DOMAIN`, `AUTH0_AUDIENCE`
+- **CORS Configuration**: Not environment-driven. `services/races-api/main.py` hardcodes `https://smarter.vote` and `https://www.smarter.vote`, adds `localhost`/`127.0.0.1` dev origins outside production, and allows this project's Cloudflare Pages preview hosts (`CLOUDFLARE_PAGES_PROJECT`, default `smartervote-web`). Credentials are allowed for auth headers. Changing allowed origins is a code change.
 
 ## Configuration
 
@@ -59,7 +59,6 @@ VITE_RACES_API_URL=https://races-api-dev-ddsvfazica-uc.a.run.app
 # secrets.tfvars
 auth0_domain   = "your-auth0-domain"
 auth0_audience = "your-auth0-audience"
-allowed_origins = ["https://your-frontend-domain.com"]
 ```
 
 ### API Settings
@@ -68,7 +67,6 @@ The protected APIs use environment variables set by Terraform:
 
 - `AUTH0_DOMAIN`: Auth0 tenant domain
 - `AUTH0_AUDIENCE`: API audience identifier
-- `ALLOWED_ORIGINS`: CORS allowed origins (comma-separated)
 - `ADMIN_API_KEY`: Optional service/admin key accepted via `X-Admin-Key`
 
 ## Authentication Flow
@@ -136,7 +134,7 @@ python -m pytest services/races-api/test_races_api.py tests/test_races_api_admin
 ### Common Issues
 
 1. **Auth0 Redirect Blocked**: Normal in sandboxed environments
-2. **CORS Errors**: Check `allowed_origins` configuration
+2. **CORS Errors**: Check the CORS origins hardcoded in `services/races-api/main.py`
 3. **Token Expired**: Frontend handles automatic refresh
 4. **Local Development**: Set `SKIP_AUTH=true` for local API testing without Auth0
 

@@ -48,6 +48,13 @@ resource "google_cloud_run_v2_service" "races_api" {
         value = var.environment
       }
 
+      # Deployed commit SHA (the image tag). /health reports it so the deploy
+      # workflow can confirm the new revision, not a stale one, is serving.
+      env {
+        name  = "APP_VERSION"
+        value = var.app_version
+      }
+
       env {
         name  = "CLOUDFLARE_ANALYTICS_ACCOUNT_TAG"
         value = var.cloudflare_analytics_account_tag

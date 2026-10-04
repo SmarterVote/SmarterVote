@@ -5,6 +5,7 @@ import { Tabs, type TabItem } from "../Tabs";
 import { ConfidenceIndicator, type ConfidenceLevel } from "../ConfidenceIndicator";
 import { SourceLink } from "../SourceLink";
 import { partyAbbr } from "../../utils/party";
+import { safeExternalUrl } from "../../utils/url";
 
 export interface CandidateCardIssue {
   issue: string;
@@ -85,6 +86,8 @@ export function CandidateCard({ candidate, href, selectable = false, selected = 
   const hasVoting = !!candidate.votingSummary;
   const hasDonors = !!candidate.donorSummary;
 
+  const websiteUrl = safeExternalUrl(candidate.websiteUrl);
+
   const summary = candidate.summary ?? "";
   const summaryPreview = summary.length > 600 ? `${summary.slice(0, 600)}...` : summary;
 
@@ -161,10 +164,10 @@ export function CandidateCard({ candidate, href, selectable = false, selected = 
 
         <p className="text-content-muted leading-relaxed text-xs sm:text-sm lg:text-base">{expanded ? summary : summaryPreview}</p>
 
-        {candidate.websiteUrl && (
+        {websiteUrl && (
           <div className="mt-3">
             <a
-              href={candidate.websiteUrl}
+              href={websiteUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium hover:text-blue-500 dark:hover:text-blue-300"

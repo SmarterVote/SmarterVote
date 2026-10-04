@@ -7,17 +7,27 @@ from typing import Any, Dict, List, Optional
 from ..handlers import _make_editing_handlers
 from ..prompts import CANONICAL_ISSUES, ITERATE_META_USER, ITERATE_SYSTEM, ITERATE_USER, cycle_kwargs
 from ..review_flags import format_review_flags as _format_review_flags
-from ..run_budget import RunBudget, RunBudgetExceeded
+from ..run_budget import RunBudget
 from ..selection import _scale_iterations
 from ..tools import BACKGROUND_TOOLS, CANDIDATE_TOOLS, ISSUE_TOOLS, RACE_TOOLS, READ_PROFILE_TOOL, RECORD_TOOLS, ROSTER_TOOLS
 from ..utils import make_logger
 from ._common import (
     _await_advisory_with_run_budget,
     _candidate_name,
+    _classify_exception,
+    _is_control_flow_exception,
     _mark_pipeline_unit_complete,
     _pipeline_completed_units,
     _race_identity_context,
+    _record_step_failure,
 )
+
+
+def _record_iteration_failure(race_json: Dict[str, Any], working: Dict[str, Any], exc: Exception, detail: str) -> None:
+    """Record an iteration failure on both copies: either may become the saved result."""
+    reason = _classify_exception(exc)
+    for target in (race_json, working):
+        _record_step_failure(target, "iteration", reason, detail)
 
 
 async def _run_iteration_pass(
@@ -123,10 +133,11 @@ async def _run_iteration_pass(
                 run_budget=run_budget,
             )
             any_success = True
-        except RunBudgetExceeded:
-            raise
         except Exception as exc:
+            if _is_control_flow_exception(exc):
+                raise
             log("warning", f"  Iteration failed for {cname}: {exc} — keeping existing")
+            _record_iteration_failure(race_json, working, exc, f"{cname}: {exc}")
 
         _mark_pipeline_unit_complete(working, unit_id)
         completed_units.add(unit_id)
@@ -159,10 +170,11 @@ async def _run_iteration_pass(
             run_budget=run_budget,
         )
         any_success = True
-    except RunBudgetExceeded:
-        raise
     except Exception as exc:
+        if _is_control_flow_exception(exc):
+            raise
         log("warning", f"  Iteration meta failed: {exc} — keeping existing meta")
+        _record_iteration_failure(race_json, working, exc, f"meta: {exc}")
 
     if not any_success and not expected_units.issubset(_pipeline_completed_units(working)):
         log("warning", "  All iteration calls failed — keeping original")

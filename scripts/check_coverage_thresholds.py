@@ -12,6 +12,25 @@ DEFAULT_THRESHOLDS = {
     "pipeline_client/backend/race_manager.py": 32.5,
     "pipeline_client/worker.py": 37.0,
     "smartervote_mcp/server.py": 65.0,
+    # Research agent: the largest modules, which the global --cov-fail-under can
+    # otherwise let erode while smaller files stay green. Floors are the levels
+    # measured on 2026-10-04 minus ~5 points of headroom for platform/branch
+    # noise and concurrent work; ratchet them up as coverage grows.
+    "pipeline_client/agent/agent.py": 50.0,
+    "pipeline_client/agent/ballotpedia.py": 68.0,
+    "pipeline_client/agent/context.py": 81.0,
+    "pipeline_client/agent/cost.py": 94.0,
+    "pipeline_client/agent/handlers.py": 71.0,
+    "pipeline_client/agent/images.py": 68.0,
+    "pipeline_client/agent/llm.py": 88.0,
+    "pipeline_client/agent/phases/discovery.py": 72.0,
+    "pipeline_client/agent/phases/forecast.py": 81.0,
+    "pipeline_client/agent/phases/issues.py": 54.0,
+    "pipeline_client/agent/phases/update_run.py": 80.0,
+    "pipeline_client/agent/review.py": 47.0,
+    "pipeline_client/agent/roster_adjudicator.py": 91.0,
+    "pipeline_client/agent/search_cache.py": 91.0,
+    "pipeline_client/agent/web_tools.py": 59.0,
 }
 
 

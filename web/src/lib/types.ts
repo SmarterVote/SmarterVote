@@ -55,21 +55,21 @@ export type IssueKey =
 export interface Source {
   url: string;
   type: SourceType;
-  title?: string;
-  description?: string;
+  title?: string | null;
+  description?: string | null;
   last_accessed: string;
-  published_at?: string;
-  checksum?: string;
+  published_at?: string | null;
+  checksum?: string | null;
   is_fresh: boolean;
-  is_official_campaign?: boolean;
+  is_official_campaign?: boolean | null;
 }
 
 export interface IssueStance {
-  issue?: IssueKey;
+  issue?: IssueKey | null;
   stance: string;
   confidence: ConfidenceLevel;
   sources: Source[];
-  research_audit?: IssueResearchAudit;
+  research_audit?: IssueResearchAudit | null;
 }
 
 export interface CandidateLink {
@@ -88,38 +88,38 @@ export interface CandidateLink {
 }
 
 export interface CandidateRosterSource {
-  url?: string;
+  url?: string | null;
   type: RosterSourceType;
-  title?: string;
-  evidence?: string;
-  last_accessed?: string;
-  published_at?: string;
-  race_id?: string;
-  evidence_tier?: 1 | 2 | 3;
-  retrieval_status?: "content" | "snippet";
+  title?: string | null;
+  evidence?: string | null;
+  last_accessed?: string | null;
+  published_at?: string | null;
+  race_id?: string | null;
+  evidence_tier?: 1 | 2 | 3 | null;
+  retrieval_status?: "content" | "snippet" | null;
 }
 
 export interface CareerEntry {
   title: string;
-  organization?: string;
-  start_year?: number;
-  end_year?: number;
-  description?: string;
-  source?: Source;
+  organization?: string | null;
+  start_year?: number | null;
+  end_year?: number | null;
+  description?: string | null;
+  source?: Source | null;
 }
 
 export interface EducationEntry {
   institution: string;
-  degree?: string;
-  field?: string;
-  year?: number;
-  source?: Source;
+  degree?: string | null;
+  field?: string | null;
+  year?: number | null;
+  source?: Source | null;
 }
 
 export interface ReviewFlag {
   field: string;
   concern: string;
-  suggestion?: string;
+  suggestion?: string | null;
   severity: "info" | "warning" | "error";
   stale: boolean;
 }
@@ -128,12 +128,12 @@ export interface AgentReview {
   model: string;
   reviewed_at: string;
   verdict: "approved" | "needs_revision" | "flagged";
-  score?: number;
+  score?: number | null;
   flags: ReviewFlag[];
   summary: string;
-  roster_fingerprint?: string;
+  roster_fingerprint?: string | null;
   stale: boolean;
-  stale_reason?: string;
+  stale_reason?: string | null;
 }
 
 export interface ValidationGrade {
@@ -142,9 +142,9 @@ export interface ValidationGrade {
   passed: boolean;
   summary: string;
   /** Reviews that judged the current roster (older grades omit this). */
-  current_review_count?: number;
+  current_review_count?: number | null;
   /** Reviews that judged an earlier roster; ignored for the score. */
-  stale_review_count?: number;
+  stale_review_count?: number | null;
 }
 
 export type ForecastRating =
@@ -170,74 +170,103 @@ export interface ForecastPanelEstimate {
   model: string;
   party_probabilities: Record<string, number>;
   /** Only in races where every candidate shares one party. */
-  candidate_probabilities?: Record<string, number>;
-  margin_estimate?: number;
+  candidate_probabilities?: Record<string, number> | null;
+  margin_estimate?: number | null;
   confidence: ConfidenceLevel;
 }
 
 export interface RaceForecast {
-  predicted_winner_name?: string;
-  predicted_winner_party?: string;
-  win_probability?: number;
+  predicted_winner_name?: string | null;
+  predicted_winner_party?: string | null;
+  win_probability?: number | null;
   party_probabilities: Record<string, number>;
-  margin_estimate?: number;
+  margin_estimate?: number | null;
   rating: ForecastRating;
   confidence: ConfidenceLevel;
   rationale: string;
-  takeaway?: string;
+  takeaway?: string | null;
   key_reasons: string[];
-  uncertainty?: string;
+  uncertainty?: string | null;
   based_on_poll_count: number;
   generated_at: string;
   model: string;
   source_urls: string[];
-  evidence_lineage?: ForecastEvidence[];
+  evidence_lineage?: ForecastEvidence[] | null;
   market_signals: ForecastMarketSignal[];
-  method?: string;
-  panel?: ForecastPanelEstimate[];
-  panel_spread?: number;
+  method?: string | null;
+  panel?: ForecastPanelEstimate[] | null;
+  panel_spread?: number | null;
+}
+
+/**
+ * The forecast as published in race summaries (summaries.json and the races
+ * API list endpoints): services/races-api/schemas.py RaceForecastSummary,
+ * built by shared/race_catalog.py build_forecast_summary. Unlike RaceForecast,
+ * every scalar may be null. The list fields are always present from the API but
+ * the forecast page's compact payload (utils/publicRaceSummaries.ts) drops them.
+ */
+export interface RaceForecastSummary {
+  predicted_winner_name?: string | null;
+  predicted_winner_party?: string | null;
+  win_probability?: number | null;
+  party_probabilities: Record<string, number>;
+  margin_estimate?: number | null;
+  rating?: ForecastRating | null;
+  confidence?: ConfidenceLevel | null;
+  rationale?: string | null;
+  takeaway?: string | null;
+  key_reasons?: string[];
+  uncertainty?: string | null;
+  based_on_poll_count: number;
+  generated_at?: string | null;
+  model?: string | null;
+  source_urls?: string[];
+  market_signals?: ForecastMarketSignal[];
+  method?: string | null;
+  panel?: ForecastPanelEstimate[] | null;
+  panel_spread?: number | null;
 }
 
 export interface ForecastMarketSignal {
   provider: "kalshi";
   market_ticker: string;
-  event_ticker?: string;
+  event_ticker?: string | null;
   title: string;
   matched_to: string;
-  matched_party?: string;
-  implied_probability?: number;
-  yes_bid?: number;
-  yes_ask?: number;
-  last_price?: number;
-  volume?: number;
-  liquidity?: number;
+  matched_party?: string | null;
+  implied_probability?: number | null;
+  yes_bid?: number | null;
+  yes_ask?: number | null;
+  last_price?: number | null;
+  volume?: number | null;
+  liquidity?: number | null;
   as_of: string;
-  url?: string;
+  url?: string | null;
   confidence: ConfidenceLevel;
 }
 
 export interface Candidate {
   name: string;
-  party?: string;
+  party?: string | null;
   incumbent: boolean;
   roster_sources: CandidateRosterSource[];
   summary: string;
   summary_sources: Source[];
-  image_url?: string;
+  image_url?: string | null;
   issues: Partial<Record<IssueKey, IssueStance>>;
   career_history: CareerEntry[];
   education: EducationEntry[];
-  voting_summary?: string;
-  voting_source_url?: string;
+  voting_summary?: string | null;
+  voting_source_url?: string | null;
   voting_sources: Source[];
-  donor_summary?: string;
-  donor_source_url?: string;
+  donor_summary?: string | null;
+  donor_source_url?: string | null;
   donor_sources: Source[];
   links: CandidateLink[];
-  website?: string;
+  website?: string | null;
   social_media: Record<string, string>;
   withdrawn: boolean;
-  withdrawal_reason?: string;
+  withdrawal_reason?: string | null;
 }
 
 export interface PollMatchup {
@@ -247,10 +276,10 @@ export interface PollMatchup {
 
 export interface PollEntry {
   pollster: string;
-  date?: string;
-  sample_size?: number;
+  date?: string | null;
+  sample_size?: number | null;
   matchups: PollMatchup[];
-  source_url?: string;
+  source_url?: string | null;
 }
 
 export interface PipelineState {
@@ -264,9 +293,9 @@ export interface PipelineState {
   step_failures: StepFailure[];
   deterministic_cleanup: Record<string, number>;
   unresolved_review_flags: string[];
-  race_identity?: RaceIdentityBrief;
-  roster_research?: RosterResearchAudit;
-  metadata_research?: MetadataResearchAudit;
+  race_identity?: RaceIdentityBrief | null;
+  roster_research?: RosterResearchAudit | null;
+  metadata_research?: MetadataResearchAudit | null;
   removed_source_urls: RemovedSourceUrl[];
 }
 
@@ -282,8 +311,8 @@ export interface RosterResearchAudit {
   active_candidate_count: number;
   candidate_names: string[];
   completeness_sources: CandidateRosterSource[];
-  completeness_status?: "unproven";
-  completeness_note?: string;
+  completeness_status?: "unproven" | null;
+  completeness_note?: string | null;
   completeness_reference_urls: string[];
 }
 
@@ -310,20 +339,20 @@ export interface IssueResearchAudit {
 }
 
 export interface RaceIdentityBrief {
-  office?: string;
-  state?: string;
-  district?: string;
+  office?: string | null;
+  state?: string | null;
+  district?: string | null;
   contest_stage: ContestStage;
-  election_date?: string;
-  primary_status?: string;
-  official_roster_source_url?: string;
-  known_incumbent?: string;
+  election_date?: string | null;
+  primary_status?: string | null;
+  official_roster_source_url?: string | null;
+  known_incumbent?: string | null;
   known_ineligible_or_not_running: string[];
 }
 
 export interface RunAudit {
   contest_stage: ContestStage;
-  roster_source_summary?: string;
+  roster_source_summary?: string | null;
   candidate_changes: string[];
   forecast_changes: string[];
   remaining_uncertainty: string[];
@@ -337,27 +366,27 @@ export interface Race {
   candidates: Candidate[];
   updated_utc: string;
   generator: string[];
-  title?: string;
-  office?: string;
-  jurisdiction?: string; // Full geographic scope (e.g. "Missouri's 1st Congressional District")
-  state?: string; // US state name for map highlighting; null for national races
-  district?: string;
-  description?: string;
+  title?: string | null;
+  office?: string | null;
+  jurisdiction?: string | null; // Full geographic scope (e.g. "Missouri's 1st Congressional District")
+  state?: string | null; // US state name for map highlighting; null for national races
+  district?: string | null;
+  description?: string | null;
   contest_stage: ContestStage;
   polling: PollEntry[];
-  polling_note?: string;
-  forecast?: RaceForecast;
+  polling_note?: string | null;
+  forecast?: RaceForecast | null;
   reviews: AgentReview[];
-  validation_grade?: ValidationGrade;
-  pipeline_state?: PipelineState;
-  run_audit?: RunAudit;
+  validation_grade?: ValidationGrade | null;
+  pipeline_state?: PipelineState | null;
+  run_audit?: RunAudit | null;
   // agent_metrics is not part of the RaceJSON schema (shared/models.py) — it is
   // merged into API responses from Firestore pipeline-run cost data. See
   // services/races-api/gcs_helpers.py / routers/races_admin.py.
   agent_metrics?: AgentMetrics;
-  ballotpedia_url?: string;
-  register_to_vote_url?: string;
-  how_to_vote_url?: string;
+  ballotpedia_url?: string | null;
+  register_to_vote_url?: string | null;
+  how_to_vote_url?: string | null;
 }
 
 export const CANONICAL_ISSUES: CanonicalIssue[] = [
@@ -408,18 +437,18 @@ export function getIssueDisplayName(issue: string): string {
 
 export interface CandidateSummary {
   name: string;
-  party?: string;
+  party?: string | null;
   incumbent: boolean;
-  image_url?: string;
+  image_url?: string | null;
 }
 
 export interface RaceSummary {
   id: string;
-  title?: string;
-  office?: string;
-  jurisdiction?: string;
-  state?: string;
-  contest_stage?: ContestStage;
+  title?: string | null;
+  office?: string | null;
+  jurisdiction?: string | null;
+  state?: string | null;
+  contest_stage?: ContestStage | null;
   election_date: string;
   updated_utc: string;
   candidates: CandidateSummary[];
@@ -429,7 +458,7 @@ export interface RaceSummary {
     model?: string;
     total_tokens?: number;
   } | null;
-  forecast?: RaceForecast | null;
+  forecast?: RaceForecastSummary | null;
 }
 
 // Pipeline run types
@@ -483,11 +512,11 @@ export const DEFAULT_UPDATE_PIPELINE_STEP_IDS: PipelineStepId[] =
   );
 
 export interface RunOptions {
-  save_artifact?: boolean;
-  note?: string;
-  goal?: string;
-  cheap_mode?: boolean;
-  model_profile?: "default" | "premium" | "custom";
+  save_artifact?: boolean | null;
+  note?: string | null;
+  goal?: string | null;
+  cheap_mode?: boolean | null;
+  model_profile?: "default" | "premium" | "custom" | null;
   model_overrides?: {
     primary?: string;
     small?: string;
@@ -497,25 +526,25 @@ export interface RunOptions {
     review_claude?: string;
     review_gemini?: string;
     review_grok?: string;
-  };
-  force_fresh?: boolean;
-  allow_fast_no_change?: boolean;
+  } | null;
+  force_fresh?: boolean | null;
+  allow_fast_no_change?: boolean | null;
   // baseline_source/resume_partial/runner are power-user options (set via admin tooling/MCP,
   // not the standard queue form) but are still valid wire-level fields on
   // shared.pipeline_options.PipelineRunOptions — kept here for completeness.
-  baseline_source?: "latest" | "published";
-  resume_partial?: boolean;
-  runner?: "cloud_run" | "local";
-  research_model?: string;
-  claude_model?: string;
-  gemini_model?: string;
-  grok_model?: string;
-  review_providers?: ("claude" | "gemini" | "grok")[];
-  enabled_steps?: string[];
-  max_candidates?: number;
-  target_no_info?: boolean;
-  candidate_names?: string[];
-  debug_mode?: boolean;
+  baseline_source?: "latest" | "published" | null;
+  resume_partial?: boolean | null;
+  runner?: "cloud_run" | "local" | null;
+  research_model?: string | null;
+  claude_model?: string | null;
+  gemini_model?: string | null;
+  grok_model?: string | null;
+  review_providers?: ("claude" | "gemini" | "grok")[] | null;
+  enabled_steps?: string[] | null;
+  max_candidates?: number | null;
+  target_no_info?: boolean | null;
+  candidate_names?: string[] | null;
+  debug_mode?: boolean | null;
 }
 
 // Structured failure taxonomy for pipeline runs (mirrors shared/run_health.py).
@@ -541,14 +570,14 @@ export type RunHealthStatus = "healthy" | "degraded" | "failed" | "unknown";
 export interface StepFailure {
   step: string;
   reason: RunFailureReason;
-  detail?: string;
+  detail?: string | null;
 }
 
 export interface RunHealthVerdict {
   status: RunHealthStatus;
   reasons: RunFailureReason[];
   step_failures: StepFailure[];
-  summary?: string;
+  summary?: string | null;
 }
 
 export interface RunStep {

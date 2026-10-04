@@ -26,7 +26,8 @@ def _get_fs() -> Any:
         _fs_db = firestore.Client(project=_FIRESTORE_PROJECT) if _FIRESTORE_PROJECT else firestore.Client()
         return _fs_db
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Firestore unavailable: {exc}") from exc
+        logging.exception("Firestore client initialization failed")
+        raise HTTPException(status_code=503, detail="Firestore unavailable") from exc
 
 
 def _ts_to_str(v: Any) -> Any:

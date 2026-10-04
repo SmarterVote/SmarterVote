@@ -26,7 +26,7 @@ This is the preferred workstation path. It uses the same Firestore queue,
 items queued with `runner=local`.
 
 ```powershell
-docker compose -f docker-compose.worker.yml up -d --build
+WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build
 docker compose -f docker-compose.worker.yml ps
 docker compose -f docker-compose.worker.yml logs -f pipeline-worker
 ```
@@ -186,8 +186,11 @@ Common tools:
   With an evidence-backed baseline, roster and metadata agents may each perform
   one current search and explicitly exit when nothing material changed. Use
   `force_fresh=true` to bypass this maintenance fast path.
-- `queue_races`: one or more races with full options
-- `run_race`: one race
+- `queue_races`: one or more races with full options; `enabled_steps` is
+  required and a call is capped at 10 races unless `confirm_large_batch=true`
+- `run_race`: one race; `enabled_steps` is required
+- `unpublish_race`, `delete_race`, `delete_draft`, `restore_race_version`:
+  destructive; each requires `confirm=true`
 - `list_active_runs`, `get_queue`: queue/worker state
 - `get_run`, `get_run_logs`: status and cursor-based logs
 - `get_race_data(draft=true)`: inspect output
@@ -640,7 +643,7 @@ Required verification:
 
 ```powershell
 pytest -q
-docker compose -f docker-compose.worker.yml up -d --build
+WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build
 docker compose -f docker-compose.worker.yml ps
 ```
 

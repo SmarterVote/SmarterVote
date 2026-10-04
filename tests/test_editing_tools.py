@@ -3250,7 +3250,7 @@ def test_finalize_roster_accepts_party_lists_that_compose_into_the_field():
     assert not result.startswith("ERROR"), result
 
 
-def test_completeness_adjudication_is_asked_about_the_whole_proposed_roster():
+def test_completeness_adjudication_is_asked_about_the_whole_proposed_roster(monkeypatch):
     """The "does this evidence cover these people" judgment moved out of the handler
     and into the adjudicator, because no string matcher survives real naming —
     MD-01's own primary result says "Andrew Harris" where the roster says "Andy
@@ -3278,10 +3278,11 @@ def test_completeness_adjudication_is_asked_about_the_whole_proposed_roster():
         return _Reply()
 
     adj.clear_cache()
-    original = adj.llm._call_openrouter if hasattr(adj, "llm") else None
     import pipeline_client.agent.llm as llm_module
 
-    llm_module._call_openrouter = _capture
+    # monkeypatch restores the real function after the test; a manual
+    # save/restore once leaked this permissive stub into every later test.
+    monkeypatch.setattr(llm_module, "_call_openrouter", _capture)
     try:
         asyncio.run(
             adj.collect_roster_adjudications(
@@ -3294,8 +3295,6 @@ def test_completeness_adjudication_is_asked_about_the_whole_proposed_roster():
             )
         )
     finally:
-        if original is not None:
-            llm_module._call_openrouter = original
         adj.clear_cache()
 
     prompt = str(seen.get("messages"))

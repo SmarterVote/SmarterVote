@@ -256,7 +256,7 @@ export function normalizeForecastParty(
   _candidates?:
     | {
         name?: string;
-        party?: string;
+        party?: string | null;
         incumbent: boolean;
       }[]
     | null,
@@ -264,7 +264,10 @@ export function normalizeForecastParty(
   return forecastWinnerParty(party, probs) ?? "Other";
 }
 
-export function ratingSortValue(rating: ForecastRating): number {
+export function ratingSortValue(
+  rating: ForecastRating | null | undefined,
+): number {
+  if (!rating) return 5;
   const order: Record<ForecastRating, number> = {
     tossup: 0,
     tilt_d: 1,
@@ -403,7 +406,10 @@ export function electionCycleYear(races: RaceSummary[]): string | null {
  * by rating used to lift exactly those races above Safe D and open the list with
  * them.
  */
-export function ratingSortIndex(rating: ForecastRating): number {
+export function ratingSortIndex(
+  rating: ForecastRating | null | undefined,
+): number {
+  if (!rating) return FORECAST_RATING_ORDER.length;
   const index = FORECAST_RATING_ORDER.indexOf(rating);
   return index === -1 ? FORECAST_RATING_ORDER.length : index;
 }
@@ -504,8 +510,8 @@ export function aggregateForecasts(
       uncountedForecasts += 1;
       uncountedSeats += 1;
     }
-    ratingCounts[race.forecast.rating] =
-      (ratingCounts[race.forecast.rating] ?? 0) + 1;
+    const rating = race.forecast.rating;
+    if (rating) ratingCounts[rating] = (ratingCounts[rating] ?? 0) + 1;
   }
 
   forecasted.sort((a, b) => {
@@ -574,7 +580,11 @@ export function aggregateForecasts(
   };
 }
 
-export function formatRating(rating: ForecastRating): string {
+/** Display label; a summary forecast may arrive without a rating. */
+export function formatRating(
+  rating: ForecastRating | null | undefined,
+): string {
+  if (!rating) return "Not rated";
   const labels: Record<ForecastRating, string> = {
     safe_d: "Safe D",
     likely_d: "Likely D",
@@ -587,7 +597,7 @@ export function formatRating(rating: ForecastRating): string {
     safe_r: "Safe R",
     other: "Other",
   };
-  return labels[rating];
+  return labels[rating] ?? "Not rated";
 }
 
 export function formatNet(value: number): string {
@@ -845,7 +855,7 @@ export function getControlRelevanceScore(
 
   let ratingPriority = 4;
   if (race.forecast) {
-    const r = race.forecast.rating.toLowerCase();
+    const r = (race.forecast.rating ?? "").toLowerCase();
     if (r.includes("tossup") || r.includes("toss-up")) {
       ratingPriority = 0;
     } else if (r.includes("tilt")) {
@@ -945,7 +955,7 @@ export function filterForecastRaces(
     if (selectedState && getRaceState(race) !== selectedState) return false;
 
     if (filterRating !== "all") {
-      const rating = race.forecast.rating.toLowerCase();
+      const rating = (race.forecast.rating ?? "").toLowerCase();
       if (filterRating === "tossup" && !rating.includes("tossup")) return false;
       if (filterRating === "tilt" && !rating.startsWith("tilt_")) return false;
       if (filterRating === "lean" && !rating.startsWith("lean_")) return false;

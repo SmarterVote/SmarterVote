@@ -170,6 +170,11 @@ jobs:
       TF_VAR_cloudflare_analytics_api_token: ${{ secrets.CLOUDFLARE_ANALYTICS_API_TOKEN }}
       TF_VAR_cloudflare_analytics_account_tag: ${{ vars.CLOUDFLARE_ANALYTICS_ACCOUNT_TAG }}
       TF_VAR_cloudflare_analytics_site_tag: ${{ vars.CLOUDFLARE_ANALYTICS_SITE_TAG }}
+      # Optional operational guardrails. Unset repository variables arrive as "",
+      # which infra/variables.tf treats as "disabled".
+      TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+      TF_VAR_billing_account_id: ${{ vars.GCP_BILLING_ACCOUNT_ID }}
+      TF_VAR_enable_billing_export: ${{ vars.ENABLE_BILLING_EXPORT == 'true' && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -215,6 +220,18 @@ jobs:
             exit 1
           fi
           echo "✅ All required secrets are configured"
+
+      - name: Warn about disabled monitoring guardrails
+        env:
+          CHECK_ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+          CHECK_BILLING_ACCOUNT_ID: ${{ vars.GCP_BILLING_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CHECK_ALERT_EMAIL" ]; then
+            echo "::warning title=Alerting disabled::ALERT_EMAIL repository variable is not set, so infra/monitoring.tf creates no alert policies (API errors, latency, pipeline job failures, queue backlog, stale local worker)."
+          fi
+          if [ -z "$CHECK_BILLING_ACCOUNT_ID" ]; then
+            echo "::warning title=Budget disabled::GCP_BILLING_ACCOUNT_ID repository variable is not set, so no billing budget alert is created."
+          fi
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
@@ -342,22 +359,58 @@ jobs:
 
       - name: Verify deployed API
         if: env.ACTION == 'apply' || env.ACTION == 'rollback'
+        env:
+          EXPECTED_VERSION: ${{ needs.verify-release.outputs.deploy_sha }}
         run: |
           set -euo pipefail
           api_url="$(terraform -chdir=infra output -raw races_api_url)"
-          for path in /health /health/ready; do
-            for attempt in {1..12}; do
-              if curl --fail --silent --show-error --max-time 15 "$api_url$path"; then
-                echo
+
+          # 1. /health must report the commit we just deployed. Cloud Run keeps
+          #    serving the previous revision until the new one passes its startup
+          #    probe, so a plain 200 from /health proves nothing about this release.
+          deadline=$(( $(date +%s) + 300 ))
+          version_checked=false
+          while :; do
+            body="$(curl --fail --silent --show-error --max-time 15 "$api_url/health" || true)"
+            if [[ -n "$body" ]]; then
+              if ! jq -e 'has("version")' >/dev/null 2>&1 <<<"$body"; then
+                # Releases built before /health exposed APP_VERSION (e.g. a rollback
+                # to an older SHA) cannot be checked; health alone must do.
+                echo "::warning::/health has no version field; cannot confirm the serving revision is $EXPECTED_VERSION"
                 break
               fi
-              if [[ "$attempt" == 12 ]]; then
-                echo "::error::Deployment verification failed for $api_url$path"
-                exit 1
+              served="$(jq -r '.version // ""' <<<"$body")"
+              if [[ "$served" == "$EXPECTED_VERSION" ]]; then
+                echo "races-api is serving $served"
+                version_checked=true
+                break
               fi
-              sleep 10
-            done
+              echo "races-api reports version '$served', waiting for $EXPECTED_VERSION..."
+            else
+              echo "races-api /health not answering yet..."
+            fi
+            if (( $(date +%s) >= deadline )); then
+              echo "::error::races-api did not report version $EXPECTED_VERSION within 5 minutes (last response: ${body:-none})"
+              exit 1
+            fi
+            sleep 10
           done
+
+          # 2. /health/ready must load the published catalog. An empty catalog means
+          #    the service started but cannot read race data (bucket, IAM or index).
+          for attempt in {1..12}; do
+            ready="$(curl --fail --silent --show-error --max-time 15 "$api_url/health/ready" || true)"
+            if [[ -n "$ready" ]] && jq -e '.ready == true and (.race_count | type == "number") and .race_count > 0' >/dev/null 2>&1 <<<"$ready"; then
+              echo "races-api ready: $ready"
+              break
+            fi
+            if [[ "$attempt" == 12 ]]; then
+              echo "::error::races-api /health/ready failed or reported no published races (last response: ${ready:-none})"
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "version_checked=$version_checked"
 
       - name: Output Infrastructure Summary
         if: always()

@@ -372,26 +372,26 @@ async def test_process_records_live_provider_cost_when_cancelled():
     assert args[2]["cost_source"] == "provider"
 
 
-def test_claim_local_item_claims_pending_local():
+def test_claim_item_local_claims_pending_local():
     from pipeline_client.backend import queue_processor as qp
 
     item = {"status": "pending", "runner": "local", "race_id": "x", "run_id": "r"}
     db, item_ref, _run_ref, _race_ref = _fs_mock(item)
 
-    claimed = qp.claim_local_item(db, item_ref, "owner-1")
+    claimed = qp.claim_item(db, item_ref, "owner-1", "local")
 
     assert claimed is not None
     claim_updates = [c.args[1] for c in db.transaction.return_value.update.call_args_list]
     assert any(u.get("status") == "running" and u.get("lease_owner") == "owner-1" for u in claim_updates)
 
 
-def test_claim_local_item_skips_non_local():
+def test_claim_item_local_skips_non_local():
     from pipeline_client.backend import queue_processor as qp
 
     item = {"status": "pending", "runner": "cloud_run", "race_id": "x", "run_id": "r"}
     db, item_ref, _run_ref, _race_ref = _fs_mock(item)
 
-    assert qp.claim_local_item(db, item_ref, "owner-1") is None
+    assert qp.claim_item(db, item_ref, "owner-1", "local") is None
     claim_updates = [c.args[1] for c in db.transaction.return_value.update.call_args_list]
     assert not any(u.get("status") == "running" for u in claim_updates)
 
@@ -598,3 +598,91 @@ async def test_process_follows_handoff_with_in_memory_checkpoint_when_gcs_save_f
         await qp.process_claimed_item(db, MagicMock(), "bucket", "item-ck", item, "owner-1")
 
     assert seen[1] == checkpoint
+
+
+def test_claim_item_fails_item_and_run_after_max_expired_leases(monkeypatch):
+    """An item whose lease keeps expiring (crash/OOM/hang) must not be re-leased forever."""
+    from datetime import datetime, timedelta, timezone
+
+    from pipeline_client.backend import queue_processor as qp
+
+    monkeypatch.setattr(qp, "_MAX_LEASE_ATTEMPTS", 3)
+    expired = datetime.now(timezone.utc) - timedelta(minutes=5)
+    item = {
+        "status": "running",
+        "runner": "local",
+        "race_id": "x",
+        "run_id": "r",
+        "lease_attempts": 3,
+        "lease_expires_at": expired,
+    }
+    db, item_ref, run_ref, race_ref = _fs_mock(item)
+
+    assert qp.claim_item(db, item_ref, "owner-1", "local") is None
+    claim_updates = [c.args[1] for c in db.transaction.return_value.update.call_args_list]
+    assert any(u.get("status") == "failed" and "expired lease" in u.get("error", "") for u in claim_updates)
+    assert not any(u.get("status") == "running" for u in claim_updates)
+    run_sets = [c.args[0] for c in run_ref.set.call_args_list]
+    assert any(u.get("status") == "failed" for u in run_sets)
+    race_sets = [c.args[0] for c in race_ref.set.call_args_list]
+    assert any(u.get("status") == "failed" and u.get("current_run_id") is None for u in race_sets)
+
+
+def test_claim_item_recovers_expired_lease_below_cap(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from pipeline_client.backend import queue_processor as qp
+
+    monkeypatch.setattr(qp, "_MAX_LEASE_ATTEMPTS", 3)
+    item = {
+        "status": "running",
+        "runner": "local",
+        "race_id": "x",
+        "run_id": "r",
+        "lease_attempts": 2,
+        "lease_expires_at": datetime.now(timezone.utc) - timedelta(minutes=5),
+    }
+    db, item_ref, _run_ref, _race_ref = _fs_mock(item)
+
+    assert qp.claim_item(db, item_ref, "owner-1", "local") is not None
+    claim_updates = [c.args[1] for c in db.transaction.return_value.update.call_args_list]
+    assert any(u.get("status") == "running" and "recovered_at" in u for u in claim_updates)
+
+
+def test_hard_deadline_only_applies_to_cloud_run(monkeypatch):
+    from pipeline_client.backend import queue_processor as qp
+
+    monkeypatch.delenv("CLOUD_RUN_JOB", raising=False)
+    monkeypatch.delenv("WORKER_TASK_TIMEOUT_SECONDS", raising=False)
+    assert qp.hard_deadline_at("local") is None
+
+    monkeypatch.setattr(qp, "_PROCESS_STARTED_AT", 1000.0)
+    monkeypatch.setattr(qp, "_CLOUD_RUN_DEADLINE_BUFFER_SECONDS", 1800)
+    assert qp.hard_deadline_at("cloud_run") == 1000.0 + 12 * 3600 - 1800
+
+    monkeypatch.setenv("WORKER_TASK_TIMEOUT_SECONDS", "7200s")
+    assert qp.hard_deadline_at("cloud_run") == 1000.0 + 7200 - 1800
+
+
+@pytest.mark.asyncio
+async def test_cloud_run_deadline_is_below_job_timeout_and_fails_cleanly_on_handoff(monkeypatch):
+    from pipeline_client.backend import queue_processor as qp
+    from pipeline_client.backend.handlers.agent import HandoffTriggered
+
+    monkeypatch.setattr(qp, "hard_deadline_at", lambda runner: time.time() - 1 if runner == "cloud_run" else None)
+    item = {"race_id": "ca-house-01-2026", "run_id": "run-9", "options": {"save_artifact": False}}
+    db, item_ref, run_ref, _race_ref = _fs_mock(item)
+    calls = []
+
+    async def fake_run(race_id, run_id, options, existing_data):
+        calls.append(options["deadline_at"])
+        raise HandoffTriggered("cont-9", ["issues"], run_id)
+
+    with patch.object(qp, "_run_agent", side_effect=fake_run):
+        reason = await qp.process_claimed_item(db, MagicMock(), "bucket", "item-9", item, "owner", runner="cloud_run")
+
+    assert len(calls) == 1, "must not follow a deadline handoff past the job timeout"
+    assert calls[0] < time.time()
+    assert reason == "budget_exhausted"
+    item_updates = [c.args[0] for c in item_ref.update.call_args_list]
+    assert any(u.get("status") == "failed" and "task deadline" in u.get("error", "") for u in item_updates)

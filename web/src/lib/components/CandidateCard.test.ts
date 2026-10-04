@@ -76,4 +76,21 @@ describe("CandidateCard", () => {
     expect(getByText("Career Source")).toBeTruthy();
     expect(getByText("Education Source")).toBeTruthy();
   });
+
+  it("never renders a dangling dash when the start year is null", async () => {
+    const { getByText, container } = render(CandidateCard, {
+      candidate: {
+        ...candidate,
+        career_history: [
+          { title: "State Senator", start_year: null, end_year: 2020 },
+        ],
+      },
+    });
+    await fireEvent.click(getByText("Show more"));
+    await fireEvent.click(getByText("Background"));
+
+    const years = container.querySelector(".timeline-years");
+    expect(years?.textContent?.trim()).toBe("Until 2020");
+    expect(container.textContent).not.toMatch(/(^|\s)– 2020/);
+  });
 });
