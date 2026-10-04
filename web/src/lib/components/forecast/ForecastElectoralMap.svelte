@@ -107,7 +107,7 @@
           id="forecast-state-select"
           value={selectedState ?? ""}
           on:change={handleStateSelect}
-          class="w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          class="w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
         >
           <option value="">All active states</option>
           {#each stateOptions as state}
@@ -194,14 +194,14 @@
       <div class="flex flex-wrap gap-x-4 gap-y-2">
         <div class="flex items-center gap-1.5 text-xs text-content-muted">
           <span
-            class="block h-3.5 w-3.5 rounded border border-stroke"
+            class="block h-3.5 w-3.5 rounded-sm border border-stroke"
             style="background: repeating-linear-gradient(45deg, var(--color-no-forecast-bg) 0 2px, var(--color-no-forecast-line) 2px 4px);"
           ></span> No forecast yet
         </div>
         {#if activeTab === "senate"}
           <div class="flex items-center gap-1.5 text-xs text-content-muted">
             <span
-              class="block h-3.5 w-3.5 rounded border border-stroke"
+              class="block h-3.5 w-3.5 rounded-sm border border-stroke"
               style="background: repeating-linear-gradient(45deg, var(--color-holdover-d-solid) 0 3px, var(--color-holdover-r-solid) 3px 6px);"
             ></span> Split holdover
           </div>
@@ -209,13 +209,13 @@
         {#if activeTab !== "house"}
           <div class="flex items-center gap-1.5 text-xs text-content-muted">
             <span
-              class="block h-3.5 w-3.5 rounded border border-dashed border-stroke"
+              class="block h-3.5 w-3.5 rounded-sm border border-dashed border-stroke"
               style="background-color: var(--color-holdover-d);"
             ></span> Democratic holdover
           </div>
           <div class="flex items-center gap-1.5 text-xs text-content-muted">
             <span
-              class="block h-3.5 w-3.5 rounded border border-dashed border-stroke"
+              class="block h-3.5 w-3.5 rounded-sm border border-dashed border-stroke"
               style="background-color: var(--color-holdover-r);"
             ></span> Republican holdover
           </div>

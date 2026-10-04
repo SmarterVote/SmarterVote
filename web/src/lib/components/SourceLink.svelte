@@ -22,7 +22,7 @@
   >
     <span>{text || source.title || domain}</span>
     <svg
-      class="w-3 h-3 flex-shrink-0"
+      class="w-3 h-3 shrink-0"
       aria-hidden="true"
       fill="none"
       stroke="currentColor"

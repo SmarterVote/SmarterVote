@@ -107,6 +107,8 @@
 </section>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .voter-resources {
     @apply p-5;
   }

@@ -365,6 +365,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   /* app.html flags a first load whose ?tab= is not the prerendered House view;
      hide the prerendered House content until hydration renders the right tab. */
   :global(html[data-forecast-pending-tab]) .forecast-prerendered {

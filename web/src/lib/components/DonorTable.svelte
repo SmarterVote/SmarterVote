@@ -93,6 +93,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .donors-container {
     @apply space-y-4;
   }

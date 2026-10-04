@@ -348,7 +348,7 @@
     {#if isDraftPreview}
       <div class="alert-warn mb-4 flex items-center gap-2">
         <svg
-          class="h-5 w-5 flex-shrink-0"
+          class="h-5 w-5 shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -369,7 +369,7 @@
     {#if candidate.withdrawn}
       <div class="alert-info mb-4 flex items-start gap-3">
         <svg
-          class="mt-0.5 h-5 w-5 flex-shrink-0"
+          class="mt-0.5 h-5 w-5 shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -394,7 +394,7 @@
     {#if candidateDiscoveryOnly}
       <div class="alert-info mb-4 flex items-start gap-3">
         <svg
-          class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+          class="mt-0.5 h-5 w-5 shrink-0 text-primary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -867,6 +867,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../../../app.css";
+
   /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
      `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .inline-link {
@@ -928,7 +930,7 @@
   }
 
   .candidate-detail-name {
-    @apply text-2xl font-bold leading-tight tracking-tight text-content sm:text-3xl lg:text-2xl;
+    @apply text-2xl font-bold leading-tight tracking-tight text-content sm:text-3xl sm:leading-9 lg:text-2xl lg:leading-8;
   }
 
   .badge {
@@ -954,7 +956,7 @@
   /* Section nav: a horizontal sticky strip on phones, a vertical list in the
      desktop sidebar. */
   .detail-nav {
-    @apply rounded-xl border border-stroke bg-surface shadow-sm;
+    @apply rounded-xl border border-stroke bg-surface shadow-xs;
   }
 
   .detail-nav--sidebar {
@@ -962,7 +964,7 @@
   }
 
   .detail-nav--strip {
-    @apply sticky top-[var(--site-header-height)] z-30 min-w-0 bg-surface/95 p-2 backdrop-blur lg:hidden;
+    @apply sticky top-(--site-header-height) z-30 min-w-0 bg-surface/95 p-2 backdrop-blur-sm lg:hidden;
   }
 
   /* At 200% zoom or on a landscape phone a pinned strip would cover too
@@ -995,7 +997,7 @@
 
   /* Other candidates collapsible */
   .other-candidates-bar {
-    @apply overflow-hidden rounded-xl border border-stroke bg-surface shadow-sm;
+    @apply overflow-hidden rounded-xl border border-stroke bg-surface shadow-xs;
   }
 
   .toggle-others {

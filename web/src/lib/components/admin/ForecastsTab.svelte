@@ -141,7 +141,7 @@
           id="model-select"
           bind:value={model}
           disabled={generating}
-          class="w-64 rounded border border-stroke bg-surface px-3 py-1.5 text-sm text-content focus:ring-1 focus:ring-blue-500 focus:outline-none"
+          class="w-64 rounded-sm border border-stroke bg-surface px-3 py-1.5 text-sm text-content focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
         >
           <option value="">Server default ({defaultModelLabel})</option>
           {#each modelOptions as option}
@@ -151,7 +151,7 @@
       </div>
       <button
         type="button"
-        class="bg-surface hover:bg-surface-alt border border-stroke text-content rounded px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+        class="bg-surface hover:bg-surface-alt border border-stroke text-content rounded-sm px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         disabled={loading || generating}
         on:click={generateDraft}
       >
@@ -159,7 +159,7 @@
       </button>
       <button
         type="button"
-        class="bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+        class="bg-blue-600 hover:bg-blue-700 text-white rounded-sm px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         disabled={loading || publishing || generating || !draft}
         title={generating ? "Wait for the new draft to finish generating" : ""}
         on:click={publishDraft}
@@ -168,7 +168,7 @@
       </button>
       <button
         type="button"
-        class="border border-stroke hover:bg-surface-alt rounded p-2 text-content-subtle hover:text-content"
+        class="border border-stroke hover:bg-surface-alt rounded-sm p-2 text-content-subtle hover:text-content"
         on:click={loadForecasts}
         aria-label="Refresh forecasts"
       >
@@ -219,7 +219,7 @@
     <div class="grid gap-6 lg:grid-cols-2">
       <!-- Published Forecast Panel -->
       <div
-        class="bg-surface border border-stroke rounded-xl p-5 shadow-sm space-y-4"
+        class="bg-surface border border-stroke rounded-xl p-5 shadow-xs space-y-4"
       >
         <div
           class="flex items-center justify-between border-b border-stroke pb-3"
@@ -260,7 +260,7 @@
                 </h3>
                 {#if chDetails}
                   <span
-                    class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                    class="text-xs font-semibold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                   >
                     {chDetails.control_party} Projected ({chDetails.control_probability
                       ? (chDetails.control_probability * 100).toFixed(1)
@@ -280,7 +280,7 @@
                     </p>
                   </div>
                   <div
-                    class="grid grid-cols-2 gap-2 text-xs border-t border-stroke/40 pt-2 mt-2"
+                    class="grid grid-cols-2 gap-2 text-xs border-t border-stroke/40 pt-2"
                   >
                     <div>
                       <span class="text-content-faint">Projected Seats:</span>
@@ -300,7 +300,7 @@
                     </div>
                   </div>
                   <div
-                    class="text-xs bg-surface/60 border border-stroke/40 p-2 rounded space-y-1"
+                    class="text-xs bg-surface/60 border border-stroke/40 p-2 rounded-sm space-y-1"
                   >
                     <div>
                       <span class="text-content-faint font-semibold"
@@ -346,7 +346,7 @@
 
       <!-- Draft Forecast Panel -->
       <div
-        class="bg-surface border border-stroke rounded-xl p-5 shadow-sm space-y-4"
+        class="bg-surface border border-stroke rounded-xl p-5 shadow-xs space-y-4"
       >
         <div
           class="flex items-center justify-between border-b border-stroke pb-3"
@@ -387,7 +387,7 @@
                 </h3>
                 {#if chDetails}
                   <span
-                    class="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                    class="text-xs font-semibold px-2 py-0.5 rounded-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                   >
                     {chDetails.control_party} Projected ({chDetails.control_probability
                       ? (chDetails.control_probability * 100).toFixed(1)
@@ -407,7 +407,7 @@
                     </p>
                   </div>
                   <div
-                    class="grid grid-cols-2 gap-2 text-xs border-t border-stroke/40 pt-2 mt-2"
+                    class="grid grid-cols-2 gap-2 text-xs border-t border-stroke/40 pt-2"
                   >
                     <div>
                       <span class="text-content-faint">Projected Seats:</span>
@@ -427,7 +427,7 @@
                     </div>
                   </div>
                   <div
-                    class="text-xs bg-surface/60 border border-stroke/40 p-2 rounded space-y-1"
+                    class="text-xs bg-surface/60 border border-stroke/40 p-2 rounded-sm space-y-1"
                   >
                     <div>
                       <span class="text-content-faint font-semibold"

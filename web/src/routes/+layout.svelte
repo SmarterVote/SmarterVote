@@ -85,14 +85,14 @@
 
 <a
   href="#main-content"
-  class="sr-only fixed left-4 top-4 z-[70] rounded-lg bg-blue-700 px-4 py-3 font-bold text-white shadow-lg focus:not-sr-only"
+  class="sr-only fixed left-4 top-4 z-70 rounded-lg bg-blue-700 px-4 py-3 font-bold text-white shadow-lg focus:not-sr-only"
 >
   Skip to main content
 </a>
 
 <div class="min-h-screen bg-page overflow-x-clip flex flex-col">
   {#if $navigating}
-    <div class="fixed top-0 left-0 right-0 z-[60] h-0.5 overflow-hidden">
+    <div class="fixed top-0 left-0 right-0 z-60 h-0.5 overflow-hidden">
       <div
         class="h-full bg-blue-600 animate-[navprogress_1.2s_ease-in-out_infinite]"
       ></div>

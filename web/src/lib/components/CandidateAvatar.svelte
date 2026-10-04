@@ -59,6 +59,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .candidate-avatar {
     @apply shrink-0 border border-stroke object-cover;
     /* A parent may resize responsively by setting --avatar-display-size. */

@@ -133,7 +133,7 @@
         </dt>
         <dd class="mt-1 flex min-w-0 items-start gap-1.5">
           <span
-            class="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold leading-none {partyBadgeClass(
+            class="shrink-0 rounded-sm px-1.5 py-0.5 text-xs font-bold leading-none {partyBadgeClass(
               party,
             )}"
             title={party}>{partyAbbr(party)}</span
@@ -147,7 +147,7 @@
             </span>
           {:else}
             <span
-              class="min-w-0 break-words text-sm font-semibold leading-tight text-content"
+              class="min-w-0 wrap-break-word text-sm font-semibold leading-tight text-content"
               >{party}</span
             >
           {/if}
@@ -209,7 +209,7 @@
       <button
         type="button"
         on:click={onToggleExpand}
-        class="flex min-h-11 items-center gap-1.5 rounded text-xs font-bold text-primary-700 hover:text-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:text-primary-300 dark:hover:text-primary-200"
+        class="flex min-h-11 items-center gap-1.5 rounded-sm text-xs font-bold text-primary-700 hover:text-primary-800 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:text-primary-300 dark:hover:text-primary-200"
         aria-expanded={isExpanded}
       >
         <span

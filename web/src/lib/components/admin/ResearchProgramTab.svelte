@@ -272,7 +272,7 @@
   <p class="py-12 text-center text-content-subtle">Loading research status…</p>
 {:else if error}
   <div
-    class="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+    class="rounded-sm border border-red-300 bg-red-50 p-3 text-sm text-red-800"
     role="alert"
   >
     {error}
@@ -358,7 +358,7 @@
 
   {#if status.orphaned_catalog_race_ids.length}
     <div
-      class="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
+      class="mb-4 rounded-sm border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-200"
     >
       <strong
         >{status.orphaned_catalog_race_ids.length} unverified catalog record(s):</strong
@@ -461,12 +461,12 @@
         >{#if notice}
           {#if noticeType === "error"}
             <span
-              class="rounded border border-red-300 bg-red-50 px-2 py-1 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
+              class="rounded-sm border border-red-300 bg-red-50 px-2 py-1 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200"
               role="alert">{notice}</span
             >
           {:else}
             <span
-              class="rounded border border-green-300 bg-green-50 px-2 py-1 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200"
+              class="rounded-sm border border-green-300 bg-green-50 px-2 py-1 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-200"
               role="status">{notice}</span
             >
           {/if}

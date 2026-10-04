@@ -166,7 +166,7 @@
         type="button"
         class="px-3 py-1 rounded-md text-sm font-medium transition-colors
           {selectedDays === range.days
-          ? 'bg-surface text-content shadow-sm'
+          ? 'bg-surface text-content shadow-xs'
           : 'text-content-subtle hover:text-content-muted'}"
         on:click={() => changeRange(range.days)}
       >
@@ -373,7 +373,7 @@
                 >{usd(line.net_usd, 2)}</span
               >
             </div>
-            <div class="h-1.5 rounded bg-surface-alt overflow-hidden">
+            <div class="h-1.5 rounded-sm bg-surface-alt overflow-hidden">
               <div
                 class="h-full bg-blue-500"
                 style="width: {maxGcpService > 0

@@ -113,10 +113,10 @@ export function forecastMarginText(forecast: {
 
 function forecastBadgeClass(rating: ForecastRating | null | undefined): string {
   return rating?.endsWith("_d")
-    ? "!bg-blue-600 !text-white"
+    ? "bg-blue-600! text-white!"
     : rating?.endsWith("_r")
-      ? "!bg-red-600 !text-white"
-      : "!bg-slate-500 !text-white";
+      ? "bg-red-600! text-white!"
+      : "bg-slate-500! text-white!";
 }
 
 function forecastDetails(
@@ -463,8 +463,8 @@ export function buildStateMapData(
         badge: `${party === "Democratic" ? "Democratic" : "Republican"} holdover`,
         badgeClass:
           party === "Democratic"
-            ? "!bg-blue-600/90 !text-white"
-            : "!bg-red-600/90 !text-white",
+            ? "bg-blue-600/90! text-white!"
+            : "bg-red-600/90! text-white!",
         details: ["Incumbent Governor holds seat"],
       };
     }
@@ -496,7 +496,7 @@ export function buildStateMapData(
           title: state,
           subtitle: `${cyclePrefix}Governor Race`,
           badge: "No forecast yet",
-          badgeClass: "!bg-slate-500 !text-white",
+          badgeClass: "bg-slate-500! text-white!",
           details: ["No published model forecasts yet"],
         };
       }
@@ -535,7 +535,7 @@ export function buildStateMapData(
           badge: `${holdoverSeats.length} holdover seat${
             holdoverSeats.length > 1 ? "s" : ""
           }`,
-          badgeClass: "!bg-slate-500 !text-white",
+          badgeClass: "bg-slate-500! text-white!",
           details: seatStrings.map((s, idx) => `Seat ${idx + 1}: ${s}`),
         };
       }
@@ -583,7 +583,7 @@ export function buildStateMapData(
           title: state,
           subtitle: `${cyclePrefix}Senate Election`,
           badge: "No forecast yet",
-          badgeClass: "!bg-slate-500 !text-white",
+          badgeClass: "bg-slate-500! text-white!",
           details,
         };
       }
@@ -612,7 +612,7 @@ export function buildStateMapData(
           : `${summary.forecastedCount}/${count} Forecasted`,
         badgeClass: summary.primary?.forecast
           ? forecastBadgeClass(summary.primary.forecast.rating)
-          : "!bg-slate-500 !text-white",
+          : "bg-slate-500! text-white!",
         details:
           summary.details.length > 0
             ? [

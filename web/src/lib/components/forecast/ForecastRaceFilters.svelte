@@ -92,7 +92,7 @@
           id="sort-by"
           value={sortBy}
           on:change={handleSortChange}
-          class="min-w-0 flex-1 text-xs bg-surface border border-stroke rounded-xl px-3 py-1.5 text-content font-bold focus:outline-none focus:ring-2 focus:ring-primary-500 sm:flex-none"
+          class="min-w-0 flex-1 text-xs bg-surface border border-stroke rounded-xl px-3 py-1.5 text-content font-bold focus:outline-hidden focus:ring-2 focus:ring-primary-500 sm:flex-none"
         >
           <option value="control_relevance"
             >Most likely to decide control</option

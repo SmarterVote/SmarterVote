@@ -93,6 +93,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .voting-container {
     @apply space-y-4;
   }

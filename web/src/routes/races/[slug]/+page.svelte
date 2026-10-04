@@ -431,7 +431,7 @@
     {#if isDraftPreview}
       <div class="alert-warn mb-4 flex items-center gap-2">
         <svg
-          class="h-5 w-5 flex-shrink-0"
+          class="h-5 w-5 shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -461,7 +461,7 @@
     {#if discoveryOnly}
       <div class="alert-info mb-4 flex items-start gap-3">
         <svg
-          class="mt-0.5 h-5 w-5 flex-shrink-0 text-primary"
+          class="mt-0.5 h-5 w-5 shrink-0 text-primary"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -1293,6 +1293,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
      `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   .loading-wrapper {
@@ -1365,7 +1367,7 @@
   }
 
   .overview-text {
-    @apply mt-3 space-y-3 text-sm leading-relaxed text-content-muted sm:text-base;
+    @apply mt-3 space-y-3 text-sm leading-relaxed text-content-muted sm:text-base sm:leading-6;
   }
 
   @media (max-width: 639px) {
@@ -1655,7 +1657,7 @@
   }
 
   .forecast-legend-swatch {
-    @apply inline-block h-2.5 w-2.5 rounded-sm;
+    @apply inline-block h-2.5 w-2.5 rounded-xs;
   }
 
   .forecast-body {
@@ -1663,7 +1665,7 @@
   }
 
   .forecast-takeaway {
-    @apply text-sm font-medium leading-relaxed text-content sm:text-base;
+    @apply text-sm font-medium leading-relaxed text-content sm:text-base sm:leading-6;
   }
 
   .forecast-detail-block {
@@ -1742,7 +1744,7 @@
   }
 
   .poll-card {
-    @apply flex flex-col gap-3 rounded-xl border border-stroke bg-surface p-4 shadow-sm;
+    @apply flex flex-col gap-3 rounded-xl border border-stroke bg-surface p-4 shadow-xs;
   }
 
   .poll-card-header {
@@ -1758,7 +1760,7 @@
   }
 
   .poll-card-cycle {
-    @apply mt-1 inline-block rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle;
+    @apply mt-1 inline-block rounded-sm border border-stroke bg-surface-alt px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-content-subtle;
   }
 
   .poll-card-sample {

@@ -78,7 +78,7 @@
         type="button"
         id={tabId(tab.id)}
         bind:this={tabButtons[index]}
-        class="relative px-5 py-3 text-sm font-medium transition-colors rounded-t-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+        class="relative px-5 py-3 text-sm font-medium transition-colors rounded-t-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
           {activeTab === tab.id
           ? 'border-b-2 border-primary-600 dark:border-primary-400 text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/20'
           : 'text-content-subtle hover:text-content-muted hover:bg-surface-alt'}"

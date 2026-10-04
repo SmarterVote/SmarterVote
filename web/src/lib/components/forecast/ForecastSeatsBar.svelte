@@ -71,7 +71,7 @@
         style="left: {(threshold / totalSeats) * 100}%"
       >
         <span
-          class="absolute bottom-full left-0 ml-0.5 bg-yellow-500 dark:bg-yellow-400 text-xs font-black text-slate-950 dark:text-slate-950 px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
+          class="absolute bottom-full left-0 ml-0.5 bg-yellow-500 dark:bg-yellow-400 text-xs font-black text-slate-950 dark:text-slate-950 px-1 py-0.5 rounded-sm shadow-xs whitespace-nowrap animate-fade-in"
         >
           Majority ({threshold})
         </span>
@@ -84,7 +84,7 @@
           style="left: 50%"
         >
           <span
-            class="absolute top-full right-0 mr-0.5 bg-slate-500 text-xs font-black text-white px-1 py-0.5 rounded shadow-sm whitespace-nowrap animate-fade-in"
+            class="absolute top-full right-0 mr-0.5 bg-slate-500 text-xs font-black text-white px-1 py-0.5 rounded-sm shadow-xs whitespace-nowrap animate-fade-in"
           >
             50-50 Split
           </span>

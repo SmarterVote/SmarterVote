@@ -160,6 +160,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .grade-wrapper {
     @apply relative inline-flex;
   }
@@ -188,7 +190,7 @@
      rightward when the badge sits too close to the left edge. */
   .popover {
     @apply absolute top-full right-0 mt-2 z-50 w-72 max-w-[calc(100vw-2rem)]
-           bg-surface border border-stroke rounded-xl shadow-lg p-4 focus:outline-none;
+           bg-surface border border-stroke rounded-xl shadow-lg p-4 focus:outline-hidden;
   }
 
   .popover--left {
@@ -204,7 +206,7 @@
   }
 
   .popover-grade {
-    @apply px-2 py-0.5 rounded text-sm font-bold border;
+    @apply px-2 py-0.5 rounded-sm text-sm font-bold border;
   }
 
   .popover-score {

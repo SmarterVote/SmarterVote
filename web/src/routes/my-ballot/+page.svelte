@@ -60,7 +60,7 @@
   <div
     class="page-container grid items-start gap-5 py-5 sm:gap-8 sm:py-12 {exploring
       ? ''
-      : 'sm:gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:py-16'}"
+      : 'lg:grid-cols-[0.8fr_1.2fr] lg:py-16'}"
   >
     {#if !exploring}
       <header class="max-w-xl">

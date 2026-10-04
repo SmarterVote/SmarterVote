@@ -231,7 +231,7 @@
                           class="entry-source-link"
                         >
                           <svg
-                            class="w-3 h-3 flex-shrink-0"
+                            class="w-3 h-3 shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -275,7 +275,7 @@
                           class="entry-source-link"
                         >
                           <svg
-                            class="w-3 h-3 flex-shrink-0"
+                            class="w-3 h-3 shrink-0"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -325,6 +325,8 @@
 </Card>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   /* Scoped `dark:` variants inside <style> never match: Svelte scopes the
      `.dark` ancestor to this component. Dark overrides use :global(.dark). */
   :global(.candidate-card) {
@@ -343,7 +345,7 @@
   }
 
   .candidate-name {
-    @apply min-w-0 text-lg font-bold leading-snug text-content sm:text-xl;
+    @apply min-w-0 text-lg font-bold leading-snug text-content sm:text-xl sm:leading-7;
   }
 
   .candidate-name-link {
@@ -364,7 +366,7 @@
   }
 
   .compare-checkbox {
-    @apply h-4 w-4 cursor-pointer rounded border-stroke bg-surface text-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-0;
+    @apply h-4 w-4 cursor-pointer rounded-sm border-stroke bg-surface text-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-0;
   }
 
   .badge {

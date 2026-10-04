@@ -168,7 +168,7 @@
     </div>
 
     <div
-      class="border-b border-stroke bg-surface/95 px-4 py-3 backdrop-blur sm:px-7 lg:sticky lg:top-[65px] lg:z-20"
+      class="border-b border-stroke bg-surface/95 px-4 py-3 backdrop-blur-sm sm:px-7 lg:sticky lg:top-[65px] lg:z-20"
       role="tablist"
       aria-label="Your matched races"
     >
@@ -202,7 +202,7 @@
     >
       {#if loadingId === selectedId}
         <div
-          class="flex min-h-[16rem] items-center justify-center text-sm font-semibold text-content-muted"
+          class="flex min-h-64 items-center justify-center text-sm font-semibold text-content-muted"
           aria-live="polite"
         >
           Loading this race comparison…

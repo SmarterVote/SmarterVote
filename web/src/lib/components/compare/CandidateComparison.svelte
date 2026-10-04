@@ -186,7 +186,7 @@
               ? `At least ${minSelected} candidate${minSelected === 1 ? "" : "s"} must stay in the comparison`
               : undefined}
             on:change={() => onToggle?.(candidate.name)}
-            class="h-5 w-5 cursor-pointer rounded border-stroke bg-surface text-primary-600 focus:ring-primary-500"
+            class="h-5 w-5 cursor-pointer rounded-sm border-stroke bg-surface text-primary-600 focus:ring-primary-500"
           />
           {candidate.name}
           {#if candidate.party}<span
@@ -216,14 +216,14 @@
      box into a scroll container, so the header can stick to the viewport. -->
   <div
     data-desktop-candidate-comparison
-    class="relative isolate hidden overflow-clip rounded-xl border border-stroke bg-surface shadow-sm lg:block"
+    class="relative isolate hidden overflow-clip rounded-xl border border-stroke bg-surface shadow-xs lg:block"
   >
     {#if showQuality && race.validation_grade}
       <div
         class="flex items-start gap-3 border-b border-stroke bg-emerald-50 px-5 py-3.5 dark:bg-emerald-950/30"
       >
         <span
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-lg font-extrabold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-lg font-extrabold text-emerald-800 shadow-xs dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
           >{race.validation_grade.grade}</span
         >
         <div class="min-w-0 text-sm leading-6 text-content-muted">
@@ -248,7 +248,7 @@
         role="rowgroup"
         class:sticky={!compact}
         class:compare-sticky-header={!compact}
-        class="z-30 border-b border-stroke bg-surface shadow-sm"
+        class="z-30 border-b border-stroke bg-surface shadow-xs"
       >
         <div role="row" class="flex">
           <div
@@ -285,12 +285,12 @@
                     >
                     <div class="mt-1 flex items-center gap-1.5">
                       {#if candidate.party}<span
-                          class="rounded border border-stroke bg-surface-alt px-1.5 py-0.5 text-xs font-bold leading-none text-content-muted"
+                          class="rounded-sm border border-stroke bg-surface-alt px-1.5 py-0.5 text-xs font-bold leading-none text-content-muted"
                           title={candidate.party}
                           >{partyAbbr(candidate.party)}</span
                         >{/if}
                       {#if candidate.incumbent}<span
-                          class="rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
+                          class="rounded-sm border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs font-bold leading-none text-green-700 dark:border-green-800 dark:bg-green-950/20 dark:text-green-300"
                           >Incumbent</span
                         >{/if}
                     </div>
@@ -664,6 +664,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../../app.css";
+
   .compare-sticky-header {
     top: var(--site-header-height, 0px);
   }

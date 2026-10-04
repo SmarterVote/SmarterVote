@@ -274,7 +274,7 @@
 
     <!-- Hero Search Bar -->
     <div
-      class="relative w-full max-w-lg shadow-sm hover:shadow-md transition-shadow duration-300 rounded-full"
+      class="relative w-full max-w-lg shadow-xs hover:shadow-md transition-shadow duration-300 rounded-full"
     >
       <label for="election-directory-search" class="sr-only">
         Search elections and candidates
@@ -303,7 +303,7 @@
         bind:value={searchQuery}
         on:input={handleHeroSearchInput}
         placeholder="Search by candidate name, office, or state..."
-        class="block w-full pl-11 pr-10 py-3 border border-stroke rounded-full text-base bg-surface placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-content transition-all duration-300"
+        class="block w-full pl-11 pr-10 py-3 border border-stroke rounded-full text-base bg-surface placeholder-content-subtle focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-content transition-all duration-300"
       />
       {#if searchQuery.trim()}
         <button
@@ -410,7 +410,7 @@
         id="mobile-state-select"
         value={selectedState || ""}
         on:change={(e) => setStateFilter(e.currentTarget.value || null)}
-        class="block min-h-11 w-full px-3 py-2 border border-stroke rounded-lg text-sm bg-surface text-content focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+        class="block min-h-11 w-full px-3 py-2 border border-stroke rounded-lg text-sm bg-surface text-content focus:outline-hidden focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
       >
         <option value="">All States</option>
         {#each stateOptions as state}
@@ -459,7 +459,7 @@
           {#each RACE_COUNT_BUCKETS as bucket (bucket.label)}
             <li class="flex items-center gap-1.5">
               <span
-                class="block h-3 w-3 rounded-sm border border-stroke"
+                class="block h-3 w-3 rounded-xs border border-stroke"
                 style="background: {bucket.fill};"
                 aria-hidden="true"
               ></span>

@@ -47,6 +47,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .tab-button {
     @apply min-h-11 px-3 py-2 text-sm font-medium border-b-2 border-transparent text-content-subtle;
     @apply hover:text-content-muted hover:border-stroke transition-colors duration-200;
@@ -55,7 +57,7 @@
 
   /* Inset so the ring isn't clipped by scrolling tab strips. */
   .tab-button:focus-visible {
-    @apply outline-none ring-2 ring-inset ring-primary;
+    @apply outline-hidden ring-2 ring-inset ring-primary;
   }
 
   .tab-button.active {

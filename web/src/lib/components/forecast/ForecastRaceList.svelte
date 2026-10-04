@@ -64,7 +64,7 @@
   id={sectionId}
   tabindex="-1"
   aria-label="Race forecasts"
-  class="card overflow-hidden scroll-mt-24 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+  class="card overflow-hidden scroll-mt-24 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
 >
   <ForecastRaceFilters
     {filterRating}

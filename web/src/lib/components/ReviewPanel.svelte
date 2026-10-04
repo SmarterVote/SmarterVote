@@ -61,7 +61,7 @@
     aria-expanded={!collapsed}
   >
     <svg
-      class="w-5 h-5 flex-shrink-0"
+      class="w-5 h-5 shrink-0"
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -206,6 +206,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .review-panel {
     @apply bg-page border border-stroke rounded-lg p-4 sm:p-6 mb-6;
   }
@@ -236,7 +238,7 @@
   }
 
   .review-stale-note {
-    @apply mb-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900;
+    @apply mb-2 rounded-sm border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900;
   }
 
   .review-header {
@@ -295,7 +297,7 @@
   }
 
   .flag-severity {
-    @apply flex-shrink-0 rounded border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase leading-none tracking-wide;
+    @apply shrink-0 rounded-sm border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase leading-none tracking-wide;
   }
   .flag-severity--error {
     @apply border-red-200 bg-red-50 text-red-800;
