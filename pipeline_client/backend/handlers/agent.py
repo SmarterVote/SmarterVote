@@ -658,7 +658,10 @@ class AgentHandler:
                         "run_id": continuation_run_id,
                         "status": "pending",
                         "options": continuation_options,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        # A native timestamp, like the API's SERVER_TIMESTAMP: Firestore
+                        # orders strings after all timestamps, so an ISO string would
+                        # sort a continuation behind every other item in the FIFO poll.
+                        "created_at": datetime.now(timezone.utc),
                         "is_continuation": True,
                         "parent_queue_item_id": queue_item_id,
                         "existing_data_gcs_path": checkpoint_gcs_path,

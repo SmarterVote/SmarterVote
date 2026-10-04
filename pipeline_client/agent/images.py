@@ -19,7 +19,7 @@ from .image_denylist import is_denied_image
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
-from .web_tools import _serper_image_search, ssrf_request_hook
+from .web_tools import MAX_PAGE_BYTES, _get_validated, _serper_image_search, ssrf_request_hook
 
 logger = logging.getLogger("pipeline")
 # Validate every request (redirect hops included) against the SSRF guard.
@@ -1180,10 +1180,12 @@ async def _lookup_known_page_image(candidate: Dict[str, Any]) -> Optional[str]:
     """Extract a direct image URL from known candidate website/profile pages."""
     headers = {"User-Agent": _BROWSER_UA}
     try:
-        async with httpx.AsyncClient(timeout=12, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
+        async with httpx.AsyncClient(timeout=12, follow_redirects=False, event_hooks=_SSRF_HOOKS) as client:
             for page_url in _candidate_page_urls(candidate):
                 try:
-                    response = await client.get(page_url, headers=headers)
+                    # Streamed with a byte cap (truncated, not rejected: the image
+                    # tags live near the top) and every redirect hop SSRF-validated.
+                    response = await _get_validated(client, page_url, headers=headers, max_bytes=MAX_PAGE_BYTES)
                     response.raise_for_status()
                 except Exception:
                     continue
