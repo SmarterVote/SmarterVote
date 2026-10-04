@@ -169,7 +169,7 @@ def test_neutrality_warning_holds_the_grade_below_a():
         "flags": neutrality_flags(_graded_race()),
     }
     race = {"candidates": [{"issues": {"Economy": {"stance": "Cut taxes."}}}]}
-    grade = compute_validation_grade([_model_review(98), automated], race)
+    grade = compute_validation_grade([_model_review(98), _model_review(98), automated], race)
     assert grade["grade"] == "B" and grade["passed"] is True
     assert grade["score"] <= NEUTRALITY_SCORE_CAP
     assert "loaded wording" in grade["summary"]

@@ -391,3 +391,128 @@ async def test_process_one_crash_clears_the_auth_streak(monkeypatch):
     await worker._process_one(MagicMock(), MagicMock(), "bucket", "item-1", {"race_id": "race-1"}, sem, "local", gate)
 
     assert gate.consecutive == 0
+
+
+# ---------------------------------------------------------------------------
+# _VersionGate (local worker staleness vs GitHub main)
+# ---------------------------------------------------------------------------
+
+
+def _fake_clock(start=0.0):
+    now = {"t": start}
+    return now, (lambda: now["t"])
+
+
+@pytest.mark.asyncio
+async def test_version_gate_blocks_leasing_when_worker_code_changed(monkeypatch):
+    monkeypatch.setenv("WORKER_GIT_COMMIT", "a" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", AsyncMock(return_value="b" * 40))
+    monkeypatch.setattr(worker, "_worker_code_changed", AsyncMock(return_value=True))
+    gate = worker._VersionGate(runner="local", stop_claiming=True)
+
+    await gate.refresh(force=True)
+
+    assert gate.is_stale is True
+    assert gate.leasing_blocked() is True
+
+
+@pytest.mark.asyncio
+async def test_version_gate_stop_claiming_is_toggleable(monkeypatch):
+    monkeypatch.setenv("WORKER_GIT_COMMIT", "a" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", AsyncMock(return_value="b" * 40))
+    monkeypatch.setattr(worker, "_worker_code_changed", AsyncMock(return_value=None))
+    gate = worker._VersionGate(runner="local", stop_claiming=False)
+
+    await gate.refresh(force=True)
+
+    assert gate.is_stale is True
+    assert gate.leasing_blocked() is False
+
+
+@pytest.mark.asyncio
+async def test_version_gate_ignores_non_worker_commits(monkeypatch):
+    monkeypatch.setenv("WORKER_GIT_COMMIT", "a" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", AsyncMock(return_value="b" * 40))
+    monkeypatch.setattr(worker, "_worker_code_changed", AsyncMock(return_value=False))
+    gate = worker._VersionGate(runner="local", stop_claiming=True)
+
+    await gate.refresh(force=True)
+
+    assert gate.is_stale is False
+    assert gate.leasing_blocked() is False
+
+
+@pytest.mark.asyncio
+async def test_version_gate_network_failure_is_unknown_not_stale(monkeypatch):
+    monkeypatch.setenv("WORKER_GIT_COMMIT", "a" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", AsyncMock(return_value=None))
+    gate = worker._VersionGate(runner="local", stop_claiming=True)
+
+    await gate.refresh(force=True)
+
+    assert gate.is_stale is None
+    assert gate.leasing_blocked() is False
+
+
+@pytest.mark.asyncio
+async def test_version_gate_unstamped_image_logs_error(monkeypatch, caplog):
+    monkeypatch.delenv("WORKER_GIT_COMMIT", raising=False)
+    monkeypatch.delenv("GIT_COMMIT", raising=False)
+    fetch = AsyncMock(return_value="b" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", fetch)
+    gate = worker._VersionGate(runner="local", stop_claiming=True)
+
+    with caplog.at_level("ERROR", logger="pipeline_worker"):
+        await gate.refresh(force=True)
+
+    assert any("WORKER VERSION UNKNOWN" in r.message for r in caplog.records)
+    assert gate.leasing_blocked() is False
+
+
+@pytest.mark.asyncio
+async def test_version_gate_rechecks_only_after_interval(monkeypatch):
+    monkeypatch.setenv("WORKER_GIT_COMMIT", "a" * 40)
+    fetch = AsyncMock(return_value="a" * 40)
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", fetch)
+    now, clock = _fake_clock()
+    gate = worker._VersionGate(runner="local", interval=1800, clock=clock)
+
+    await gate.refresh()
+    now["t"] = 100
+    await gate.refresh()
+    assert fetch.await_count == 1
+    now["t"] = 1801
+    await gate.refresh()
+    assert fetch.await_count == 2
+    assert gate.is_stale is False
+
+
+@pytest.mark.asyncio
+async def test_version_gate_skips_network_for_cloud_run(monkeypatch):
+    fetch = AsyncMock()
+    monkeypatch.setattr(worker, "_fetch_latest_main_commit", fetch)
+    gate = worker._VersionGate(runner="cloud_run")
+
+    await gate.refresh(force=True)
+
+    fetch.assert_not_awaited()
+    assert gate.leasing_blocked() is False
+
+
+@pytest.mark.asyncio
+async def test_fetch_latest_main_commit_parses_sha(monkeypatch):
+    import httpx
+
+    def handler(request):
+        assert request.url.path.endswith("/repos/SmarterVote/SmarterVote/commits/main")
+        return httpx.Response(200, json={"sha": "c" * 40})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw))
+
+    assert await worker._fetch_latest_main_commit() == "c" * 40
+
+
+def test_poll_window_reads_more_than_capacity():
+    assert worker._poll_window(1) == 50
+    assert worker._poll_window(8) == 80

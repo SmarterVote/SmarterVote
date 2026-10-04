@@ -10,6 +10,7 @@ import os
 import random
 import re
 import socket
+import weakref
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -89,34 +90,180 @@ _BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " "AppleWebKit/537.36 (
 # URL validation (SSRF protection)
 # ---------------------------------------------------------------------------
 
-_PRIVATE_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+
+class UnsafeURLError(ValueError):
+    """The URL uses a disallowed scheme or resolves to a non-public address."""
+
+
+class UnresolvableHostError(httpx.ConnectError):
+    """The URL's host did not resolve. Raised instead of letting the fetch proceed.
+
+    A ``ConnectError`` (not a ``ValueError``) so callers keep treating it like the
+    connection failure it is: the message carries the resolver's own text, which
+    the link checker uses to tell a dead host from a transient DNS blip.
+    """
+
+
+# Address ranges that ``ipaddress``'s is_* properties do not all cover on every
+# supported Python version (e.g. carrier-grade NAT is not ``is_private``).
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),  # "this network"
     ipaddress.ip_network("10.0.0.0/8"),  # RFC 1918
-    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918
-    ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918
+    ipaddress.ip_network("100.64.0.0/10"),  # carrier-grade NAT (RFC 6598)
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
     ipaddress.ip_network("169.254.0.0/16"),  # link-local / GCP metadata
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918
+    ipaddress.ip_network("192.0.0.0/24"),  # IETF protocol assignments
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918
+    ipaddress.ip_network("198.18.0.0/15"),  # benchmarking
+    ipaddress.ip_network("::/128"),  # unspecified
     ipaddress.ip_network("::1/128"),  # IPv6 loopback
     ipaddress.ip_network("fc00::/7"),  # IPv6 ULA
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
+# Backward-compatible name.
+_PRIVATE_NETWORKS = _BLOCKED_NETWORKS
+
+
+def _is_blocked_address(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True when *addr* is not a routable public address."""
+    if isinstance(addr, ipaddress.IPv6Address):
+        mapped = addr.ipv4_mapped or addr.sixtofour
+        if mapped is not None and _is_blocked_address(mapped):
+            return True
+    if (
+        addr.is_private
+        or addr.is_loopback
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_unspecified
+        or addr.is_multicast
+    ):
+        return True
+    return any(addr.version == network.version and addr in network for network in _BLOCKED_NETWORKS)
+
+
+def _url_hostname(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise UnsafeURLError(f"Disallowed URL scheme: {parsed.scheme!r}")
+    hostname = parsed.hostname
+    if not hostname:
+        raise UnsafeURLError("URL has no hostname")
+    return hostname
+
+
+def _literal_ip(hostname: str) -> Optional[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    try:
+        return ipaddress.ip_address(hostname.strip("[]"))
+    except ValueError:
+        return None
+
+
+def _getaddrinfo(hostname: str) -> list:
+    """Indirection over ``socket.getaddrinfo`` so tests can stub DNS without patching ``socket``."""
+    return socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+
+
+def _check_host_addresses(hostname: str) -> None:
+    """Resolve *hostname* (all A/AAAA records) and fail closed on any non-public address."""
+    literal = _literal_ip(hostname)
+    if literal is not None:
+        addresses = [literal]
+    else:
+        try:
+            infos = _getaddrinfo(hostname)
+        except (socket.gaierror, UnicodeError) as exc:
+            raise UnresolvableHostError(f"DNS resolution failed for {hostname}: {exc}") from exc
+        addresses = []
+        for info in infos:
+            try:
+                addresses.append(ipaddress.ip_address(str(info[4][0]).split("%", 1)[0]))
+            except ValueError:
+                continue
+        if not addresses:
+            raise UnresolvableHostError(f"DNS resolution returned no addresses for {hostname}")
+    for addr in addresses:
+        if _is_blocked_address(addr):
+            raise UnsafeURLError(f"URL resolves to private/internal address: {addr}")
 
 
 def _validate_url(url: str) -> None:
-    """Raise ValueError if the URL targets a private/internal address or uses a disallowed scheme."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise ValueError(f"Disallowed URL scheme: {parsed.scheme!r}")
-    hostname = parsed.hostname
-    if not hostname:
-        raise ValueError("URL has no hostname")
-    try:
-        # Resolve to IP and check against private ranges
-        addr = ipaddress.ip_address(socket.gethostbyname(hostname))
-        for network in _PRIVATE_NETWORKS:
-            if addr in network:
-                raise ValueError(f"URL resolves to private/internal address: {addr}")
-    except socket.gaierror:
-        # DNS failure — let the actual fetch fail naturally; don't block
-        pass
+    """Raise if the URL uses a disallowed scheme or targets a non-public address.
+
+    ``UnsafeURLError`` (a ``ValueError``) for a blocked target, and
+    ``UnresolvableHostError`` when the host does not resolve — resolution
+    failures fail closed rather than letting the fetch resolve it again itself.
+    Blocking: use ``_validate_url_async`` from coroutines.
+    """
+    _check_host_addresses(_url_hostname(url))
+
+
+async def _validate_url_async(url: str) -> None:
+    """``_validate_url`` with the DNS lookup moved off the event loop."""
+    hostname = _url_hostname(url)
+    if _literal_ip(hostname) is not None:
+        _check_host_addresses(hostname)
+        return
+    await asyncio.to_thread(_check_host_addresses, hostname)
+
+
+async def ssrf_request_hook(request: httpx.Request) -> None:
+    """httpx ``event_hooks["request"]`` hook validating every request, redirects included."""
+    await _validate_url_async(str(request.url))
+
+
+# Raw response bodies larger than this are never buffered in full. Pages are cut
+# to _PAGE_MAX_CHARS of text anyway; the cap bounds memory for hostile or huge
+# responses (and decompression bombs, since the cap applies after decoding).
+MAX_PAGE_BYTES = 5 * 1024 * 1024
+
+
+class ResponseTooLarge(ValueError):
+    """A response body exceeded the caller's byte cap."""
+
+
+async def _read_capped(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    headers: Dict[str, str] | None,
+    max_bytes: int,
+    truncate: bool,
+    timeout: float | None = None,
+) -> httpx.Response:
+    """Stream a GET and buffer at most *max_bytes* of (decoded) body."""
+    extra: Dict[str, Any] = {"timeout": timeout} if timeout is not None else {}
+    async with client.stream("GET", url, headers=headers, follow_redirects=False, **extra) as streamed:
+        chunks: List[bytes] = []
+        total = 0
+        truncated = False
+        async for chunk in streamed.aiter_bytes():
+            remaining = max_bytes - total
+            if len(chunk) > remaining:
+                if not truncate:
+                    raise ResponseTooLarge(f"Response from {url} exceeded {max_bytes} bytes")
+                chunks.append(chunk[:remaining])
+                total = max_bytes
+                truncated = True
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        response_headers = [
+            (name, value)
+            for name, value in streamed.headers.multi_items()
+            if name.lower() not in {"content-encoding", "content-length", "transfer-encoding"}
+        ]
+        response = httpx.Response(
+            status_code=streamed.status_code,
+            headers=response_headers,
+            content=b"".join(chunks),
+            request=streamed.request,
+            extensions=streamed.extensions,
+        )
+        if truncated:
+            logger.debug("Truncated response from %s at %d bytes", url, max_bytes)
+        return response
 
 
 async def _get_validated(
@@ -125,12 +272,26 @@ async def _get_validated(
     *,
     headers: Dict[str, str] | None = None,
     max_redirects: int = 5,
+    max_bytes: int | None = None,
+    truncate: bool = True,
+    timeout: float | None = None,
 ) -> httpx.Response:
-    """GET a URL while validating each redirect target before following it."""
+    """GET a URL while validating each redirect target before following it.
+
+    With *max_bytes* and a real ``httpx.AsyncClient`` the body is streamed and
+    capped (truncated, or ``ResponseTooLarge`` when ``truncate`` is False).
+    """
     current_url = url
     for _ in range(max_redirects + 1):
-        _validate_url(current_url)
-        resp = await client.get(current_url, headers=headers)
+        await _validate_url_async(current_url)
+        if max_bytes is not None and isinstance(client, httpx.AsyncClient):
+            resp = await _read_capped(
+                client, current_url, headers=headers, max_bytes=max_bytes, truncate=truncate, timeout=timeout
+            )
+        elif timeout is not None:
+            resp = await client.get(current_url, headers=headers, timeout=timeout)
+        else:
+            resp = await client.get(current_url, headers=headers)
         if not getattr(resp, "is_redirect", False):
             return resp
         location = resp.headers.get("location")
@@ -255,25 +416,32 @@ _POLICY_URL_PATH_TOKENS = [
 # Per-event-loop HTTP client singletons
 # ---------------------------------------------------------------------------
 
-_fetch_clients_by_loop: Dict[int, httpx.AsyncClient] = {}
-_serper_clients_by_loop: Dict[int, httpx.AsyncClient] = {}
+# Keyed weakly by the loop object itself (not ``id(loop)``, which is reused after
+# a loop is collected): entries vanish with their loop, and clients of loops that
+# are closed but still referenced are pruned on the next lookup.
+_fetch_clients_by_loop: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient]" = weakref.WeakKeyDictionary()
+_serper_clients_by_loop: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _loop_client(cache: "weakref.WeakKeyDictionary", factory: Any) -> httpx.AsyncClient:
+    loop = asyncio.get_running_loop()
+    for stale_loop in [lp for lp, client in list(cache.items()) if lp.is_closed() or client.is_closed]:
+        cache.pop(stale_loop, None)
+    client = cache.get(loop)
+    if client is None or client.is_closed:
+        client = factory()
+        cache[loop] = client
+    return client
 
 
 def _get_fetch_client() -> httpx.AsyncClient:
     """Return a per-event-loop AsyncClient for page fetches."""
-    loop_id = id(asyncio.get_running_loop())
-    # Prune entries for closed clients / defunct event loops
-    for k in [k for k, v in _fetch_clients_by_loop.items() if v.is_closed]:
-        del _fetch_clients_by_loop[k]
-    client = _fetch_clients_by_loop.get(loop_id)
-    if client is None or client.is_closed:
-        client = httpx.AsyncClient(
-            timeout=20,
-            follow_redirects=False,
-            headers={"User-Agent": _BROWSER_UA},
-        )
-        _fetch_clients_by_loop[loop_id] = client
-    return client
+    return _loop_client(
+        _fetch_clients_by_loop,
+        lambda: httpx.AsyncClient(timeout=20, follow_redirects=False, headers={"User-Agent": _BROWSER_UA}),
+    )
 
 
 TEXT_PROXY_BASE = "https://r.jina.ai/"
@@ -385,7 +553,8 @@ def _xlsx_to_text(payload: bytes) -> str:
 
 async def _fetch_tabular_document(client: httpx.AsyncClient, url: str) -> Optional[str]:
     """Download and flatten a spreadsheet/CSV directly, bypassing the text proxy."""
-    resp = await _get_validated(client, url)
+    # A truncated spreadsheet is unreadable, so oversize documents fail outright.
+    resp = await _get_validated(client, url, max_bytes=MAX_PAGE_BYTES * 4, truncate=False)
     resp.raise_for_status()
     path = urlparse(url).path.lower()
     if path.endswith((".xlsx", ".xlsm")):
@@ -396,15 +565,7 @@ async def _fetch_tabular_document(client: httpx.AsyncClient, url: str) -> Option
 
 def _get_serper_client() -> httpx.AsyncClient:
     """Return a per-event-loop AsyncClient for Serper API calls."""
-    loop_id = id(asyncio.get_running_loop())
-    # Prune entries for closed clients / defunct event loops
-    for k in [k for k, v in _serper_clients_by_loop.items() if v.is_closed]:
-        del _serper_clients_by_loop[k]
-    client = _serper_clients_by_loop.get(loop_id)
-    if client is None or client.is_closed:
-        client = httpx.AsyncClient(timeout=15)
-        _serper_clients_by_loop[loop_id] = client
-    return client
+    return _loop_client(_serper_clients_by_loop, lambda: httpx.AsyncClient(timeout=15))
 
 
 # ---------------------------------------------------------------------------
@@ -415,7 +576,11 @@ def _get_serper_client() -> httpx.AsyncClient:
 async def _fetch_page(url: str) -> str:
     """Fetch a URL and return stripped text content, with caching and fallback."""
     try:
-        _validate_url(url)
+        await _validate_url_async(url)
+    except UnresolvableHostError:
+        # Fail closed for our own fetches (every direct hop re-validates), but
+        # still let the remote text proxy try: it resolves on its own network.
+        pass
     except ValueError as exc:
         logger.warning("Blocked fetch of disallowed URL %s: %s", url, exc)
         return f"[Blocked: {exc}]"
@@ -462,7 +627,7 @@ async def _fetch_page(url: str) -> str:
 
     for headers in header_profiles:
         try:
-            resp = await _get_validated(client, url, headers=headers or None)
+            resp = await _get_validated(client, url, headers=headers or None, max_bytes=MAX_PAGE_BYTES)
             resp.raise_for_status()
             content_type = resp.headers.get("content-type", "")
             if "html" in content_type or "text" in content_type:
@@ -480,7 +645,9 @@ async def _fetch_page(url: str) -> str:
             if len(text.strip()) < _PAGE_PROXY_RETRY_CHARS:
                 try:
                     proxy_url = text_proxy_url(url)
-                    proxy_resp = await _get_validated(client, proxy_url, headers=text_proxy_headers())
+                    proxy_resp = await _get_validated(
+                        client, proxy_url, headers=text_proxy_headers(), max_bytes=MAX_PAGE_BYTES
+                    )
                     proxy_resp.raise_for_status()
                     proxy_text = proxy_resp.text.strip()
                     record_proxy_result(ok=not _is_unusable_page_text(proxy_text))
@@ -507,7 +674,7 @@ async def _fetch_page(url: str) -> str:
     # Fallback: jina text proxy often succeeds when direct fetches hit bot checks.
     proxy_url = text_proxy_url(url)
     try:
-        proxy_resp = await _get_validated(client, proxy_url, headers=text_proxy_headers())
+        proxy_resp = await _get_validated(client, proxy_url, headers=text_proxy_headers(), max_bytes=MAX_PAGE_BYTES)
         proxy_resp.raise_for_status()
         proxy_text = proxy_resp.text.strip()
         record_proxy_result(ok=not _is_unusable_page_text(proxy_text))
@@ -658,7 +825,7 @@ async def _try_sitemap_policy_fallback(url: str, client: httpx.AsyncClient, fail
     discovered_pages.append(homepage_url)
     for sitemap_url in sitemap_urls:
         try:
-            resp = await _get_validated(client, sitemap_url, headers=headers)
+            resp = await _get_validated(client, sitemap_url, headers=headers, max_bytes=MAX_PAGE_BYTES)
             resp.raise_for_status()
             discovered = _extract_sitemap_urls(resp.text, parsed.netloc)
             for page_url in discovered:
@@ -670,7 +837,7 @@ async def _try_sitemap_policy_fallback(url: str, client: httpx.AsyncClient, fail
     # If sitemap parsing yielded no links, crawl the homepage directly for links
     if len(discovered_pages) == 1:
         try:
-            resp = await _get_validated(client, homepage_url, headers=headers)
+            resp = await _get_validated(client, homepage_url, headers=headers, max_bytes=MAX_PAGE_BYTES)
             resp.raise_for_status()
             homepage_links = _extract_links_from_html(resp.text, homepage_url)
             for page_url in homepage_links:
@@ -700,7 +867,7 @@ async def _try_sitemap_policy_fallback(url: str, client: httpx.AsyncClient, fail
 
     for candidate_url in candidates:
         try:
-            resp = await _get_validated(client, candidate_url, headers=headers)
+            resp = await _get_validated(client, candidate_url, headers=headers, max_bytes=MAX_PAGE_BYTES)
             resp.raise_for_status()
             content_type = resp.headers.get("content-type", "")
             if "html" in content_type or "text" in content_type:
@@ -1242,7 +1409,9 @@ async def get_homepage_policy_links(homepage_url: str) -> List[str]:
     Used to discover real platform/issue paths instead of blindly guessing them.
     """
     try:
-        _validate_url(homepage_url)
+        await _validate_url_async(homepage_url)
+    except UnresolvableHostError:
+        pass  # direct hops re-validate and fail closed; the remote proxy may still recover
     except ValueError as exc:
         logger.warning("Blocked homepage links fetch of disallowed URL %s: %s", homepage_url, exc)
         return []
@@ -1256,14 +1425,14 @@ async def get_homepage_policy_links(homepage_url: str) -> List[str]:
     html_content = ""
     try:
         # Try direct fetch first
-        resp = await _get_validated(client, homepage_url, headers=headers)
+        resp = await _get_validated(client, homepage_url, headers=headers, max_bytes=MAX_PAGE_BYTES)
         resp.raise_for_status()
         html_content = resp.text
     except Exception:
         # Fallback to Jina Reader proxy
         proxy_url = text_proxy_url(homepage_url)
         try:
-            proxy_resp = await _get_validated(client, proxy_url, headers=text_proxy_headers())
+            proxy_resp = await _get_validated(client, proxy_url, headers=text_proxy_headers(), max_bytes=MAX_PAGE_BYTES)
             proxy_resp.raise_for_status()
             # If jina returns markdown, extract links using markdown regex [text](url)
             markdown = proxy_resp.text or ""

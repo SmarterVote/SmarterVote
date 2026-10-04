@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup
 from .ballotpedia import lookup_election_page as _ballotpedia_election_lookup
 from .ballotpedia import state_name_for_race
-from .context import AgentContext, AgentContextBudget
+from .context import UNTRUSTED_CONTENT_NOTICE, AgentContext, AgentContextBudget
 from .cost import (
     accumulate,
     record_context_metrics,
@@ -148,6 +148,17 @@ def _get_openrouter_client() -> Any:
     return _openrouter_client
 
 
+def _model_supports_temperature(model: str) -> bool:
+    """Whether the model accepts a ``temperature`` parameter.
+
+    OpenAI reasoning models (o1/o3/o4) and nano models reject it. Model IDs are
+    normalized to OpenRouter slugs (``openai/o3-mini``), so the provider prefix is
+    stripped before matching — matching the raw slug never fired.
+    """
+    bare = str(model or "").rsplit("/", 1)[-1].lower()
+    return not (bare.startswith(("o1", "o3", "o4")) or "nano" in bare)
+
+
 def _openrouter_request_timeout_seconds() -> float:
     raw = os.getenv("OPENROUTER_REQUEST_TIMEOUT_SECONDS", "").strip()
     if not raw:
@@ -272,10 +283,13 @@ async def _call_openrouter(
     """
     from openai import APIConnectionError, APIStatusError, APITimeoutError, BadRequestError, RateLimitError
 
+    from .cost import enforce_total_token_hard_limit
+
+    enforce_total_token_hard_limit()
     client = _get_openrouter_client()
     model = normalize_model_id(model) or model
 
-    _supports_temperature = not (model.startswith("o1") or model.startswith("o3") or model.startswith("o4") or "nano" in model)
+    _supports_temperature = _model_supports_temperature(model)
     kwargs: Dict[str, Any] = {
         "model": model,
         "messages": messages,
@@ -586,7 +600,7 @@ async def _agent_loop(
     set_current_phase(phase_name)
 
     messages: List[Dict[str, Any]] = [
-        {"role": "system", "content": system},
+        {"role": "system", "content": f"{system}\n\n{UNTRUSTED_CONTENT_NOTICE}"},
         {"role": "user", "content": user},
     ]
     context_budget = AgentContextBudget.for_model(

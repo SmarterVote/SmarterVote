@@ -374,6 +374,51 @@ def _iso_timestamp_or_now(*candidates: Any) -> str:
     return iso_timestamp_or_now(*candidates)
 
 
+def _citation_key(url: Any) -> str:
+    return str(url or "").strip().rstrip("/").casefold()
+
+
+_URL_IN_TEXT_RE = re.compile(r"https?://[^\s\"'<>]+")
+
+
+def _flag_unobserved_citations(
+    args: Dict[str, Any],
+    candidate: Dict[str, Any],
+    candidate_name: str,
+    issue: str,
+    new_sources: list,
+) -> None:
+    """Warn (never block) when a stance cites a URL this research loop never observed.
+
+    A URL that was neither fetched nor returned by a search in this phase, and is
+    not already part of the candidate's record, was either invented by the model
+    or planted by injected page text. Blocking could break legitimate runs, so it
+    is logged and surfaced in the run audit's publish-attention notes instead.
+    """
+    trace = args.get("_research_trace")
+    if not isinstance(trace, dict) or not new_sources:
+        return
+    observed = {_citation_key(url) for url in (trace.get("researched_urls") or []) + (trace.get("fetched_urls") or [])}
+    try:
+        known = {_citation_key(url) for url in _URL_IN_TEXT_RE.findall(json.dumps(candidate, default=str))}
+    except (TypeError, ValueError):
+        known = set()
+    unobserved = [
+        str(source.get("url"))
+        for source in new_sources
+        if isinstance(source, dict) and source.get("url") and _citation_key(source.get("url")) not in observed | known
+    ]
+    if not unobserved:
+        return
+    from pipeline_client.agent.cost import record_unobserved_citation
+
+    logger.warning(
+        "set_issue_stance(%r, %r) cites URL(s) not observed in this run: %s", candidate_name, issue, ", ".join(unobserved)
+    )
+    for url in unobserved:
+        record_unobserved_citation(f"{candidate_name} / {issue}: {url}")
+
+
 def _normalize_source(source: Any, *, default_type: str = "finance") -> Dict[str, Any] | None:
     """Normalize a lightweight tool-provided source into the shared Source shape."""
     if not isinstance(source, dict) or not source.get("url"):
@@ -1567,6 +1612,7 @@ def _make_editing_handlers(
         new_sources = [
             src for src in (_normalize_source(source, default_type="website") for source in args.get("sources") or []) if src
         ]
+        _flag_unobserved_citations(args, c, name, issue, new_sources)
         merged_sources = merge_source_lists(new_sources, existing_sources)
         is_documented_absence = "no public position found" in stance_text.casefold()
         if not merged_sources and not is_documented_absence:

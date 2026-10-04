@@ -13,6 +13,20 @@ from pipeline_client.agent import images
 from pipeline_client.agent.image_vision import PhotoVerdict, inspect_candidate_photo, verdict_from_observations
 
 
+@pytest.fixture(autouse=True)
+def hermetic_dns(monkeypatch):
+    """Resolve test hostnames to a public address so the SSRF guard never needs real DNS."""
+    import socket
+
+    from pipeline_client.agent import web_tools
+
+    monkeypatch.setattr(
+        web_tools,
+        "_getaddrinfo",
+        lambda hostname: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))],
+    )
+
+
 def _seen(**overrides):
     """Observations for an ordinary usable portrait, before overrides."""
     base = {

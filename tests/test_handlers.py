@@ -370,6 +370,46 @@ async def test_v2_handler_stops_when_queue_item_cancelled():
 
 
 @pytest.mark.asyncio
+async def test_v2_handler_throttles_firestore_cancellation_reads():
+    """Progress ticks must not each do a blocking Firestore GET on the event loop."""
+    handler = AgentHandler()
+
+    async def _fake_run_agent(*_args, **kwargs):
+        tracker = kwargs["step_tracker"]
+        tracker["start"]("polling")
+        for pct in range(0, 100, 5):
+            tracker["progress"]("polling", pct=pct)
+        return {"id": "test-race", "candidates": [{"name": "Alice", "issues": {}}]}
+
+    queue_doc = MagicMock()
+    queue_doc.exists = True
+    queue_doc.to_dict.return_value = {"status": "running"}
+    queue_ref = MagicMock()
+    queue_ref.get.return_value = queue_doc
+    queue_coll = MagicMock()
+    queue_coll.document.return_value = queue_ref
+    mock_db = MagicMock()
+    mock_db.collection.return_value = queue_coll
+
+    with (
+        patch("pipeline_client.agent.agent.run_agent", new_callable=AsyncMock, side_effect=_fake_run_agent),
+        patch("pipeline_client.backend.firestore_logger.FirestoreLogger", MagicMock()),
+        patch("pipeline_client.backend.firestore_logger._get_db", return_value=mock_db),
+        patch.dict(sys.modules, {"pipeline_client.backend.pipeline_runner": None}),
+        patch.object(handler, "_load_existing_from_gcs", new_callable=AsyncMock, return_value=None),
+        patch.object(handler, "_save_draft", new_callable=AsyncMock, return_value=Path("/tmp/test-race.json")),
+        patch("pipeline_client.backend.pipeline_metrics.get_pipeline_metrics_store") as metrics_store,
+    ):
+        metrics_store.return_value.record_run = AsyncMock()
+        await handler.handle(
+            {"race_id": "test-race"},
+            {"cheap_mode": True, "run_id": "run-throttle", "queue_item_id": "item-throttle"},
+        )
+
+    assert queue_ref.get.call_count <= 2, "cancellation reads must be throttled, not one per progress tick"
+
+
+@pytest.mark.asyncio
 async def test_save_draft_rejects_placeholder_only_candidates():
     """A one-candidate Unknown draft should not overwrite usable race data."""
     handler = AgentHandler()

@@ -330,3 +330,23 @@ def test_apply_finance_patch_logs_info_when_candidates_updated():
     log = _log()
     _apply_finance_patch({"candidates": [{"name": "Jane Doe"}]}, {"Jane Doe": {"donor_summary": "x"}}, log)
     assert log.call_args.args[0] == "info"
+
+
+def test_finance_patch_matches_names_case_insensitively_and_rejects_non_strings():
+    from pipeline_client.agent.patches import _apply_finance_patch
+
+    race = {"candidates": [{"name": "Jane Doe"}, {"name": "John Roe"}]}
+    _apply_finance_patch(
+        race,
+        {
+            "JANE DOE": {"donor_summary": "  Raised $1.2M, mostly small donors.  ", "voting_summary": {"bad": 1}},
+            "john roe": {"donor_summary": "DRAFT", "voting_summary": "   ", "donor_source_url": 42},
+        },
+        lambda *_a, **_kw: None,
+    )
+
+    jane, john = race["candidates"]
+    assert jane["donor_summary"] == "Raised $1.2M, mostly small donors."
+    assert "voting_summary" not in jane
+    assert "donor_summary" not in john and "voting_summary" not in john
+    assert "donor_source_url" not in john

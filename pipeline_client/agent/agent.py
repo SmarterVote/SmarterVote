@@ -56,6 +56,7 @@ from .review import (
     build_semantic_review_packet,
     compute_validation_grade,
     invalidate_stale_reviews,
+    review_quorum,
     run_reviews,
     stamp_roster_fingerprint,
 )
@@ -191,10 +192,14 @@ _VALID_CANDIDATE_LINK_TYPES = {
 # ---------------------------------------------------------------------------
 
 
-def _load_existing(race_id: str) -> Optional[Dict[str, Any]]:
-    """Load an existing RaceJSON if it exists (drafts first, then published)."""
+def _load_existing(race_id: str, *, baseline_source: str = "latest") -> Optional[Dict[str, Any]]:
+    """Load an existing local RaceJSON if it exists (drafts first, then published).
+
+    ``baseline_source="published"`` ignores drafts, matching the GCS loader.
+    """
     base = Path(__file__).resolve().parents[2] / "data"
-    for subdir in ("drafts", "published"):
+    subdirs = ("published",) if baseline_source == "published" else ("drafts", "published")
+    for subdir in subdirs:
         path = base / subdir / f"{race_id}.json"
         if path.exists():
             with path.open("r", encoding="utf-8") as f:
@@ -689,6 +694,14 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
         publish_attention.append("No candidates are present.")
     if candidates_missing_sources:
         publish_attention.append("Some candidates lack explicit roster source evidence.")
+    from .cost import unobserved_citations
+
+    unobserved = unobserved_citations()
+    if unobserved:
+        publish_attention.append(
+            f"{len(unobserved)} issue stance citation(s) were never fetched or seen in search results this run "
+            "(possible fabricated or injected URL): " + "; ".join(unobserved[:5])
+        )
 
     return {
         "contest_stage": contest_stage,
@@ -760,13 +773,15 @@ async def run_agent(
     on_log : callable, optional
         ``(level, message) -> None`` callback for streaming logs.
     cheap_mode : bool
-        When *True*, use cheaper/faster model variants (``gpt-5.4-mini``).
+        When *True*, use the ``default`` profile's models instead of ``premium``
+        (see ``shared/model_catalog.py``).
     max_iterations : int
         Safety limit on each phase's tool-call loop.
     existing_data : dict, optional
         An existing RaceJSON to update/improve. When *None* (default),
-        the agent checks ``data/published/{race_id}.json`` for a previously
-        published profile and enters update mode if found.
+        the agent checks local ``data/drafts/`` then ``data/published/`` for a
+        previous profile and enters update mode if found. Queued runs resolve the
+        baseline in ``AgentHandler`` (GCS when a bucket is configured) instead.
         Pass an empty dict to force a fresh research run.
     research_model : str, optional
         Override the OpenRouter model for research phases.
@@ -861,6 +876,7 @@ async def run_agent(
         "page_fetches": int(prior_agent_metrics.get("page_fetches", 0) or 0),
         "fetched_chars": int(prior_agent_metrics.get("fetched_chars", 0) or 0),
         "page_budget_blocked": int(prior_agent_metrics.get("page_budget_blocked", 0) or 0),
+        "unit_budget": copy.deepcopy(prior_agent_metrics.get("unit_budget") or {}),
     }
     _ctx_token = _cost_ctx.set(_acc)
 
@@ -1006,14 +1022,17 @@ async def run_agent(
         )
         # The stored grade counted those flags, so it is stale for the same reason.
         race_json["validation_grade"] = (
-            compute_validation_grade(race_json.get("reviews", []), race_json) if race_json.get("reviews") else None
+            compute_validation_grade(race_json.get("reviews", []), race_json, min_reviews=1)
+            if race_json.get("reviews")
+            else None
         )
 
+    reviews_ran_this_run = False
     review_required_steps_ran = bool(_enabled & {"issues", "refinement", "iteration"})
     maintenance_steps_ran = bool(_enabled & {"polling", "forecast", "voter_resources"})
     validation_grade = race_json.get("validation_grade")
     if not isinstance(validation_grade, dict) and race_json.get("reviews"):
-        validation_grade = compute_validation_grade(race_json.get("reviews", []), race_json)
+        validation_grade = compute_validation_grade(race_json.get("reviews", []), race_json, min_reviews=1)
     has_passing_validation = (
         isinstance(validation_grade, dict) and validation_grade.get("passed") is True and bool(race_json.get("reviews"))
     )
@@ -1071,6 +1090,7 @@ async def run_agent(
                 goal=goal,
             )
             race_json["reviews"] = reviews
+            reviews_ran_this_run = True
             stamp_roster_fingerprint(reviews, race_json)
             # Log review results to live logs
             for rev in reviews:
@@ -1175,6 +1195,7 @@ async def run_agent(
                     )
                     reviewed_packet = updated_packet
                     race_json["reviews"] = reviews
+                    reviews_ran_this_run = True
                     stamp_roster_fingerprint(reviews, race_json)
 
                     # A flag on the same field before and after remediation means
@@ -1238,7 +1259,15 @@ async def run_agent(
     validate_forecast_evidence(race_json)
 
     # Compute aggregate validation grade from review scores
-    grade = compute_validation_grade(race_json.get("reviews", []), race_json) if race_json.get("reviews") else None
+    # The reviewer quorum applies to reviews this run produced. Reviews carried
+    # forward from an earlier run keep the grading rules they were judged under,
+    # so a maintenance refresh never flips a published race's pass state.
+    grade_quorum = review_quorum(enabled_review_providers) if reviews_ran_this_run else 1
+    grade = (
+        compute_validation_grade(race_json.get("reviews", []), race_json, min_reviews=grade_quorum)
+        if race_json.get("reviews")
+        else None
+    )
     race_json["validation_grade"] = grade
     race_json["run_audit"] = _build_run_audit(baseline_existing_data, race_json)
 

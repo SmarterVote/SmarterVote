@@ -242,8 +242,15 @@ def get_step_failures(race_json: Dict[str, Any]) -> List[StepFailure]:
 # ---------------------------------------------------------------------------
 
 
+def is_substantive_text(value: Any) -> bool:
+    """True for a non-blank string that is not a literal placeholder like ``"DRAFT"``."""
+    return isinstance(value, str) and bool(value.strip()) and not is_placeholder_junk_stance(value)
+
+
 def _has_finance_data(candidate: Dict[str, Any]) -> bool:
-    return bool(candidate.get("donor_summary") or candidate.get("voting_summary"))
+    # Any truthy value used to count: a stray dict, a list, whitespace or the
+    # word "DRAFT" all read as "finance populated" and hid the silent failure.
+    return is_substantive_text(candidate.get("donor_summary")) or is_substantive_text(candidate.get("voting_summary"))
 
 
 def find_finance_gaps(race_json: Dict[str, Any], candidate_names: Optional[Iterable[str]] = None) -> Dict[str, Any]:
@@ -267,16 +274,17 @@ def find_finance_gaps(race_json: Dict[str, Any], candidate_names: Optional[Itera
     candidates = race_json.get("candidates")
     if not isinstance(candidates, list) or not candidates:
         return gaps
-    roster = {str(c.get("name") or "").strip(): c for c in candidates if isinstance(c, dict)}
+    roster = {str(c.get("name") or "").strip().casefold(): c for c in candidates if isinstance(c, dict)}
     roster.pop("", None)
     if candidate_names is None:
-        targets = list(roster)
+        targets = [str(c.get("name") or "").strip() for c in candidates if isinstance(c, dict)]
+        targets = [name for name in targets if name]
     else:
         targets = [str(name or "").strip() for name in candidate_names]
         targets = [name for name in targets if name]
     gaps["targeted"] = len(targets)
     for name in targets:
-        candidate = roster.get(name)
+        candidate = roster.get(name.casefold())
         if candidate is None:
             gaps["unmatched"].append(name)
         elif not _has_finance_data(candidate):
@@ -317,7 +325,7 @@ _TIMEOUT_CODES = {"provider_unavailable", "connection_failed", "timeout", "reque
 #: A rename on the pipeline side would otherwise be invisible here: the match
 #: simply stops hitting and the run is filed as UNKNOWN_ERROR, which is exactly
 #: the verdict the taxonomy exists to avoid.
-BUDGET_EXCEPTION_NAMES = frozenset({"RunBudgetExceeded"})
+BUDGET_EXCEPTION_NAMES = frozenset({"RunBudgetExceeded", "TokenBudgetExceeded"})
 CANCELLED_EXCEPTION_NAMES = frozenset({"AgentCancelled"})
 
 
@@ -411,6 +419,14 @@ def compute_run_health_verdict(
     return RunHealthVerdict(status=status, reasons=reasons, step_failures=step_failures, summary=summary or None)
 
 
+def _same_commit(a: str, b: str) -> bool:
+    """Compare commit SHAs, allowing one side to be an abbreviated (>=7 char) prefix."""
+    a, b = a.strip().lower(), b.strip().lower()
+    if len(a) < 7 or len(b) < 7:
+        return a == b
+    return a.startswith(b) or b.startswith(a)
+
+
 def check_worker_version_staleness(
     runner: str = "local",
     worker_commit: Optional[str] = None,
@@ -449,10 +465,24 @@ def check_worker_version_staleness(
             ),
         }
 
-    if w_commit and r_commit and w_commit != r_commit:
+    if not r_commit:
+        # The container has no .git (or git binary), so HEAD is unknowable here.
+        # Unknown is not "current": report it so callers can surface it.
+        return {
+            "is_stale": None,
+            "runner": "local",
+            "worker_commit": w_commit[:7],
+            "repo_commit": None,
+            "warning": (
+                f"Worker runner='local' is built from commit {w_commit[:7]}, but the latest repo commit could "
+                "not be determined, so staleness is unknown."
+            ),
+        }
+
+    if not _same_commit(w_commit, r_commit):
         warning_msg = (
             f"Worker runner='local' is running git commit {w_commit[:7]}, "
-            f"which differs from local repo HEAD {r_commit[:7]}. "
+            f"which differs from the latest repo commit {r_commit[:7]}. "
             "Please run 'docker compose -f docker-compose.worker.yml up -d --build'."
         )
         return {

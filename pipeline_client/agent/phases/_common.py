@@ -36,8 +36,9 @@ class PipelineWorkRemaining(RuntimeError):
     """Signal that durable work units remain and a continuation is required."""
 
 
-def _is_control_flow_exception(exc: Exception) -> bool:
-    return exc.__class__.__name__ in _CONTROL_FLOW_EXCEPTION_NAMES
+def _is_control_flow_exception(exc: BaseException) -> bool:
+    # Match subclasses too (e.g. TokenBudgetExceeded is a RunBudgetExceeded).
+    return any(cls.__name__ in _CONTROL_FLOW_EXCEPTION_NAMES for cls in type(exc).__mro__)
 
 
 async def _await_with_run_budget(

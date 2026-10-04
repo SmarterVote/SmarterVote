@@ -15,6 +15,20 @@ from pipeline_client.agent.agent import (
 )
 from pipeline_client.agent.web_tools import SearchProviderUnavailable
 
+
+@pytest.fixture(autouse=True)
+def hermetic_dns(monkeypatch):
+    """Resolve every test hostname to a public address so SSRF checks never touch real DNS."""
+    import socket
+
+    from pipeline_client.agent import web_tools
+
+    def fake_getaddrinfo(hostname):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
+
+    monkeypatch.setattr(web_tools, "_getaddrinfo", fake_getaddrinfo)
+
+
 # ---------------------------------------------------------------------------
 # Serper search tests
 # ---------------------------------------------------------------------------
@@ -966,3 +980,146 @@ async def test_searlo_auth_failure_is_not_retried():
 
     assert results[0]["title"] == "Backup"
     assert mock_client.get.await_count == 1, "403 is terminal; no backoff"
+
+
+# ---------------------------------------------------------------------------
+# SSRF guard
+# ---------------------------------------------------------------------------
+
+
+def _resolve_to(monkeypatch, *addresses):
+    import socket
+
+    from pipeline_client.agent import web_tools
+
+    def fake_getaddrinfo(hostname):
+        return [
+            (socket.AF_INET6 if ":" in addr else socket.AF_INET, socket.SOCK_STREAM, 6, "", (addr, 0)) for addr in addresses
+        ]
+
+    monkeypatch.setattr(web_tools, "_getaddrinfo", fake_getaddrinfo)
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "127.0.0.1",
+        "10.1.2.3",
+        "169.254.169.254",
+        "0.0.0.0",
+        "100.64.0.1",
+        "::1",
+        "fe80::1",
+        "fd00::1",
+        "::ffff:127.0.0.1",
+        "::ffff:169.254.169.254",
+    ],
+)
+def test_validate_url_blocks_non_public_addresses(monkeypatch, address):
+    from pipeline_client.agent.web_tools import UnsafeURLError, _validate_url
+
+    _resolve_to(monkeypatch, address)
+    with pytest.raises(UnsafeURLError):
+        _validate_url("https://attacker.example/path")
+
+
+def test_validate_url_blocks_when_any_resolved_address_is_private(monkeypatch):
+    from pipeline_client.agent.web_tools import UnsafeURLError, _validate_url
+
+    _resolve_to(monkeypatch, "93.184.216.34", "10.0.0.5")
+    with pytest.raises(UnsafeURLError):
+        _validate_url("https://rebinding.example/")
+
+
+def test_validate_url_blocks_literal_private_ips_without_dns():
+    from pipeline_client.agent.web_tools import UnsafeURLError, _validate_url
+
+    for url in ("http://127.0.0.1/", "http://[::1]/", "http://169.254.169.254/latest/meta-data"):
+        with pytest.raises(UnsafeURLError):
+            _validate_url(url)
+
+
+def test_validate_url_fails_closed_on_dns_error(monkeypatch):
+    import socket
+
+    from pipeline_client.agent import web_tools
+
+    def broken(hostname):
+        raise socket.gaierror(-2, "Name or service not known")
+
+    monkeypatch.setattr(web_tools, "_getaddrinfo", broken)
+    with pytest.raises(web_tools.UnresolvableHostError, match="Name or service not known"):
+        web_tools._validate_url("https://nowhere.example/")
+
+
+def test_validate_url_allows_public_addresses(monkeypatch):
+    from pipeline_client.agent.web_tools import _validate_url
+
+    _resolve_to(monkeypatch, "93.184.216.34", "2606:2800:220:1:248:1893:25c8:1946")
+    _validate_url("https://www.example.com/")
+
+
+@pytest.mark.asyncio
+async def test_get_validated_rejects_redirect_to_metadata_server(monkeypatch):
+    from pipeline_client.agent.web_tools import UnsafeURLError, _get_validated
+
+    def handler(request):
+        return httpx.Response(302, headers={"location": "http://169.254.169.254/computeMetadata/v1/"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(UnsafeURLError):
+            await _get_validated(client, "https://www.example.com/redirect")
+
+
+@pytest.mark.asyncio
+async def test_get_validated_caps_body_size():
+    from pipeline_client.agent.web_tools import ResponseTooLarge, _get_validated
+
+    def handler(request):
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=b"x" * 10_000)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        resp = await _get_validated(client, "https://www.example.com/big", max_bytes=1_000)
+        assert len(resp.content) == 1_000
+        assert resp.text == "x" * 1_000
+        with pytest.raises(ResponseTooLarge):
+            await _get_validated(client, "https://www.example.com/big", max_bytes=1_000, truncate=False)
+
+
+@pytest.mark.asyncio
+async def test_ssrf_request_hook_validates_each_request(monkeypatch):
+    from pipeline_client.agent.web_tools import UnsafeURLError, ssrf_request_hook
+
+    def handler(request):
+        if request.url.host == "www.example.com":
+            return httpx.Response(301, headers={"location": "http://127.0.0.1/admin"})
+        return httpx.Response(200)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), follow_redirects=True, event_hooks={"request": [ssrf_request_hook]}
+    ) as client:
+        with pytest.raises(UnsafeURLError):
+            await client.get("https://www.example.com/")
+
+
+def test_per_loop_clients_are_pruned_when_their_loop_closes():
+    import asyncio
+
+    from pipeline_client.agent import web_tools
+
+    async def grab():
+        return web_tools._get_fetch_client()
+
+    first_loop = asyncio.new_event_loop()
+    first = first_loop.run_until_complete(grab())
+    first_loop.close()
+
+    second_loop = asyncio.new_event_loop()
+    try:
+        second = second_loop.run_until_complete(grab())
+        assert second is not first
+        assert first_loop not in web_tools._fetch_clients_by_loop
+        assert web_tools._fetch_clients_by_loop.get(second_loop) is second
+    finally:
+        second_loop.run_until_complete(second.aclose())
+        second_loop.close()

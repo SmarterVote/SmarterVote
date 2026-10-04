@@ -481,3 +481,26 @@ async def test_finance_phase_records_partial_gap(monkeypatch):
     assert "Bob" in (failures[0].detail or "")
     assert "Alice" not in (failures[0].detail or "")
     assert any(level == "warning" and "left gaps" in msg for level, msg in logs)
+
+
+def test_finance_placeholders_and_non_strings_do_not_count_as_data():
+    from shared.run_health import find_finance_gaps
+
+    race = {
+        "candidates": [
+            {"name": "A", "donor_summary": "DRAFT"},
+            {"name": "B", "voting_summary": "   "},
+            {"name": "C", "donor_summary": {"total": 1}},
+            {"name": "D", "voting_summary": "Voted for the 2025 budget."},
+        ]
+    }
+    gaps = find_finance_gaps(race)
+    assert gaps["missing"] == ["A", "B", "C"]
+
+
+def test_finance_gap_target_names_match_case_insensitively():
+    from shared.run_health import find_finance_gaps
+
+    race = {"candidates": [{"name": "Jane Doe", "donor_summary": "Raised $5k."}]}
+    gaps = find_finance_gaps(race, ["JANE DOE"])
+    assert gaps["unmatched"] == [] and gaps["missing"] == []

@@ -42,6 +42,7 @@ from typing import Any, Optional
 import httpx
 
 from .cost import accumulate
+from .web_tools import ResponseTooLarge, _get_validated
 
 logger = logging.getLogger("pipeline")
 
@@ -192,7 +193,12 @@ _FETCH_HEADERS = {"User-Agent": os.getenv("IMAGE_FETCH_USER_AGENT", "SmarterVote
 
 
 async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[tuple[str, bytes]]:
-    resp = await client.get(url, follow_redirects=True, timeout=30, headers=_FETCH_HEADERS)
+    # Every redirect hop is SSRF-validated, and the body is streamed with a hard
+    # cap instead of being downloaded whole before the size check.
+    try:
+        resp = await _get_validated(client, url, headers=_FETCH_HEADERS, max_bytes=MAX_IMAGE_BYTES, truncate=False, timeout=30)
+    except ResponseTooLarge:
+        return None
     resp.raise_for_status()
     payload = resp.content
     if not payload or len(payload) > MAX_IMAGE_BYTES:

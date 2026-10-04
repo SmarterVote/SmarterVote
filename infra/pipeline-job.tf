@@ -75,6 +75,11 @@ resource "google_cloud_run_v2_job" "pipeline" {
           value = "cloud_run"
         }
         env {
+          # Keeps the worker's hard deadline inside the job timeout above.
+          name  = "WORKER_TASK_TIMEOUT_SECONDS"
+          value = "43200"
+        }
+        env {
           name  = "WORKER_CONCURRENCY"
           value = "1"
         }

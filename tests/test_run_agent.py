@@ -1401,7 +1401,10 @@ async def test_run_agent_iteration_continuation_preserves_reviews_and_computes_g
             }
         ],
     }
-    final_reviews = [{"model": "claude", "verdict": "approved", "score": 95, "flags": []}]
+    final_reviews = [
+        {"model": "claude", "verdict": "approved", "score": 95, "flags": []},
+        {"model": "gemini", "verdict": "approved", "score": 95, "flags": []},
+    ]
 
     with (
         patch(
@@ -1424,8 +1427,8 @@ async def test_run_agent_iteration_continuation_preserves_reviews_and_computes_g
         "grade": "A",
         "score": 95,
         "passed": True,
-        "summary": "Validated by 1/1 reviewers with an average score of 95/100.",
-        "current_review_count": 1,
+        "summary": "Validated by 2/2 reviewers with an average score of 95/100.",
+        "current_review_count": 2,
         "stale_review_count": 0,
     }
     assert result["pipeline_state"]["complete"] is True

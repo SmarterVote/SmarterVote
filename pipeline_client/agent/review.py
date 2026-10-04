@@ -41,6 +41,31 @@ _REVIEW_ROLES = {
 }
 
 
+# A grade must rest on more than one model's opinion. The default and premium
+# profiles both seat three reviewers; a run that explicitly configures fewer
+# reviewers uses that count instead (see ``review_quorum``).
+REVIEW_QUORUM = 2
+
+
+def review_quorum(review_providers: Optional[List[str]]) -> int:
+    """Minimum usable current reviews for a passing grade, given the configured seats."""
+    configured = len(review_providers) if review_providers is not None else len(_REVIEW_ROLES)
+    return max(1, min(REVIEW_QUORUM, configured))
+
+
+def _clamp_score(value: Any) -> Optional[int]:
+    """Return a reviewer score clamped to 0-100, or None when it is not a real number.
+
+    ``bool`` is an ``int`` subclass, so a reviewer answering ``"score": true``
+    used to count as a score of 1 (and ``false`` as 0).
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value != value or value in (float("inf"), float("-inf")):
+        return None
+    return int(max(0, min(100, round(value))))
+
+
 def _review_model_for(provider: str, *, cheap_mode: bool) -> str:
     """Return the profile-default model for a review seat."""
     return PROFILE_DEFAULTS["default" if cheap_mode else "premium"][_REVIEW_ROLES[provider]]
@@ -270,6 +295,7 @@ async def _run_single_review(
     race_identity_context_text: str = "",
     research_effort_context_text: str = "",
     correction_goal: str = "No correction goal was supplied.",
+    failure_sink: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Run a single review agent role (claude, gemini, or grok)."""
     log = make_logger(on_log)
@@ -314,25 +340,68 @@ async def _run_single_review(
             review_data = _extract_json(raw)
         except (json.JSONDecodeError, ValueError):
             log("warning", f"  {provider} review returned malformed JSON - skipping")
+            _note_review_failure(failure_sink, provider, None, "malformed JSON")
             return None
 
         if not isinstance(review_data, dict):
             log("warning", f"  {provider} review returned unexpected type {type(review_data).__name__} - skipping")
+            _note_review_failure(failure_sink, provider, None, f"unexpected type {type(review_data).__name__}")
             return None
+
+        score = _clamp_score(review_data.get("score"))
+        if score is None:
+            log("warning", f"  {provider} review returned no usable score ({review_data.get('score')!r})")
+            _note_review_failure(failure_sink, provider, None, "no usable score")
 
         return {
             "model": model_name,
             "reviewed_at": datetime.now(timezone.utc).isoformat(),
             "verdict": review_data.get("verdict", "flagged"),
-            "score": review_data.get("score"),
+            "score": score,
             "flags": review_data.get("flags", []),
             "summary": review_data.get("summary", ""),
         }
     except RunBudgetExceeded:
         raise
     except Exception as exc:
+        if _is_review_control_flow(exc):
+            raise
         log("warning", f"  {provider} review failed: {exc}")
+        _note_review_failure(failure_sink, provider, exc, str(exc))
         return None
+
+
+def _is_review_control_flow(exc: BaseException) -> bool:
+    return exc.__class__.__name__ in {"AgentCancelled", "HandoffFailed", "HandoffTriggered", "PipelineWorkRemaining"}
+
+
+def _note_review_failure(
+    failure_sink: Optional[List[Dict[str, Any]]], provider: str, exc: Optional[BaseException], detail: str
+) -> None:
+    if failure_sink is not None:
+        failure_sink.append({"provider": provider, "exc": exc, "detail": (detail or "")[:200]})
+
+
+def _record_reviewer_failures(race_json: Dict[str, Any], failures: List[Dict[str, Any]]) -> None:
+    """Make a failed reviewer seat visible in run health instead of silently shrinking the panel."""
+    if not failures:
+        return
+    from shared.run_health import RunFailureReason, classify_exception, record_step_failure
+
+    for failure in failures:
+        exc = failure.get("exc")
+        reason = classify_exception(exc) if exc is not None else RunFailureReason.STEP_NO_DATA
+        if reason not in {
+            RunFailureReason.PROVIDER_AUTH_FAILURE,
+            RunFailureReason.PROVIDER_RATE_LIMIT,
+            RunFailureReason.PROVIDER_TIMEOUT,
+        }:
+            # A reviewer seat failing degrades the run; it does not by itself make
+            # the research wrong. The quorum in compute_validation_grade decides
+            # whether the remaining reviews may still pass the race.
+            reason = RunFailureReason.STEP_NO_DATA
+        detail = f"{failure.get('provider')} reviewer failed: {failure.get('detail') or 'no detail'}"
+        record_step_failure(race_json, "review", reason, detail)
 
 
 # Failures that will not resolve themselves on a retry, so the citation can be
@@ -1042,6 +1111,13 @@ async def run_reviews(
         log = make_logger(on_log)
         for provider in requested_providers:
             log("warning", f"  {provider} review failed: OPENROUTER_API_KEY is not set")
+        _record_reviewer_failures(
+            race_json,
+            [
+                {"provider": provider, "exc": None, "detail": "OPENROUTER_API_KEY is not set"}
+                for provider in requested_providers
+            ],
+        )
         return []
 
     packet = semantic_packet if semantic_packet is not None else build_semantic_review_packet(race_json)
@@ -1059,6 +1135,7 @@ async def run_reviews(
     identity_context = race_identity_context(race_json)
 
     tasks = []
+    reviewer_failures: List[Dict[str, Any]] = []
     for provider in requested_providers:
         effective_model = normalize_model_id(model_overrides.get(provider)) or _review_model_for(
             provider, cheap_mode=bool(cheap_mode)
@@ -1076,11 +1153,13 @@ async def run_reviews(
                 race_identity_context_text=identity_context,
                 research_effort_context_text=research_effort_context,
                 correction_goal=goal or "No correction goal was supplied.",
+                failure_sink=reviewer_failures,
             )
         )
 
     results = await asyncio.gather(*tasks)
     results_list = [r for r in results if r is not None]
+    _record_reviewer_failures(race_json, reviewer_failures)
 
     cache = review_cache if review_cache is not None else {}
     cached_deterministic = cache.get(packet_key)
@@ -1259,7 +1338,10 @@ def _has_any_issue_stance(race_json: Optional[Dict[str, Any]]) -> bool:
 
 
 def compute_validation_grade(
-    reviews: List[Dict[str, Any]], race_json: Optional[Dict[str, Any]] = None
+    reviews: List[Dict[str, Any]],
+    race_json: Optional[Dict[str, Any]] = None,
+    *,
+    min_reviews: int = REVIEW_QUORUM,
 ) -> Optional[Dict[str, Any]]:
     """Compute an aggregate validation grade from review scores.
 
@@ -1273,6 +1355,10 @@ def compute_validation_grade(
     unaffected, since an absent grade is already treated as ungraded rather than
     failed. A maintenance-only refresh of a race with no issue stances will
     replace a stale stored grade with this honest ungraded result.
+
+    ``min_reviews`` is the reviewer quorum: fewer usable model scores than this
+    can still produce a grade, but never a passing one. Without it, two of three
+    reviewers failing silently left one model's score speaking for the panel.
     """
     automated_models = {"automated-link-validator", "automated-profile-quality"}
     eligible_reviews = [r for r in reviews if r.get("model") not in automated_models]
@@ -1280,9 +1366,9 @@ def compute_validation_grade(
     # A review of a roster the race has since replaced only speaks for the race
     # when nothing current exists.
     scored_reviews = [r for r in eligible_reviews if not r.get("stale")] or eligible_reviews
-    scores = [r["score"] for r in scored_reviews if isinstance(r.get("score"), (int, float))]
+    scores = [score for score in (_clamp_score(r.get("score")) for r in scored_reviews) if score is not None]
     if not scores:
-        scores = [r["score"] for r in eligible_reviews if isinstance(r.get("score"), (int, float))]
+        scores = [score for score in (_clamp_score(r.get("score")) for r in eligible_reviews) if score is not None]
     if not scores:
         return None
 
@@ -1329,7 +1415,9 @@ def compute_validation_grade(
     else:
         grade = "F"
 
-    passed = avg >= PASSING_SCORE
+    quorum_met = len(scores) >= max(1, min_reviews)
+    score_passed = avg >= PASSING_SCORE
+    passed = score_passed and quorum_met
     # Stale reviews judged a roster the race has since replaced. They still
     # carry their score (nothing better exists until review re-runs), but the
     # summary and counts must not present them as a check of today's roster:
@@ -1347,15 +1435,20 @@ def compute_validation_grade(
             f"Below quality threshold - {approved_count}/{total} reviewers approved, but {len(error_flags)} "
             f"error-severity flag(s) block publication (scored {avg}/100)."
         )
-    elif passed and warning_flags:
+    elif score_passed and warning_flags:
         summary = f"Validated by {approved_count}/{total} reviewers at {avg}/100 {deduction}."
-    elif passed:
+    elif score_passed:
         summary = f"Validated by {approved_count}/{total} reviewers with an average score of {avg}/100."
     elif warning_flags:
         summary = f"Below quality threshold - {approved_count}/{total} reviewers approved, {avg}/100 {deduction}."
     else:
         summary = f"Below quality threshold - {approved_count}/{total} reviewers approved, average score {avg}/100."
 
+    if not quorum_met:
+        summary = (
+            f"Not validated: only {len(scores)} reviewer score(s) were usable, below the quorum of {min_reviews}. Scored: "
+            f"{summary}"
+        )
     if neutrality_warnings:
         summary = f"{summary} Held below A: {len(neutrality_warnings)} field(s) use loaded wording in the site's own voice."
     if eligible_reviews and not current_reviews:

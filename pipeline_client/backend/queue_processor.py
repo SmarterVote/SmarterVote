@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -37,15 +38,55 @@ logger = logging.getLogger("pipeline_worker")
 # is unconditional there) from raising HandoffTriggered when a research unit doesn't
 # complete in one pass — see the in-process continuation loop in process_claimed_item.
 WORKER_DEADLINE_SECONDS = max(3600, int(os.getenv("WORKER_DEADLINE_SECONDS", str(24 * 3600))))
+# One-shot Cloud Run Job tasks are SIGKILLed at the job's task timeout
+# (infra/pipeline-job.tf, 43200s), far below the 24h default above. A run killed
+# there leaves its queue item "running" with nobody to recover it, so cloud_run
+# runs get a hard deadline anchored to process start, minus a buffer to
+# checkpoint and finalize Firestore state cleanly.
+_PROCESS_STARTED_AT = time.time()
+_CLOUD_RUN_DEFAULT_TASK_TIMEOUT_SECONDS = 12 * 3600
+_CLOUD_RUN_DEADLINE_BUFFER_SECONDS = max(60, int(os.getenv("WORKER_DEADLINE_BUFFER_SECONDS", "1800")))
 _LEASE_SECONDS = max(60, int(os.getenv("WORKER_LEASE_SECONDS", "300")))
 _LEASE_RENEW_SECONDS = max(15, min(int(os.getenv("WORKER_LEASE_RENEW_SECONDS", "60")), _LEASE_SECONDS // 2))
 _MAX_LOCAL_HANDOFFS = max(1, int(os.getenv("WORKER_MAX_HANDOFFS", "50")))
+# A queue item whose lease has expired this many times has crashed or hung every
+# worker that took it (OOM, container kill, wedged provider call). Re-leasing it
+# forever burns spend and blocks the queue, so recovery gives up at this cap.
+_MAX_LEASE_ATTEMPTS = max(1, int(os.getenv("WORKER_MAX_LEASE_ATTEMPTS", "3")))
 _RETENTION = RetentionConfig.from_env()
 
 # Queue item ids whose lease heartbeat found the lease gone (cancelled, deleted,
 # or reclaimed by another worker). AgentHandler's cancellation check consults
 # this so the running agent stops spending at the next step boundary.
 _LOST_LEASE_ITEMS: set = set()
+
+
+def _parse_duration_seconds(raw: Optional[str]) -> Optional[int]:
+    """Parse ``"43200"`` or ``"43200s"`` (Cloud Run's duration format) into seconds."""
+    if not raw:
+        return None
+    value = raw.strip().lower()
+    if value.endswith("s"):
+        value = value[:-1]
+    try:
+        seconds = int(float(value))
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
+
+
+def hard_deadline_at(runner: str) -> Optional[float]:
+    """Absolute wall-clock time this process must finish by, or None when unbounded.
+
+    Only one-shot Cloud Run Job executions have a platform-enforced timeout. The
+    timeout comes from ``WORKER_TASK_TIMEOUT_SECONDS`` when the job sets it, otherwise
+    the 12h value configured in ``infra/pipeline-job.tf``.
+    """
+    if runner != "cloud_run" and not os.getenv("CLOUD_RUN_JOB"):
+        return None
+    timeout = _parse_duration_seconds(os.getenv("WORKER_TASK_TIMEOUT_SECONDS")) or _CLOUD_RUN_DEFAULT_TASK_TIMEOUT_SECONDS
+    usable = max(timeout // 2, timeout - _CLOUD_RUN_DEADLINE_BUFFER_SECONDS)
+    return _PROCESS_STARTED_AT + usable
 
 
 def lease_lost(item_id: Optional[str]) -> bool:
@@ -210,6 +251,26 @@ def claim_item(db: Any, item_ref: Any, lease_owner: str, expected_runner: str) -
         status = data.get("status")
         if status != "pending" and not (status == "running" and _lease_expired(data, now)):
             return None
+        attempts = int(data.get("lease_attempts") or 0)
+        if status == "running" and attempts >= _MAX_LEASE_ATTEMPTS:
+            error = (
+                f"Abandoned after {attempts} expired lease(s): every worker that leased this item "
+                "stopped renewing it (crash, OOM or hang) before it finished"
+            )
+            transaction.update(
+                ref,
+                {
+                    "status": "failed",
+                    "error": error,
+                    "failed_at": now.isoformat(),
+                    "lease_owner": None,
+                    "lease_expires_at": None,
+                    "ttl_at": _queue_ttl_at(now),
+                },
+            )
+            abandoned.update(data)
+            abandoned["error"] = error
+            return None
         update = {
             "status": "running",
             "lease_owner": lease_owner,
@@ -221,16 +282,52 @@ def claim_item(db: Any, item_ref: Any, lease_owner: str, expected_runner: str) -
         transaction.update(ref, update)
         return data
 
+    abandoned: Dict[str, Any] = {}
     try:
-        return _claim(db.transaction(), item_ref)
+        claimed = _claim(db.transaction(), item_ref)
     except Exception as exc:
         logger.warning("Claim failed for local queue item %s: %s", getattr(item_ref, "id", "?"), exc)
         return None
+    if abandoned:
+        _fail_abandoned_run(db, getattr(item_ref, "id", "?"), abandoned)
+    return claimed
 
 
-def claim_local_item(db: Any, item_ref: Any, lease_owner: str) -> Optional[Dict[str, Any]]:
-    """Backward-compatible local-runner claim helper."""
-    return claim_item(db, item_ref, lease_owner, "local")
+def _fail_abandoned_run(db: Any, item_id: str, data: Dict[str, Any]) -> None:
+    """Mark the run (and race) of a queue item that exhausted its lease attempts failed."""
+    error = data.get("error") or "Lease attempts exhausted"
+    logger.error("Queue item %s (race %s) failed: %s", item_id, data.get("race_id", "?"), error)
+    run_id = data.get("run_id")
+    race_id = data.get("race_id")
+    if not run_id:
+        return
+    try:
+        from google.cloud.firestore_v1 import SERVER_TIMESTAMP  # type: ignore
+
+        db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).set(
+            {
+                "status": "failed",
+                "error": error,
+                "completed_at": SERVER_TIMESTAMP,
+                "activity_at": SERVER_TIMESTAMP,
+                "run_health": {
+                    "status": RunHealthStatus.FAILED.value,
+                    "reasons": [RunFailureReason.UNKNOWN_ERROR.value],
+                    "step_failures": [],
+                    "summary": error,
+                },
+            },
+            merge=True,
+        )
+        if race_id:
+            _set_race_if_current(
+                db,
+                race_id,
+                run_id,
+                {"status": "failed", "current_run_id": None, "last_run_id": run_id, "last_run_status": "failed"},
+            )
+    except Exception:
+        logger.warning("Could not mark abandoned run %s failed", run_id, exc_info=True)
 
 
 def _finalize_queue_item(db: Any, item_ref: Any, lease_owner: str, update: Dict[str, Any]) -> str:
@@ -326,6 +423,45 @@ def _start_lease_heartbeat(db: Any, item_ref: Any, lease_owner: str, item_id: Op
     thread = threading.Thread(target=_heartbeat, name="worker-lease-heartbeat", daemon=True)
     thread.start()
     return stop_event, thread
+
+
+def _metrics_from_cost_ctx(options: Dict[str, Any], duration_s: float) -> Dict[str, Any]:
+    """Build run metrics from the live cost accumulator for a run that never returned.
+
+    Cancelled and crashed runs never reach ``run_agent``'s own metrics
+    finalization, so spend is reconstructed from the per-run cost context.
+    """
+    from pipeline_client.agent.cost import _cost_ctx, estimate_cost
+    from pipeline_client.agent.cost import search_cost_usd as _search_cost_usd
+
+    acc = _cost_ctx.get() or {}
+    breakdown = acc.get("model_breakdown", {})
+    estimated_usd = sum(
+        estimate_cost(model, counts.get("prompt_tokens", 0), counts.get("completion_tokens", 0))
+        for model, counts in breakdown.items()
+    )
+    search_cost_usd = _search_cost_usd(acc.get("serper_calls"), acc.get("searlo_calls"))
+    llm_cost_usd = float(acc.get("provider_cost_usd", 0.0) or 0.0)
+    has_exact_cost = int(acc.get("priced_calls", 0) or 0) > 0 and int(acc.get("unpriced_calls", 0) or 0) == 0
+    return {
+        "model": options.get("research_model", ""),
+        "model_profile": options.get("model_profile"),
+        "prompt_tokens": int(acc.get("prompt_tokens", 0) or 0),
+        "completion_tokens": int(acc.get("completion_tokens", 0) or 0),
+        "total_tokens": int(acc.get("prompt_tokens", 0) or 0) + int(acc.get("completion_tokens", 0) or 0),
+        "llm_cost_usd": llm_cost_usd if has_exact_cost else None,
+        "search_cost_usd": search_cost_usd,
+        "cost_usd": llm_cost_usd + search_cost_usd if has_exact_cost else None,
+        "cost_source": "provider" if has_exact_cost else "estimated",
+        "estimated_usd": estimated_usd + search_cost_usd,
+        "model_breakdown": breakdown,
+        "phase_breakdown": acc.get("phase_breakdown", {}),
+        "page_fetches": int(acc.get("page_fetches", 0) or 0),
+        "fetched_chars": int(acc.get("fetched_chars", 0) or 0),
+        "page_budget_blocked": int(acc.get("page_budget_blocked", 0) or 0),
+        "duration_s": round(duration_s, 1),
+        "serper_calls": int(acc.get("serper_calls", 0) or 0),
+    }
 
 
 async def _run_agent(
@@ -446,12 +582,29 @@ async def process_claimed_item(
             # of being treated as fatal, since giving up here discards all completed
             # research for the run.
             options["deadline_at"] = _time.time() + WORKER_DEADLINE_SECONDS
+            hard_deadline = hard_deadline_at(runner)
+            if hard_deadline is not None:
+                options["deadline_at"] = min(options["deadline_at"], hard_deadline)
             try:
                 last_result = await _run_agent(race_id, run_id, options, existing_data)
                 success = True
                 break
             except HandoffTriggered as exc:
                 handoffs_followed += 1
+                if hard_deadline is not None and _time.time() >= hard_deadline:
+                    # Following in-process would run into the platform kill; fail
+                    # cleanly while Firestore state can still be finalized.
+                    error_msg = (
+                        f"Run {run_id} reached the {runner} task deadline before finishing "
+                        f"(remaining steps: {exc.remaining_steps}); re-queue with baseline_source='latest'"
+                    )
+                    failure_reason = RunFailureReason.BUDGET_EXHAUSTED
+                    logger.error(error_msg)
+                    try:
+                        db.collection(FIRESTORE_QUEUE_COLLECTION).document(exc.continuation_item_id).delete()
+                    except Exception:
+                        logger.warning("Could not delete orphaned continuation item %s", exc.continuation_item_id)
+                    break
                 if handoffs_followed > _MAX_LOCAL_HANDOFFS:
                     error_msg = (
                         f"Gave up after {handoffs_followed} in-process continuations for run {run_id} "
@@ -493,38 +646,10 @@ async def process_claimed_item(
     except AgentCancelled as exc:
         logger.info("Local run %s cancelled: %s", run_id, exc)
         try:
-            from pipeline_client.agent.cost import _cost_ctx, estimate_cost
-            from pipeline_client.agent.cost import search_cost_usd as _search_cost_usd
+            from pipeline_client.agent.cost import _cost_ctx
             from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
 
-            acc = _cost_ctx.get() or {}
-            breakdown = acc.get("model_breakdown", {})
-            estimated_usd = sum(
-                estimate_cost(model, counts.get("prompt_tokens", 0), counts.get("completion_tokens", 0))
-                for model, counts in breakdown.items()
-            )
-            search_cost_usd = _search_cost_usd(acc.get("serper_calls"), acc.get("searlo_calls"))
-            llm_cost_usd = float(acc.get("provider_cost_usd", 0.0) or 0.0)
-            has_exact_cost = int(acc.get("priced_calls", 0) or 0) > 0 and int(acc.get("unpriced_calls", 0) or 0) == 0
-            cancelled_metrics = {
-                "model": options.get("research_model", ""),
-                "model_profile": options.get("model_profile"),
-                "prompt_tokens": int(acc.get("prompt_tokens", 0) or 0),
-                "completion_tokens": int(acc.get("completion_tokens", 0) or 0),
-                "total_tokens": int(acc.get("prompt_tokens", 0) or 0) + int(acc.get("completion_tokens", 0) or 0),
-                "llm_cost_usd": llm_cost_usd if has_exact_cost else None,
-                "search_cost_usd": search_cost_usd,
-                "cost_usd": llm_cost_usd + search_cost_usd if has_exact_cost else None,
-                "cost_source": "provider" if has_exact_cost else "estimated",
-                "estimated_usd": estimated_usd + search_cost_usd,
-                "model_breakdown": breakdown,
-                "phase_breakdown": acc.get("phase_breakdown", {}),
-                "page_fetches": int(acc.get("page_fetches", 0) or 0),
-                "fetched_chars": int(acc.get("fetched_chars", 0) or 0),
-                "page_budget_blocked": int(acc.get("page_budget_blocked", 0) or 0),
-                "duration_s": round(_time.perf_counter() - started_at, 1),
-                "serper_calls": int(acc.get("serper_calls", 0) or 0),
-            }
+            cancelled_metrics = _metrics_from_cost_ctx(options, _time.perf_counter() - started_at)
             await get_pipeline_metrics_store().record_run(
                 run_id,
                 race_id,
@@ -557,42 +682,14 @@ async def process_claimed_item(
         failure_reason = classify_exception(exc)
         logger.exception("Local run %s failed: %s", run_id, exc)
         try:
-            from pipeline_client.agent.cost import _cost_ctx, estimate_cost
-            from pipeline_client.agent.cost import search_cost_usd as _search_cost_usd
+            from pipeline_client.agent.cost import _cost_ctx
             from pipeline_client.backend.pipeline_metrics import get_pipeline_metrics_store
 
             provided_metrics = getattr(exc, "pipeline_agent_metrics", None)
-            acc = _cost_ctx.get() or {}
-            breakdown = acc.get("model_breakdown", {})
-            estimated_usd = sum(
-                estimate_cost(model, counts.get("prompt_tokens", 0), counts.get("completion_tokens", 0))
-                for model, counts in breakdown.items()
-            )
-            search_cost_usd = _search_cost_usd(acc.get("serper_calls"), acc.get("searlo_calls"))
-            llm_cost_usd = float(acc.get("provider_cost_usd", 0.0) or 0.0)
-            has_exact_cost = int(acc.get("priced_calls", 0) or 0) > 0 and int(acc.get("unpriced_calls", 0) or 0) == 0
             failed_metrics = (
                 dict(provided_metrics)
                 if isinstance(provided_metrics, dict)
-                else {
-                    "model": options.get("research_model", ""),
-                    "model_profile": options.get("model_profile"),
-                    "prompt_tokens": int(acc.get("prompt_tokens", 0) or 0),
-                    "completion_tokens": int(acc.get("completion_tokens", 0) or 0),
-                    "total_tokens": int(acc.get("prompt_tokens", 0) or 0) + int(acc.get("completion_tokens", 0) or 0),
-                    "llm_cost_usd": llm_cost_usd if has_exact_cost else None,
-                    "search_cost_usd": search_cost_usd,
-                    "cost_usd": llm_cost_usd + search_cost_usd if has_exact_cost else None,
-                    "cost_source": "provider" if has_exact_cost else "estimated",
-                    "estimated_usd": estimated_usd + search_cost_usd,
-                    "model_breakdown": breakdown,
-                    "phase_breakdown": acc.get("phase_breakdown", {}),
-                    "page_fetches": int(acc.get("page_fetches", 0) or 0),
-                    "fetched_chars": int(acc.get("fetched_chars", 0) or 0),
-                    "page_budget_blocked": int(acc.get("page_budget_blocked", 0) or 0),
-                    "duration_s": round(_time.perf_counter() - started_at, 1),
-                    "serper_calls": int(acc.get("serper_calls", 0) or 0),
-                }
+                else _metrics_from_cost_ctx(options, _time.perf_counter() - started_at)
             )
             failed_metrics.setdefault("serper_calls", int(failed_metrics.get("search_calls", 0) or 0))
             await get_pipeline_metrics_store().record_run(

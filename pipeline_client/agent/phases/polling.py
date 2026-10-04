@@ -6,9 +6,8 @@ from datetime import datetime, timezone
 
 from ..handlers import _make_editing_handlers
 from ..prompts import POLLING_SYSTEM, POLLING_USER
-from ..run_budget import RunBudgetExceeded
 from ..tools import POLLING_TOOLS, READ_PROFILE_TOOL
-from ._common import _classify_exception, _race_identity_context, _record_step_failure
+from ._common import _classify_exception, _is_control_flow_exception, _race_identity_context, _record_step_failure
 from .context import PhaseContext
 
 
@@ -66,9 +65,9 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
             tools_mode=True,
             run_budget=run_budget,
         )
-    except RunBudgetExceeded:
-        raise
     except Exception as exc:
+        if _is_control_flow_exception(exc):
+            raise
         log("warning", f"  Polling phase failed: {exc}")
         _record_step_failure(race_json, "polling", _classify_exception(exc), str(exc))
     track("complete", "polling", duration_ms=int((time.perf_counter() - polling_t0) * 1000), race_json=race_json)

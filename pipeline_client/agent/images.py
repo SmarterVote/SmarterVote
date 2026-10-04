@@ -19,9 +19,11 @@ from .image_denylist import is_denied_image
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
-from .web_tools import _serper_image_search
+from .web_tools import _serper_image_search, ssrf_request_hook
 
 logger = logging.getLogger("pipeline")
+# Validate every request (redirect hops included) against the SSRF guard.
+_SSRF_HOOKS = {"request": [ssrf_request_hook]}
 
 _IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"})
 
@@ -1178,7 +1180,7 @@ async def _lookup_known_page_image(candidate: Dict[str, Any]) -> Optional[str]:
     """Extract a direct image URL from known candidate website/profile pages."""
     headers = {"User-Agent": _BROWSER_UA}
     try:
-        async with httpx.AsyncClient(timeout=12, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=12, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
             for page_url in _candidate_page_urls(candidate):
                 try:
                     response = await client.get(page_url, headers=headers)
@@ -1404,7 +1406,7 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
     """
     headers = {"User-Agent": _BROWSER_UA}
     try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
             resp = await client.head(url, headers=headers)
             final_url = str(resp.url)
             if resp.status_code < 400:
@@ -1545,7 +1547,7 @@ async def _lookup_wikipedia_image(candidate_name: str, context: str = "") -> Opt
     candidate_tokens = _name_tokens(candidate_name)
 
     try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
 
             async def _search_and_fetch(query: str) -> Optional[str]:
                 search_resp = await client.get(
