@@ -22,6 +22,10 @@ DENIED_IMAGE_URLS: Dict[str, str] = {
     "https://upload.wikimedia.org/wikipedia/commons/7/7a/Jonathan_Kreiss-Tomkins_and_Terry_Gardiner.jpg": (
         "two-person photo; the candidate cannot be identified"
     ),
+    "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Brett_Smith.jpg": (
+        "bare-name Ballotpedia portrait (a man in a suit, studio backdrop) that cannot be tied to Brett Smith, "
+        "the Pacific Green nominee for Oregon governor, whose own page is Brett_Smith_(Oregon)"
+    ),
 }
 
 
