@@ -99,3 +99,17 @@ export function legacyCandidateSlug(name: string): string {
 export function matchesCandidateSlug(name: string, slug: string): boolean {
   return candidateSlug(name) === slug || legacyCandidateSlug(name) === slug;
 }
+
+/**
+ * Year range for a career entry: "2010 – 2020", "2010 – Present" (no end
+ * year), "Until 2020" (no start year), or "" when neither is known. Years are
+ * nullable in RaceJSON, so a missing start must never render as "– 2020".
+ */
+export function careerYears(entry: {
+  start_year?: number | null;
+  end_year?: number | null;
+}): string {
+  const { start_year: start, end_year: end } = entry;
+  if (start) return end ? `${start} – ${end}` : `${start} – Present`;
+  return end ? `Until ${end}` : "";
+}

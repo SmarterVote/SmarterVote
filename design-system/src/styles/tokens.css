@@ -1,4 +1,5 @@
-/* Semantic color tokens — ported verbatim from web/src/app.css. Keep in sync. */
+/* Semantic color tokens — ported verbatim from web/src/app.css. Keep in sync
+   (web/src/lib/designTokens.test.ts fails when the --sv-* values drift). */
 
 :root {
   --sv-page: 249 250 251; /* gray-50  — page background   */
@@ -7,8 +8,10 @@
   --sv-border: 229 231 235; /* gray-200 — borders            */
   --sv-text: 17 24 39; /* gray-900 — primary text       */
   --sv-text-muted: 75 85 99; /* gray-600 — secondary text     */
-  --sv-text-subtle: 107 114 128; /* gray-500 — tertiary text      */
-  --sv-text-faint: 156 163 175; /* gray-400 — placeholder / meta */
+  /* subtle/faint are tuned to stay >= 4.5:1 (WCAG AA) on page, surface and
+     surface-alt — faint is meaningful meta text, not decoration. */
+  --sv-text-subtle: 95 102 115; /* #5f6673 — tertiary text (5.25:1 on alt) */
+  --sv-text-faint: 104 111 124; /* #686f7c — meta text (4.59:1 on alt)    */
   --sv-primary: 37 99 235; /* blue-600 — accent / links     */
 }
 
@@ -20,6 +23,6 @@
   --sv-text: 249 250 251; /* gray-50  — primary text       */
   --sv-text-muted: 209 213 219; /* gray-300 — secondary text     */
   --sv-text-subtle: 156 163 175; /* gray-400 — tertiary text      */
-  --sv-text-faint: 107 114 128; /* gray-500 — placeholder / meta */
+  --sv-text-faint: 143 150 163; /* #8f96a3 — meta text (4.93:1 on alt)    */
   --sv-primary: 96 165 250; /* blue-400 — accent / links     */
 }

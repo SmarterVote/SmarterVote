@@ -7,12 +7,14 @@
 # HTML file without SvelteKit's meta CSP, 404.html, has no inline script and
 # ships its own strict meta policy.
 #
-# connect-src: the races API host must match VITE_RACES_API_URL /
-# vars.RACES_API_URL in cloudflare-deploy.yaml; update both together.
+# connect-src: the DATA_CONNECT_SRC placeholder is replaced at build time
+# (scripts/csp-headers.mjs, wired in vite.config.js) with the origins of
+# VITE_RACES_API_URL (default: the production races API) and, when it is an
+# absolute URL, VITE_PUBLIC_DATA_URL (e.g. https://storage.googleapis.com).
 # img-src stays https: because candidate headshots are hotlinked from many
 # campaign, government and Wikimedia hosts.
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://races-api-dev-ddsvfazica-uc.a.run.app https://places.googleapis.com https://maps.googleapis.com https://cloudflareinsights.com https://*.auth0.com; frame-src 'self' https://*.auth0.com; worker-src 'self' blob:; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' %DATA_CONNECT_SRC% https://places.googleapis.com https://maps.googleapis.com https://cloudflareinsights.com https://*.auth0.com; frame-src 'self' https://*.auth0.com; worker-src 'self' blob:; upgrade-insecure-requests
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
@@ -45,5 +47,3 @@
 /chamber_forecasts.json
   X-Robots-Tag: noindex
 
-/states-10m.json
-  X-Robots-Tag: noindex

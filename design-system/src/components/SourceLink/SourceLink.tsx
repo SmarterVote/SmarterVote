@@ -1,3 +1,5 @@
+import { safeExternalUrl } from "../../utils/url";
+
 export interface SourceLinkProps {
   /** Source URL. Only http/https URLs render as a link — anything else falls back to plain text. */
   url: string;
@@ -22,16 +24,16 @@ function domainOf(url: string): string {
  */
 export function SourceLink({ url, title, text }: SourceLinkProps) {
   const domain = domainOf(url);
-  const isSafe = /^https?:\/\//i.test(url.trim());
+  const safeUrl = safeExternalUrl(url);
   const label = text || title || domain;
 
-  if (!isSafe) {
+  if (!safeUrl) {
     return <span className="inline-flex items-center gap-1 text-xs sm:text-sm">{label}</span>;
   }
 
   return (
     <a
-      href={url.trim()}
+      href={safeUrl}
       target="_blank"
       rel="noopener noreferrer"
       title={`${label} - Open in new tab`}

@@ -29,4 +29,22 @@ describe("avatarSrc", () => {
     );
     expect(avatarSrc(null)).toBeUndefined();
   });
+
+  it("drops non-https and malformed image URLs", () => {
+    for (const bad of [
+      "javascript:alert(1)",
+      "data:image/svg+xml,<svg onload=alert(1)>",
+      "http://example.com/x.jpg",
+      "/images/x.jpg",
+      "//evil.example/x.jpg",
+      "https://exa mple.com/x.jpg",
+      "",
+      undefined,
+    ]) {
+      expect(avatarSrc(bad)).toBeUndefined();
+    }
+    expect(avatarSrc("  https://example.com/x.jpg ")).toBe(
+      "https://example.com/x.jpg",
+    );
+  });
 });

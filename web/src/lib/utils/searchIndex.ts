@@ -48,7 +48,7 @@ export interface SearchIndex {
   races: SearchIndexRace[];
 }
 
-function officeKind(office: string | undefined): SearchIndexRace["o"] {
+function officeKind(office: string | null | undefined): SearchIndexRace["o"] {
   const o = (office ?? "").toLowerCase();
   if (o.includes("senate") || o.includes("senator")) return "S";
   if (o.includes("governor") || o.includes("gubernatorial")) return "G";

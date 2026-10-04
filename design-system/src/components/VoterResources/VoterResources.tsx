@@ -1,3 +1,5 @@
+import { safeExternalUrl } from "../../utils/url";
+
 export interface VoterResourcesProps {
   ballotpediaUrl?: string;
   registerToVoteUrl?: string;
@@ -26,12 +28,16 @@ const btnBase = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-semi
  * variants, matching the original.
  */
 export function VoterResources({
-  ballotpediaUrl,
-  registerToVoteUrl = "https://vote.gov/register",
-  howToVoteUrl = "https://vote.gov/",
+  ballotpediaUrl: rawBallotpediaUrl,
+  registerToVoteUrl: rawRegisterToVoteUrl,
+  howToVoteUrl: rawHowToVoteUrl,
   hasForecast = false,
   onJumpToForecast,
 }: VoterResourcesProps) {
+  // Non-http(s) values are dropped: Ballotpedia hides, the vote.gov links fall back.
+  const ballotpediaUrl = safeExternalUrl(rawBallotpediaUrl);
+  const registerToVoteUrl = safeExternalUrl(rawRegisterToVoteUrl) ?? "https://vote.gov/register";
+  const howToVoteUrl = safeExternalUrl(rawHowToVoteUrl) ?? "https://vote.gov/";
   return (
     <div className="flex flex-wrap gap-3 mb-6">
       {ballotpediaUrl && (

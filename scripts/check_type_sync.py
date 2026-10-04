@@ -150,6 +150,7 @@ FRONTEND_ONLY_OR_OTHER_BACKEND_TYPES: Dict[str, str] = {
     "RENAMED_ISSUE_NOTES": "Frontend-only user-facing copy (tooltip text) for renamed issues; has no backend equivalent.",
     "CandidateSummary": "Mirrors services/races-api/schemas.py:CandidateSummary (search/listing projection), not shared/models.py:Candidate.",
     "RaceSummary": "Mirrors services/races-api/schemas.py:RaceSummary, not shared/models.py:RaceJSON.",
+    "RaceForecastSummary": "Mirrors services/races-api/schemas.py:RaceForecastSummary (the compact forecast on a summary), not shared/models.py:RaceForecast.",
     "RunStatus": "Mirrors pipeline_client/backend/models.py:RunStatus, not shared/models.py; checked separately by check_run_status().",
     "PipelineStepId": "Mirrors shared/pipeline_config.py:PIPELINE_STEP_IDS; checked separately by check_pipeline_step_ids().",
     "PIPELINE_STEPS": "Derived const array; checked separately by check_pipeline_step_ids().",
@@ -448,6 +449,15 @@ def expected_ts_type(annotation: Any) -> Optional[str]:
     return None
 
 
+def _strip_null(ts_type_text: str) -> tuple:
+    """Return (type_text_without_null, is_nullable) for a TS field type."""
+    tokens = _union_tokens(ts_type_text)
+    if "null" not in tokens:
+        return ts_type_text, False
+    rest = [tok for tok in tokens if tok != "null"]
+    return " | ".join(rest), True
+
+
 def types_match(annotation: Any, ts_type_text: str) -> bool:
     origin = get_origin(annotation)
     if origin is Literal:
@@ -538,7 +548,7 @@ def check_model_overrides_shape(ts_interfaces: Dict[str, TsInterface]) -> List[s
     if iface is None or "model_overrides" not in iface.fields:
         violations.append("[RunOptions] missing field 'model_overrides'")
         return violations
-    type_text = iface.fields["model_overrides"].type_text
+    type_text, _ = _strip_null(iface.fields["model_overrides"].type_text)
     obj_match = re.match(r"^\{(.*)\}$", type_text.strip())
     if not obj_match:
         violations.append(f"[RunOptions.model_overrides] expected an object literal type, got: {type_text!r}")
@@ -595,28 +605,37 @@ def check_model(ts_name: str, model_cls: Type[BaseModel], ts_interfaces: Dict[st
                 f"{'Optional' if is_optional else 'non-Optional (has a default but must always be present)'}"
             )
 
+        # Pydantic dumps an unset Optional field as `null`, not as a missing key,
+        # so the TS mirror must spell it `?: T | null`; strip the `| null` before
+        # comparing the inner type.
+        ts_type_text, ts_nullable = _strip_null(ts_field.type_text)
+        if ts_nullable != is_optional:
+            violations.append(
+                f"[{ts_name}.{fname}] nullability mismatch: TS type is "
+                f"{'nullable' if ts_nullable else 'not nullable'} but Python type is "
+                f"{'Optional (dumped as null)' if is_optional else 'non-Optional'}"
+            )
+
         key = (ts_name, fname)
         if key in BESPOKE_FIELD_CHECKS:
             continue
         if key in FIELD_TYPE_OVERRIDES:
             expected = FIELD_TYPE_OVERRIDES[key]
-            if ts_field.type_text != expected:
-                violations.append(
-                    f"[{ts_name}.{fname}] type mismatch: ts={ts_field.type_text!r} expected(override)={expected!r}"
-                )
+            if ts_type_text != expected:
+                violations.append(f"[{ts_name}.{fname}] type mismatch: ts={ts_type_text!r} expected(override)={expected!r}")
             continue
         if key in FIELD_LITERAL_SET_OVERRIDES:
             expected_values = FIELD_LITERAL_SET_OVERRIDES[key]
-            if not _literal_set_matches(expected_values, ts_field.type_text):
+            if not _literal_set_matches(expected_values, ts_type_text):
                 violations.append(
-                    f"[{ts_name}.{fname}] value-set mismatch: ts={ts_field.type_text!r} expected values={sorted(expected_values)}"
+                    f"[{ts_name}.{fname}] value-set mismatch: ts={ts_type_text!r} expected values={sorted(expected_values)}"
                 )
             continue
 
-        if not types_match(inner_annotation, ts_field.type_text):
+        if not types_match(inner_annotation, ts_type_text):
             derived = expected_ts_type(inner_annotation)
             violations.append(
-                f"[{ts_name}.{fname}] type mismatch: ts={ts_field.type_text!r} "
+                f"[{ts_name}.{fname}] type mismatch: ts={ts_type_text!r} "
                 f"python_annotation={inner_annotation!r} expected_ts~={derived!r}"
             )
 

@@ -46,7 +46,7 @@ export function shortCandidateName(
   return collisions.length > 0 ? name.trim() : last;
 }
 
-function isMajorParty(party: string | undefined): boolean {
+function isMajorParty(party: string | null | undefined): boolean {
   const key = partyKey(party);
   return key === "dem" || key === "rep";
 }

@@ -13,7 +13,7 @@
   import VotingRecordTable from "$lib/components/VotingRecordTable.svelte";
   import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
-  import { candidateSlug } from "$lib/utils/format";
+  import { candidateSlug, careerYears } from "$lib/utils/format";
   import { partyBadgeClass } from "$lib/utils/party";
   import { hasNoResearchedPositions } from "$lib/utils/candidates";
   import { isExternalUrl } from "$lib/utils/url";
@@ -690,11 +690,9 @@
                         <div class="timeline-entry">
                           <div class="timeline-header">
                             <span class="timeline-title">{entry.title}</span>
-                            {#if entry.start_year}
+                            {#if careerYears(entry)}
                               <span class="timeline-years">
-                                {entry.start_year}{entry.end_year
-                                  ? ` – ${entry.end_year}`
-                                  : " – Present"}
+                                {careerYears(entry)}
                               </span>
                             {/if}
                           </div>

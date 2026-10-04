@@ -190,7 +190,7 @@
   );
 
   // unique short office names for filter chips - raising the bar
-  function officeShort(office: string | undefined): string {
+  function officeShort(office: string | null | undefined): string {
     if (!office) return "Other";
     const o = office.toLowerCase();
     if (o.includes("senate")) return "Senate";

@@ -18,6 +18,14 @@
     general: "We haven't found this information for this candidate yet.",
   };
 
+  // Option labels of the `data-type` checkboxes in
+  // .github/ISSUE_TEMPLATE/missing-data.yml; keep them identical.
+  const issueTemplateDataTypes: Record<string, string> = {
+    issues: "Issue stances / positions",
+    donors: "Donor information",
+    voting: "Voting record",
+  };
+
   function buildGitHubIssueUrl(): string {
     const baseUrl = `https://github.com/${GITHUB_REPO}/issues/new`;
     const params = new URLSearchParams({
@@ -26,6 +34,8 @@
       "race-id": raceId,
       "candidate-name": candidateName,
     });
+    const templateDataType = issueTemplateDataTypes[dataType];
+    if (templateDataType) params.set("data-type", templateDataType);
 
     return `${baseUrl}?${params.toString()}`;
   }

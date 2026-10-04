@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
   import type { RaceSummary } from "$lib/types";
   import { raceDisplayTitle } from "$lib/utils/raceTitle";
   import {
@@ -44,7 +43,7 @@
             <tr class="hover:bg-surface-alt/10 transition-colors">
               <td class="px-5 py-3">
                 <a
-                  href={browser ? raceHref(race.id) : undefined}
+                  href={raceHref(race.id)}
                   class="font-semibold text-content hover:text-primary-700 dark:hover:text-primary-300"
                 >
                   {raceDisplayTitle(race)}

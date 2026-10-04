@@ -71,10 +71,10 @@ export function partyClass(party: string): string {
   return "text-content-muted";
 }
 
-export function ratingClass(rating: ForecastRating): string {
-  if (rating.endsWith("_d"))
+export function ratingClass(rating: ForecastRating | null | undefined): string {
+  if (rating?.endsWith("_d"))
     return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800/60";
-  if (rating.endsWith("_r"))
+  if (rating?.endsWith("_r"))
     return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-800/60";
   return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800/40 dark:text-slate-200 dark:border-slate-700/60";
 }
@@ -111,10 +111,10 @@ export function forecastMarginText(forecast: {
   return `${leader} +${Math.abs(margin).toFixed(1)} pts`;
 }
 
-function forecastBadgeClass(rating: ForecastRating): string {
-  return rating.endsWith("_d")
+function forecastBadgeClass(rating: ForecastRating | null | undefined): string {
+  return rating?.endsWith("_d")
     ? "!bg-blue-600 !text-white"
-    : rating.endsWith("_r")
+    : rating?.endsWith("_r")
       ? "!bg-red-600 !text-white"
       : "!bg-slate-500 !text-white";
 }
@@ -150,11 +150,17 @@ function forecastDetails(
   };
 }
 
-export function colorForRating(rating: ForecastRating): string {
+export function colorForRating(
+  rating: ForecastRating | null | undefined,
+): string {
+  if (!rating) return NO_FORECAST_FILL;
   return `var(--color-${rating.replace("_", "-")})`;
 }
 
-export function ratingCompetitiveness(rating: ForecastRating): number {
+export function ratingCompetitiveness(
+  rating: ForecastRating | null | undefined,
+): number {
+  if (!rating) return 5;
   if (rating === "tossup") return 0;
   if (rating.startsWith("tilt_")) return 1;
   if (rating.startsWith("lean_")) return 2;
@@ -273,7 +279,7 @@ export function controlProbabilities(
 
 export function marketSignalTarget(signal: {
   matched_to: string;
-  matched_party?: string;
+  matched_party?: string | null;
 }): string {
   if (signal.matched_party && signal.matched_party !== signal.matched_to) {
     return `${signal.matched_to} (${signal.matched_party})`;

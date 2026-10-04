@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
   import type { RaceSummary } from "$lib/types";
   import {
     formatRating,
@@ -118,7 +117,7 @@
         >
           <div class="flex items-center justify-between mb-2">
             <a
-              href={browser ? raceHref(race.id) : undefined}
+              href={raceHref(race.id)}
               class="inline-flex min-h-11 min-w-0 items-center font-bold text-sm text-content hover:text-primary-700 dark:hover:text-primary-300"
             >
               <span class="truncate">{keyRaceLabel(race)}</span>
@@ -162,7 +161,7 @@
 
           <div class="mt-auto pt-2 border-t border-stroke">
             <a
-              href={browser ? raceHref(race.id) : undefined}
+              href={raceHref(race.id)}
               class="inline-flex min-h-11 items-center gap-1.5 text-xs text-primary-700 dark:text-primary-300 font-bold hover:underline"
             >
               View details<span class="sr-only"> for {keyRaceLabel(race)}</span>

@@ -14,7 +14,7 @@
     uniqueCandidatesByName,
   } from "$lib/utils/candidates";
   import { formatRating } from "$lib/utils/forecast";
-  import { candidateSlug } from "$lib/utils/format";
+  import { candidateSlug, careerYears } from "$lib/utils/format";
   import { partyAbbr } from "$lib/utils/party";
   import {
     candidateForecastProbability,
@@ -528,11 +528,9 @@
                           >
                             <span class="text-xs font-semibold text-content"
                               >{entry.title}</span
-                            >{#if entry.start_year}<span
+                            >{#if careerYears(entry)}<span
                                 class="text-xs text-content-subtle"
-                                >{entry.start_year}{entry.end_year
-                                  ? ` – ${entry.end_year}`
-                                  : " – Present"}</span
+                                >{careerYears(entry)}</span
                               >{/if}
                           </div>
                           {#if entry.organization}<span

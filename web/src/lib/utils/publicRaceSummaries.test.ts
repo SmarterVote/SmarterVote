@@ -3,6 +3,7 @@ import type { RaceSummary } from "$lib/types";
 import {
   toDirectoryRaceSummaries,
   toForecastRaceSummaries,
+  toForecastSummary,
 } from "./publicRaceSummaries";
 
 const summary: RaceSummary = {
@@ -90,5 +91,33 @@ describe("public race summary payloads", () => {
     ]);
     expect(withTakeaway.forecast?.takeaway).toBe("Published takeaway.");
     expect(withoutForecast).not.toHaveProperty("forecast");
+  });
+
+  it("compacts an API summary forecast whose scalars are null", () => {
+    expect(
+      toForecastSummary({
+        predicted_winner_name: null,
+        predicted_winner_party: null,
+        win_probability: null,
+        party_probabilities: {},
+        margin_estimate: null,
+        rating: null,
+        rationale: null,
+        takeaway: null,
+        based_on_poll_count: 0,
+        method: null,
+        panel: null,
+        panel_spread: null,
+      }),
+    ).toEqual({
+      predicted_winner_name: null,
+      predicted_winner_party: null,
+      win_probability: null,
+      party_probabilities: {},
+      margin_estimate: null,
+      rating: null,
+      based_on_poll_count: 0,
+    });
+    expect(toForecastSummary(null)).toBeNull();
   });
 });

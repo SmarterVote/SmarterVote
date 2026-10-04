@@ -9,12 +9,14 @@ import {
   FORECAST_RATING_ORDER,
   electionCycleYear,
   ratingSortIndex,
+  ratingSortValue,
   officeGroup,
   fallbackPartyForRace,
   parseForecastTab,
   groupSeatDistribution,
   normalizeForecastParty,
   forecastWinnerParty,
+  formatRating,
   getRaceState,
   raceHref,
   resolveControlParty,
@@ -768,5 +770,18 @@ describe("isUncontestedForecastRace", () => {
         contest_stage: "post_primary_general",
       }),
     ).toBe(false);
+  });
+});
+
+describe("summary forecasts without a rating", () => {
+  it("formats a missing rating with a fallback label", () => {
+    expect(formatRating("lean_d")).toBe("Lean D");
+    expect(formatRating(null)).toBe("Not rated");
+    expect(formatRating(undefined)).toBe("Not rated");
+  });
+
+  it("sorts a missing rating after every rated race", () => {
+    expect(ratingSortIndex(null)).toBe(FORECAST_RATING_ORDER.length);
+    expect(ratingSortValue(undefined)).toBe(5);
   });
 });

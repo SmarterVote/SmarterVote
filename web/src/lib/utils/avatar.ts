@@ -1,3 +1,5 @@
+import { isExternalUrl } from "./url";
+
 /**
  * Headshot URL for display. Candidate images are hotlinked; Wikimedia ones
  * point at full-size originals (often 1.5–8 MB) that we render at 20–128 px.
@@ -10,8 +12,15 @@ const WIKIMEDIA_ORIGINAL =
 
 export const AVATAR_THUMB_WIDTH = 250;
 
-export function avatarSrc(url: string | null | undefined): string | undefined {
-  if (!url) return undefined;
+/**
+ * Only absolute https:// URLs are rendered. image_url is pipeline-sourced
+ * data; anything else (javascript:, data:, http:, relative paths, junk) is
+ * dropped so callers fall back to initials.
+ */
+export function avatarSrc(raw: string | null | undefined): string | undefined {
+  if (!isExternalUrl(raw)) return undefined;
+  const url = raw.trim();
+  if (!url.toLowerCase().startsWith("https://")) return undefined;
   const match = url.match(WIKIMEDIA_ORIGINAL);
   if (!match) return url;
   const [, project, a, ab, file] = match;

@@ -38,7 +38,7 @@
   ): SourceLink[] {
     const links: SourceLink[] = [];
     const seen = new Set<string>();
-    const add = (url: string | undefined, title?: string) => {
+    const add = (url: string | undefined, title?: string | null) => {
       if (!isExternalUrl(url)) return;
       const safeUrl = url.trim();
       if (seen.has(safeUrl)) return;
