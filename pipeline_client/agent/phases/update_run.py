@@ -498,7 +498,8 @@ async def _run_update(
             try:
                 metadata_result = await _agent_loop(
                     UPDATE_META_SYSTEM,
-                    UPDATE_META_USER.format(
+                    (f"## Run Goal\n{goal}\n\n" if goal else "")
+                    + UPDATE_META_USER.format(
                         race_id=race_id,
                         last_updated=last_updated,
                         current_date=as_of_date,
