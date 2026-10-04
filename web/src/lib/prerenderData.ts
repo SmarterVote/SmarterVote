@@ -1,5 +1,10 @@
 import { candidateSlug, legacyCandidateSlug } from "$lib/utils/format";
-import type { ChamberForecasts, Race, RaceSummary } from "$lib/types";
+import type {
+  ChamberForecasts,
+  Race,
+  RaceForecast,
+  RaceSummary,
+} from "$lib/types";
 import { publicDataBase as configuredPublicDataBase } from "$lib/config/api";
 
 let summariesCache: Promise<RaceSummary[]> | null = null;
@@ -63,6 +68,102 @@ export async function fetchPublishedRace(
     return await racePromise;
   } catch (error) {
     if (raceCache.get(id) === racePromise) raceCache.delete(id);
+    throw error;
+  }
+}
+
+/**
+ * Forecast fields the /forecast/ analysis drawer reads. The deploy writes
+ * just these to /forecast/<race_id>.json (scripts/prepare-public-data.mjs,
+ * whose copy of this list a parity test keeps in sync).
+ */
+export const FORECAST_DETAIL_FIELDS = [
+  "rationale",
+  "key_reasons",
+  "uncertainty",
+  "market_signals",
+  "evidence_lineage",
+  "source_urls",
+  "panel",
+  "panel_spread",
+  "model",
+  "generated_at",
+] as const satisfies ReadonlyArray<keyof RaceForecast>;
+
+export type ForecastDetails = Partial<
+  Pick<RaceForecast, (typeof FORECAST_DETAIL_FIELDS)[number]>
+>;
+
+interface ForecastDetailsPayload {
+  id?: string;
+  updated_utc?: string;
+  forecast?: ForecastDetails | null;
+}
+
+const forecastDetailsCache = new Map<string, Promise<ForecastDetails>>();
+
+/** Only the drawer fields of a forecast (empty when there is none). */
+export function pickForecastDetails(
+  forecast: Partial<RaceForecast> | null | undefined,
+): ForecastDetails {
+  const details: Record<string, unknown> = {};
+  if (!forecast) return details;
+  for (const key of FORECAST_DETAIL_FIELDS) {
+    if (forecast[key] !== undefined) details[key] = forecast[key];
+  }
+  return details as ForecastDetails;
+}
+
+async function fetchForecastDetailsPayload(
+  id: string,
+  updatedUtc: string | undefined,
+  fetchFn: typeof fetch,
+): Promise<ForecastDetails | null> {
+  try {
+    // A deploy artifact served by the site itself, never from
+    // VITE_PUBLIC_DATA_URL (the pipeline does not publish it there).
+    const res = await fetchFn(`/forecast/${encodeURIComponent(id)}.json`);
+    if (!res.ok) return null;
+    const payload = (await res.json()) as ForecastDetailsPayload;
+    if (!payload || typeof payload !== "object" || payload.id !== id)
+      return null;
+    // The card may show fresher data than this deploy (VITE_PUBLIC_DATA_URL
+    // or a later publish); a payload from another version is not used.
+    if (updatedUtc && payload.updated_utc !== updatedUtc) return null;
+    return pickForecastDetails(payload.forecast);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The analysis drawer's forecast fields for one race. Reads the small
+ * per-race payload written at deploy; when it is missing (local dev, older
+ * deploys) or stale relative to `updatedUtc`, falls back to the full
+ * published race file.
+ */
+export async function fetchForecastDetails(
+  id: string,
+  updatedUtc?: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ForecastDetails> {
+  const key = `${id}|${updatedUtc ?? ""}`;
+  const cached = forecastDetailsCache.get(key);
+  if (cached) return cached;
+
+  const request = (async () => {
+    const small = await fetchForecastDetailsPayload(id, updatedUtc, fetchFn);
+    if (small) return small;
+    return pickForecastDetails(
+      (await fetchPublishedRace(id, fetchFn)).forecast,
+    );
+  })();
+  forecastDetailsCache.set(key, request);
+  try {
+    return await request;
+  } catch (error) {
+    if (forecastDetailsCache.get(key) === request)
+      forecastDetailsCache.delete(key);
     throw error;
   }
 }

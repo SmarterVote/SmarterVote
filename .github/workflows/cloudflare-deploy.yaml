@@ -107,33 +107,12 @@ jobs:
           gcloud storage cp "gs://${BUCKET_NAME}/races/*.json" web/static/
           # Published race files keep pipeline_state (the pipeline builds on it
           # with baseline_source="published"), but the public site never reads
-          # it, agent_metrics or run_audit; drop them from the served copies.
-          # summaries.json entries also carry agent_metrics (run cost, model,
-          # token counts) for the admin API; strip it from the public index too.
-          node -e '
-            const fs = require("fs");
-            const PRIVATE_KEYS = ["pipeline_state", "agent_metrics", "run_audit"];
-            const strip = (d) => {
-              if (d && typeof d === "object" && !Array.isArray(d)) {
-                for (const k of PRIVATE_KEYS) delete d[k];
-              }
-            };
-            for (const f of fs.readdirSync("web/static")) {
-              if (!f.endsWith(".json") || f === "chamber_forecasts.json") continue;
-              const p = "web/static/" + f;
-              const d = JSON.parse(fs.readFileSync(p, "utf8"));
-              if (f === "summaries.json") {
-                const entries = Array.isArray(d) ? d : Array.isArray(d && d.races) ? d.races : null;
-                if (!entries) throw new Error("Unexpected summaries.json shape");
-                entries.forEach(strip);
-              } else if (!d || typeof d !== "object" || Array.isArray(d)) {
-                continue;
-              } else {
-                strip(d);
-              }
-              fs.writeFileSync(p, JSON.stringify(d));
-            }
-          '
+          # it, agent_metrics or run_audit. The script first derives what needs
+          # pipeline_state (removed-candidate redirects appended to _redirects)
+          # and the small per-race forecast drawer payloads (forecast/<id>.json),
+          # then strips those fields from the served copies and summaries.json.
+          # Plain Node with no npm dependencies: it runs before `npm ci`.
+          node web/scripts/prepare-public-data.mjs web/static
 
       # GCP access is only needed for the fetch above. Remove the credential
       # file the auth action wrote (a full service-account key on the legacy
