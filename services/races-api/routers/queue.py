@@ -1,6 +1,7 @@
 """Queue management endpoints.
 
-All endpoints are Auth0-JWT protected via verify_token dependency.
+All endpoints are Auth0-JWT protected via verify_token dependency; GET /api/queue
+also accepts the queue-backlog Cloud Scheduler service account's OIDC token.
 Queue items are stored in Firestore `pipeline_queue` collection and picked up
 by a one-shot Cloud Run Job or the explicitly selected local Docker worker.
 """
@@ -11,7 +12,7 @@ import uuid
 from typing import Any, Dict
 
 import firestore_helpers
-from auth import verify_token
+from auth import verify_token, verify_token_or_scheduler
 from cloud_run_jobs import dispatch_pipeline_job
 from fastapi import APIRouter, Depends, HTTPException
 from request_models import RaceQueueRequest, validate_race_id
@@ -140,7 +141,9 @@ async def list_steps() -> Dict[str, Any]:
     return {"steps": _PIPELINE_STEPS, "step_details": _PIPELINE_STEP_DETAILS}
 
 
-@router.get("/api/queue", dependencies=[Depends(verify_token)])
+# Read-only: also accepts the queue-backlog Cloud Scheduler job's OIDC token
+# (infra/monitoring.tf), which polls this route to emit pipeline_queue_depth.
+@router.get("/api/queue", dependencies=[Depends(verify_token_or_scheduler)])
 def get_queue(active_only: bool = False, limit: int = 200) -> Dict[str, Any]:
     """List queue items from Firestore.
 

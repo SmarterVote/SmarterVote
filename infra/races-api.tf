@@ -160,6 +160,19 @@ resource "google_cloud_run_v2_service" "races_api" {
         value = var.auth0_audience
       }
 
+      # Cloud Scheduler's queue-backlog poll (monitoring.tf) authenticates with
+      # a Google-signed OIDC token for this service account. races-api accepts
+      # it only on GET /api/queue and only when both values below match.
+      env {
+        name  = "SCHEDULER_INVOKER_EMAIL"
+        value = google_service_account.queue_backlog_scheduler.email
+      }
+
+      env {
+        name  = "SCHEDULER_OIDC_AUDIENCE"
+        value = local.races_api_oidc_audience
+      }
+
       # GCS bucket name (also exposed as GCS_BUCKET for admin GCS helpers)
       env {
         name  = "GCS_BUCKET"

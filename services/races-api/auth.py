@@ -4,8 +4,9 @@ import asyncio
 import logging
 import os
 import secrets
+import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 import jwt
@@ -146,3 +147,94 @@ async def verify_token(
         return await _decode_jwt(credentials.credentials)
     except (InvalidTokenError, httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="Invalid authentication") from exc
+
+
+# ---------------------------------------------------------------------------
+# Cloud Scheduler OIDC (narrow: GET /api/queue only)
+# ---------------------------------------------------------------------------
+# The queue-backlog Cloud Scheduler job (infra/monitoring.tf) authenticates
+# with a Google-signed OIDC ID token for a dedicated service account instead
+# of a plaintext X-Admin-Key header. That identity is trusted ONLY on routes
+# that opt in with ``verify_token_or_scheduler``; every other admin route keeps
+# ``verify_token`` and rejects these tokens (they are not Auth0 tokens).
+
+_GOOGLE_ISSUERS = ("accounts.google.com", "https://accounts.google.com")
+# Google's signing certs rotate on a schedule of days and are published well
+# before use, so a short response cache is safe. It keeps a stream of forged
+# "Google-looking" bearer tokens from turning into one outbound fetch each.
+_GOOGLE_CERTS_CACHE_TTL = 600.0
+_google_certs_cache: dict[str, tuple[Any, float]] = {}
+_google_certs_lock = threading.Lock()
+
+
+class _CachingGoogleRequest:
+    """google.auth transport wrapper that caches GET responses (the certs) briefly."""
+
+    def __init__(self) -> None:
+        import google.auth.transport.requests
+
+        self._inner = google.auth.transport.requests.Request()
+
+    def __call__(self, url: str, method: str = "GET", **kwargs: Any) -> Any:
+        if method != "GET":
+            return self._inner(url, method=method, **kwargs)
+        now = time.monotonic()
+        with _google_certs_lock:
+            cached = _google_certs_cache.get(url)
+            if cached is not None and now - cached[1] < _GOOGLE_CERTS_CACHE_TTL:
+                return cached[0]
+        response = self._inner(url, method=method, **kwargs)
+        if getattr(response, "status", None) == 200:
+            with _google_certs_lock:
+                _google_certs_cache[url] = (response, now)
+        return response
+
+
+def _verify_google_id_token(token: str, audience: str) -> dict:
+    """Verify a Google-signed ID token's signature, expiry, issuer, and audience.
+
+    Raises ValueError (or a google.auth exception) on any failure.
+    """
+    from google.oauth2 import id_token as google_id_token
+
+    return google_id_token.verify_oauth2_token(token, _CachingGoogleRequest(), audience=audience)
+
+
+def _looks_like_google_token(token: str) -> bool:
+    try:
+        claims = jwt.decode(token, options={"verify_signature": False})
+    except InvalidTokenError:
+        return False
+    return claims.get("iss") in _GOOGLE_ISSUERS
+
+
+async def verify_token_or_scheduler(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_http_bearer),
+    x_admin_key: str = Header(default=""),
+) -> dict:
+    """Dependency: ``verify_token``, or the Cloud Scheduler service account's OIDC token.
+
+    Only for read-only routes the scheduler polls. The OIDC path is enabled only
+    when both SCHEDULER_INVOKER_EMAIL and SCHEDULER_OIDC_AUDIENCE are set, and a
+    Google-issued bearer token must pass signature, audience, ``email`` ==
+    SCHEDULER_INVOKER_EMAIL, and ``email_verified`` checks. Anything else falls
+    through to ``verify_token`` unchanged.
+    """
+    expected_email = os.getenv("SCHEDULER_INVOKER_EMAIL", "").strip()
+    expected_audience = os.getenv("SCHEDULER_OIDC_AUDIENCE", "").strip()
+    if expected_email and expected_audience and credentials is not None and _looks_like_google_token(credentials.credentials):
+        try:
+            claims = await asyncio.to_thread(_verify_google_id_token, credentials.credentials, expected_audience)
+        except Exception as exc:  # signature/expiry/audience/issuer/cert fetch failure
+            logger.warning("Rejected Google OIDC token: %s", type(exc).__name__)
+            raise HTTPException(status_code=401, detail="Invalid authentication") from exc
+        email = claims.get("email")
+        if (
+            claims.get("iss") not in _GOOGLE_ISSUERS
+            or not isinstance(email, str)
+            or not secrets.compare_digest(email.lower(), expected_email.lower())
+            or claims.get("email_verified") is not True
+        ):
+            raise HTTPException(status_code=401, detail="Invalid authentication")
+        return {"auth": "scheduler_oidc", "email": email}
+    return await verify_token(credentials=credentials, x_admin_key=x_admin_key)

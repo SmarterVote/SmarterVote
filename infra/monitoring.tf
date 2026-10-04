@@ -238,12 +238,36 @@ resource "google_logging_metric" "pipeline_queue_pending_depth" {
 }
 
 # Cloud Scheduler -> races-api GET /api/queue, solely to keep the log line
-# above flowing on a fixed cadence. Authenticates with X-Admin-Key the same
-# way other non-browser admin clients do (services/races-api/auth.py
-# verify_token already accepts this header), so it only gets created when
-# admin_api_key is actually set.
+# above flowing on a fixed cadence.
+#
+# Authenticates with a Google-signed OIDC ID token minted for a dedicated,
+# role-less service account. This used to send the full admin key as a plain
+# `X-Admin-Key` header, which anyone with cloudscheduler.jobs.get could read
+# off the job definition. races-api accepts this token ONLY on GET /api/queue
+# (services/races-api/auth.py verify_token_or_scheduler): it verifies the
+# Google signature, the audience below, email == SCHEDULER_INVOKER_EMAIL, and
+# email_verified. Every other admin route still requires Auth0/X-Admin-Key.
+#
+# races-api is publicly invokable (allUsers run.invoker), so Cloud Run passes
+# the Authorization header through untouched and the app does the checking.
+# The audience is the service's deterministic run.app URL, computed rather than
+# read from google_cloud_run_v2_service.races_api.uri because races-api needs
+# the same value as an env var (reading .uri there would be a self-reference).
+# The service account is created unconditionally (it holds no roles) so the
+# races-api env var never depends on alert_email.
+locals {
+  races_api_oidc_audience = "https://races-api-${var.environment}-${data.google_project.project.number}.${var.region}.run.app"
+}
+
+resource "google_service_account" "queue_backlog_scheduler" {
+  project      = var.project_id
+  account_id   = "queue-backlog-sched-${var.environment}"
+  display_name = "SmarterVote queue backlog scheduler (${var.environment})"
+  description  = "Identity Cloud Scheduler signs OIDC tokens as when polling races-api GET /api/queue. Holds no IAM roles; races-api trusts it for that one read-only route."
+}
+
 resource "google_cloud_scheduler_job" "queue_backlog_check" {
-  count       = nonsensitive(var.alert_email != "" && var.admin_api_key != "") ? 1 : 0
+  count       = var.alert_email != "" ? 1 : 0
   project     = var.project_id
   region      = var.region
   name        = "queue-backlog-check-${var.environment}"
@@ -255,8 +279,9 @@ resource "google_cloud_scheduler_job" "queue_backlog_check" {
     uri         = "${google_cloud_run_v2_service.races_api.uri}/api/queue?active_only=true"
     http_method = "GET"
 
-    headers = {
-      "X-Admin-Key" = var.admin_api_key
+    oidc_token {
+      service_account_email = google_service_account.queue_backlog_scheduler.email
+      audience              = local.races_api_oidc_audience
     }
   }
 

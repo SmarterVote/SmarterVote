@@ -5179,3 +5179,148 @@ def test_race_summary_schema_keeps_forecast_panel_fields():
     assert dumped["method"] == "panel_median_v1"
     assert dumped["panel"] == [{"model": "a/model"}]
     assert dumped["panel_spread"] == 0.12
+
+
+# ---------------------------------------------------------------------------
+# Cloud Scheduler OIDC auth (GET /api/queue only)
+# ---------------------------------------------------------------------------
+
+_SCHED_EMAIL = "queue-backlog-sched-dev@proj.iam.gserviceaccount.com"
+_SCHED_AUD = "https://races-api-dev-123.us-central1.run.app"
+
+
+def _google_looking_token(**claims) -> str:
+    import jwt
+
+    payload = {"iss": "https://accounts.google.com", "aud": _SCHED_AUD, "email": _SCHED_EMAIL}
+    payload.update(claims)
+    return jwt.encode(payload, "not-a-real-google-key-not-a-real-google-key", algorithm="HS256")
+
+
+@pytest.fixture
+def scheduler_client(monkeypatch):
+    """TestClient with real auth: scheduler OIDC configured, Auth0 configured but unreachable."""
+    monkeypatch.delenv("SKIP_AUTH", raising=False)
+    monkeypatch.setenv("ADMIN_API_KEY", "test-key")
+    monkeypatch.setenv("AUTH0_DOMAIN", "example.auth0.com")
+    monkeypatch.setenv("AUTH0_AUDIENCE", "https://api.example")
+    monkeypatch.setenv("SCHEDULER_INVOKER_EMAIL", _SCHED_EMAIL)
+    monkeypatch.setenv("SCHEDULER_OIDC_AUDIENCE", _SCHED_AUD)
+
+    import auth
+
+    with (
+        patch("firestore_helpers._get_fs", side_effect=_make_mock_fs),
+        patch("gcs_helpers._get_gcs_admin", return_value=None),
+        patch("gcs_helpers._GCS_BUCKET", ""),
+        # Auth0 JWKS has no matching key: any non-scheduler bearer token is rejected.
+        patch.object(auth, "_get_jwks", AsyncMock(return_value={"keys": []})),
+    ):
+        import main as app_module
+        from fastapi.testclient import TestClient
+
+        firestore_helpers._fs_db = None
+        # Other test modules may leave a verify_token override installed on the
+        # shared app; these tests need the real dependency.
+        saved_overrides = dict(app_module.app.dependency_overrides)
+        app_module.app.dependency_overrides.clear()
+        try:
+            yield TestClient(app_module.app)
+        finally:
+            app_module.app.dependency_overrides.update(saved_overrides)
+
+
+def _valid_claims(**overrides):
+    claims = {"iss": "https://accounts.google.com", "aud": _SCHED_AUD, "email": _SCHED_EMAIL, "email_verified": True}
+    claims.update(overrides)
+    return claims
+
+
+def test_scheduler_oidc_token_accepted_on_get_queue(scheduler_client):
+    import auth
+
+    token = _google_looking_token()
+    with patch.object(auth, "_verify_google_id_token", return_value=_valid_claims()) as verify:
+        resp = scheduler_client.get("/api/queue?active_only=true", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
+    verify.assert_called_once_with(token, _SCHED_AUD)
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        _valid_claims(email="attacker@proj.iam.gserviceaccount.com"),
+        _valid_claims(email_verified=False),
+        _valid_claims(email_verified="true"),
+        _valid_claims(iss="https://evil.example"),
+        {k: v for k, v in _valid_claims().items() if k != "email"},
+    ],
+)
+def test_scheduler_oidc_token_rejected_on_claim_mismatch(scheduler_client, claims):
+    import auth
+
+    token = _google_looking_token()
+    with patch.object(auth, "_verify_google_id_token", return_value=claims):
+        resp = scheduler_client.get("/api/queue", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def test_scheduler_oidc_token_rejected_when_signature_invalid(scheduler_client):
+    import auth
+
+    token = _google_looking_token()
+    with patch.object(auth, "_verify_google_id_token", side_effect=ValueError("Token used too late / bad signature")):
+        resp = scheduler_client.get("/api/queue", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+
+
+def test_scheduler_oidc_token_not_accepted_on_other_admin_routes(scheduler_client):
+    import auth
+
+    token = _google_looking_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    with patch.object(auth, "_verify_google_id_token", return_value=_valid_claims()) as verify:
+        assert scheduler_client.get("/steps", headers=headers).status_code == 401
+        assert scheduler_client.post("/api/queue/reconcile", headers=headers).status_code == 401
+        assert scheduler_client.delete("/api/queue/finished", headers=headers).status_code == 401
+    verify.assert_not_called()
+
+
+def test_scheduler_oidc_disabled_without_configuration(scheduler_client, monkeypatch):
+    import auth
+
+    monkeypatch.delenv("SCHEDULER_INVOKER_EMAIL")
+    token = _google_looking_token()
+    with patch.object(auth, "_verify_google_id_token", return_value=_valid_claims()) as verify:
+        resp = scheduler_client.get("/api/queue", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401
+    verify.assert_not_called()
+
+
+def test_get_queue_still_accepts_admin_key_and_rejects_anonymous(scheduler_client):
+    assert scheduler_client.get("/api/queue", headers={"X-Admin-Key": "test-key"}).status_code == 200
+    assert scheduler_client.get("/api/queue").status_code == 401
+
+
+def test_verify_google_id_token_uses_verify_oauth2_token_with_audience():
+    import auth
+
+    with patch("google.oauth2.id_token.verify_oauth2_token", return_value={"email": _SCHED_EMAIL}) as verify:
+        assert auth._verify_google_id_token("tok", _SCHED_AUD) == {"email": _SCHED_EMAIL}
+    args, kwargs = verify.call_args
+    assert args[0] == "tok"
+    assert kwargs["audience"] == _SCHED_AUD
+
+
+def test_google_certs_request_caches_successful_get(monkeypatch):
+    import auth
+
+    auth._google_certs_cache.clear()
+    inner = MagicMock(return_value=MagicMock(status=200))
+    req = auth._CachingGoogleRequest()
+    req._inner = inner
+    first = req("https://www.googleapis.com/oauth2/v1/certs")
+    second = req("https://www.googleapis.com/oauth2/v1/certs")
+    assert first is second
+    assert inner.call_count == 1
+    auth._google_certs_cache.clear()
