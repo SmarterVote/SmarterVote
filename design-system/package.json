@@ -39,6 +39,7 @@
     "typescript": "^5.9.3"
   },
   "overrides": {
+    "@parcel/watcher": "^2.6.0",
     "esbuild": "0.28.1"
   }
 }

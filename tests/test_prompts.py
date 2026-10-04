@@ -547,3 +547,13 @@ def test_no_prompt_hardcodes_an_election_year(name, template):
             continue
         offenders.append(line.strip())
     assert not offenders, f"{name} hardcodes an election year:\n" + "\n".join(offenders)
+
+
+def test_update_prompt_keeps_summaries_biographical_and_balanced():
+    result = UPDATE_META_USER.format(
+        race_id="az-01-house-2026", last_updated="2026-09-01", current_date="2026-10-03", candidate_names="A, B"
+    )
+    assert "SUMMARY BALANCE" in result
+    assert "attack line" in result
+    assert "same kind of content at the same depth" in result
+    assert "Leave poll numbers" in result
