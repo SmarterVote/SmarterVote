@@ -726,6 +726,8 @@ async def test_discovery_only_update_uses_update_discovery_phases():
         "update-meta",
     ]
     assert "Use the certified special-election roster." in mock_loop.call_args_list[0].args[1]
+    # The summaries are written in update-meta, so a goal about wording must reach it too.
+    assert "Use the certified special-election roster." in mock_loop.call_args_list[2].args[1]
 
 
 def _emulate_forecast_tools(kwargs):
