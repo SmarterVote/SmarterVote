@@ -12,10 +12,67 @@ resource "google_project_iam_member" "pipeline_job_firestore" {
   member  = "serviceAccount:${google_service_account.pipeline_job.email}"
 }
 
+# Data-bucket access is split into bucket-wide read and prefix-scoped write.
+#
+# This was an unconditional bucket-wide `roles/storage.objectAdmin`, which let
+# the job overwrite or delete published `races/*.json` and the public
+# `races/summaries.json` index — publishing is an explicit admin action that
+# only races-api performs, so a worker bug or a prompt-injection path should
+# never be able to reach them.
+#
+# What the worker actually touches (pipeline_client/ + shared/, GCP mode):
+#   READS   drafts/, races/ (baseline + catalog hydration), checkpoints/
+#           (continuation handoff), artifacts/ — and lists drafts/, races/,
+#           artifacts/.
+#   WRITES  drafts/<race>.json       AgentHandler._upload_to_gcs (overwrite)
+#           retired/<race>/<ts>.json AgentHandler._archive_gcs_version (copy)
+#           checkpoints/<run>.json   handoff checkpoint in AgentHandler
+#           artifacts/<id>.json      GCPStorageBackend.save_artifact
+#   (GCPStorageBackend.save_race_json -> races/ and save_web_content ->
+#   <race>/<kind>/ exist but have no callers; they are intentionally not
+#   granted.) No GCS deletes; overwriting drafts/ needs objects.delete, which
+#   objectAdmin carries within the condition.
+#
+# Bucket IAM Conditions require uniform bucket-level access, which
+# google_storage_bucket.sv_data sets. objects.list is checked against the
+# bucket (not an object), so the conditional grant cannot provide it; the
+# unconditional objectViewer below does.
+#
+# Apply ordering: this keeps the original resource address and uses
+# create_before_destroy, so the new conditional binding (and, via depends_on,
+# the viewer binding) exists before the old unconditional one is removed. IAM
+# propagation is still eventual, so a job writing during the apply could see a
+# brief 403; prefer applying with no runner="cloud_run" runs in flight. The
+# local Docker worker uses developer ADC and is unaffected.
+locals {
+  pipeline_job_write_prefixes = ["drafts/", "retired/", "checkpoints/", "artifacts/"]
+}
+
+resource "google_storage_bucket_iam_member" "pipeline_job_storage_read" {
+  bucket = google_storage_bucket.sv_data.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.pipeline_job.email}"
+}
+
 resource "google_storage_bucket_iam_member" "pipeline_job_storage" {
   bucket = google_storage_bucket.sv_data.name
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.pipeline_job.email}"
+
+  condition {
+    title       = "pipeline-job-write-prefixes"
+    description = "Pipeline job may write only ${join(", ", local.pipeline_job_write_prefixes)}; never races/ or summaries.json."
+    expression = join(" || ", [
+      for prefix in local.pipeline_job_write_prefixes :
+      "resource.name.startsWith(\"projects/_/buckets/${google_storage_bucket.sv_data.name}/objects/${prefix}\")"
+    ])
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  depends_on = [google_storage_bucket_iam_member.pipeline_job_storage_read]
 }
 
 # Secret access is granted per secret, not project-wide.
@@ -152,6 +209,7 @@ resource "google_cloud_run_v2_job" "pipeline" {
     google_project_service.apis,
     google_project_iam_member.pipeline_job_firestore,
     google_storage_bucket_iam_member.pipeline_job_storage,
+    google_storage_bucket_iam_member.pipeline_job_storage_read,
     google_secret_manager_secret_iam_member.pipeline_job_secrets,
   ]
 }

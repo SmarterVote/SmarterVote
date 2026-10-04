@@ -412,6 +412,7 @@ def test_pending_items_filters_runner_and_status_in_firestore():
     query = MagicMock()
     db.collection.return_value = query
     query.where.return_value = query
+    query.order_by.return_value = query
     query.limit.return_value = query
     query.stream.return_value = []
 

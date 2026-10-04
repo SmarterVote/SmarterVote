@@ -112,6 +112,55 @@ def test_get_openrouter_client_recreates_when_api_key_changes(monkeypatch):
     monkeypatch.setattr(llm_module, "_openrouter_client", None)
 
 
+def test_get_openrouter_client_is_per_loop_and_drops_closed_loops(monkeypatch):
+    import weakref
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-1")
+    cache = weakref.WeakKeyDictionary()
+    monkeypatch.setattr(llm_module, "_openrouter_clients_by_loop", cache)
+
+    async def grab():
+        return _get_openrouter_client(), _get_openrouter_client()
+
+    loop_a = asyncio.new_event_loop()
+    try:
+        a1, a2 = loop_a.run_until_complete(grab())
+    finally:
+        loop_a.close()
+    assert a1 is a2
+    assert list(cache.keys()) == [loop_a]
+
+    loop_b = asyncio.new_event_loop()
+    try:
+        (b1, _b2) = loop_b.run_until_complete(grab())
+        # The closed loop's client was dropped (not closed: that needs the dead loop).
+        assert b1 is not a1
+        assert list(cache.keys()) == [loop_b]
+    finally:
+        loop_b.close()
+
+
+def test_get_openrouter_client_closes_replaced_client_on_live_loop(monkeypatch):
+    import weakref
+
+    monkeypatch.setattr(llm_module, "_openrouter_clients_by_loop", weakref.WeakKeyDictionary())
+
+    async def rotate():
+        monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-1")
+        first = _get_openrouter_client()
+        monkeypatch.setenv("OPENROUTER_API_KEY", "test-key-2")
+        second = _get_openrouter_client()
+        await asyncio.sleep(0)
+        await asyncio.gather(*list(llm_module._openrouter_close_tasks))
+        return first, second
+
+    first, second = asyncio.run(rotate())
+    assert second is not first
+    assert second.api_key == "test-key-2"
+    assert first.is_closed()
+    assert not llm_module._openrouter_close_tasks
+
+
 # ---------------------------------------------------------------------------
 # _openrouter_request_timeout_seconds
 # ---------------------------------------------------------------------------

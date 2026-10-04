@@ -82,7 +82,7 @@ The admin dashboard should target `services/races-api`.
 | DELETE | `/runs`                                                     | Prune terminal pipeline runs                     |
 | POST   | `/runs/{run_id}/cancel`                                     | Cancel an active run (409 if already finished)   |
 | DELETE | `/runs/{run_id}`                                            | Cancel or delete a run (`?cancel_only=true` never deletes) |
-| GET    | `/api/queue`                                                | List queue items                                 |
+| GET    | `/api/queue`                                                | List queue items (also the queue-backlog scheduler, see below) |
 | POST   | `/api/queue/reconcile`                                      | Persist queue state from authoritative runs      |
 | DELETE | `/api/queue/{item_id}`                                      | Cancel/remove a queue item                       |
 | DELETE | `/api/queue/finished`                                       | Clear completed/failed/cancelled queue items     |
@@ -232,6 +232,24 @@ Update/rerun mode adds roster and metadata synchronization before re-researching
 | Firestore `rate_limits`               | Shared transactional API throttling counters with TTL cleanup                |
 | Firestore `races`                     | Race catalog metadata for admin listing/filtering, plus status and history   |
 | Secret Manager                        | API keys and admin secrets                                                   |
+
+GCS `checkpoints/` (continuation handoff) and `artifacts/` (run artifacts) are
+also worker-written. The `pipeline-job-<env>` service account can read the whole
+data bucket but can write only `drafts/`, `retired/`, `checkpoints/`, and
+`artifacts/` (an IAM-conditioned `roles/storage.objectAdmin`,
+`infra/pipeline-job.tf`). Publishing to `races/` and maintaining
+`races/summaries.json` is done only by races-api. The local Docker worker uses
+the workstation's ADC and is not bound by this.
+
+### Scheduler authentication
+
+Every admin route uses `verify_token` (Auth0 JWT or `X-Admin-Key`). The single
+exception is read-only `GET /api/queue`, which uses `verify_token_or_scheduler`
+(`services/races-api/auth.py`): it additionally accepts a Google-signed OIDC ID
+token from the queue-backlog Cloud Scheduler job, verified with
+`google.oauth2.id_token.verify_oauth2_token` against `SCHEDULER_OIDC_AUDIENCE`,
+with `email` equal to `SCHEDULER_INVOKER_EMAIL` and `email_verified` true. Both
+env vars are set by Terraform; when either is empty the OIDC path is off.
 
 ## Local Development
 

@@ -15,6 +15,7 @@ from pipeline_client.agent.images import (
     _looks_like_non_photo,
     _looks_like_social_profile_avatar,
     _lookup_ballotpedia_image,
+    _lookup_known_page_image,
     _lookup_wikipedia_image,
     _name_tokens,
     _resolve_single_image,
@@ -1538,3 +1539,47 @@ async def test_partisan_serper_hit_does_not_beat_a_later_fallback_order(monkeypa
     await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
 
     assert candidate["image_url"] == partisan
+
+
+@pytest.mark.asyncio
+async def test_known_page_image_lookup_caps_html_bytes(monkeypatch):
+    """A huge (or endless) candidate page is streamed under a byte cap, not buffered whole."""
+    import types
+    from unittest.mock import AsyncMock
+
+    import httpx
+
+    from pipeline_client.agent import images as images_module
+    from pipeline_client.agent import web_tools
+
+    monkeypatch.setattr(web_tools, "MAX_PAGE_BYTES", 64 * 1024)
+    monkeypatch.setattr(images_module, "MAX_PAGE_BYTES", 64 * 1024)
+    monkeypatch.setattr(web_tools, "_validate_url_async", AsyncMock(return_value=None))
+    monkeypatch.setattr(images_module, "_check_url_accessible", AsyncMock(side_effect=lambda url: (True, url)))
+
+    head = b'<html><head><meta property="og:image" content="https://example.org/media/jane-doe-headshot.jpg"></head><body>'
+    sent = {"bytes": 0}
+
+    async def endless_body():
+        yield head
+        sent["bytes"] += len(head)
+        chunk = b"x" * 8192
+        for _ in range(10_000):  # ~80 MB if read in full
+            sent["bytes"] += len(chunk)
+            yield chunk
+
+    def handler(request):
+        return httpx.Response(200, headers={"content-type": "text/html"}, content=endless_body())
+
+    real_client = httpx.AsyncClient
+
+    def client_factory(**kwargs):
+        kwargs.pop("event_hooks", None)
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(images_module, "httpx", types.SimpleNamespace(AsyncClient=client_factory))
+
+    result = await _lookup_known_page_image({"name": "Jane Doe", "website": "https://janedoe.example.org/"})
+
+    assert result == "https://example.org/media/jane-doe-headshot.jpg"
+    assert sent["bytes"] < 1024 * 1024

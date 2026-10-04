@@ -360,10 +360,46 @@ class _VersionGate:
 def _poll_window(capacity: int) -> int:
     """How many queue docs to read per poll so client-side FIFO ordering is meaningful.
 
-    Firestore returns equality-filtered docs in document-id order (random ids), so
-    reading only ``capacity`` docs picked arbitrary items and could starve old ones.
+    With the composite index the query is ordered server-side, but without it
+    (index still building) Firestore returns equality-filtered docs in document-id
+    order (random ids), so reading only ``capacity`` docs would pick arbitrary
+    items and could starve old ones.
     """
     return max(capacity * 10, 50)
+
+
+#: Set once the ordered poll query has failed for want of its composite index,
+#: so the fallback is logged once rather than on every poll.
+_ordered_poll_fallback_logged = False
+
+
+def _stream_queue_status(collection: Any, runner: str, status: str, limit: int) -> list:
+    """Stream one runner/status slice of the queue, oldest ``created_at`` first.
+
+    The ordered query needs the ``(runner, status, created_at)`` composite index
+    (``infra/firestore-indexes.tf``). Terraform applies on merge but the index
+    takes minutes to build, and until then Firestore raises FailedPrecondition;
+    in that case fall back to the unordered read (the caller still sorts
+    client-side), so the worker and the index can deploy in either order. The
+    ordered query is retried on every poll, so FIFO resumes once the index is up.
+    """
+    global _ordered_poll_fallback_logged
+    from google.api_core.exceptions import FailedPrecondition  # type: ignore
+    from google.cloud.firestore_v1 import FieldFilter  # type: ignore
+
+    base = collection.where(filter=FieldFilter("runner", "==", runner))
+    base = base.where(filter=FieldFilter("status", "==", status))
+    try:
+        return list(base.order_by("created_at").limit(limit).stream())
+    except FailedPrecondition as exc:
+        if not _ordered_poll_fallback_logged:
+            _ordered_poll_fallback_logged = True
+            logger.warning(
+                "Ordered queue poll unavailable (composite index missing or still building): %s — "
+                "falling back to an unordered read with client-side FIFO sort",
+                exc,
+            )
+        return list(base.limit(limit).stream())
 
 
 def _pending_items(db: Any, runner: str, limit: int = 50):
@@ -372,18 +408,15 @@ def _pending_items(db: Any, runner: str, limit: int = 50):
     Runner and status filters execute in Firestore so completed history can
     never starve new work. Pending and running items use separate equality
     queries to avoid requiring a composite ``in`` index; only expired running
-    leases are returned. Ordering stays client-side.
+    leases are returned. Firestore orders each slice by ``created_at`` when the
+    composite index exists; the merged result is also sorted client-side.
     """
-    from google.cloud.firestore_v1 import FieldFilter  # type: ignore
-
     from pipeline_client.backend.queue_processor import _lease_expired, _now
 
     collection = db.collection(FIRESTORE_QUEUE_COLLECTION)
     docs = []
     for status in ("pending", "running"):
-        query = collection.where(filter=FieldFilter("runner", "==", runner))
-        query = query.where(filter=FieldFilter("status", "==", status))
-        docs.extend(query.limit(limit).stream())
+        docs.extend(_stream_queue_status(collection, runner, status, limit))
     now = _now()
     items = []
     seen_ids = set()

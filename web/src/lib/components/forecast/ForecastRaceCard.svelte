@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { fetchPublishedRace } from "$lib/prerenderData";
+  import {
+    fetchForecastDetails,
+    type ForecastDetails,
+  } from "$lib/prerenderData";
   import type { RaceForecast } from "$lib/types";
   import { isExternalUrl } from "$lib/utils/url";
   import type { ForecastRace } from "$lib/utils/forecast";
@@ -48,23 +51,11 @@
   /*
    * The forecast page embeds only the fields the collapsed card, map and
    * aggregates need (see toForecastRaceSummaries). The analysis drawer's
-   * longer fields are loaded from the published race file the first time the
-   * card is expanded; fetchPublishedRace caches that request per race.
+   * longer fields are loaded the first time the card is expanded, from the
+   * small per-race forecast payload written at deploy (falling back to the
+   * full published race file); fetchForecastDetails caches that per race.
    */
-  type DetailFields = Pick<
-    RaceForecast,
-    | "rationale"
-    | "key_reasons"
-    | "uncertainty"
-    | "market_signals"
-    | "evidence_lineage"
-    | "source_urls"
-    | "panel"
-    | "panel_spread"
-    | "model"
-    | "generated_at"
-  >;
-  let details: Partial<DetailFields> | null = null;
+  let details: ForecastDetails | null = null;
   let detailsState: "idle" | "loading" | "error" | "ready" = "idle";
   let detailsFor = race.id;
 
@@ -84,22 +75,9 @@
     const id = race.id;
     detailsState = "loading";
     try {
-      const full = (await fetchPublishedRace(id)).forecast;
+      const loaded = await fetchForecastDetails(id, race.updated_utc);
       if (id !== race.id) return;
-      details = full
-        ? {
-            rationale: full.rationale,
-            key_reasons: full.key_reasons,
-            uncertainty: full.uncertainty,
-            market_signals: full.market_signals,
-            evidence_lineage: full.evidence_lineage,
-            source_urls: full.source_urls,
-            panel: full.panel,
-            panel_spread: full.panel_spread,
-            model: full.model,
-            generated_at: full.generated_at,
-          }
-        : {};
+      details = loaded;
       detailsState = "ready";
     } catch {
       if (id === race.id) detailsState = "error";

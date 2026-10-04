@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import time
+import weakref
 from typing import Any, Dict, List, Optional
 
 from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup
@@ -106,20 +107,51 @@ def _accumulate_usage(resp: Any, model: str) -> None:
 # OpenRouter client singleton
 # ---------------------------------------------------------------------------
 
+#: Client for callers with no running event loop (the pool binds lazily on first use).
 _openrouter_client: Any = None
-#: Event loop the cached client's connection pool is bound to. httpx pools cannot
-#: cross loops, so a sync caller that wraps each call in ``asyncio.run`` would
-#: otherwise get "Event loop is closed" on every call after the first.
-_openrouter_client_loop: Any = None
+#: One client per event loop. httpx pools cannot cross loops, so a sync caller that
+#: wraps each call in ``asyncio.run`` would otherwise get "Event loop is closed" on
+#: every call after the first. Keyed weakly by the loop object (not ``id(loop)``,
+#: which is reused after collection), so an entry vanishes with its loop; clients
+#: of loops that are closed but still referenced are pruned on the next lookup.
+_openrouter_clients_by_loop: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, Any]" = weakref.WeakKeyDictionary()
+#: Strong references to in-flight ``close()`` tasks so they are not collected mid-run.
+_openrouter_close_tasks: "set[asyncio.Task]" = set()
 _DEFAULT_LLM_REQUEST_TIMEOUT_SECONDS = 240.0
 _DEFAULT_LLM_RATE_LIMIT_MAX_RETRIES = 3
 _DEFAULT_LLM_RATE_LIMIT_MAX_WAIT_SECONDS = 60
 
 
-def _get_openrouter_client() -> Any:
-    """Return (and lazily create) the shared OpenRouter AsyncOpenAI client."""
-    global _openrouter_client, _openrouter_client_loop
+def _new_openrouter_client(api_key: str) -> Any:
     from openai import AsyncOpenAI
+
+    return AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        max_retries=0,
+        timeout=300,
+        default_headers={
+            "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "https://smarter.vote"),
+            "X-Title": os.getenv("OPENROUTER_APP_TITLE", "SmarterVote"),
+        },
+    )
+
+
+def _close_openrouter_client_soon(loop: asyncio.AbstractEventLoop, client: Any) -> None:
+    """Close a replaced client on *loop* (its own, still-running loop) without awaiting."""
+    try:
+        if client.is_closed():
+            return
+        task = loop.create_task(client.close())
+    except Exception:  # noqa: BLE001 - best effort; dropping the reference still frees it
+        return
+    _openrouter_close_tasks.add(task)
+    task.add_done_callback(_openrouter_close_tasks.discard)
+
+
+def _get_openrouter_client() -> Any:
+    """Return (and lazily create) the OpenRouter AsyncOpenAI client for the running loop."""
+    global _openrouter_client
 
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
@@ -130,22 +162,25 @@ def _get_openrouter_client() -> Any:
     except RuntimeError:
         loop = None
 
-    existing_key = getattr(_openrouter_client, "api_key", None)
-    loop_changed = _openrouter_client_loop is not None and loop is not None and loop is not _openrouter_client_loop
-    if _openrouter_client is None or existing_key != api_key or loop_changed:
-        _openrouter_client_loop = loop
-        _openrouter_client = AsyncOpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-            max_retries=0,
-            timeout=300,
-            default_headers={
-                "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "https://smarter.vote"),
-                "X-Title": os.getenv("OPENROUTER_APP_TITLE", "SmarterVote"),
-            },
-        )
+    if loop is None:
+        if _openrouter_client is None or getattr(_openrouter_client, "api_key", None) != api_key:
+            _openrouter_client = _new_openrouter_client(api_key)
+        return _openrouter_client
 
-    return _openrouter_client
+    # A closed loop's client cannot be closed (that needs the dead loop), so just
+    # drop the reference and let it be garbage collected.
+    for stale_loop in [lp for lp in list(_openrouter_clients_by_loop.keys()) if lp.is_closed()]:
+        _openrouter_clients_by_loop.pop(stale_loop, None)
+
+    client = _openrouter_clients_by_loop.get(loop)
+    if client is not None and getattr(client, "api_key", None) == api_key and not client.is_closed():
+        return client
+    if client is not None:
+        # Replaced on the same live loop (e.g. API key rotated): close it there.
+        _close_openrouter_client_soon(loop, client)
+    client = _new_openrouter_client(api_key)
+    _openrouter_clients_by_loop[loop] = client
+    return client
 
 
 def _model_supports_temperature(model: str) -> bool:

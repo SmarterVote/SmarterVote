@@ -4,10 +4,10 @@ import type { ForecastEvidence, RaceForecast } from "$lib/types";
 import type { ForecastRace } from "$lib/utils/forecast";
 import ForecastRaceCard from "./ForecastRaceCard.svelte";
 
-const { fetchPublishedRace } = vi.hoisted(() => ({
-  fetchPublishedRace: vi.fn(),
+const { fetchForecastDetails } = vi.hoisted(() => ({
+  fetchForecastDetails: vi.fn(),
 }));
-vi.mock("$lib/prerenderData", () => ({ fetchPublishedRace }));
+vi.mock("$lib/prerenderData", () => ({ fetchForecastDetails }));
 
 // Summary forecasts never carry evidence_lineage (the drawer fetches it), but
 // the card renders it from whichever forecast it has; these fixtures add it.
@@ -189,7 +189,7 @@ describe("ForecastRaceCard", () => {
     } = race.forecast;
     const trimmed = { ...race, forecast: compact } as ForecastRace;
 
-    afterEach(() => fetchPublishedRace.mockReset());
+    afterEach(() => fetchForecastDetails.mockReset());
 
     it("does not fetch details while collapsed", () => {
       render(ForecastRaceCard, {
@@ -197,11 +197,11 @@ describe("ForecastRaceCard", () => {
         isExpanded: false,
         onToggleExpand: vi.fn(),
       });
-      expect(fetchPublishedRace).not.toHaveBeenCalled();
+      expect(fetchForecastDetails).not.toHaveBeenCalled();
     });
 
-    it("loads the drawer fields from the race file when expanded", async () => {
-      fetchPublishedRace.mockResolvedValue({ forecast: race.forecast });
+    it("loads the drawer fields for this race version when expanded", async () => {
+      fetchForecastDetails.mockResolvedValue(race.forecast);
       render(ForecastRaceCard, {
         race: trimmed,
         isExpanded: true,
@@ -209,14 +209,17 @@ describe("ForecastRaceCard", () => {
       });
 
       expect(screen.getByText("Loading analysis…")).toBeTruthy();
-      expect(fetchPublishedRace).toHaveBeenCalledWith("mi-senate-2026");
+      expect(fetchForecastDetails).toHaveBeenCalledWith(
+        "mi-senate-2026",
+        "2026-07-01T00:00:00Z",
+      );
       expect(await screen.findByText("Polling advantage")).toBeTruthy();
       expect(screen.getByText("Full assessment")).toBeTruthy();
     });
 
     it("offers a retry when the details request fails", async () => {
-      fetchPublishedRace.mockRejectedValueOnce(new Error("offline"));
-      fetchPublishedRace.mockResolvedValueOnce({ forecast: race.forecast });
+      fetchForecastDetails.mockRejectedValueOnce(new Error("offline"));
+      fetchForecastDetails.mockResolvedValueOnce(race.forecast);
       render(ForecastRaceCard, {
         race: trimmed,
         isExpanded: true,
@@ -227,7 +230,7 @@ describe("ForecastRaceCard", () => {
       await fireEvent.click(retry);
 
       expect(await screen.findByText("Polling advantage")).toBeTruthy();
-      expect(fetchPublishedRace).toHaveBeenCalledTimes(2);
+      expect(fetchForecastDetails).toHaveBeenCalledTimes(2);
     });
   });
 

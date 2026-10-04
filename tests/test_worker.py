@@ -128,6 +128,9 @@ class _FakeQuery:
     def where(self, *_a, **_k):
         return self
 
+    def order_by(self, *_a, **_k):
+        return self
+
     def limit(self, _n):
         return self
 
@@ -166,6 +169,89 @@ def test_pending_items_sorts_by_created_at_ascending(monkeypatch):
     items = worker._pending_items(db, "local", limit=10)
 
     assert [item_id for item_id, _ in items] == ["item-a", "item-b"]
+
+
+def _firestore_stub(monkeypatch):
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "google.cloud.firestore_v1",
+        types.SimpleNamespace(FieldFilter=lambda *a, **k: ("filter", a, k)),
+    )
+
+
+class _OrderedQuery:
+    """Records whether the poll asked Firestore to order by created_at."""
+
+    def __init__(self, docs, *, ordered_error=None, calls=None):
+        self._docs = docs
+        self._ordered_error = ordered_error
+        self._ordered = False
+        self.calls = calls if calls is not None else []
+
+    def where(self, *_a, **_k):
+        return self
+
+    def order_by(self, field, *_a, **_k):
+        self.calls.append(("order_by", field))
+        clone = _OrderedQuery(self._docs, ordered_error=self._ordered_error, calls=self.calls)
+        clone._ordered = True
+        return clone
+
+    def limit(self, n):
+        self.calls.append(("limit", n))
+        return self
+
+    def stream(self):
+        if self._ordered and self._ordered_error is not None:
+            raise self._ordered_error
+        self.calls.append(("stream", "ordered" if self._ordered else "unordered"))
+        return iter(self._docs)
+
+
+def _ordered_db(query):
+    return types.SimpleNamespace(collection=lambda _n: types.SimpleNamespace(where=lambda *a, **k: query))
+
+
+def test_pending_items_orders_server_side_by_created_at(monkeypatch):
+    _firestore_stub(monkeypatch)
+    query = _OrderedQuery([_FakeDocSnapshot("item-a", {"status": "pending", "created_at": "2026-01-01T00:00:00Z"})])
+
+    items = worker._pending_items(_ordered_db(query), "local", limit=7)
+
+    assert [item_id for item_id, _ in items] == ["item-a"]
+    assert query.calls.count(("order_by", "created_at")) == 2
+    assert ("stream", "unordered") not in query.calls
+    assert query.calls.count(("stream", "ordered")) == 2
+
+
+def test_pending_items_falls_back_when_index_missing(monkeypatch, caplog):
+    from google.api_core.exceptions import FailedPrecondition
+
+    _firestore_stub(monkeypatch)
+    monkeypatch.setattr(worker, "_ordered_poll_fallback_logged", False)
+    docs = [
+        _FakeDocSnapshot("item-b", {"status": "pending", "created_at": "2026-01-02T00:00:00Z"}),
+        _FakeDocSnapshot("item-a", {"status": "pending", "created_at": "2026-01-01T00:00:00Z"}),
+    ]
+    query = _OrderedQuery(docs, ordered_error=FailedPrecondition("The query requires an index."))
+
+    with caplog.at_level("WARNING", logger="pipeline_worker"):
+        items = worker._pending_items(_ordered_db(query), "local", limit=10)
+        worker._pending_items(_ordered_db(query), "local", limit=10)
+
+    # Client-side sort still yields FIFO from the unordered read.
+    assert [item_id for item_id, _ in items] == ["item-a", "item-b"]
+    assert query.calls.count(("stream", "unordered")) == 4
+    fallback_logs = [r for r in caplog.records if "Ordered queue poll unavailable" in r.getMessage()]
+    assert len(fallback_logs) == 1
+
+
+def test_pending_items_does_not_swallow_other_errors(monkeypatch):
+    _firestore_stub(monkeypatch)
+    query = _OrderedQuery([], ordered_error=RuntimeError("boom"))
+
+    with pytest.raises(RuntimeError):
+        worker._pending_items(_ordered_db(query), "local")
 
 
 def test_pending_items_handles_missing_created_at(monkeypatch):
