@@ -9,7 +9,12 @@ from typing import Any, Dict, List, Optional
 from google.api_core.exceptions import NotFound, PreconditionFailed
 
 from shared.config import NON_RACE_CATALOG_IDS
-from shared.race_catalog import build_forecast_summary
+from shared.race_catalog import (
+    build_agent_metrics_summary,
+    build_candidate_summaries,
+    build_forecast_summary,
+    extract_quality_grade,
+)
 
 # Resolved once at startup; can be overridden in tests.
 _GCS_BUCKET = os.getenv("GCS_BUCKET", "")
@@ -41,9 +46,10 @@ def _gcs_list_race_ids(prefix: str) -> Optional[List[str]]:
         return None
     try:
         bucket = client.bucket(_GCS_BUCKET)
-        blobs = list(bucket.list_blobs(prefix=f"{prefix}/", max_results=500))
+        # No max_results: the iterator pages through every blob. A fixed cap
+        # silently truncated the listing once the catalog passed 500 contests.
         ids = []
-        for blob in blobs:
+        for blob in bucket.list_blobs(prefix=f"{prefix}/"):
             filename = blob.name.split("/")[-1]
             if not filename.endswith(".json"):
                 continue
@@ -189,9 +195,15 @@ def _gcs_list_versions(race_id: str) -> List[Dict[str, Any]]:
 
 
 def _summary_from_race_data(race_id: str, race_data: Dict[str, Any]) -> Dict[str, Any]:
-    agent_metrics = race_data.get("agent_metrics") or None
+    """Build one races/summaries.json entry; the single builder every index writer uses.
+
+    ``id`` is always the storage key ``race_id`` -- never the blob's own
+    ``id`` field -- so the entry added on publish is the same one removed on
+    unpublish/delete (both keyed by the URL race_id). A draft whose ``id``
+    disagreed used to leave an orphaned index entry that nothing could remove.
+    """
     return {
-        "id": race_data.get("id", race_id),
+        "id": race_id,
         "title": race_data.get("title"),
         "office": race_data.get("office"),
         "jurisdiction": race_data.get("jurisdiction"),
@@ -199,28 +211,9 @@ def _summary_from_race_data(race_id: str, race_data: Dict[str, Any]) -> Dict[str
         "contest_stage": race_data.get("contest_stage", "unknown"),
         "election_date": race_data.get("election_date", ""),
         "updated_utc": race_data.get("updated_utc", ""),
-        "candidates": [
-            {
-                "name": candidate.get("name", ""),
-                "party": candidate.get("party"),
-                "incumbent": candidate.get("incumbent", False),
-                "image_url": candidate.get("image_url"),
-            }
-            for candidate in race_data.get("candidates", [])
-            if isinstance(candidate, dict)
-        ],
-        "quality_grade": (
-            race_data.get("validation_grade", {}).get("grade") if isinstance(race_data.get("validation_grade"), dict) else None
-        ),
-        "agent_metrics": (
-            {
-                "estimated_usd": agent_metrics.get("estimated_usd"),
-                "model": agent_metrics.get("model"),
-                "total_tokens": agent_metrics.get("total_tokens"),
-            }
-            if isinstance(agent_metrics, dict)
-            else None
-        ),
+        "candidates": build_candidate_summaries(race_data),
+        "quality_grade": extract_quality_grade(race_data),
+        "agent_metrics": build_agent_metrics_summary(race_data),
         # One shape for every summary writer: this used to be a third hand-copied
         # field list that silently dropped takeaway, key_reasons, uncertainty and
         # the forecast panel from summaries.json, which the forecast page reads.
@@ -281,8 +274,16 @@ def update_gcs_summaries_json(updates: Dict[str, Optional[Dict[str, Any]]], max_
     raise RuntimeError("Failed to update races/summaries.json after concurrent writes")
 
 
-def _assert_publishable_race(data: Dict[str, Any]) -> None:
-    """Block publishing data that failed review or deterministic integrity checks."""
+def _assert_publishable_race(data: Dict[str, Any], race_id: Optional[str] = None) -> None:
+    """Block publishing data that failed review or deterministic integrity checks.
+
+    When ``race_id`` (the storage key) is given, the blob's own ``id`` must
+    match it: the summaries index is keyed by the storage key, so a mismatched
+    blob would publish under one ID while claiming another.
+    """
+    data_id = data.get("id")
+    if race_id is not None and data_id is not None and data_id != race_id:
+        raise ValueError(f"Race draft id {data_id!r} does not match race_id {race_id!r} and cannot be published")
     candidates = [candidate for candidate in data.get("candidates", []) if isinstance(candidate, dict)]
     names = [str(candidate.get("name") or "").strip() for candidate in candidates]
     normalized_names = [name.casefold() for name in names if name]
@@ -397,9 +398,11 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> bool:
     """
     import firestore_helpers  # avoid circular at module load
 
-    _assert_publishable_race(data)
-    _gcs_archive_race(race_id, "races", "published")
-    _gcs_archive_race(race_id, "drafts", "draft")
+    _assert_publishable_race(data, race_id)
+    # Strict archive: a provider failure aborts the publish rather than
+    # overwriting races/{id}.json with no retired copy of the previous version.
+    _gcs_archive_active_if_present(race_id, "races", "published")
+    _gcs_archive_active_if_present(race_id, "drafts", "draft")
     if not _gcs_put_race_json(race_id, "races", data):
         raise RuntimeError(f"Failed to write published race blob for {race_id}")
 

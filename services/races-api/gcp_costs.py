@@ -41,8 +41,8 @@ def get_gcp_costs(days: int = 30) -> Dict[str, Any]:
     try:
         client = bigquery.Client(project=project)
     except Exception as exc:  # noqa: BLE001 - surface as unconfigured, never 500
-        logger.warning("BigQuery client init failed: %s", exc)
-        return {"configured": False, "reason": f"BigQuery unavailable: {exc}"}
+        logger.warning("BigQuery client init failed: %s", exc, exc_info=True)
+        return {"configured": False, "reason": "BigQuery unavailable; see server logs."}
 
     dataset_ref = f"{project}.{_DATASET}"
 
@@ -50,13 +50,13 @@ def get_gcp_costs(days: int = 30) -> Dict[str, Any]:
     try:
         tables = list(client.list_tables(dataset_ref))
     except Exception as exc:  # noqa: BLE001
+        logger.warning("Billing export dataset %s unreadable: %s", _DATASET, exc, exc_info=True)
         return {
             "configured": False,
             "reason": (
                 f"Billing export dataset '{_DATASET}' not found or unreadable. "
                 "Run terraform apply, then enable the export in the Cloud Console."
             ),
-            "detail": str(exc),
         }
 
     export_tables = [t for t in tables if t.table_id.startswith(_TABLE_PREFIX)]
@@ -93,8 +93,8 @@ def get_gcp_costs(days: int = 30) -> Dict[str, Any]:
         job_config = bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("days", "INT64", days)])
         rows = list(client.query(query, job_config=job_config).result())
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Billing export query failed: %s", exc)
-        return {"configured": False, "reason": f"Billing export query failed: {exc}"}
+        logger.warning("Billing export query failed: %s", exc, exc_info=True)
+        return {"configured": False, "reason": "Billing export query failed; see server logs."}
 
     by_service = []
     total_net = total_gross = total_credits = 0.0

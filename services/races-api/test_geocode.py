@@ -202,6 +202,9 @@ def test_rate_limited(client):
 def test_registered_on_main_app_without_auth():
     import main
 
+    # The limit is checked off the event loop before body validation, so an
+    # invalid request also spends budget; start from a clean window.
+    geocode.limiter.reset()
     # No credentials: validation (422) runs, so the route exists and is not
     # behind auth (which would answer 401/403 first).
     with TestClient(main.app) as test_client:

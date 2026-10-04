@@ -1,14 +1,16 @@
 """Chamber-level forecast draft, generate, and publish endpoints."""
 
 import logging
+import math
 from typing import Any, Dict, Literal
 
 import gcs_helpers
 from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
+from starlette.concurrency import run_in_threadpool
 
-from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL
+from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL, MODEL_CATALOG, normalize_model_id
 
 router = APIRouter()
 
@@ -52,6 +54,22 @@ class GenerateForecastsRequest(BaseModel):
         ),
     )
 
+    @field_validator("model")
+    @classmethod
+    def _model_must_be_catalogued(cls, value: str) -> str:
+        # Every model choice lives in shared.model_catalog; an arbitrary slug
+        # here would bill an uncatalogued (unpriced, unchecked) model.
+        normalized = normalize_model_id(value)
+        if not normalized or normalized not in MODEL_CATALOG:
+            raise ValueError("model must be a model listed in shared/model_catalog.py")
+        return normalized
+
+    @model_validator(mode="after")
+    def _goal_requires_review(self) -> "GenerateForecastsRequest":
+        if self.goal and not self.review:
+            raise ValueError("goal is only applied during the review pass; set review=true")
+        return self
+
 
 @router.get("/api/races/chamber_forecasts/draft", dependencies=[Depends(verify_token)])
 def get_chamber_forecasts_draft_endpoint() -> Dict[str, Any]:
@@ -72,16 +90,22 @@ async def generate_chamber_forecasts_endpoint(
     from shared.forecast_summary import build_chamber_forecasts
 
     service = request.app.state.publish_service
-    summaries = service.get_race_summaries()
+    # Read the index fresh: the per-instance summaries cache can be up to
+    # CACHE_TTL_SECONDS old (1h in production), and a forecast generated right
+    # after publishing must see the races just published. The storage clients
+    # are synchronous, so the read runs in the threadpool.
+    fetch_fresh = getattr(service, "get_race_summaries_fresh", None) or service.get_race_summaries
+    summaries = await run_in_threadpool(fetch_fresh)
 
     if not isinstance(summaries, list):
-        raise HTTPException(status_code=500, detail=f"Invalid summaries from publish service: {type(summaries)}")
+        logging.error("Invalid summaries from publish service: %s", type(summaries))
+        raise HTTPException(status_code=500, detail="Invalid summaries from publish service")
 
     kept: Dict[str, Dict[str, Any]] = {}
     if payload.chambers is not None:
         from chamber_narratives import REQUIRED_ANALYSIS_KEYS
 
-        existing = gcs_helpers.load_chamber_forecasts(draft=True) or {}
+        existing = await run_in_threadpool(gcs_helpers.load_chamber_forecasts, draft=True) or {}
         for chamber in {"house", "senate", "governors"} - set(payload.chambers):
             previous = (existing.get("chambers") or {}).get(chamber) or {}
             if not all(previous.get(key) for key in REQUIRED_ANALYSIS_KEYS):
@@ -102,7 +126,7 @@ async def generate_chamber_forecasts_endpoint(
         )
     except Exception as exc:
         logging.error("Error generating chamber forecast analyses using model %s: %s", payload.model, exc, exc_info=True)
-        raise HTTPException(status_code=502, detail=f"LLM chamber forecast generation failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail="LLM chamber forecast generation failed; see server logs") from exc
     analyses = {**kept, **analyses}
 
     forecast_data = build_chamber_forecasts(
@@ -119,9 +143,10 @@ async def generate_chamber_forecasts_endpoint(
             }
 
     try:
-        gcs_helpers.save_chamber_forecasts(forecast_data, draft=True)
+        await run_in_threadpool(gcs_helpers.save_chamber_forecasts, forecast_data, draft=True)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to save chamber forecasts draft: {exc}")
+        logging.exception("Failed to save chamber forecasts draft")
+        raise HTTPException(status_code=500, detail="Failed to save chamber forecasts draft; see server logs") from exc
 
     return {
         "message": "Draft chamber forecasts generated successfully",
@@ -164,6 +189,11 @@ def publish_chamber_forecasts_endpoint(request: Request) -> Dict[str, Any]:
             raise HTTPException(status_code=400, detail=f"{chamber_id} chamber forecast missing")
 
         projected = chamber.get("projected_seats", {})
+        if not isinstance(projected, dict) or not all(
+            isinstance(seats, (int, float)) and not isinstance(seats, bool) and math.isfinite(seats)
+            for seats in projected.values()
+        ):
+            raise HTTPException(status_code=400, detail=f"{chamber_id} projected_seats must map parties to seat counts")
         total_projected = sum(projected.values())
         if total_projected != expected_total:
             raise HTTPException(
@@ -188,7 +218,8 @@ def publish_chamber_forecasts_endpoint(request: Request) -> Dict[str, Any]:
     try:
         gcs_helpers.save_chamber_forecasts(data, draft=False)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to publish chamber forecasts: {exc}")
+        logging.exception("Failed to publish chamber forecasts")
+        raise HTTPException(status_code=500, detail="Failed to publish chamber forecasts; see server logs") from exc
 
     # Clear memory cache on simple publish service
     service = request.app.state.publish_service

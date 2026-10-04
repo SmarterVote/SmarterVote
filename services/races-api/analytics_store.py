@@ -20,6 +20,10 @@ from shared.config import FIRESTORE_ANALYTICS_EVENTS_COLLECTION
 
 logger = logging.getLogger("races_api")
 
+# Firestore events carry ``expires_at`` for the collection's TTL policy. Keep
+# this comfortably above the longest query window the API serves (720h).
+ANALYTICS_EVENT_RETENTION = timedelta(days=90)
+
 _SQLITE_EVENT_LIMIT = 10_000
 _SQLITE_TRIM_INTERVAL = 100
 
@@ -175,6 +179,8 @@ class AnalyticsStore:
                 "response_ms": response_ms,
                 "ip_hash": ip_hash,
                 "referer": referer,
+                # Must be a timestamp (not an ISO string) for Firestore TTL.
+                "expires_at": datetime.fromisoformat(ts) + ANALYTICS_EVENT_RETENTION,
             }
             await self._client.collection(FIRESTORE_ANALYTICS_EVENTS_COLLECTION).add(doc)
         except Exception:

@@ -19,9 +19,9 @@ import re
 from typing import Any, Dict, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from rate_limit import limiter
+from rate_limit import limiter, offload_rate_limit_check
 
 logger = logging.getLogger("races_api")
 
@@ -95,7 +95,7 @@ def parse_census_geographies(payload: Any) -> Optional[Dict[str, Any]]:
     return {"state": state, "congressional_district": district}
 
 
-@router.post("/census")
+@router.post("/census", dependencies=[Depends(offload_rate_limit_check)])
 @limiter.limit("20/minute")
 async def geocode_census(body: CensusGeocodeRequest, request: Request, response: Response) -> Dict[str, Any]:
     """Resolve a one-line U.S. address to its state and congressional district."""

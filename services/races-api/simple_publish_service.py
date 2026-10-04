@@ -12,8 +12,9 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from shared.models import RaceJSON
-from shared.race_catalog import build_forecast_summary
+from gcs_helpers import _summary_from_race_data
+
+from shared.config import NON_RACE_CATALOG_IDS
 
 logger = logging.getLogger("races_api")
 
@@ -209,38 +210,8 @@ class SimplePublishService:
 
     @staticmethod
     def _summary_from_race_data(race_id: str, race_data: Dict) -> Dict:
-        agent_metrics = race_data.get("agent_metrics") or None
-        return {
-            "id": race_data.get("id", race_id),
-            "title": race_data.get("title"),
-            "office": race_data.get("office"),
-            "jurisdiction": race_data.get("jurisdiction"),
-            "state": race_data.get("state"),
-            "contest_stage": race_data.get("contest_stage", "unknown"),
-            "election_date": race_data.get("election_date", ""),
-            "updated_utc": race_data.get("updated_utc", ""),
-            "candidates": [
-                {
-                    "name": candidate.get("name", ""),
-                    "party": candidate.get("party"),
-                    "incumbent": candidate.get("incumbent", False),
-                    "image_url": candidate.get("image_url"),
-                }
-                for candidate in race_data.get("candidates", [])
-                if isinstance(candidate, dict)
-            ],
-            "agent_metrics": (
-                {
-                    "estimated_usd": agent_metrics.get("estimated_usd"),
-                    "model": agent_metrics.get("model"),
-                    "total_tokens": agent_metrics.get("total_tokens"),
-                }
-                if isinstance(agent_metrics, dict)
-                else None
-            ),
-            # Same shape as every other summary writer (shared.race_catalog).
-            "forecast": build_forecast_summary(race_data),
-        }
+        # One builder for every summaries.json writer (see gcs_helpers).
+        return _summary_from_race_data(race_id, race_data)
 
     def _load_cloud_summaries_index(self, client) -> Optional[List[Dict]]:
         try:
@@ -315,7 +286,10 @@ class SimplePublishService:
                         race_data = race_data["race_json"]
                     if not isinstance(race_data, dict):
                         continue
-                    summaries.append(self._summary_from_race_data(file_path.stem, race_data))
+                    race_id = str(race_data.get("id") or file_path.stem)
+                    if race_id in NON_RACE_CATALOG_IDS:
+                        continue
+                    summaries.append(self._summary_from_race_data(race_id, race_data))
                 except (json.JSONDecodeError, IOError, ValueError):
                     logger.warning("Failed to parse local race summary file %s", file_path, exc_info=True)
         return summaries
@@ -406,6 +380,14 @@ class SimplePublishService:
 
         return self._get_or_fetch_summaries()
 
+    def get_race_summaries_fresh(self) -> List[Dict]:
+        """Read the summaries index from storage, bypassing the in-memory cache.
+
+        For admin actions (chamber forecast generation) that must see races
+        published moments ago on any instance, not this instance's cached copy.
+        """
+        return self._fetch_summaries_unlocked()
+
     def get_race_data(self, race_id: str) -> Optional[Dict]:
         """Retrieve race data by ID from local files or cloud storage.
 
@@ -483,18 +465,6 @@ class SimplePublishService:
 
         except Exception as e:
             logger.warning("Error reading from cloud storage for race %s: %s", race_id, e)
-            return None
-
-    def get_race(self, race_id: str) -> Optional[RaceJSON]:
-        """Retrieve race data as RaceJSON model."""
-        data = self.get_race_data(race_id)
-        if not data:
-            return None
-
-        try:
-            return RaceJSON(**data)
-        except Exception as e:
-            logger.warning(f"Error creating RaceJSON for race {race_id}: {e}")
             return None
 
     def get_chamber_forecasts_data(self) -> Optional[Dict]:

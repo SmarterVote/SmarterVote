@@ -19,18 +19,18 @@ from request_models import BatchPublishRequest, validate_race_id
 from routers import races_admin as _races_admin_pkg
 from routers.research_program import assert_race_admitted
 
-from .helpers import _clear_public_race_cache, _published_race_update
+from .helpers import _clear_public_race_cache, _published_race_update, _update_summaries_index
 
 router = APIRouter()
 
 
-def _assert_publishable_race(data: Dict[str, Any]) -> None:
+def _assert_publishable_race(data: Dict[str, Any], race_id: str | None = None) -> None:
     """Block publishing drafts that the review gate explicitly failed.
 
     Delegates through the package namespace (see import comment above) so it
     remains patchable at ``routers.races_admin._assert_publishable_race``.
     """
-    _races_admin_pkg._assert_publishable_race(data)
+    _races_admin_pkg._assert_publishable_race(data, race_id)
 
 
 def _published_catalog_update(race_id: str, data: Dict[str, Any], draft_removed: bool) -> Dict[str, Any]:
@@ -52,20 +52,6 @@ def _published_catalog_update(race_id: str, data: Dict[str, Any], draft_removed:
     else:
         update.pop("draft_updated_at", None)
     return update
-
-
-def _update_summaries_index(updates: Dict[str, Any]) -> str | None:
-    """Update races/summaries.json; return an error string instead of raising.
-
-    The race blobs are already live by the time this runs, so a failure here
-    must not skip the catalog/cache updates for races that were written.
-    """
-    try:
-        gcs_helpers.update_gcs_summaries_json(updates)
-    except Exception as exc:
-        logging.exception("races/summaries.json update failed for %s", sorted(updates))
-        return f"summaries.json update failed ({type(exc).__name__}); see server logs"
-    return None
 
 
 @router.delete("/api/races/{race_id}/draft", dependencies=[Depends(verify_token)])
@@ -101,7 +87,7 @@ def publish_race(request: Request, race_id: str) -> Dict[str, Any]:
     data = gcs_helpers._gcs_get_race_json(race_id, "drafts")
     if data is None:
         raise HTTPException(status_code=404, detail="Draft not found")
-    _assert_publishable_race(data)
+    _assert_publishable_race(data, race_id)
     draft_removed = gcs_helpers._publish_race_gcs(race_id, data) is not False
     firestore_helpers._fs_update_race(race_id, _published_catalog_update(race_id, data, draft_removed))
     summaries_error = _update_summaries_index({race_id: data})
@@ -120,13 +106,21 @@ def publish_race(request: Request, race_id: str) -> Dict[str, Any]:
 
 @router.post("/api/races/{race_id}/unpublish", dependencies=[Depends(verify_token)])
 def unpublish_race(request: Request, race_id: str) -> Dict[str, Any]:
-    """Remove a race from published (keeps draft)."""
+    """Remove a race from published (keeps draft).
+
+    Idempotent with respect to the summaries index: when the published blob is
+    already gone (e.g. a previous attempt deleted it and then failed to update
+    races/summaries.json) the index entry is still removed before the 404, so
+    a retry repairs the index instead of leaving the race listed forever.
+    """
     validate_race_id(race_id)
     has_draft = gcs_helpers._gcs_get_race_json(race_id, "drafts") is not None
     deleted = gcs_helpers._gcs_delete_race_json(race_id, "races")
     if not deleted:
+        summaries_error = _update_summaries_index({race_id: None})
+        if summaries_error is None:
+            _clear_public_race_cache(request)
         raise HTTPException(status_code=404, detail="Published race not found")
-    gcs_helpers.update_gcs_summaries_json({race_id: None})
     update: Dict[str, Any] = {
         "status": "draft" if has_draft else "empty",
         "published_at": None,
@@ -142,7 +136,19 @@ def unpublish_race(request: Request, race_id: str) -> Dict[str, Any]:
         if isinstance(draft_data, dict):
             update.update(firestore_helpers._fs_build_draft_catalog_fields(race_id, draft_data))
     firestore_helpers._fs_update_race(race_id, update)
+    # The blob is already gone, so an index failure must not skip the catalog
+    # and cache updates above/below (mirrors publish).
+    summaries_error = _update_summaries_index({race_id: None})
     _clear_public_race_cache(request)
+    if summaries_error:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": f"Race {race_id} was unpublished but races/summaries.json was not updated; retry the unpublish",
+                "unpublished": [race_id],
+                "summaries_error": summaries_error,
+            },
+        )
     return {"message": f"Race {race_id} unpublished (draft retained)", "id": race_id}
 
 
@@ -160,15 +166,19 @@ def batch_publish_races(request: Request, payload: BatchPublishRequest) -> Dict[
             if data is None:
                 errors.append({"race_id": race_id, "error": "Draft not found"})
                 continue
-            _assert_publishable_race(data)
+            _assert_publishable_race(data, race_id)
             draft_removed = gcs_helpers._publish_race_gcs(race_id, data) is not False
             updates_for_gcs[race_id] = data
             firestore_helpers._fs_update_race(race_id, _published_catalog_update(race_id, data, draft_removed))
             published.append(race_id)
         except HTTPException as exc:
             errors.append({"race_id": race_id, "error": exc.detail})
-        except Exception as exc:
+        except ValueError as exc:
+            # Publish-gate rejections carry our own validation message.
             errors.append({"race_id": race_id, "error": str(exc)})
+        except Exception:
+            logging.exception("Batch publish failed for %s", race_id)
+            errors.append({"race_id": race_id, "error": "Publish failed; see server logs"})
     result: Dict[str, Any] = {"published": published, "errors": errors}
     if published:
         summaries_error = _update_summaries_index(updates_for_gcs)

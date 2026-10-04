@@ -15,6 +15,7 @@ from auth import verify_token
 from cloud_run_jobs import dispatch_pipeline_job
 from fastapi import APIRouter, Depends, HTTPException
 from request_models import RaceQueueRequest, validate_race_id
+from routers.races_admin.helpers import _run_is_terminal_or_missing, _self_heal_stale_active_race
 from routers.research_program import assert_race_admitted
 from routers.utils import _queue_ttl_at
 
@@ -28,6 +29,8 @@ _PIPELINE_STEPS = list(PIPELINE_STEP_ORDER)
 _PIPELINE_STEP_DETAILS = [
     {"id": step, "label": PIPELINE_STEP_LABELS[step], "weight": PIPELINE_STEP_WEIGHTS[step]} for step in PIPELINE_STEP_ORDER
 ]
+# Queue-item and run statuses. Race docs use "queued"/"running" instead; stale
+# active race docs are healed by routers.races_admin.helpers._self_heal_stale_active_race.
 _ACTIVE_STATUSES = {"pending", "running"}
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "continued"}
 _INACTIVE_RACE_STATUSES = {"draft", "published", "empty", "failed", "cancelled"}
@@ -64,54 +67,6 @@ def _enqueue_claimed_item(db: Any, item: Dict[str, Any]) -> None:
     except Exception:
         firestore_helpers._settle_race_after_run_stop(db, str(item["race_id"]), str(item["run_id"]), "idle")
         raise
-
-
-def _current_run_is_terminal_or_missing(db: Any, run_id: str) -> bool:
-    try:
-        run_doc = db.collection(FIRESTORE_RUNS_COLLECTION).document(run_id).get()
-        run_data = firestore_helpers._doc_to_plain(run_doc)
-    except Exception:
-        return False
-    if run_data is None:
-        return True
-    return run_data.get("status") in _TERMINAL_STATUSES
-
-
-def _is_run_actually_active(db: Any, run_id: str) -> bool:
-    """Return True only when run + queue docs both indicate active work."""
-    try:
-        run_doc = db.collection(FIRESTORE_RUNS_COLLECTION).document(str(run_id)).get()
-        run_data = firestore_helpers._doc_to_plain(run_doc)
-    except Exception:
-        return False
-    if not run_data or run_data.get("status") not in _ACTIVE_STATUSES:
-        return False
-    try:
-        queue_docs = db.collection(FIRESTORE_QUEUE_COLLECTION).where("run_id", "==", str(run_id)).limit(20).stream()
-        return any((doc.to_dict() or {}).get("status") in _ACTIVE_STATUSES for doc in queue_docs)
-    except Exception:
-        return False
-
-
-def _self_heal_stale_active_race(db: Any, race_id: str, race_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Clear stale queued/running blockers so a new queue request can proceed."""
-    status = race_data.get("status")
-    if status not in _ACTIVE_STATUSES:
-        return race_data
-
-    run_id = race_data.get("current_run_id")
-    if not run_id:
-        return race_data
-
-    if _is_run_actually_active(db, str(run_id)):
-        return race_data
-
-    fallback_status = (
-        "published" if race_data.get("published_at") else ("draft" if race_data.get("draft_updated_at") else "failed")
-    )
-    update = {"status": fallback_status, "current_run_id": None}
-    firestore_helpers._fs_update_race(race_id, update)
-    return {**race_data, **update}
 
 
 def _normalize_continuation_ancestors(items: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
@@ -158,7 +113,7 @@ def _normalize_terminal_run_items(db: Any, items: list[Dict[str, Any]], *, persi
                 race_status = (race_data or {}).get("status")
                 current_run_id = (race_data or {}).get("current_run_id")
                 if race_status in _INACTIVE_RACE_STATUSES and current_run_id and current_run_id != next_item.get("run_id"):
-                    if _current_run_is_terminal_or_missing(db, str(current_run_id)):
+                    if _run_is_terminal_or_missing(db, str(current_run_id)):
                         if persist:
                             firestore_helpers._fs_update_race(str(next_item["race_id"]), {"current_run_id": None})
                     else:
@@ -282,8 +237,11 @@ def queue_races(request: RaceQueueRequest) -> Dict[str, Any]:
                     "dispatch": dispatch,
                 }
             )
-        except Exception as exc:
-            errors.append({"race_id": race_id, "error": str(exc)})
+        except HTTPException as exc:
+            errors.append({"race_id": race_id, "error": exc.detail})
+        except Exception:
+            logger.exception("Failed to queue race %s", race_id)
+            errors.append({"race_id": race_id, "error": "Failed to queue race; see server logs"})
 
     return {"added": added, "errors": errors}
 

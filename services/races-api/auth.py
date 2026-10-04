@@ -1,6 +1,7 @@
 """Auth0 JWT verification dependency for the races-api admin endpoints."""
 
 import asyncio
+import logging
 import os
 import secrets
 import time
@@ -8,6 +9,7 @@ from typing import Optional
 
 import httpx
 import jwt
+from config import is_production
 from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError
@@ -18,6 +20,17 @@ _http_bearer = HTTPBearer(auto_error=False)
 _jwks_cache: dict[str, tuple[dict, float]] = {}
 _jwks_lock = asyncio.Lock()
 _JWKS_CACHE_TTL = 3600.0  # Cache for 1 hour
+# An unknown ``kid`` forces a JWKS refetch (key rotation), but the header is
+# attacker-controlled: without a throttle every unauthenticated request with a
+# random kid became one outbound fetch. Forced refreshes are limited to one per
+# interval per domain, and kids still unknown after a refresh are remembered.
+_JWKS_FORCED_REFRESH_INTERVAL = 60.0
+_UNKNOWN_KID_TTL = 300.0
+_UNKNOWN_KID_CACHE_MAX = 1024
+_jwks_last_forced_refresh: dict[str, float] = {}
+_unknown_kids: dict[tuple[str, str], float] = {}
+
+logger = logging.getLogger("races_api")
 
 
 async def _get_jwks(auth0_domain: str, *, force_refresh: bool = False) -> dict:
@@ -28,6 +41,12 @@ async def _get_jwks(auth0_domain: str, *, force_refresh: bool = False) -> dict:
             # Recheck cache after acquiring lock
             now = time.monotonic()
             cache_entry = _jwks_cache.get(auth0_domain)
+            if force_refresh and cache_entry is not None:
+                last_forced = _jwks_last_forced_refresh.get(auth0_domain)
+                if last_forced is not None and now - last_forced < _JWKS_FORCED_REFRESH_INTERVAL:
+                    force_refresh = False
+                else:
+                    _jwks_last_forced_refresh[auth0_domain] = now
             if force_refresh or cache_entry is None or (now - cache_entry[1]) > _JWKS_CACHE_TTL:
                 jwks_url = f"https://{auth0_domain}/.well-known/jwks.json"
                 async with httpx.AsyncClient(timeout=10) as client:
@@ -38,18 +57,44 @@ async def _get_jwks(auth0_domain: str, *, force_refresh: bool = False) -> dict:
     return cache_entry[0]
 
 
+def _find_key(jwks: dict, kid: object) -> Optional[dict]:
+    return next((k for k in jwks["keys"] if k.get("kid") == kid), None)
+
+
+def _kid_recently_unknown(auth0_domain: str, kid: str) -> bool:
+    seen_at = _unknown_kids.get((auth0_domain, kid))
+    if seen_at is None:
+        return False
+    if time.monotonic() - seen_at > _UNKNOWN_KID_TTL:
+        _unknown_kids.pop((auth0_domain, kid), None)
+        return False
+    return True
+
+
+def _remember_unknown_kid(auth0_domain: str, kid: str) -> None:
+    if len(_unknown_kids) >= _UNKNOWN_KID_CACHE_MAX:
+        _unknown_kids.clear()
+    _unknown_kids[(auth0_domain, kid)] = time.monotonic()
+
+
 async def _decode_jwt(token: str) -> dict:
     auth0_domain = os.getenv("AUTH0_DOMAIN", "")
     auth0_audience = os.getenv("AUTH0_AUDIENCE", "")
     jwks = await _get_jwks(auth0_domain)
 
     unverified = jwt.get_unverified_header(token)
-    rsa_key = next((k for k in jwks["keys"] if k.get("kid") == unverified.get("kid")), None)
-    if not rsa_key:
-        # Auth0 may rotate signing keys before the TTL expires. Refresh once on
-        # an unknown key ID so valid tokens do not fail for the cache lifetime.
-        jwks = await _get_jwks(auth0_domain, force_refresh=True)
-        rsa_key = next((k for k in jwks["keys"] if k.get("kid") == unverified.get("kid")), None)
+    kid = unverified.get("kid")
+    rsa_key = _find_key(jwks, kid)
+    if not rsa_key and isinstance(kid, str) and not _kid_recently_unknown(auth0_domain, kid):
+        # Auth0 may rotate signing keys before the TTL expires. Refresh (at most
+        # once per throttle interval) on an unknown key ID so valid tokens do
+        # not fail for the cache lifetime.
+        refreshed = await _get_jwks(auth0_domain, force_refresh=True)
+        rsa_key = _find_key(refreshed, kid)
+        # Only a kid absent from a genuinely refetched set is negatively cached;
+        # a throttled (cached) answer says nothing about a newly rotated key.
+        if not rsa_key and refreshed is not jwks:
+            _remember_unknown_kid(auth0_domain, kid)
     if not rsa_key:
         raise HTTPException(status_code=401, detail="Invalid token: signing key not found")
     return jwt.decode(
@@ -73,7 +118,11 @@ async def verify_token(
     # Read env at call time so tests can set it without module reload.
     skip_auth = os.getenv("SKIP_AUTH", "").lower() in ("1", "true", "yes")
     if skip_auth:
-        return {}
+        if not is_production():
+            return {}
+        # A stray SKIP_AUTH on the deployed service would make every admin
+        # endpoint anonymous; refuse it there and authenticate normally.
+        logger.error("SKIP_AUTH is set on a production service and is being ignored")
 
     if not isinstance(x_admin_key, str):
         x_admin_key = ""

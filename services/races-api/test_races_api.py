@@ -633,10 +633,14 @@ def test_generate_chamber_forecasts_fails_without_saving_when_llm_fails(client, 
 
     monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", failing_generate_chamber_analysis)
 
-    resp = client.post("/api/races/chamber_forecasts/generate", json={"model": "test/model"})
+    from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL
+
+    resp = client.post("/api/races/chamber_forecasts/generate", json={"model": DEFAULT_CHAMBER_FORECAST_MODEL})
 
     assert resp.status_code == 502
     assert "LLM chamber forecast generation failed" in resp.json()["detail"]
+    # Provider error text stays in the server logs.
+    assert "provider unavailable" not in resp.json()["detail"]
 
     draft_resp = client.get("/api/races/chamber_forecasts/draft")
     assert draft_resp.status_code == 404
@@ -855,77 +859,127 @@ def test_singleflight_discards_stale_data_if_cleared_during_fetch(tmp_path):
     assert service._race_summaries_cache is None
 
 
-def test_singleflight_wakes_waiters_on_exception(tmp_path):
+class _SignalingCondition(threading.Condition):
+    """Condition that reports how many threads are parked in ``wait()``.
+
+    ``wait()`` is entered with the lock held and releases it atomically, and the
+    single-flight leader must reacquire that lock before it can notify. So once
+    ``waiters`` reaches N, N followers are guaranteed to be parked (or about to
+    park) behind the leader -- no sleeps needed to force the overlap.
+    """
+
+    def __init__(self, lock):
+        super().__init__(lock)
+        self.waiters = 0
+        self.changed = threading.Event()
+
+    def wait(self, timeout=None):
+        self.waiters += 1
+        self.changed.set()
+        return super().wait(timeout)
+
+    def wait_for_waiters(self, count, timeout=5.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            with self:
+                if self.waiters >= count:
+                    return True
+            self.changed.wait(0.01)
+            self.changed.clear()
+        return False
+
+
+def _singleflight_service(tmp_path, cache_ttl):
     service = SimplePublishService.__new__(SimplePublishService)
     service.data_directory = tmp_path
     service.gcs_bucket_name = "test-bucket"
     service.cloud_configured = True
-    service.cache_ttl = 300
+    service.cache_ttl = cache_ttl
     service._race_list_cache = None
     service._race_data_cache = {}
     service._race_summaries_cache = None
+    service._cache_lock = threading.Lock()
+    service._summaries_condition = _SignalingCondition(service._cache_lock)
+    return service
+
+
+def test_singleflight_wakes_waiters_on_exception(tmp_path):
+    service = _singleflight_service(tmp_path, cache_ttl=300)
+    condition = service._summaries_condition
+    leader_fetching = threading.Event()
 
     def mock_failing_fetch():
-        time.sleep(0.02)
+        leader_fetching.set()
+        # Hold the fetch open until the follower is parked on the condition.
+        assert condition.wait_for_waiters(1)
         raise RuntimeError("GCS network failure")
 
     service._fetch_summaries_unlocked = mock_failing_fetch
 
-    waiter_failed = False
+    outcomes = {}
 
     def leader_worker():
         try:
             service.get_race_summaries()
+            outcomes["leader"] = "ok"
         except RuntimeError:
-            pass
+            outcomes["leader"] = "failed"
 
     def follower_worker():
-        nonlocal waiter_failed
+        assert leader_fetching.wait(5)
         try:
-            time.sleep(0.005)
             service.get_race_summaries()
+            outcomes["follower"] = "ok"
         except RuntimeError:
-            waiter_failed = True
+            outcomes["follower"] = "failed"
 
     t1 = threading.Thread(target=leader_worker)
     t2 = threading.Thread(target=follower_worker)
     t1.start()
     t2.start()
-    t1.join(timeout=2)
-    t2.join(timeout=2)
+    t1.join(timeout=5)
+    t2.join(timeout=5)
 
     assert not t1.is_alive()
     assert not t2.is_alive()
-    assert waiter_failed is True
+    assert condition.waiters >= 1
+    # The follower was woken by the leader's failure and re-raised it rather
+    # than hanging or starting a second fetch.
+    assert outcomes == {"leader": "failed", "follower": "failed"}
 
 
 def test_singleflight_cache_ttl_zero_coalesces_without_retaining(tmp_path):
-    service = SimplePublishService.__new__(SimplePublishService)
-    service.data_directory = tmp_path
-    service.gcs_bucket_name = "test-bucket"
-    service.cloud_configured = True
-    service.cache_ttl = 0
-    service._race_list_cache = None
-    service._race_data_cache = {}
-    service._race_summaries_cache = None
-
+    service = _singleflight_service(tmp_path, cache_ttl=0)
+    condition = service._summaries_condition
+    follower_count = 4
+    leader_fetching = threading.Event()
     fetch_count = 0
 
     def mock_fetch():
         nonlocal fetch_count
         fetch_count += 1
-        time.sleep(0.03)
+        leader_fetching.set()
+        # Every follower must be parked behind this in-flight fetch.
+        assert condition.wait_for_waiters(follower_count)
         return [{"id": "race-1"}]
 
     service._fetch_summaries_unlocked = mock_fetch
+    results = []
 
-    threads = [threading.Thread(target=service.get_race_summaries) for _ in range(5)]
+    def worker(wait_for_leader):
+        if wait_for_leader:
+            assert leader_fetching.wait(5)
+        results.append(service.get_race_summaries())
+
+    threads = [threading.Thread(target=worker, args=(index > 0,)) for index in range(follower_count + 1)]
     for t in threads:
         t.start()
     for t in threads:
-        t.join()
+        t.join(timeout=5)
 
+    assert not any(t.is_alive() for t in threads)
     assert fetch_count == 1
+    assert results == [[{"id": "race-1"}]] * (follower_count + 1)
     # cache_ttl=0 means results are not stored long-term
     assert service._race_summaries_cache is None
 

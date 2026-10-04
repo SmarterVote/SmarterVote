@@ -1586,11 +1586,11 @@ def test_run_options_normalize_and_validate_pipeline_controls():
     from request_models import RunOptions
 
     opts = RunOptions(
-        enabled_steps=[" discovery ", "issues", "issues"],
+        enabled_steps=[" discovery ", "issues", "issues", "review"],
         candidate_names=[" Alice ", "", "Alice"],
         baseline_source="published",
     )
-    assert opts.enabled_steps == ["discovery", "issues"]
+    assert opts.enabled_steps == ["discovery", "issues", "review"]
     assert opts.candidate_names == ["Alice"]
     assert opts.baseline_source == "published"
 
@@ -2835,7 +2835,7 @@ def test_gcs_publish_helper_rejects_failed_validation_grade():
     }
 
     with (
-        patch("gcs_helpers._gcs_archive_race") as mock_archive,
+        patch("gcs_helpers._gcs_archive_active_if_present") as mock_archive,
         patch("gcs_helpers._gcs_put_race_json") as mock_put,
         patch("gcs_helpers._gcs_delete_race_json") as mock_delete,
         pytest.raises(ValueError, match="failed validation"),
@@ -2874,7 +2874,7 @@ def test_gcs_publish_helper_allows_review_only_remaining_with_passing_grade():
     }
 
     with (
-        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_archive_active_if_present"),
         patch("gcs_helpers._gcs_put_race_json", return_value=True) as mock_put,
         patch("gcs_helpers._gcs_delete_race_json", return_value=True),
         patch("firestore_helpers._fs_update_race"),
@@ -4616,7 +4616,7 @@ def test_publish_keeps_newer_draft_written_concurrently(monkeypatch):
     assert gcs_helpers._gcs_delete_published_draft("ga-senate-2026", draft) is False
 
     with (
-        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_archive_active_if_present"),
         patch("gcs_helpers._gcs_put_race_json", return_value=True),
         patch("firestore_helpers._fs_update_race") as mock_update,
     ):
@@ -4693,7 +4693,7 @@ def test_restore_version_keeps_published_race_published():
         patch("gcs_helpers._GCS_BUCKET", "bucket"),
         patch("gcs_helpers._get_gcs_admin", return_value=client),
         patch("gcs_helpers._gcs_get_race_json", side_effect=fake_get),
-        patch("gcs_helpers._gcs_archive_race"),
+        patch("gcs_helpers._gcs_archive_active_if_present"),
         patch("gcs_helpers._gcs_put_race_json", return_value=True),
         patch("firestore_helpers._fs_update_race") as mock_update,
     ):
@@ -4764,3 +4764,418 @@ def test_race_run_endpoints_reject_run_from_another_race():
     assert get_resp.status_code == 404
     assert delete_resp.status_code == 404
     run_ref.delete.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Audit fixes: reserved IDs, index consistency, heal, listing, archive, auth
+# ---------------------------------------------------------------------------
+
+
+def _admin_test_client():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    return TestClient(app_module.app)
+
+
+@pytest.mark.parametrize("reserved", ["summaries", "chamber_forecasts"])
+def test_reserved_index_stems_are_never_race_ids(reserved):
+    """`summaries` would address races/summaries.json, the public index itself."""
+    from fastapi import HTTPException
+    from pydantic import ValidationError
+    from request_models import RepairPlanRequest, validate_race_id
+
+    with pytest.raises(HTTPException) as exc_info:
+        validate_race_id(reserved)
+    assert exc_info.value.status_code == 400
+    with pytest.raises(ValidationError):
+        RepairPlanRequest(race_ids=[reserved])
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_delete_race_json") as delete_blob,
+        patch("gcs_helpers.update_gcs_summaries_json") as update_index,
+    ):
+        tc = _admin_test_client()
+        unpublish = tc.post(f"/api/races/{reserved}/unpublish")
+        delete = tc.delete(f"/api/races/{reserved}")
+        queued = tc.post("/api/races/queue", json={"race_ids": [reserved]})
+
+    assert unpublish.status_code == 400
+    assert delete.status_code == 400
+    assert queued.json()["errors"] == [{"race_id": reserved, "error": "Invalid race_id format"}]
+    delete_blob.assert_not_called()
+    update_index.assert_not_called()
+
+
+def test_unpublish_retry_removes_index_entry_when_blob_already_gone():
+    """A prior unpublish that deleted the blob but failed the index update must be repairable."""
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("gcs_helpers._gcs_delete_race_json", return_value=False),
+        patch("gcs_helpers.update_gcs_summaries_json") as update_index,
+        patch("firestore_helpers._fs_update_race") as fs_update,
+    ):
+        resp = _admin_test_client().post("/api/races/ga-senate-2026/unpublish")
+
+    assert resp.status_code == 404
+    update_index.assert_called_once_with({"ga-senate-2026": None})
+    fs_update.assert_not_called()
+
+
+def test_unpublish_index_failure_still_updates_catalog_and_reports_502():
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("gcs_helpers._gcs_delete_race_json", return_value=True),
+        patch("gcs_helpers.update_gcs_summaries_json", side_effect=RuntimeError("index conflict")),
+        patch("firestore_helpers._fs_update_race") as fs_update,
+        patch("routers.races_admin.drafts._clear_public_race_cache") as clear_cache,
+    ):
+        resp = _admin_test_client().post("/api/races/ga-senate-2026/unpublish")
+
+    assert resp.status_code == 502
+    assert resp.json()["detail"]["unpublished"] == ["ga-senate-2026"]
+    assert "index conflict" not in json.dumps(resp.json())
+    assert fs_update.call_args.args[1]["status"] == "empty"
+    clear_cache.assert_called_once()
+
+
+def test_delete_race_index_failure_still_deletes_catalog_and_reports_502():
+    db = _build_empty_firestore_mock()
+    race_ref = MagicMock()
+    races_coll = MagicMock()
+    races_coll.document.return_value = race_ref
+    db.collection.side_effect = lambda name: races_coll if name == "races" else MagicMock()
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("gcs_helpers._gcs_archive_active_if_present", return_value=False),
+        patch("gcs_helpers._gcs_delete_race_json"),
+        patch("gcs_helpers.update_gcs_summaries_json", side_effect=RuntimeError("index conflict")),
+    ):
+        resp = _admin_test_client().delete("/api/races/nh-governor-2026")
+
+    assert resp.status_code == 502
+    assert resp.json()["detail"]["deleted"] == ["nh-governor-2026"]
+    race_ref.delete.assert_called_once()
+
+
+def test_queue_heals_stale_queued_race_doc():
+    """Race docs use `queued`, not the queue-item `pending`; a stuck `queued` race must heal."""
+    from routers import queue
+    from routers.races_admin import helpers
+
+    assert queue._self_heal_stale_active_race is helpers._self_heal_stale_active_race
+
+    db = MagicMock()
+    run_ref = MagicMock()
+    run_ref.get.return_value = _make_missing_doc_ref().get()
+    db.collection.return_value.document.return_value = run_ref
+    stale = {"status": "queued", "current_run_id": "run-dead", "published_at": "2026-01-01T00:00:00Z"}
+
+    with patch("firestore_helpers._fs_update_race") as fs_update:
+        healed = queue._self_heal_stale_active_race(db, "ga-senate-2026", stale)
+
+    assert healed["status"] == "published"
+    assert healed["current_run_id"] is None
+    fs_update.assert_called_once_with("ga-senate-2026", {"status": "published", "current_run_id": None})
+
+
+def test_queue_hides_unexpected_exception_text():
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("routers.queue.assert_race_admitted", side_effect=RuntimeError("secret internals")),
+    ):
+        resp = _admin_test_client().post("/api/races/queue", json={"race_ids": ["ga-senate-2026"]})
+
+    error = resp.json()["errors"][0]["error"]
+    assert "secret internals" not in error
+    assert "server logs" in error
+
+
+def test_gcs_race_listing_pages_past_500(monkeypatch):
+    blobs = [MagicMock(name=f"b{index}") for index in range(506)]
+    for index, blob in enumerate(blobs):
+        blob.name = f"races/race-{index:03d}.json"
+    summaries_blob = MagicMock()
+    summaries_blob.name = "races/summaries.json"
+    bucket = MagicMock()
+    bucket.list_blobs.return_value = iter([*blobs, summaries_blob])
+    monkeypatch.setattr(gcs_helpers, "_GCS_BUCKET", "bucket")
+    monkeypatch.setattr(gcs_helpers, "_get_gcs_admin", lambda: MagicMock(bucket=MagicMock(return_value=bucket)))
+
+    ids = gcs_helpers._gcs_list_race_ids("races")
+
+    assert len(ids) == 506
+    assert "summaries" not in ids
+    assert "max_results" not in bucket.list_blobs.call_args.kwargs
+
+
+def test_publish_aborts_when_prior_version_cannot_be_archived():
+    race = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    with (
+        patch("gcs_helpers._gcs_archive_active_if_present", side_effect=RuntimeError("copy failed")),
+        patch("gcs_helpers._gcs_put_race_json") as put,
+        pytest.raises(RuntimeError),
+    ):
+        gcs_helpers.publish_race_to_gcs("ga-senate-2026", race)
+    put.assert_not_called()
+
+
+def test_publish_rejects_draft_whose_id_differs_from_race_id():
+    race = {"id": "ga-senate-2024", "candidates": [{"name": "Alice"}]}
+    with pytest.raises(ValueError, match="does not match race_id"):
+        gcs_helpers.publish_race_to_gcs("ga-senate-2026", race)
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=race),
+        patch("gcs_helpers._publish_race_gcs") as publish,
+    ):
+        resp = _admin_test_client().post("/api/races/ga-senate-2026/publish")
+    assert resp.status_code == 409
+    publish.assert_not_called()
+
+
+def test_summary_index_entry_is_keyed_by_storage_race_id():
+    summary = gcs_helpers._summary_from_race_data(
+        "ga-senate-2026",
+        {"id": "stale-id", "validation_grade": {"grade": "B"}, "candidates": [{"name": "Alice"}]},
+    )
+    assert summary["id"] == "ga-senate-2026"
+    assert summary["quality_grade"] == "B"
+
+    from simple_publish_service import SimplePublishService
+
+    assert SimplePublishService._summary_from_race_data("ga-senate-2026", {"id": "x"}) == gcs_helpers._summary_from_race_data(
+        "ga-senate-2026", {"id": "x"}
+    )
+
+
+def _restore_client_patches(version, put_ok=True, archive_error=None):
+    source = MagicMock()
+    source.exists.return_value = True
+    source.download_as_text.return_value = json.dumps(version)
+    bucket = MagicMock()
+    bucket.blob.return_value = source
+    client = MagicMock()
+    client.bucket.return_value = bucket
+    return (
+        patch("gcs_helpers._GCS_BUCKET", "bucket"),
+        patch("gcs_helpers._get_gcs_admin", return_value=client),
+        patch("gcs_helpers._gcs_get_race_json", return_value=None),
+        patch("gcs_helpers._gcs_archive_active_if_present", side_effect=archive_error),
+        patch("gcs_helpers._gcs_put_race_json", return_value=put_ok),
+        patch("firestore_helpers._fs_update_race"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("put_ok", "archive_error", "expected"),
+    [(False, None, 502), (True, RuntimeError("copy failed"), 503)],
+)
+def test_restore_version_fails_loudly_when_storage_write_fails(put_ok, archive_error, expected):
+    version = {"id": "ga-senate-2026", "candidates": [{"name": "Alice"}]}
+    patches = _restore_client_patches(version, put_ok=put_ok, archive_error=archive_error)
+    with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5] as fs_update:
+        resp = _admin_test_client().post("/api/races/ga-senate-2026/versions/20260501T000000Z-published.json/restore")
+
+    assert resp.status_code == expected
+    fs_update.assert_not_called()
+
+
+def test_asset_audit_bounds_concurrent_probes(monkeypatch):
+    from routers.races_admin import records
+
+    race = {"candidates": [{"name": "A", "summary_sources": [{"url": f"https://e{i}.example/x"} for i in range(12)]}]}
+    active = 0
+    peak = 0
+
+    async def fake_probe(client, kind, url):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return {"kind": kind, "url": url, "reachable": True}
+
+    monkeypatch.setattr(records, "_ASSET_PROBE_CONCURRENCY", 3)
+    monkeypatch.setattr(records, "_probe_asset", fake_probe)
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=race),
+    ):
+        resp = _admin_test_client().post("/api/races/asset-audit", json={"race_ids": ["ga-senate-2026"]})
+
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["asset_count"] == 12
+    assert peak == 3
+
+
+@pytest.mark.parametrize(
+    ("payload", "fragment"),
+    [
+        ({"model": "not-a/catalogued-model"}, "model_catalog"),
+        ({"goal": "be brief"}, "review=true"),
+    ],
+)
+def test_generate_chamber_forecasts_rejects_invalid_requests(payload, fragment):
+    resp = _admin_test_client().post("/api/races/chamber_forecasts/generate", json=payload)
+    assert resp.status_code == 422
+    assert fragment in json.dumps(resp.json())
+
+
+def test_generate_chamber_forecasts_reads_summaries_fresh(monkeypatch):
+    import main as app_module
+
+    service = MagicMock()
+    service.get_race_summaries_fresh.return_value = "not-a-list"
+    monkeypatch.setattr(app_module.app.state, "publish_service", service)
+
+    resp = _admin_test_client().post("/api/races/chamber_forecasts/generate", json={"panel": False})
+
+    assert resp.status_code == 500
+    service.get_race_summaries_fresh.assert_called_once()
+    service.get_race_summaries.assert_not_called()
+
+
+def test_publish_chamber_forecasts_rejects_non_numeric_seats():
+    draft = {
+        "schema_version": "chamber_forecasts.v2",
+        "chambers": {"house": {"projected_seats": {"Democratic": "218", "Republican": 217}}},
+    }
+    with patch("gcs_helpers.load_chamber_forecasts", return_value=draft):
+        resp = _admin_test_client().post("/api/races/chamber_forecasts/publish")
+    assert resp.status_code == 400
+    assert "projected_seats" in resp.json()["detail"]
+
+
+def test_skip_auth_is_ignored_in_production(monkeypatch):
+    import auth
+    from fastapi import HTTPException
+
+    monkeypatch.setenv("SKIP_AUTH", "true")
+    monkeypatch.setenv("K_SERVICE", "races-api-dev")
+    monkeypatch.delenv("ADMIN_API_KEY", raising=False)
+    monkeypatch.setenv("AUTH0_DOMAIN", "example.auth0.com")
+    monkeypatch.setenv("AUTH0_AUDIENCE", "https://api.example.test")
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(auth.verify_token(None, x_admin_key=""))
+    assert exc_info.value.status_code == 401
+
+    monkeypatch.delenv("K_SERVICE")
+    assert asyncio.run(auth.verify_token(None, x_admin_key="")) == {}
+
+
+def test_unknown_kid_refresh_is_throttled_and_negatively_cached(monkeypatch):
+    import auth
+
+    monkeypatch.setenv("AUTH0_DOMAIN", "example.auth0.com")
+    monkeypatch.setenv("AUTH0_AUDIENCE", "https://api.example.test")
+    monkeypatch.setattr(auth, "_jwks_cache", {})
+    monkeypatch.setattr(auth, "_jwks_last_forced_refresh", {})
+    monkeypatch.setattr(auth, "_unknown_kids", {})
+    fetches = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, url):
+            fetches.append(url)
+            response = MagicMock()
+            response.json.return_value = {"keys": [{"kid": "real-key"}]}
+            return response
+
+    monkeypatch.setattr(auth.httpx, "AsyncClient", FakeClient)
+
+    async def attempt(kid):
+        with patch("auth.jwt.get_unverified_header", return_value={"kid": kid}):
+            try:
+                await auth._decode_jwt("token")
+            except Exception:
+                pass
+
+    async def run():
+        # Warm fetch + one forced refresh for the first unknown kid.
+        await attempt("forged-1")
+        assert len(fetches) == 2
+        # Same kid again: negatively cached, no fetch.
+        await attempt("forged-1")
+        # A different random kid inside the throttle window: no fetch either.
+        for index in range(20):
+            await attempt(f"forged-{index + 2}")
+        assert len(fetches) == 2
+
+    asyncio.run(run())
+    # The throttled kids were never confirmed missing by a real refetch, so a
+    # genuinely rotated key is not locked out once the window passes.
+    assert ("example.auth0.com", "forged-2") not in auth._unknown_kids
+
+
+def test_health_reports_app_version():
+    resp = _admin_test_client().get("/health")
+    assert resp.status_code == 200
+    assert "version" in resp.json()
+
+
+def test_checkout_rejects_localhost_origin_in_production(monkeypatch):
+    from fastapi import HTTPException
+    from routers import payments
+
+    request = MagicMock()
+    request.headers = {"origin": "http://localhost:5173"}
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("ENV", raising=False)
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    assert payments._checkout_origin(request) == "http://localhost:5173"
+
+    monkeypatch.setenv("K_SERVICE", "races-api-dev")
+    with pytest.raises(HTTPException) as exc_info:
+        payments._checkout_origin(request)
+    assert exc_info.value.status_code == 403
+    request.headers = {"origin": "https://smarter.vote"}
+    assert payments._checkout_origin(request) == "https://smarter.vote"
+
+
+def test_analytics_events_carry_ttl_and_tasks_are_retained():
+    import analytics_middleware
+    import analytics_store
+
+    store = analytics_store.AnalyticsStore.__new__(analytics_store.AnalyticsStore)
+    collection = MagicMock()
+    collection.add = AsyncMock()
+    store._client = MagicMock()
+    store._client.collection.return_value = collection
+    ts = "2026-10-01T00:00:00+00:00"
+
+    asyncio.run(store._log_firestore(ts, "/races/x", "x", 200, 5, None, None))
+
+    doc = collection.add.await_args.args[0]
+    assert doc["expires_at"] == datetime(2026, 12, 30, tzinfo=timezone.utc)
+    assert analytics_store.ANALYTICS_EVENT_RETENTION >= timedelta(hours=720)
+    assert isinstance(analytics_middleware._background_tasks, set)
+
+
+def test_race_summary_schema_keeps_forecast_panel_fields():
+    import schemas
+
+    summary = schemas.RaceForecastSummary.model_validate(
+        {"method": "panel_median_v1", "panel": [{"model": "a/model"}], "panel_spread": 0.12}
+    )
+    dumped = summary.model_dump()
+    assert dumped["method"] == "panel_median_v1"
+    assert dumped["panel"] == [{"model": "a/model"}]
+    assert dumped["panel_spread"] == 0.12
