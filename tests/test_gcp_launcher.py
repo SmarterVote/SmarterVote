@@ -7,12 +7,27 @@ configure_admin_key_from_gcp, _is_localhost, and main()'s error handling,
 none of which had any coverage before.
 """
 
+import os
 from importlib.util import find_spec
 from unittest.mock import MagicMock
 
 import pytest
 
 import smartervote_mcp.gcp_launcher as gcp_launcher
+
+
+def _require_mcp_sdk() -> None:
+    """Skip locally when the optional MCP SDK is absent, but fail in CI.
+
+    CI installs requirements-mcp.txt; a silent skip there would hide a broken
+    install and drop every MCP tool test from the gate without anyone noticing.
+    """
+    if find_spec("mcp") is not None:
+        return
+    if os.environ.get("CI", "").strip().lower() not in {"", "0", "false", "no"}:
+        pytest.fail("MCP SDK is missing in CI; install requirements-mcp.txt")
+    pytest.skip("MCP SDK is optional outside the local MCP environment")
+
 
 # ---------------------------------------------------------------------------
 # _gcloud_executable
@@ -211,8 +226,7 @@ def test_is_localhost_returns_false_on_parse_error(monkeypatch):
 
 
 def test_main_warns_and_continues_on_localhost_when_admin_key_setup_fails(monkeypatch, capsys):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
     monkeypatch.setenv("SMARTERVOTE_RACES_API_URL", "http://127.0.0.1:8080")
     monkeypatch.setattr(gcp_launcher, "configure_admin_key_from_gcp", MagicMock(side_effect=RuntimeError("no gcloud")))
     monkeypatch.setattr(gcp_launcher, "configure_cloud_run_identity_token_from_gcp", MagicMock())
@@ -251,8 +265,7 @@ def test_main_exits_on_remote_url_when_identity_token_setup_fails(monkeypatch):
 
 
 def test_main_runs_server_when_setup_succeeds(monkeypatch):
-    if find_spec("mcp") is None:
-        pytest.skip("MCP SDK is optional outside the local MCP environment")
+    _require_mcp_sdk()
     monkeypatch.setenv("SMARTERVOTE_RACES_API_URL", "http://127.0.0.1:8080")
     monkeypatch.setattr(gcp_launcher, "configure_admin_key_from_gcp", MagicMock())
     monkeypatch.setattr(gcp_launcher, "configure_cloud_run_identity_token_from_gcp", MagicMock())

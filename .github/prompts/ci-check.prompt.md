@@ -30,8 +30,8 @@ PYTHONPATH=. python scripts/check_coverage_thresholds.py coverage.json
 ## Step 3 — Python formatting check
 
 ```bash
-python -m black --check shared smartervote_mcp services/races-api tests pipeline_client functions scripts
-python -m isort --check-only shared smartervote_mcp services/races-api tests pipeline_client functions scripts
+python -m black --check shared smartervote_mcp services/races-api tests pipeline_client scripts
+python -m isort --check-only shared smartervote_mcp services/races-api tests pipeline_client scripts
 ```
 
 ## Step 4 — Races API tests

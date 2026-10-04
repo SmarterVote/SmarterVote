@@ -39,9 +39,9 @@ python -m uvicorn pipeline_client.backend.main:app --port 8001 --reload
 python -m uvicorn main:app --app-dir services/races-api --host 0.0.0.0 --port 8080 --reload
 ```
 
-## Cloud Run Job Mode (Production)
+## Cloud Run Job Mode (optional `runner=cloud_run`)
 
-The primary cloud architecture. Admin triggers runs through `races-api`; each race runs in a one-shot Cloud Run Job with no idle instance cost or request-timeout handoffs.
+Production queue items default to the local Docker worker (`PIPELINE_DEFAULT_RUNNER=local` in `infra/races-api.tf`; see below). Queuing with `runner=cloud_run` instead runs each race in a one-shot Cloud Run Job with no idle instance cost or request-timeout handoffs.
 
 **How it works**:
 
@@ -102,7 +102,7 @@ To avoid redundant Serper API calls and reduce costs, web search results and fet
 
 ## Local Docker Worker (Permanent)
 
-The long-lived Docker worker is a supported execution mode, not a temporary migration tool. Queue with `runner=local`; the deployed Cloud Run path ignores those items.
+The long-lived Docker worker is the production default (`runner=local`), not a temporary migration tool; the Cloud Run Job path ignores those items. It is not deployed by Terraform, so rebuild it after pipeline fixes merge.
 
 ```powershell
 docker compose -f docker-compose.worker.yml up -d --build

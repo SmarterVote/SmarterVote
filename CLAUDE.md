@@ -51,6 +51,9 @@ Run the narrowest useful check for what you touched. The commands below mirror t
 PYTHONPATH=. python -m pytest tests -v \
   --ignore=tests/test_races_api_admin.py
 
+# Paid live-LLM tests (tests/test_roster_adjudicator_live.py) are skipped unless
+# RUN_LIVE_LLM_TESTS=1 *and* OPENROUTER_API_KEY are set; a key in .env alone never spends.
+
 # CI additionally enforces the ratcheted branch-coverage floor configured in
 # .github/workflows/ci.yaml; local coverage behavior is in .coveragerc.
 
@@ -74,8 +77,8 @@ cd infra && terraform fmt -check -recursive && terraform init -backend=false && 
 For the full local gate sequence: `.\scripts\run-ci-gates.ps1`
 
 **Before changing any model choice**, run the catalog guard. It is not a CI gate
-because it needs live network and `OPENROUTER_API_KEY`, which `tests/conftest.py`
-deliberately mocks away:
+because it needs live network and `OPENROUTER_API_KEY`, while the test suite mocks
+network calls and never needs a real key:
 
 ```bash
 python scripts/check_model_catalog.py
@@ -131,7 +134,8 @@ silently aborting an escalation.
 7. **Pipeline run cost** — **full research runs are expensive** (LLM + web search API costs per candidate per race; real issues research runs ~$0.20–0.30/candidate). Only queue full runs when the user explicitly asks or there is a clear data quality problem requiring it. Never batch-queue full runs autonomously without user sign-off — queue small batches (a handful of races, not dozens) and verify results before continuing.
    - **"Refresh" means the lightweight core refresh — use the `refresh_race_core` MCP tool, don't hand-roll it.** It is the canonical definition: `enabled_steps=["discovery","images","polling","forecast","voter_resources"]` (drop `images` / `voter_resources` via `include_images=False` / `include_voter_resources=False`). Re-verifies the exact-contest roster, refreshes candidate summaries and headshots, re-pulls polls, regenerates the evidence-backed forecast. Order matters and the tool encodes it — `discovery` must settle the roster before the rest. Roughly **$0.09/race** for the discovery/polling/forecast core. It does **not** include `issues`, `finance`, `refinement`, `review`, or `iteration`. Never read "refresh" as authorization to spend on issue research; a full run costs ~5-10x a refresh and needs its own explicit ask.
    - **Standalone/targeted single-step runs are fine** for `steps=["discovery"]` (fix candidate lists), `steps=["forecast"]`, `steps=["polling"]`, or image-only refreshes — each is a self-contained, useful unit of work on its own.
-   - **Never queue `steps=["issues"]` alone.** Raw issue stances without the `review`/`iteration` steps that follow aren't validated, so an issues-only run produces unreviewed data and nothing gets published. If a race needs real issue research, queue one combined run: `enabled_steps=["issues","finance","refinement","polling","forecast","voter_resources","review","iteration"]` with `baseline_source="latest"` if building on an existing draft (`"published"` to ignore it and start over). Don't split "issues" and "the rest" into two separate `queue_races` calls — it's fragile (easy to lose the first run's work if you forget `baseline_source="latest"` on the second, or if the run hangs before either checkpoints) for no benefit.
+   - **MCP guardrails:** `queue_races` / `run_race` require an explicit `enabled_steps` (no implicit default), `queue_races` caps a call at 10 races unless `confirm_large_batch=True`, and the destructive tools (`unpublish_race`, `delete_race`, `delete_draft`, `restore_race_version`) require `confirm=True`.
+   - **Never queue `steps=["issues"]` alone.** `shared/pipeline_options.py` now rejects `issues` without `review` (API, local backend, and MCP alike). Raw issue stances without the `review`/`iteration` steps that follow aren't validated, so an issues-only run produces unreviewed data and nothing gets published. If a race needs real issue research, queue one combined run: `enabled_steps=["issues","finance","refinement","polling","forecast","voter_resources","review","iteration"]` with `baseline_source="latest"` if building on an existing draft (`"published"` to ignore it and start over). Don't split "issues" and "the rest" into two separate `queue_races` calls — it's fragile (easy to lose the first run's work if you forget `baseline_source="latest"` on the second, or if the run hangs before either checkpoints) for no benefit.
    - **Verify the candidate roster before spending on issue research.** Check for empty `summary`/no `summary_sources`/no `roster_sources`/suspicious images (e.g., a name-collision headshot) before queuing full research — that pattern means the roster itself needs a `steps=["discovery"]` re-verification first (`baseline_source="published"`, **not** `force_fresh=true` — that wipes all existing evidence and can trip the "lacks qualifying current-cycle exact-contest evidence" safety check even for candidates that were already well-sourced), not 12-issue-deep research on unverified candidates.
    - Always verify results with `get_race_data(draft=true)` and check `validation_grade.passed` (not just that a grade exists) before trusting or publishing a "completed" run — a race can finish with `pipeline_state.complete: true` and still fail review. Spot-check for literal placeholder text (e.g. a stance that's just the word `"DRAFT"`) in addition to the recognized `"No public position found"` marker, and confirm `finance` actually populated `donor_summary`/`voting_summary` — that step can fail silently and leave everyone's data blank with no error surfaced.
 8. **MCP over scratch** — for reusable operations prefer enhancing `smartervote_mcp/server.py` over one-off scripts in `scratch/`

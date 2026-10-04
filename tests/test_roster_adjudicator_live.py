@@ -1,8 +1,9 @@
 """Live adjudicator judgments against evidence that really broke the regexes.
 
 These cases are the ones prose-grading got wrong in production. They cost a few
-cents to run and need a real ``OPENROUTER_API_KEY``, so they skip in CI (which
-mocks network) and run locally when someone has a key.
+cents to run, so they need an explicit opt-in (``RUN_LIVE_LLM_TESTS=1``) plus a
+real ``OPENROUTER_API_KEY``. Having a key in the environment (e.g. from ``.env``)
+is not enough: an ordinary local test run must never spend money.
 
 They are not redundant with tests/test_roster_adjudicator.py, which mocks the
 provider and covers wiring. Only these can catch a prompt regression — the first
@@ -10,7 +11,7 @@ draft of the COMPLETENESS question blocked Ballotpedia's standard full-field
 sentence, reproducing the exact ne-house-02-2026 failure the adjudicator exists
 to fix, and no mocked test could have noticed.
 
-    PYTHONPATH=. python -m pytest tests/test_roster_adjudicator_live.py -v
+    RUN_LIVE_LLM_TESTS=1 PYTHONPATH=. python -m pytest tests/test_roster_adjudicator_live.py -v
 """
 
 from __future__ import annotations
@@ -22,9 +23,15 @@ import pytest
 
 from pipeline_client.agent.roster_adjudicator import Claim, adjudicate
 
+
+def _live_llm_tests_enabled() -> bool:
+    opted_in = os.environ.get("RUN_LIVE_LLM_TESTS", "").strip().lower() in {"1", "true", "yes"}
+    return opted_in and bool(os.environ.get("OPENROUTER_API_KEY"))
+
+
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("OPENROUTER_API_KEY"),
-    reason="live adjudicator check needs a real OPENROUTER_API_KEY",
+    not _live_llm_tests_enabled(),
+    reason="paid live adjudicator check: set RUN_LIVE_LLM_TESTS=1 and a real OPENROUTER_API_KEY",
 )
 
 

@@ -104,8 +104,17 @@ class PipelineRunOptions(BaseModel):
 
     @model_validator(mode="after")
     def validate_step_dependencies(self) -> "PipelineRunOptions":
-        if self.enabled_steps and "iteration" in self.enabled_steps and "review" not in self.enabled_steps:
+        steps = self.enabled_steps or []
+        if "iteration" in steps and "review" not in steps:
             raise ValueError("'iteration' requires 'review' in enabled_steps")
+        # Issue stances are only trustworthy after review; an issues-only run
+        # produces unvalidated data that can never be published, so it is pure
+        # spend. Enforced here so the API, the worker, and MCP all share it.
+        if "issues" in steps and "review" not in steps:
+            raise ValueError(
+                "'issues' requires 'review' in enabled_steps; queue issue research as one combined run, e.g. "
+                "['issues','finance','refinement','polling','forecast','voter_resources','review','iteration']"
+            )
         return self
 
 

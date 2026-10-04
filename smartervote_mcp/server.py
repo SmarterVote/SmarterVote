@@ -10,7 +10,7 @@ from urllib.parse import quote, unquote
 
 from mcp.server.mcpserver import MCPServer
 
-from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL
+from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL, normalize_profile_name
 from smartervote_mcp.client import RacesApiClient, compact_options
 
 mcp = MCPServer("SmarterVote Races")
@@ -44,18 +44,47 @@ def _pipeline_options(**kwargs: Any) -> Dict[str, Any]:
 
     Anything above `default` costs materially more per race, and a profile name
     alone can raise spend without the caller ever saying so. Require an explicit
-    ``cheap_mode=False`` as the sign-off. Retired profile names are still
-    rejected the same way, since they map forward onto `premium`.
+    ``cheap_mode=False`` as the sign-off. Names are normalized first (case,
+    whitespace, retired aliases): ``quality`` maps to `premium` and is guarded;
+    ``balanced`` maps to `default` and is not.
     """
     requested_cheap_mode = kwargs.get("cheap_mode")
-    model_profile = kwargs.get("model_profile")
-    if requested_cheap_mode is not False and model_profile in {"premium", "custom", "balanced", "quality"}:
+    # Normalize before comparing: " Premium " or a retired alias must not slip
+    # past a literal set check and silently raise spend.
+    model_profile = normalize_profile_name(kwargs.get("model_profile"))
+    if model_profile is not None:
+        kwargs["model_profile"] = model_profile
+    if requested_cheap_mode is not False and model_profile not in {None, "default"}:
         raise ValueError(
             "model_profile above 'default' requires explicit cheap_mode=False. "
             "Omit model_profile or use model_profile='default' for the standard cheap run."
         )
     kwargs["cheap_mode"] = False if requested_cheap_mode is False else True
     return compact_options(**kwargs)
+
+
+#: MCP-side cap on races per queue call. The API accepts far more, but an agent
+#: should never be able to fan out dozens of paid runs in a single tool call.
+MAX_MCP_QUEUE_BATCH = 10
+
+
+def _require_enabled_steps(enabled_steps: Any, *, tool: str) -> None:
+    """Refuse to queue without an explicit step list.
+
+    The API's fallback when steps are omitted includes finance/refinement, so an
+    agent reading "refresh" could otherwise spend on work nobody asked for.
+    """
+    if not enabled_steps:
+        raise ValueError(
+            f"{tool} requires an explicit, non-empty enabled_steps list. For a refresh use refresh_race_core; "
+            'for targeted work pass e.g. ["discovery"] or ["forecast"]; for full issue research pass '
+            '["issues","finance","refinement","polling","forecast","voter_resources","review","iteration"].'
+        )
+
+
+def _require_confirm(confirm: bool, *, action: str) -> None:
+    if confirm is not True:
+        raise ValueError(f"{action} is destructive; call again with confirm=True once the user has approved it.")
 
 
 @mcp.tool(structured_output=False)
@@ -846,6 +875,64 @@ def _contains_placeholder(value: Any) -> bool:
     return False
 
 
+def _is_not_found(exc: BaseException) -> bool:
+    """True only when a races-api call failed because the resource does not exist."""
+    status = getattr(exc, "status_code", None)
+    if status is not None:
+        return status == 404
+    return bool(re.match(r"races-api 404\b", str(exc)))
+
+
+#: Placeholder tokens that, appearing *inside* a stance, mean the text was never
+#: finished. Upper-case tokens match case-sensitively so ordinary prose ("a draft
+#: bill") is not flagged; lorem ipsum matches in any case.
+_STANCE_PLACEHOLDER_RE = re.compile(r"\b(?:DRAFT|TODO|TBD|FIXME|PLACEHOLDER)\b|(?i:lorem ipsum)")
+_NO_POSITION_PREFIX = "no public position found"
+
+
+def _stance_quality(draft: Dict[str, Any]) -> Dict[str, Any]:
+    """Summarize stance placeholders, the no-position ratio, and empty finance fields.
+
+    Finance can fail silently and leave every candidate's donor/voting summary
+    blank, and a stance can carry placeholder text embedded in a sentence that the
+    whole-value placeholder check cannot see. None of these block — the API does
+    not reject them — but an operator must look before publishing.
+    """
+    candidates = [c for c in draft.get("candidates") or [] if isinstance(c, dict)]
+    placeholder_stances: List[str] = []
+    stance_count = 0
+    no_position_count = 0
+    finance_missing: List[str] = []
+    for candidate in candidates:
+        name = str(candidate.get("name") or "?")
+        issues = candidate.get("issues") if isinstance(candidate.get("issues"), dict) else {}
+        for issue, stance_obj in issues.items():
+            stance = stance_obj.get("stance") if isinstance(stance_obj, dict) else stance_obj
+            if not isinstance(stance, str):
+                continue
+            stance_count += 1
+            if stance.strip().lower().startswith(_NO_POSITION_PREFIX):
+                no_position_count += 1
+            elif _STANCE_PLACEHOLDER_RE.search(stance):
+                placeholder_stances.append(f"{name}:{issue}")
+        if not str(candidate.get("donor_summary") or "").strip() or not str(candidate.get("voting_summary") or "").strip():
+            finance_missing.append(name)
+    # There is no per-step completion record on the draft, so infer that finance
+    # was expected: it runs in every issue-research run, and any candidate with a
+    # finance summary proves it ran. A discovery-only draft for a new race has
+    # neither and is not flagged.
+    finance_expected = stance_count > 0 or len(finance_missing) < len(candidates)
+    if not finance_expected:
+        finance_missing = []
+    return {
+        "placeholder_stances": placeholder_stances,
+        "stance_count": stance_count,
+        "no_position_count": no_position_count,
+        "no_position_ratio": round(no_position_count / stance_count, 3) if stance_count else None,
+        "finance_missing_candidates": finance_missing,
+    }
+
+
 @mcp.tool(structured_output=False)
 async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     """Build a conservative batch publish plan without changing production data.
@@ -860,17 +947,27 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     client = _client()
     rows: List[Dict[str, Any]] = []
     for race_id in race_ids:
-        try:
-            draft = await client.get(f"/api/races/{_path_id(race_id)}/data", params={"draft": True})
-        except Exception:
-            draft = None
-        try:
-            published = await client.get(f"/races/{_path_id(race_id)}")
-        except Exception:
-            published = None
-
         blockers: List[str] = []
         warnings: List[str] = []
+        try:
+            draft = await client.get(f"/api/races/{_path_id(race_id)}/data", params={"draft": True})
+        except Exception as exc:
+            draft = None
+            if not _is_not_found(exc):
+                blockers.append("draft_lookup_failed")
+        published_lookup_failed = False
+        try:
+            published = await client.get(f"/races/{_path_id(race_id)}")
+        except Exception as exc:
+            # Only a 404 means "never published". A 500, auth failure, or timeout
+            # says nothing about whether a published page exists, so treating it
+            # as a first publication would skip every roster-change check.
+            published = None
+            if not _is_not_found(exc):
+                published_lookup_failed = True
+                blockers.append("published_lookup_failed")
+
+        stance_quality: Dict[str, Any] = {}
         names = _candidate_names(draft)
         if not isinstance(draft, dict):
             blockers.append("draft_missing")
@@ -922,6 +1019,13 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
                     warnings.append("pipeline_not_complete")
             if _contains_placeholder(draft):
                 blockers.append("literal_placeholder_content")
+            stance_quality = _stance_quality(draft)
+            if stance_quality["placeholder_stances"]:
+                warnings.append("stance_placeholder_text")
+            if stance_quality["finance_missing_candidates"]:
+                warnings.append("finance_summaries_missing")
+            if stance_quality["no_position_ratio"] is not None and stance_quality["no_position_ratio"] >= 0.5:
+                warnings.append("mostly_no_public_position")
             step_failures = pipeline_state.get("step_failures") or []
             if any(
                 isinstance(failure, dict) and failure.get("reason") == "roster_verification_failed"
@@ -930,7 +1034,9 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
                 blockers.append("roster_verification_failed")
 
         published_names = _candidate_names(published)
-        if published is None:
+        if published_lookup_failed:
+            pass  # already a blocker; roster comparison is impossible
+        elif published is None:
             warnings.append("first_publication")
         elif sorted(names) != sorted(published_names):
             warnings.append("candidate_roster_changes")
@@ -972,6 +1078,7 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
                 "draft_candidates": names,
                 "published_candidates": published_names,
                 "published_exists": published is not None,
+                **stance_quality,
             }
         )
     return {
@@ -986,13 +1093,13 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
 @mcp.tool(structured_output=False)
 async def queue_races(
     race_ids: List[str],
+    enabled_steps: List[str],
     cheap_mode: bool | None = True,
     force_fresh: bool | None = None,
     allow_fast_no_change: bool | None = None,
     baseline_source: Literal["latest", "published"] | None = None,
     resume_partial: bool | None = None,
     save_artifact: bool | None = None,
-    enabled_steps: List[str] | None = None,
     research_model: str | None = None,
     claude_model: str | None = None,
     gemini_model: str | None = None,
@@ -1007,13 +1114,22 @@ async def queue_races(
     note: str | None = None,
     goal: str | None = None,
     runner: str | None = "local",
+    confirm_large_batch: bool = False,
 ) -> Dict[str, Any]:
     """Queue one or more races for pipeline processing.
 
+    ``enabled_steps`` is required: there is no implicit step set, because the
+    API's fallback includes paid finance/refinement work. For a routine refresh
+    use ``refresh_race_core`` instead. For real issue research pass the combined
+    set ["issues","finance","refinement","polling","forecast","voter_resources",
+    "review","iteration"] — ``issues`` is rejected without ``review``.
+
+    At most 10 races (MAX_MCP_QUEUE_BATCH) per call unless ``confirm_large_batch=True``; queue
+    a small batch and verify its results before queuing more.
+
     Defaults to the cheap `default` profile, routed to the long-lived local Docker
-    worker (runner="local"). Pass runner="cloud_run" to use the one-shot Cloud
-    Run Job instead (currently broken: the races-api service account is
-    missing run.invoker on pipeline-job-dev, so dispatch 403s as of 2026-07-17).
+    worker (runner="local"), which is what production uses by design. Pass
+    runner="cloud_run" to dispatch the optional one-shot Cloud Run Job instead.
     The expensive `premium` and `custom` model profiles require explicitly passing
     cheap_mode=False. Set baseline_source="published" for a targeted repair
     that must ignore any existing draft; the default "latest" behavior prefers
@@ -1023,6 +1139,13 @@ async def queue_races(
     allow_fast_no_change is an explicit optimization for maintenance workflows;
     it defaults off here so a targeted discovery repair always rechecks roster.
     """
+    _require_enabled_steps(enabled_steps, tool="queue_races")
+    if len(race_ids) > MAX_MCP_QUEUE_BATCH and not confirm_large_batch:
+        raise ValueError(
+            f"queue_races received {len(race_ids)} races; the MCP cap is {MAX_MCP_QUEUE_BATCH} per call. "
+            "Pipeline runs cost money per candidate — queue a small batch, verify the drafts, then continue. "
+            "Pass confirm_large_batch=True only with explicit user sign-off for a larger batch."
+        )
     options = _pipeline_options(
         cheap_mode=cheap_mode,
         force_fresh=force_fresh,
@@ -1062,6 +1185,7 @@ async def refresh_race_core(
     runner: str = "local",
     note: str | None = None,
     goal: str | None = None,
+    confirm_large_batch: bool = False,
 ) -> Dict[str, Any]:
     """Queue the standard roster-and-race core refresh workflow.
 
@@ -1093,6 +1217,7 @@ async def refresh_race_core(
             "refresh candidate summaries, then update polling and the evidence-backed forecast."
         ),
         runner=runner,
+        confirm_large_batch=confirm_large_batch,
     )
     return {**result, "mode": "core_refresh", "enabled_steps": steps}
 
@@ -1100,10 +1225,10 @@ async def refresh_race_core(
 @mcp.tool(structured_output=False)
 async def run_race(
     race_id: str,
+    enabled_steps: List[str],
     cheap_mode: bool | None = True,
     force_fresh: bool | None = None,
     baseline_source: Literal["latest", "published"] | None = None,
-    enabled_steps: List[str] | None = None,
     debug_mode: bool | None = None,
     note: str | None = None,
     goal: str | None = None,
@@ -1111,13 +1236,14 @@ async def run_race(
 ) -> Dict[str, Any]:
     """Queue a single race for pipeline processing.
 
-    Defaults to the cheap `default` profile, routed to the long-lived local Docker
-    worker (runner="local"). Pass runner="cloud_run" to use the one-shot Cloud
-    Run Job instead (currently broken: the races-api service account is
-    missing run.invoker on pipeline-job-dev, so dispatch 403s as of 2026-07-17).
-    Set baseline_source="published" to ignore an existing draft when performing
-    a targeted repair.
+    ``enabled_steps`` is required (see ``queue_races``); use ``refresh_race_core``
+    for a routine refresh. Defaults to the cheap `default` profile, routed to the
+    long-lived local Docker worker (runner="local"), which is what production uses
+    by design. Pass runner="cloud_run" to dispatch the optional one-shot Cloud Run
+    Job instead. Set baseline_source="published" to ignore an existing draft when
+    performing a targeted repair.
     """
+    _require_enabled_steps(enabled_steps, tool="run_race")
     options = _pipeline_options(
         cheap_mode=cheap_mode,
         force_fresh=force_fresh,
@@ -1183,8 +1309,9 @@ async def list_unpublished_drafts() -> List[Dict[str, Any]]:
 
 
 @mcp.tool(structured_output=False)
-async def unpublish_race(race_id: str) -> Dict[str, Any]:
-    """Remove a race from public published data while keeping its draft."""
+async def unpublish_race(race_id: str, confirm: bool = False) -> Dict[str, Any]:
+    """Remove a race from public published data while keeping its draft. Requires confirm=True."""
+    _require_confirm(confirm, action="unpublish_race")
     return await _client().post(f"/api/races/{_path_id(race_id)}/unpublish")
 
 
@@ -1333,19 +1460,24 @@ async def list_races_by_state(state: str, office: str | None = None) -> List[Dic
 
 
 @mcp.tool(structured_output=False)
-async def delete_race(race_id: str) -> Dict[str, Any]:
-    """Delete active race data and its Firestore record after archival.
+async def delete_race(race_id: str, confirm: bool = False) -> Dict[str, Any]:
+    """Delete active race data and its Firestore record after archival. Requires confirm=True.
 
     Existing draft/published artifacts are copied to retired version storage
     first; the API refuses deletion if archival fails. Use ``unpublish_race``
     instead if you only want to hide a race from public view.
     """
+    _require_confirm(confirm, action="delete_race")
     return await _client().delete(f"/api/races/{_path_id(race_id)}")
 
 
 @mcp.tool(structured_output=False)
-async def delete_draft(race_id: str) -> Dict[str, Any]:
-    """Delete only the draft version of a race from GCS, keeping the published page and Firestore record."""
+async def delete_draft(race_id: str, confirm: bool = False) -> Dict[str, Any]:
+    """Delete only the draft version of a race from GCS, keeping the published page and Firestore record.
+
+    Requires confirm=True.
+    """
+    _require_confirm(confirm, action="delete_draft")
     return await _client().delete(f"/api/races/{_path_id(race_id)}/draft")
 
 
@@ -1444,8 +1576,9 @@ async def get_race_version(race_id: str, filename: str) -> Dict[str, Any]:
 
 
 @mcp.tool(structured_output=False)
-async def restore_race_version(race_id: str, filename: str) -> Dict[str, Any]:
-    """Restore one historical version as the current draft. This mutates draft state."""
+async def restore_race_version(race_id: str, filename: str, confirm: bool = False) -> Dict[str, Any]:
+    """Restore one historical version as the current draft. This mutates draft state; requires confirm=True."""
+    _require_confirm(confirm, action="restore_race_version")
     return await _client().post(f"/api/races/{_path_id(race_id)}/versions/{_path_id(filename, 'version')}/restore")
 
 

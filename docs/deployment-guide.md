@@ -16,11 +16,12 @@ The normal backend flow is:
 
 ```text
 web admin -> races-api -> Firestore pipeline_queue
-  -> pipeline Cloud Run Job -> shared queue processor -> AgentHandler -> GCS drafts/
+  -> local Docker worker (default runner) or pipeline Cloud Run Job (runner=cloud_run)
+  -> shared queue processor -> AgentHandler -> GCS drafts/
   -> admin publish -> GCS races/ + races/summaries.json
 ```
 
-The local Docker worker remains supported for `runner=local`; it is not deployed as an always-on cloud service.
+`races-api` defaults new queue items to `runner=local` (`PIPELINE_DEFAULT_RUNNER` in `infra/races-api.tf`), so production runs are claimed by the workstation Docker worker. That worker is not deployed by Terraform or CI; rebuild it by hand after pipeline fixes merge. The Cloud Run Job is the optional `runner=cloud_run` path.
 
 ## Required GitHub Configuration
 

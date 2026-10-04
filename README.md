@@ -38,7 +38,7 @@ The admin dashboard is available at `http://localhost:5173/admin/pipeline`.
 ## Current Architecture
 
 - **Production admin/public API**: `services/races-api`
-- **Production agent execution**: `races-api` queue item -> one-shot Cloud Run Job -> `pipeline_client.worker` -> `AgentHandler`
+- **Production agent execution**: `races-api` queue item -> long-lived local Docker worker (`runner=local`, the default via `PIPELINE_DEFAULT_RUNNER`) or the optional one-shot Cloud Run Job (`runner=cloud_run`) -> `pipeline_client.worker` -> `AgentHandler`
 - **Shared agent library**: `pipeline_client/agent`
 - **Shared schema**: `shared/models.py`
 - **Frontend**: `web`; production bundles the published GCS race snapshot into the Cloudflare Pages build, while admin operations target `races-api`
@@ -52,7 +52,7 @@ Production:
 
 ```text
 Admin dashboard -> races-api queue endpoint -> Firestore pipeline_queue
-    -> Cloud Run Job -> shared queue processor -> AgentHandler -> GCS drafts/{race_id}.json
+    -> local Docker worker (default) or Cloud Run Job -> shared queue processor -> AgentHandler -> GCS drafts/{race_id}.json
     -> admin publish -> GCS races/{race_id}.json
     -> Cloudflare deploy copies published JSON into the static site build
 ```

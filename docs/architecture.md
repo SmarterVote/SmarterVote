@@ -1,6 +1,6 @@
 # SmarterVote Architecture
 
-SmarterVote has one production API surface: `services/races-api`. The older `pipeline_client` FastAPI app is retained for local development only. Production race research runs as one-shot Cloud Run Job executions; the same worker remains available as a continuous local Docker mode.
+SmarterVote has one production API surface: `services/races-api`. The older `pipeline_client` FastAPI app is retained for local development only. Production race research runs on the continuous local Docker worker by default (`PIPELINE_DEFAULT_RUNNER=local` in `infra/races-api.tf`); the same worker is also deployed as an optional one-shot Cloud Run Job, selected per request with `runner=cloud_run`.
 
 ## Ownership
 
@@ -23,9 +23,10 @@ SmarterVote has one production API surface: `services/races-api`. The older `pip
 Admin dashboard
   -> Dashboard for traffic, health, queue state, and run drilldowns
   -> races-api POST /api/races/queue or POST /api/races/{race_id}/run
-  -> Firestore pipeline_queue document (`runner=cloud_run`)
-  -> races-api starts pipeline-job with QUEUE_ITEM_ID override
-  -> pipeline_client.worker one-shot execution
+  -> Firestore pipeline_queue document (`runner=local` by default)
+  -> runner=local: the long-lived Docker worker polls and claims the item
+     runner=cloud_run: races-api starts pipeline-job with a QUEUE_ITEM_ID override
+  -> pipeline_client.worker execution (continuous or one-shot)
   -> atomic queue lease + heartbeat
   -> AgentHandler.handle()
   -> pipeline_client.agent.run_agent()
@@ -49,10 +50,11 @@ Queue documents should contain:
 - `runner` (`cloud_run` or `local`)
 - `created_at`
 
-Each production queue item maps to one Cloud Run Job execution and one logical
-`pipeline_runs/{run_id}` record. The worker renews a Firestore lease while active;
-expired leases can be reclaimed safely. Logs live under `pipeline_runs/{run_id}/logs`.
-Local Docker uses the identical processor with `runner=local` and continuous polling.
+Each queue item maps to one logical `pipeline_runs/{run_id}` record. The default
+`runner=local` items are claimed by the continuous Docker worker; a `runner=cloud_run`
+item maps to one Cloud Run Job execution. Both use the identical queue processor.
+The worker renews a Firestore lease while active; expired leases can be reclaimed
+safely. Logs live under `pipeline_runs/{run_id}/logs`.
 
 ## Admin API Surface
 
@@ -65,7 +67,9 @@ The admin dashboard should target `services/races-api`.
 | GET    | `/api/races/{race_id}`                                      | Get one Firestore race record                    |
 | DELETE | `/api/races/{race_id}`                                      | Delete race record and associated GCS JSON       |
 | POST   | `/api/races/queue`                                          | Queue one or more races                          |
-| POST   | `/api/races/recheck`                                        | Reconcile all race records from Firestore/GCS    |
+| POST   | `/api/races/recheck`                                        | Reconcile one page of race records (`?limit=50` default, `?cursor=` to continue) |
+| POST   | `/api/races/repair-plan`                                    | Build bounded repair plans from draft-or-published RaceJSON |
+| POST   | `/api/races/asset-audit`                                    | Probe race asset URLs; optionally persist results |
 | POST   | `/api/races/{race_id}/run`                                  | Queue a single race                              |
 | POST   | `/api/races/{race_id}/cancel`                               | Cancel queued/running race                       |
 | POST   | `/api/races/{race_id}/recheck`                              | Reconcile status from Firestore/GCS              |
@@ -104,9 +108,7 @@ The admin dashboard should target `services/races-api`.
 | POST   | `/api/races/chamber_forecasts/publish`                      | Publish chamber forecast draft                   |
 | GET    | `/pipeline/metrics`                                         | Get pipeline metrics                             |
 | GET    | `/pipeline/metrics/summary`                                 | Get summarized pipeline metrics                  |
-| GET    | `/alerts`                                                   | List operational alerts                          |
-| POST   | `/alerts/{alert_id}/acknowledge`                            | Acknowledge one alert                            |
-| POST   | `/alerts/acknowledge-all`                                   | Acknowledge all active alerts                    |
+| GET    | `/pipeline/gcp-costs`                                       | GCP spend by service from the Cloud Billing export |
 | POST   | `/cache/clear`                                              | Clear the races API in-memory public data cache  |
 | GET    | `/analytics/overview`                                       | Races API request analytics summary              |
 | GET    | `/analytics/traffic`                                        | Cloudflare static-site traffic summary           |
@@ -137,8 +139,9 @@ JSON on the hot path; draft/published filter state, candidate counts, grades, an
 `races/{race_id}` catalog document.
 
 Initial population is handled by the existing admin recheck flow. After deploy, `POST /api/races/recheck` sweeps the
-existing Firestore race docs plus known GCS draft/published race IDs, hydrates catalog metadata from storage, and
-creates missing `races/{race_id}` documents when a race already exists in GCS.
+existing Firestore race docs plus known GCS draft/published race IDs one bounded page at a time (default 50; pass the
+returned cursor to continue), hydrates catalog metadata from storage, and creates missing `races/{race_id}` documents
+when a race already exists in GCS. The MCP `recheck_all_races` tool follows the cursor pages.
 
 The 2026 research program is manifest-first rather than catalog-first. The
 committed `shared/data/research_manifest_2026.json` defines the expected 506
@@ -169,6 +172,7 @@ subject to admission, so the guard cannot strand an existing record.
 | POST   | `/payments/webhook`        | Receive signature-verified Stripe lifecycle events        |
 | GET    | `/health`                  | Liveness                                                  |
 | GET    | `/health/ready`            | Readiness                                                 |
+| POST   | `/geocode/census`          | Census geocoder proxy: address -> state and congressional district (rate limited, address not logged) |
 
 The production Cloudflare workflow copies the current published files from GCS into `web/static/` before building.
 Public SvelteKit pages therefore load the bundled `/{race_id}.json`, `/summaries.json`, and
@@ -199,7 +203,7 @@ and browser titles must use that formatter instead of displaying the model-suppl
 canonical links continue to use the stable race ID and do not change when title copy changes.
 - `/support/` offers one-time and monthly support through Stripe-hosted Checkout when the server-side Stripe secrets are configured. `/partners/` remains an informational contact page and does not create financial commitments.
 
-The `/my-ballot/` route provides a no-server-storage election lookup. When `VITE_GOOGLE_MAPS_API_KEY` is configured, a visitor can select a U.S. address suggestion supplied directly by Google Places; the optional integration uses debounced requests and one autocomplete session token per search. The completed address is sent directly from the browser to the U.S. Census Geocoder using its documented JSONP interface; the address is never sent to or stored by Smarter.Vote. Without Google configuration or if suggestions fail, visitors can enter the full address normally. The returned state and congressional district plus matched race IDs are retained in tab-scoped `sessionStorage` so results survive a refresh. The non-sensitive state and congressional district are also written as `state` and `district` URL parameters so a result can be bookmarked or shared without exposing the address; the current published catalog is matched again when that URL opens. Both the saved result and URL parameters are cleared when the visitor searches another address. Results transition in place on the focused route rather than returning to the homepage. The lookup is not a complete ballot and does not identify other state, local, judicial, or ballot-measure contests, so results link to VOTE411's personalized ballot guide for broader ballot information. There is no Smarter.Vote address endpoint or durable address persistence. Correction reports use public GitHub issues; other public inquiries currently use mail links rather than a server-side CRM or form-processing service.
+The `/my-ballot/` route provides a no-server-storage election lookup. When `VITE_GOOGLE_MAPS_API_KEY` is configured, a visitor can select a U.S. address suggestion supplied directly by Google Places; the optional integration uses debounced requests and one autocomplete session token per search. The completed address is sent from the browser in a JSON POST body to the races-api `POST /geocode/census` proxy, which forwards it to the U.S. Census Geocoder and returns only the state and congressional-district fields; the address is not logged or stored, and never appears in a URL. Without Google configuration or if suggestions fail, visitors can enter the full address normally. The returned state and congressional district plus matched race IDs are retained in tab-scoped `sessionStorage` so results survive a refresh. The non-sensitive state and congressional district are also written as `state` and `district` URL parameters so a result can be bookmarked or shared without exposing the address; the current published catalog is matched again when that URL opens. Both the saved result and URL parameters are cleared when the visitor searches another address. Results transition in place on the focused route rather than returning to the homepage. The lookup is not a complete ballot and does not identify other state, local, judicial, or ballot-measure contests, so results link to VOTE411's personalized ballot guide for broader ballot information. There is no durable address persistence. Correction reports use public GitHub issues; other public inquiries currently use mail links rather than a server-side CRM or form-processing service.
 
 Support checkout sends only an amount and one-time/monthly mode to `races-api`; card and billing details go directly to Stripe Checkout and never enter Smarter.Vote's frontend or API. The API derives success and cancellation routes from an exact allowlist of public/local origins, applies checkout rate limits, and keeps Stripe credentials server-side in Secret Manager. The return page verifies the opaque Checkout session ID with Stripe before displaying a confirmed state; the signed webhook endpoint handles lifecycle notifications separately. If Stripe secrets are absent, checkout fails closed with a service-unavailable response.
 
@@ -231,7 +235,7 @@ Update/rerun mode adds roster and metadata synchronization before re-researching
 
 ## Local Development
 
-`pipeline_client/backend/main.py` is local-only and exposes runner/debug routes. The permanent Docker worker is started with `docker-compose.worker.yml` and claims only `runner=local` items. Production correctness should be tested against `services/races-api` plus the shared queue processor and one-shot worker path.
+`pipeline_client/backend/main.py` is local-only and exposes runner/debug routes. The permanent Docker worker is started with `docker compose -f docker-compose.worker.yml up -d --build` and claims only `runner=local` items, which is the production default; it is not deployed by Terraform and must be rebuilt by hand after pipeline fixes merge (see `CLAUDE.md`). Production correctness should be tested against `services/races-api` plus the shared queue processor.
 
 ## Migration Guardrails
 
