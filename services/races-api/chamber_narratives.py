@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from typing import Any, Dict, Literal
+from typing import Any, Dict, Iterable, Literal
 
 import httpx
 
@@ -260,14 +260,18 @@ async def generate_chamber_analyses(
     panel: bool = False,
     panel_models: tuple[str, ...] = CHAMBER_FORECAST_PANEL_MODELS,
     synthesis_model: str = CHAMBER_FORECAST_SYNTHESIS_MODEL,
+    only: Iterable[Chamber] | None = None,
 ) -> Dict[Chamber, dict[str, Any]]:
-    """Write the analysis for every chamber. The three chambers run concurrently.
+    """Write the analysis for every chamber, or just ``only``. Chambers run concurrently.
 
     With ``panel`` the note is drafted by ``panel_models`` and merged by
     ``synthesis_model``; otherwise ``model`` writes it alone. ``model`` also runs
     the optional review pass either way.
     """
     chamber_names: Dict[Chamber, str] = {"senate": "US Senate", "house": "US House", "governors": "Governors"}
+    if only is not None:
+        wanted = set(only)
+        chamber_names = {chamber: name for chamber, name in chamber_names.items() if chamber in wanted}
     cycle_year = election_cycle_year(summaries)
 
     async def one(chamber: Chamber, name: str) -> tuple[Chamber, dict[str, Any]]:

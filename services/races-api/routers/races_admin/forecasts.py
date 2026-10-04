@@ -1,7 +1,7 @@
 """Chamber-level forecast draft, generate, and publish endpoints."""
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 import gcs_helpers
 from auth import verify_token
@@ -43,6 +43,14 @@ class GenerateForecastsRequest(BaseModel):
             "CHAMBER_FORECAST_SYNTHESIS_MODEL. When false, `model` writes the note alone."
         ),
     )
+    chambers: list[Literal["house", "senate", "governors"]] | None = Field(
+        default=None,
+        description=(
+            "Regenerate only these chambers. The others keep the text of the current draft, so one chamber whose "
+            "note came out wrong can be redone without re-rolling notes that were already checked. Seat numbers are "
+            "recomputed for every chamber. Requires an existing draft."
+        ),
+    )
 
 
 @router.get("/api/races/chamber_forecasts/draft", dependencies=[Depends(verify_token)])
@@ -69,13 +77,33 @@ async def generate_chamber_forecasts_endpoint(
     if not isinstance(summaries, list):
         raise HTTPException(status_code=500, detail=f"Invalid summaries from publish service: {type(summaries)}")
 
+    kept: Dict[str, Dict[str, Any]] = {}
+    if payload.chambers is not None:
+        from chamber_narratives import REQUIRED_ANALYSIS_KEYS
+
+        existing = gcs_helpers.load_chamber_forecasts(draft=True) or {}
+        for chamber in {"house", "senate", "governors"} - set(payload.chambers):
+            previous = (existing.get("chambers") or {}).get(chamber) or {}
+            if not all(previous.get(key) for key in REQUIRED_ANALYSIS_KEYS):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"No complete {chamber} note in the current draft to keep; regenerate all chambers instead",
+                )
+            kept[chamber] = {key: previous[key] for key in REQUIRED_ANALYSIS_KEYS}
+
     try:
         analyses = await generate_chamber_analyses(
-            summaries, model=payload.model, review=payload.review, goal=payload.goal, panel=payload.panel
+            summaries,
+            model=payload.model,
+            review=payload.review,
+            goal=payload.goal,
+            panel=payload.panel,
+            only=payload.chambers,
         )
     except Exception as exc:
         logging.error("Error generating chamber forecast analyses using model %s: %s", payload.model, exc, exc_info=True)
         raise HTTPException(status_code=502, detail=f"LLM chamber forecast generation failed: {exc}") from exc
+    analyses = {**kept, **analyses}
 
     forecast_data = build_chamber_forecasts(
         summaries,
