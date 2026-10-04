@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = pipeline_client,shared,functions,smartervote_mcp
+source = pipeline_client,shared,smartervote_mcp
 
 [report]
 exclude_lines =

@@ -1,4 +1,21 @@
 # SmarterVote Infrastructure Deployment Script (PowerShell)
+#
+# Usage: .\deploy.ps1 -AppVersion <verified commit SHA>   (or set $env:APP_VERSION)
+#
+# The normal deploy path is the "Deploy Infrastructure" GitHub workflow, which
+# applies only images CI built and scanned for a commit. This script is for
+# break-glass use and deploys the same immutable, SHA-tagged images; it never
+# builds or pushes anything and refuses to run without an explicit version.
+param(
+    [string]$AppVersion = $env:APP_VERSION
+)
+
+if ([string]::IsNullOrWhiteSpace($AppVersion) -or $AppVersion -eq "latest") {
+    Write-Host "Error: an immutable app version is required." -ForegroundColor Red
+    Write-Host "Usage: .\deploy.ps1 -AppVersion <full commit SHA already published by CI>" -ForegroundColor Yellow
+    Write-Host "Prefer: GitHub Actions -> Deploy Infrastructure -> Run workflow (action=apply, deploy_sha=<sha>)" -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "SmarterVote Infrastructure Deployment" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
@@ -41,6 +58,7 @@ if ([string]::IsNullOrEmpty($region)) { $region = "us-central1" }
 
 Write-Host "Project ID: $projectId" -ForegroundColor Cyan
 Write-Host "Region: $region" -ForegroundColor Cyan
+Write-Host "App version: $AppVersion" -ForegroundColor Cyan
 
 # Set gcloud project
 Write-Host "Setting gcloud project..." -ForegroundColor Yellow
@@ -56,27 +74,23 @@ terraform validate
 
 # Plan deployment
 Write-Host "Planning deployment..." -ForegroundColor Yellow
-terraform plan -var-file=secrets.tfvars
+terraform plan -var-file=secrets.tfvars -var "app_version=$AppVersion" -out=tfplan
 
 # Ask for confirmation
 $confirmation = Read-Host "Do you want to proceed with the deployment? (y/N)"
 if ($confirmation -ne 'y' -and $confirmation -ne 'Y') {
     Write-Host "Deployment cancelled" -ForegroundColor Red
+    Remove-Item -ErrorAction SilentlyContinue tfplan
     exit 0
 }
 
 # Apply configuration
 Write-Host "Deploying infrastructure..." -ForegroundColor Green
-terraform apply -var-file=secrets.tfvars -auto-approve
+terraform apply tfplan
+Remove-Item -ErrorAction SilentlyContinue tfplan
 
 Write-Host "Infrastructure deployment completed!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "1. Build and push the races-api Docker image to Artifact Registry:" -ForegroundColor White
-Write-Host "   - gcloud auth configure-docker $region-docker.pkg.dev" -ForegroundColor Gray
-Write-Host "   - cd ../services/races-api && docker build -t $region-docker.pkg.dev/$projectId/smartervote-dev/races-api:latest ." -ForegroundColor Gray
-Write-Host "   - docker push $region-docker.pkg.dev/$projectId/smartervote-dev/races-api:latest" -ForegroundColor Gray
-Write-Host ""
-Write-Host "2. Build and push the pipeline worker image used by the pipeline Cloud Run Job" -ForegroundColor White
-Write-Host "3. Update the races-api service and pipeline Job image tags if they changed" -ForegroundColor White
-Write-Host "4. Test the API endpoints and queue a smoke race through the admin UI" -ForegroundColor White
+Write-Host "1. Verify the deployed API: curl `"$(terraform output -raw races_api_url)/health`"" -ForegroundColor White
+Write-Host "2. Queue a smoke race through the admin UI" -ForegroundColor White

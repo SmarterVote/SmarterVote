@@ -15,7 +15,7 @@ RUN apt-get update \
 COPY requirements-constraints.txt /tmp/requirements-constraints.txt
 COPY pipeline_client/backend/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -c /tmp/requirements-constraints.txt -r /tmp/requirements.txt \
-    && pip install --no-cache-dir "python-dotenv==1.2.2"
+    && pip install --no-cache-dir -c /tmp/requirements-constraints.txt python-dotenv
 
 COPY pipeline_client ./pipeline_client
 COPY shared ./shared

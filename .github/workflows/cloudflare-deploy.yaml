@@ -80,10 +80,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: "web/package-lock.json"
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: web
-
       - name: Authenticate to Google Cloud with OIDC
         if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_DEPLOY_SERVICE_ACCOUNT != ''
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
@@ -112,18 +108,52 @@ jobs:
           # Published race files keep pipeline_state (the pipeline builds on it
           # with baseline_source="published"), but the public site never reads
           # it, agent_metrics or run_audit; drop them from the served copies.
+          # summaries.json entries also carry agent_metrics (run cost, model,
+          # token counts) for the admin API; strip it from the public index too.
           node -e '
             const fs = require("fs");
-            const skip = new Set(["summaries.json", "chamber_forecasts.json", "states-10m.json"]);
+            const PRIVATE_KEYS = ["pipeline_state", "agent_metrics", "run_audit"];
+            const strip = (d) => {
+              if (d && typeof d === "object" && !Array.isArray(d)) {
+                for (const k of PRIVATE_KEYS) delete d[k];
+              }
+            };
             for (const f of fs.readdirSync("web/static")) {
-              if (!f.endsWith(".json") || skip.has(f)) continue;
+              if (!f.endsWith(".json") || f === "chamber_forecasts.json") continue;
               const p = "web/static/" + f;
               const d = JSON.parse(fs.readFileSync(p, "utf8"));
-              if (!d || typeof d !== "object" || Array.isArray(d)) continue;
-              for (const k of ["pipeline_state", "agent_metrics", "run_audit"]) delete d[k];
+              if (f === "summaries.json") {
+                const entries = Array.isArray(d) ? d : Array.isArray(d && d.races) ? d.races : null;
+                if (!entries) throw new Error("Unexpected summaries.json shape");
+                entries.forEach(strip);
+              } else if (!d || typeof d !== "object" || Array.isArray(d)) {
+                continue;
+              } else {
+                strip(d);
+              }
               fs.writeFileSync(p, JSON.stringify(d));
             }
           '
+
+      # GCP access is only needed for the fetch above. Remove the credential
+      # file the auth action wrote (a full service-account key on the legacy
+      # path) and gcloud's cached login before any npm package code runs.
+      - name: Drop Google Cloud credentials
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ -n "${GOOGLE_GHA_CREDS_PATH:-}" ]]; then rm -f "$GOOGLE_GHA_CREDS_PATH"; fi
+          rm -f "$GITHUB_WORKSPACE"/gha-creds-*.json
+          rm -rf "${CLOUDSDK_CONFIG:-$HOME/.config/gcloud}"
+          {
+            echo "GOOGLE_APPLICATION_CREDENTIALS="
+            echo "CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="
+            echo "GOOGLE_GHA_CREDS_PATH="
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: web
 
       - name: Generate SvelteKit files
         run: npx svelte-kit sync
@@ -213,7 +243,7 @@ jobs:
           INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
 
       - name: Create Pages Project if not exists
-        run: npx wrangler pages project create ${{ vars.CLOUDFLARE_PROJECT_NAME || 'smartervote-web' }} --production-branch main || true
+        run: npx --yes wrangler@4.147.0 pages project create ${{ vars.CLOUDFLARE_PROJECT_NAME || 'smartervote-web' }} --production-branch main || true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID || 'b9e75903377dcca73a27a5d6be4e4384' }}
@@ -221,6 +251,7 @@ jobs:
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4
         with:
+          wranglerVersion: "4.147.0"
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID || 'b9e75903377dcca73a27a5d6be4e4384' }}
           command: pages deploy web/build --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME || 'smartervote-web' }} --branch=main

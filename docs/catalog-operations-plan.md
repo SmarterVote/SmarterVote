@@ -53,7 +53,7 @@ day, with a later runoff where applicable.
   `summarize_run_costs`. Stop the batch if any run exceeds 2× the quote without an
   understood escalation.
 - Runs use `runner="local"`: the owner's workstation Docker worker must be up and
-  built from current `main` (`docker compose -f docker-compose.worker.yml up -d --build`).
+  built from current `main` (`WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build`).
   This cloud session cannot see that worker, so confirm liveness from run progress.
 - Search goes through Searlo (primary). Serper is not in use; a run that falls back
   to Serper or hits Searlo HTTP 402 is a credit problem — stop and tell the owner to

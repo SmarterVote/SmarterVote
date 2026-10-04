@@ -66,15 +66,20 @@ resource "google_storage_bucket" "terraform_state" {
   lifecycle_rule {
     condition {
       num_newer_versions = 10
+      with_state         = "ARCHIVED"
     }
     action {
       type = "Delete"
     }
   }
 
+  # Only ever expire NONCURRENT state versions. A bare `age = 365` condition also
+  # matches the live object, so a state file nobody touched for a year would be
+  # deleted outright.
   lifecycle_rule {
     condition {
-      age = 365
+      age        = 365
+      with_state = "ARCHIVED"
     }
     action {
       type = "Delete"
@@ -120,12 +125,15 @@ resource "google_artifact_registry_repository" "smartervote" {
   description   = "SmarterVote container images for ${var.environment} environment"
   format        = "DOCKER"
 
-  # Keep only the 5 most recent versions of each image; delete anything older than 30 days
+  # Delete images older than 30 days, but always KEEP the 20 most recent versions
+  # of each image (KEEP policies take precedence over DELETE). Rollback deploys a
+  # previous commit SHA's image, so pruning to only 5 versions / 30 days could
+  # leave no image for a SHA that is only a week or two old after busy weeks.
   cleanup_policies {
     id     = "keep-minimum-versions"
     action = "KEEP"
     most_recent_versions {
-      keep_count = 5
+      keep_count = 20
     }
   }
 
@@ -140,6 +148,11 @@ resource "google_artifact_registry_repository" "smartervote" {
   depends_on = [google_project_service.apis]
 }
 
+# Created only when billing_account_id is set (CI: GCP_BILLING_ACCOUNT_ID repo
+# variable). Budgets are billing-account resources: the deploy identity needs
+# roles/billing.costsManager on the billing account itself, which project
+# Owner/Editor does not include. Grant that before setting the variable or the
+# apply fails here.
 resource "google_billing_budget" "budget" {
   count           = var.billing_account_id != "" ? 1 : 0
   billing_account = var.billing_account_id

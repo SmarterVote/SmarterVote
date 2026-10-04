@@ -235,7 +235,7 @@ Update/rerun mode adds roster and metadata synchronization before re-researching
 
 ## Local Development
 
-`pipeline_client/backend/main.py` is local-only and exposes runner/debug routes. The permanent Docker worker is started with `docker compose -f docker-compose.worker.yml up -d --build` and claims only `runner=local` items, which is the production default; it is not deployed by Terraform and must be rebuilt by hand after pipeline fixes merge (see `CLAUDE.md`). Production correctness should be tested against `services/races-api` plus the shared queue processor.
+`pipeline_client/backend/main.py` is local-only and exposes runner/debug routes. The permanent Docker worker is started with `WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build` and claims only `runner=local` items, which is the production default; it is not deployed by Terraform and must be rebuilt by hand after pipeline fixes merge (see `CLAUDE.md`). Production correctness should be tested against `services/races-api` plus the shared queue processor.
 
 ## Migration Guardrails
 

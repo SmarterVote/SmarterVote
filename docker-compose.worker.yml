@@ -2,14 +2,27 @@
 # permanent first-class alternative to the default one-shot Cloud Run Job runner.
 #
 # Setup:
-#   1. Run `gcloud auth application-default login` on the host (uses your own GCP
-#      identity — no static service-account key needed). This writes ADC to
-#      %APPDATA%\gcloud\application_default_credentials.json (Windows) or
-#      ~/.config/gcloud/application_default_credentials.json (Linux/Mac); the
-#      volume mount below covers the Windows path.
+#   1. Create Application Default Credentials on the host. Recommended: impersonate
+#      the pipeline Cloud Run Job's service account, so the local worker has
+#      exactly the production job's access (its Firestore, bucket and secret
+#      grants) instead of your personal Owner/Editor rights:
+#        gcloud auth application-default login \
+#          --impersonate-service-account=pipeline-job-dev@<PROJECT_ID>.iam.gserviceaccount.com
+#      This needs roles/iam.serviceAccountTokenCreator on that account (Terraform
+#      currently grants it only on the races-api account), and the heartbeat
+#      behind the local_worker_stale alert additionally needs
+#      roles/logging.logWriter on it. Plain `gcloud auth application-default
+#      login` also works, using your own identity.
+#      ADC is written to %APPDATA%\gcloud (Windows) or ~/.config/gcloud
+#      (Linux/macOS). The mount below defaults to the Windows path; on
+#      Linux/macOS set GCLOUD_CONFIG_DIR=$HOME/.config/gcloud.
 #   2. Ensure ./.env has the LLM/search API keys the agent needs (OpenRouter, Serper)
 #      and GCS_BUCKET_NAME / GOOGLE_CLOUD_PROJECT for the target (dev) environment.
-#   3. docker compose -f docker-compose.worker.yml up --build
+#   3. Build from an up-to-date checkout of origin/main, stamping the commit
+#      (WORKER_GIT_COMMIT is required; compose refuses to run without it):
+#        bash/zsh:   WORKER_GIT_COMMIT=$(git rev-parse HEAD) GCLOUD_CONFIG_DIR=$HOME/.config/gcloud \
+#                      docker compose -f docker-compose.worker.yml up -d --build
+#        PowerShell: $env:WORKER_GIT_COMMIT = (git rev-parse HEAD); docker compose -f docker-compose.worker.yml up -d --build
 #
 # To route work here:  run_race(<race_id>, runner="local")  (via the MCP tool / admin API)
 services:
@@ -20,8 +33,10 @@ services:
       args:
         # Stamps the image with the commit it was built from so the worker can
         # report whether it predates merged fixes. Set WORKER_GIT_COMMIT in the
-        # environment (or .env) to the output of `git rev-parse HEAD`.
-        WORKER_GIT_COMMIT: ${WORKER_GIT_COMMIT:-}
+        # environment to the output of `git rev-parse HEAD`; an unset value
+        # used to build an image that reported "unknown" and silently kept
+        # claiming work after fixes merged.
+        WORKER_GIT_COMMIT: ${WORKER_GIT_COMMIT:?set WORKER_GIT_COMMIT to the output of git rev-parse HEAD}
     env_file:
       - .env
     environment:
@@ -49,7 +64,7 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     volumes:
-      - ${APPDATA}/gcloud:/gcloud-config:ro
+      - ${GCLOUD_CONFIG_DIR:-${APPDATA}/gcloud}:/gcloud-config:ro
     restart: unless-stopped
     # Active research commonly exceeds two hours. SIGTERM stops new leases and
     # lets in-flight races checkpoint/finish; do not force-kill them after 120s.

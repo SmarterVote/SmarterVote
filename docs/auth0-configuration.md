@@ -134,7 +134,7 @@ python -m pytest services/races-api/test_races_api.py tests/test_races_api_admin
 ### Common Issues
 
 1. **Auth0 Redirect Blocked**: Normal in sandboxed environments
-2. **CORS Errors**: Check `allowed_origins` configuration
+2. **CORS Errors**: Check the CORS origins hardcoded in `services/races-api/main.py`
 3. **Token Expired**: Frontend handles automatic refresh
 4. **Local Development**: Set `SKIP_AUTH=true` for local API testing without Auth0
 

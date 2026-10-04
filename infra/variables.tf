@@ -47,9 +47,17 @@ variable "jina_api_key" {
 
 # Deployment and versioning variables
 variable "app_version" {
-  description = "Application version for tracking updates"
+  description = <<-EOT
+    Immutable container image tag to deploy (the verified commit SHA). No default:
+    CI passes the SHA it built and scanned, and a mutable tag such as "latest"
+    would let an unreviewed local build replace production and break rollback.
+  EOT
   type        = string
-  default     = "latest"
+
+  validation {
+    condition     = length(trimspace(var.app_version)) > 0 && var.app_version != "latest"
+    error_message = "app_version must be an immutable image tag (the deployed commit SHA), not empty or \"latest\"."
+  }
 }
 
 variable "prevent_destroy_prod" {
@@ -70,22 +78,16 @@ variable "auth0_audience" {
   default     = ""
 }
 
-variable "allowed_origins" {
-  description = "Allowed CORS origins for the optional legacy pipeline client"
-  type        = list(string)
-  default = [
-    "https://smarter.vote",
-    "https://www.smarter.vote",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-  ]
-}
-
 # Monitoring / alerting
 variable "alert_email" {
-  description = "Email address to receive GCP monitoring alerts. Leave empty to disable alert policies."
+  description = <<-EOT
+    Email address to receive GCP monitoring alerts. Leave empty (or unset) to
+    disable every alert policy. CI passes the ALERT_EMAIL repository variable,
+    which arrives as "" when that variable is not configured.
+  EOT
   type        = string
   default     = ""
+  nullable    = false
 }
 
 variable "admin_api_key" {
@@ -141,9 +143,18 @@ variable "stripe_webhook_secret" {
 }
 
 variable "billing_account_id" {
-  description = "GCP Billing Account ID. If empty, the budget alert resource is not created."
+  description = <<-EOT
+    GCP Billing Account ID (XXXXXX-XXXXXX-XXXXXX). If empty, the budget alert
+    resource is not created. CI passes the GCP_BILLING_ACCOUNT_ID repository
+    variable ("" when unset).
+    NOTE: the budget lives on the billing account, not the project, so the
+    deploy service account needs roles/billing.costsManager (or
+    roles/billing.admin) granted ON THE BILLING ACCOUNT before this is set;
+    project-level Owner/Editor is not enough and the apply fails without it.
+  EOT
   type        = string
   default     = ""
+  nullable    = false
 }
 
 variable "enable_billing_export" {
@@ -156,6 +167,7 @@ variable "enable_billing_export" {
   EOT
   type        = bool
   default     = false
+  nullable    = false
 }
 
 variable "bigquery_location" {

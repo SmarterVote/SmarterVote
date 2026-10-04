@@ -42,3 +42,14 @@ resource "google_firestore_field" "rate_limits_ttl" {
 
   ttl_config {}
 }
+
+# Raw analytics events written by races-api carry an `expires_at` timestamp so
+# per-request rows age out instead of accumulating indefinitely.
+resource "google_firestore_field" "analytics_events_ttl" {
+  project    = var.project_id
+  database   = "(default)"
+  collection = "analytics_events"
+  field      = "expires_at"
+
+  ttl_config {}
+}

@@ -26,7 +26,7 @@ This is the preferred workstation path. It uses the same Firestore queue,
 items queued with `runner=local`.
 
 ```powershell
-docker compose -f docker-compose.worker.yml up -d --build
+WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build
 docker compose -f docker-compose.worker.yml ps
 docker compose -f docker-compose.worker.yml logs -f pipeline-worker
 ```
@@ -643,7 +643,7 @@ Required verification:
 
 ```powershell
 pytest -q
-docker compose -f docker-compose.worker.yml up -d --build
+WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build
 docker compose -f docker-compose.worker.yml ps
 ```
 

@@ -240,4 +240,4 @@ Remove-Item -Recurse -Force data\cache
 
 ## Production Notes
 
-In production, the admin dashboard queues races through `services/races-api`. Items default to `runner=local` and are claimed by the workstation Docker worker (`docker compose -f docker-compose.worker.yml up -d --build`); `runner=cloud_run` instead starts a one-shot Cloud Run Job using the same shared worker and `AgentHandler`. The local pipeline API does not run in production.
+In production, the admin dashboard queues races through `services/races-api`. Items default to `runner=local` and are claimed by the workstation Docker worker (`WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build`); `runner=cloud_run` instead starts a one-shot Cloud Run Job using the same shared worker and `AgentHandler`. The local pipeline API does not run in production.

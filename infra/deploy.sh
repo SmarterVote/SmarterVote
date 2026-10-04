@@ -2,7 +2,21 @@
 
 # SmarterVote Infrastructure Deployment Script
 
-set -e
+set -euo pipefail
+
+# Usage: APP_VERSION=<verified commit SHA> ./deploy.sh   (or ./deploy.sh <sha>)
+#
+# The normal deploy path is the "Deploy Infrastructure" GitHub workflow, which
+# applies only images CI built and scanned for a commit. This script exists for
+# break-glass use and deploys the same immutable, SHA-tagged images: it never
+# builds or pushes anything, and it refuses to run without an explicit version.
+APP_VERSION="${1:-${APP_VERSION:-}}"
+if [ -z "$APP_VERSION" ] || [ "$APP_VERSION" = "latest" ]; then
+    echo "Error: an immutable app version is required."
+    echo "Usage: APP_VERSION=<full commit SHA already published by CI> ./deploy.sh"
+    echo "Prefer: GitHub Actions -> Deploy Infrastructure -> Run workflow (action=apply, deploy_sha=<sha>)"
+    exit 1
+fi
 
 echo "SmarterVote Infrastructure Deployment"
 echo "========================================"
@@ -27,14 +41,15 @@ fi
 echo "Prerequisites check passed"
 
 # Get project ID and region from secrets.tfvars
-PROJECT_ID=$(grep 'project_id' secrets.tfvars | cut -d'"' -f2)
-REGION=$(grep 'region' secrets.tfvars | cut -d'"' -f2)
-if [ -z "$REGION" ]; then
+PROJECT_ID=$(grep 'project_id' secrets.tfvars | cut -d'"' -f2 || true)
+REGION=$(grep 'region' secrets.tfvars | cut -d'"' -f2 || true)
+if [ -z "${REGION:-}" ]; then
     REGION="us-central1"
 fi
 
 echo "Project ID: $PROJECT_ID"
 echo "Region: $REGION"
+echo "App version: $APP_VERSION"
 
 # Set gcloud project
 echo "Setting gcloud project..."
@@ -50,28 +65,24 @@ terraform validate
 
 # Plan deployment
 echo "Planning deployment..."
-terraform plan -var-file=secrets.tfvars
+terraform plan -var-file=secrets.tfvars -var "app_version=$APP_VERSION" -out=tfplan
 
 # Ask for confirmation
 read -p "Do you want to proceed with the deployment? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Deployment cancelled"
+    rm -f tfplan
     exit 0
 fi
 
 # Apply configuration
 echo "Deploying infrastructure..."
-terraform apply -var-file=secrets.tfvars -auto-approve
+terraform apply tfplan
+rm -f tfplan
 
 echo "Infrastructure deployment completed!"
 echo ""
 echo "Next steps:"
-echo "1. Build and push the races-api Docker image to Artifact Registry:"
-echo "   - gcloud auth configure-docker $REGION-docker.pkg.dev"
-echo "   - docker build -f services/races-api/Dockerfile -t $REGION-docker.pkg.dev/$PROJECT_ID/smartervote-dev/races-api:latest ."
-echo "   - docker push $REGION-docker.pkg.dev/$PROJECT_ID/smartervote-dev/races-api:latest"
-echo ""
-echo "2. Build and push the pipeline worker image used by the pipeline Cloud Run Job"
-echo "3. Update the races-api service and pipeline Job image tags if they changed"
-echo "4. Test the API endpoints and queue a smoke race through the admin UI"
+echo "1. Verify the deployed API: curl \"\$(terraform output -raw races_api_url)/health\""
+echo "2. Queue a smoke race through the admin UI"
