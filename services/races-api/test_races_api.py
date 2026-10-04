@@ -1185,3 +1185,50 @@ def test_race_cache_write_is_dropped_after_concurrent_clear(tmp_path):
     service._get_race_data_cloud = lambda race_id, _client: {"id": race_id, "title": "fresh"}
     assert service.get_race_data("ga-senate-2026")["title"] == "fresh"
     assert service._cache_get_race("ga-senate-2026")["title"] == "fresh"
+
+
+def test_generate_chamber_forecasts_redoes_only_requested_chambers(client, monkeypatch):
+    """Redoing one chamber keeps the other notes from the current draft untouched."""
+    calls = []
+
+    async def fake_generate(chamber_name, context_text, *, model, cycle_year=None):
+        calls.append(chamber_name)
+        return _stub_analysis(chamber_name)
+
+    import chamber_narratives
+
+    monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_generate)
+
+    assert client.post("/api/races/chamber_forecasts/generate", json={"panel": False}).status_code == 200
+    calls.clear()
+
+    async def fake_regenerate(chamber_name, context_text, *, model, cycle_year=None):
+        calls.append(chamber_name)
+        return {key: f"{value} v2" for key, value in _stub_analysis(chamber_name).items()}
+
+    monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_regenerate)
+
+    resp = client.post("/api/races/chamber_forecasts/generate", json={"panel": False, "chambers": ["governors"]})
+
+    assert resp.status_code == 200
+    assert calls == ["Governors"]
+    chambers = resp.json()["forecast"]["chambers"]
+    assert chambers["governors"]["opposing_party_path"] == "Governors opposing path v2"
+    assert chambers["house"]["opposing_party_path"] == "US House opposing path"
+    assert chambers["senate"]["narrative"] == "US Senate narrative"
+
+
+def test_generate_single_chamber_needs_a_draft_to_keep(client, monkeypatch):
+    """Without a complete draft there is nothing to keep, so a partial regenerate is refused."""
+
+    async def fake_generate(chamber_name, context_text, *, model, cycle_year=None):
+        raise AssertionError("no LLM call should be made")
+
+    import chamber_narratives
+
+    monkeypatch.setattr(chamber_narratives, "generate_chamber_analysis", fake_generate)
+
+    resp = client.post("/api/races/chamber_forecasts/generate", json={"panel": False, "chambers": ["house"]})
+
+    assert resp.status_code == 409
+    assert "regenerate all chambers" in resp.json()["detail"]

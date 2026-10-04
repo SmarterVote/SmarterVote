@@ -1767,6 +1767,7 @@ async def generate_chamber_forecasts(
     review: bool = False,
     goal: str | None = None,
     panel: bool = True,
+    chambers: List[str] | None = None,
 ) -> Dict[str, Any]:
     """Automatically generate chamber-level forecast narratives using an LLM on the remote races-api backend.
 
@@ -1780,11 +1781,16 @@ async def generate_chamber_forecasts(
 
     ``goal`` is an optional editorial steer for that pass, e.g. "lead with the tipping-point races". Factual
     corrections always take precedence over it. It requires ``review=True``.
+
+    ``chambers`` (any of "house", "senate", "governors") regenerates only those notes; the others keep the
+    current draft's text. Use it to redo one chamber whose note came out wrong without re-rolling the rest.
     """
     client = _client()
     payload: Dict[str, Any] = {"model": model, "review": review, "panel": panel}
     if goal:
         payload["goal"] = goal
+    if chambers:
+        payload["chambers"] = chambers
     res = await client.post("/api/races/chamber_forecasts/generate", json=payload)
     return {"success": True, "api_response": res}
 
