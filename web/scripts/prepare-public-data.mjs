@@ -87,6 +87,26 @@ export function forecastDetailsPayload(race) {
   return { id: race.id, updated_utc: race.updated_utc, forecast };
 }
 
+/** Longest bare name kept from a not-running entry, in words. */
+const MAX_NAME_WORDS = 6;
+
+/**
+ * The candidate name inside a not-running entry. The pipeline often records
+ * a reason after the name ("Cori Bush (D) - lost Democratic primary",
+ * "Brian Shortsleeve — lost the September 1 primary ... Sources: https://..."),
+ * which slugged whole produced paths no candidate page ever had, one of them
+ * too long to be a file name (ENAMETOOLONG failed the deploy). Returns null
+ * when what is left still does not look like a name.
+ * @param {unknown} entry
+ * @returns {string | null}
+ */
+export function removedCandidateName(entry) {
+  if (typeof entry !== "string") return null;
+  const name = entry.split(/\s*(?:\(|\[|;|:| [-–—] )/u)[0].trim();
+  if (!name || name.split(/\s+/).length > MAX_NAME_WORDS) return null;
+  return /\d|\bhttps?\b|www\./i.test(name) ? null : name;
+}
+
 /**
  * Slugs of candidates the pipeline recorded as not running whose pages are
  * gone from the published roster. Slugs that still address a published
@@ -117,8 +137,9 @@ export function removedCandidateSlugs(race) {
   }
 
   const slugs = new Set();
-  for (const name of removed) {
-    if (typeof name !== "string" || !name.trim()) continue;
+  for (const entry of removed) {
+    const name = removedCandidateName(entry);
+    if (!name) continue;
     for (const slug of [candidateSlug(name), legacyCandidateSlug(name)]) {
       if (slug && SAFE_SLUG_PATTERN.test(slug) && !live.has(slug))
         slugs.add(slug);
