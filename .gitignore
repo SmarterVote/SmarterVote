@@ -273,6 +273,7 @@ web/screenshots/
 # summary fixture after fetching published JSON from GCS.
 web/static/sitemap.xml
 web/static/forecast/
+web/static/races/
 
 # Mac/Linux
 web/.DS_Store

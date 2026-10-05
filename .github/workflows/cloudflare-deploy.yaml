@@ -108,7 +108,8 @@ jobs:
           # Published race files keep pipeline_state (the pipeline builds on it
           # with baseline_source="published"), but the public site never reads
           # it, agent_metrics or run_audit. The script first derives what needs
-          # pipeline_state (removed-candidate redirects appended to _redirects)
+          # pipeline_state (redirect pages under races/<id>/<slug>/ for removed
+          # candidates)
           # and the small per-race forecast drawer payloads (forecast/<id>.json),
           # then strips those fields from the served copies and summaries.json.
           # Plain Node with no npm dependencies: it runs before `npm ci`.

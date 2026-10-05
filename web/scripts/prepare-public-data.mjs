@@ -6,10 +6,13 @@
  *   1. Writes static/forecast/<race_id>.json: just the forecast fields the
  *      /forecast/ analysis drawer reads, so expanding a card no longer pulls
  *      the full race file (candidates, issues, sources, reviews).
- *   2. Appends 301s to static/_redirects for candidates a pipeline run recorded
- *      as not running (pipeline_state.race_identity.known_ineligible_or_not_running)
- *      and who are no longer on the published roster, so shared links to their
- *      old pages land on the race overview instead of a 404.
+ *   2. Writes static/races/<race_id>/<slug>/index.html redirect stubs for
+ *      candidates a pipeline run recorded as not running
+ *      (pipeline_state.race_identity.known_ineligible_or_not_running) who are
+ *      no longer on the published roster, so shared links to their old pages
+ *      land on the race overview instead of a 404. Stubs rather than
+ *      _redirects rules: there are thousands of these, and Cloudflare Pages
+ *      caps _redirects at 2,000 static rules.
  *   3. Strips the internal pipeline fields the public site never reads
  *      (pipeline_state, agent_metrics, run_audit) from every served copy.
  *
@@ -48,10 +51,7 @@ const NON_RACE_FILES = new Set(["summaries.json", "chamber_forecasts.json"]);
 /** Child routes of /races/<race>/ that are not candidate pages. */
 const RESERVED_CANDIDATE_SLUGS = new Set(["compare"]);
 const RACE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,99}$/;
-const GENERATED_HEADER =
-  "# Generated at deploy (scripts/prepare-public-data.mjs): candidates recorded\n# as not running who are no longer on the published roster.";
-/** Cloudflare Pages honours at most this many static redirect rules. */
-const CLOUDFLARE_STATIC_REDIRECT_LIMIT = 2000;
+const SAFE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * Pre-accent-folding slug, mirroring legacyCandidateSlug in
@@ -88,15 +88,14 @@ export function forecastDetailsPayload(race) {
 }
 
 /**
- * Redirect rules for candidates the pipeline recorded as not running whose
- * pages are gone from the published roster. Slugs that still address a
- * published candidate (current or legacy scheme, withdrawn included) are
- * never redirected: Cloudflare applies _redirects before static files, so
- * such a rule would hide a live page.
+ * Slugs of candidates the pipeline recorded as not running whose pages are
+ * gone from the published roster. Slugs that still address a published
+ * candidate (current or legacy scheme, withdrawn included) are skipped so a
+ * stub never stands in for a live page.
  * @param {Record<string, any>} race
  * @returns {string[]}
  */
-export function removedCandidateRedirects(race) {
+export function removedCandidateSlugs(race) {
   if (!isObject(race) || !RACE_ID_PATTERN.test(String(race.id ?? "")))
     return [];
   const identity = isObject(race.pipeline_state)
@@ -117,61 +116,58 @@ export function removedCandidateRedirects(race) {
     live.add(legacyCandidateSlug(name));
   }
 
-  const target = `/races/${race.id}/`;
   const slugs = new Set();
   for (const name of removed) {
     if (typeof name !== "string" || !name.trim()) continue;
     for (const slug of [candidateSlug(name), legacyCandidateSlug(name)]) {
-      if (slug && !live.has(slug)) slugs.add(slug);
+      if (slug && SAFE_SLUG_PATTERN.test(slug) && !live.has(slug))
+        slugs.add(slug);
     }
   }
-  const lines = [];
-  for (const slug of [...slugs].sort()) {
-    const from = `/races/${race.id}/${slug}`;
-    lines.push(`${from} ${target} 301`, `${from}/ ${target} 301`);
-  }
-  return lines;
+  return [...slugs].sort();
 }
 
 /**
- * Source path of a redirect rule line, or null for comments/blank lines.
- * @param {string} line
+ * A static page that sends visitors (and crawlers, which treat an immediate
+ * meta refresh as a permanent redirect) to `target`.
+ * @param {string} target site-relative path
  */
-function ruleSource(line) {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith("#")) return null;
-  return trimmed.split(/\s+/)[0];
+export function redirectStubHtml(target) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url=${target}">
+<link rel="canonical" href="${target}">
+<title>Candidate no longer on the ballot</title>
+</head>
+<body>
+<p>This candidate is no longer on the ballot. <a href="${target}">See the race overview</a>.</p>
+</body>
+</html>
+`;
 }
 
 /**
- * Append generated rules to the hand-maintained _redirects text. Existing
- * lines are kept verbatim and win: a generated rule whose source path already
- * has a rule (or repeats an earlier generated one) is dropped.
- * @param {string} existing
- * @param {string[]} generated
+ * Write redirect stubs for a race's removed candidates under
+ * `<staticDir>/races/<race_id>/<slug>/index.html`, never overwriting a file
+ * that is already there. Returns the number written.
+ * @param {string} staticDir
+ * @param {Record<string, any>} race
  */
-export function mergeRedirects(existing, generated) {
-  const seen = new Set(
-    existing
-      .split("\n")
-      .map(ruleSource)
-      .filter((source) => source !== null),
-  );
-  const added = [];
-  for (const line of generated) {
-    const source = ruleSource(line);
-    if (source === null || seen.has(source)) continue;
-    seen.add(source);
-    added.push(line);
+export function writeRemovedCandidateStubs(staticDir, race) {
+  let written = 0;
+  const target = `/races/${race.id}/`;
+  for (const slug of removedCandidateSlugs(race)) {
+    const dir = path.join(staticDir, "races", String(race.id), slug);
+    const file = path.join(dir, "index.html");
+    if (fs.existsSync(file)) continue;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(file, redirectStubHtml(target));
+    written += 1;
   }
-  if (added.length === 0) return { text: existing, added: 0, total: seen.size };
-  const base =
-    existing.endsWith("\n") || !existing ? existing : `${existing}\n`;
-  return {
-    text: `${base}\n${GENERATED_HEADER}\n${added.join("\n")}\n`,
-    added: added.length,
-    total: seen.size,
-  };
+  return written;
 }
 
 /** @param {any} d */
@@ -188,8 +184,8 @@ function stripPrivate(d) {
  */
 export function preparePublicData(staticDir, { log = console.log } = {}) {
   const forecastDir = path.join(staticDir, FORECAST_DIR);
-  const redirects = [];
   let forecasts = 0;
+  let stubs = 0;
 
   for (const file of fs.readdirSync(staticDir).sort()) {
     if (!file.endsWith(".json") || file === "chamber_forecasts.json") continue;
@@ -210,7 +206,7 @@ export function preparePublicData(staticDir, { log = console.log } = {}) {
       continue;
     } else {
       if (!NON_RACE_FILES.has(file) && RACE_ID_PATTERN.test(String(data.id))) {
-        redirects.push(...removedCandidateRedirects(data));
+        stubs += writeRemovedCandidateStubs(staticDir, data);
         const payload = forecastDetailsPayload(data);
         if (payload) {
           fs.mkdirSync(forecastDir, { recursive: true });
@@ -226,21 +222,10 @@ export function preparePublicData(staticDir, { log = console.log } = {}) {
     fs.writeFileSync(filePath, JSON.stringify(data));
   }
 
-  const redirectsPath = path.join(staticDir, "_redirects");
-  const existing = fs.existsSync(redirectsPath)
-    ? fs.readFileSync(redirectsPath, "utf8")
-    : "";
-  const merged = mergeRedirects(existing, redirects);
-  if (merged.added > 0) fs.writeFileSync(redirectsPath, merged.text);
-  if (merged.total > CLOUDFLARE_STATIC_REDIRECT_LIMIT) {
-    throw new Error(
-      `_redirects has ${merged.total} rules; Cloudflare Pages allows ${CLOUDFLARE_STATIC_REDIRECT_LIMIT}`,
-    );
-  }
   log(
-    `Wrote ${forecasts} forecast payloads; added ${merged.added} removed-candidate redirects.`,
+    `Wrote ${forecasts} forecast payloads and ${stubs} removed-candidate redirect pages.`,
   );
-  return { forecasts, redirectsAdded: merged.added };
+  return { forecasts, redirectStubs: stubs };
 }
 
 if (
