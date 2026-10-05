@@ -52,6 +52,8 @@ const NON_RACE_FILES = new Set(["summaries.json", "chamber_forecasts.json"]);
 const RESERVED_CANDIDATE_SLUGS = new Set(["compare"]);
 const RACE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,99}$/;
 const SAFE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+/** Longest candidate slug a redirect page is written for. */
+const MAX_SLUG_LENGTH = 80;
 
 /**
  * Pre-accent-folding slug, mirroring legacyCandidateSlug in
@@ -117,14 +119,43 @@ export function removedCandidateSlugs(race) {
   }
 
   const slugs = new Set();
-  for (const name of removed) {
-    if (typeof name !== "string" || !name.trim()) continue;
+  for (const entry of removed) {
+    const name = removedCandidateName(entry);
+    if (!name) continue;
     for (const slug of [candidateSlug(name), legacyCandidateSlug(name)]) {
-      if (slug && SAFE_SLUG_PATTERN.test(slug) && !live.has(slug))
+      if (
+        slug &&
+        slug.length <= MAX_SLUG_LENGTH &&
+        SAFE_SLUG_PATTERN.test(slug) &&
+        !live.has(slug)
+      )
         slugs.add(slug);
     }
   }
   return [...slugs].sort();
+}
+
+/**
+ * The candidate's name from a known_ineligible_or_not_running entry. Entries
+ * are usually a bare name, but the agent sometimes writes a note instead
+ * ("Brian Shortsleeve lost the September 1 primary ... sources: https://...")
+ * or a name with a parenthetical. Keep the text before the first bracket or
+ * separator, then its leading run of 2-5 capitalised words; an entry that
+ * doesn't open with a name yields null.
+ * @param {unknown} entry
+ * @returns {string | null}
+ */
+export function removedCandidateName(entry) {
+  if (typeof entry !== "string") return null;
+  const head = entry.split(/\s*(?:[([{:;,]|\s[-–—]\s|https?:\/\/)/u)[0].trim();
+  const words = head.split(/\s+/);
+  const name = [];
+  for (const word of words) {
+    if (!/^\p{Lu}[\p{L}\p{M}.'’-]*$/u.test(word)) break;
+    name.push(word);
+    if (name.length === 5) break;
+  }
+  return name.length >= 2 ? name.join(" ") : null;
 }
 
 /**
@@ -163,9 +194,14 @@ export function writeRemovedCandidateStubs(staticDir, race) {
     const dir = path.join(staticDir, "races", String(race.id), slug);
     const file = path.join(dir, "index.html");
     if (fs.existsSync(file)) continue;
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, redirectStubHtml(target));
-    written += 1;
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(file, redirectStubHtml(target));
+      written += 1;
+    } catch (error) {
+      // One unwritable stub must never block the whole site deploy.
+      console.warn(`Skipped redirect page ${dir}: ${error}`);
+    }
   }
   return written;
 }
@@ -206,7 +242,12 @@ export function preparePublicData(staticDir, { log = console.log } = {}) {
       continue;
     } else {
       if (!NON_RACE_FILES.has(file) && RACE_ID_PATTERN.test(String(data.id))) {
-        stubs += writeRemovedCandidateStubs(staticDir, data);
+        try {
+          stubs += writeRemovedCandidateStubs(staticDir, data);
+        } catch (error) {
+          // Redirect pages are a nicety; never let one race's data block the deploy.
+          log(`Skipped redirect pages for ${data.id}: ${error}`);
+        }
         const payload = forecastDetailsPayload(data);
         if (payload) {
           fs.mkdirSync(forecastDir, { recursive: true });

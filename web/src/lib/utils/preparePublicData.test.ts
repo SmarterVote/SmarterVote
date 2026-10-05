@@ -7,6 +7,7 @@ import {
   legacyCandidateSlug as scriptLegacySlug,
   preparePublicData,
   redirectStubHtml,
+  removedCandidateName,
   removedCandidateSlugs,
 } from "../../../scripts/prepare-public-data.mjs";
 import { candidateSlug, legacyCandidateSlug } from "./format";
@@ -89,6 +90,29 @@ describe("removedCandidateSlugs", () => {
       ),
     ).toEqual([]);
   });
+});
+
+describe("removedCandidateName", () => {
+  it.each([
+    ["Mike Cox", "Mike Cox"],
+    ["Chris Swanson (withdrew May 2026)", "Chris Swanson"],
+    ["José Peña - not on the ballot", "José Peña"],
+    ["Mary O'Neil-Smith: lost primary", "Mary O'Neil-Smith"],
+    ["J. Robert Smith Jr.", "J. Robert Smith Jr."],
+    [
+      "Brian Shortsleeve lost the September 1, 2026 Republican primary for Governor of Massachusetts to Michael Minogue 76.0% to 24.0% per Ballotpedia ... sources: https://ballotpedia.org/x",
+      "Brian Shortsleeve",
+    ],
+  ])("extracts the name from %j", (entry, name) => {
+    expect(removedCandidateName(entry)).toBe(name);
+  });
+
+  it.each(["lost the primary", "Cox", "", "   ", 7, null])(
+    "returns null for %j",
+    (entry) => {
+      expect(removedCandidateName(entry)).toBeNull();
+    },
+  );
 });
 
 describe("redirectStubHtml", () => {
