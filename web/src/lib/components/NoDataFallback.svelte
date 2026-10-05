@@ -92,6 +92,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .no-data-fallback {
     @apply flex flex-col items-center justify-center py-8 px-4 text-center;
     @apply bg-surface-alt rounded-lg border border-stroke;

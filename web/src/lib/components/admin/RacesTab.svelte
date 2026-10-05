@@ -852,12 +852,12 @@
         value={globalFilter}
         on:input={handleGlobalFilterInput}
         placeholder="Search visible races..."
-        class="flex-1 max-w-md px-3 py-2 text-sm border border-stroke rounded-lg bg-surface text-content focus:outline-none focus:border-blue-500"
+        class="flex-1 max-w-md px-3 py-2 text-sm border border-stroke rounded-lg bg-surface text-content focus:outline-hidden focus:border-blue-500"
       />
       <select
         value={statusFilter}
         on:change={handleStatusFilter}
-        class="px-3 py-2 text-sm border border-stroke rounded-lg bg-surface text-content focus:outline-none focus:border-blue-500"
+        class="px-3 py-2 text-sm border border-stroke rounded-lg bg-surface text-content focus:outline-hidden focus:border-blue-500"
         aria-label="Filter by status"
       >
         {#each STATUS_OPTIONS as opt}
@@ -894,7 +894,7 @@
         type="text"
         bind:value={jurisdictionFilter}
         placeholder="e.g. Georgia, CA..."
-        class="px-2.5 py-1 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 w-36"
+        class="px-2.5 py-1 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500 w-36"
       />
     </div>
 
@@ -906,7 +906,7 @@
       <select
         id="quality-filter"
         bind:value={qualityFilter}
-        class="px-2 py-1 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
+        class="px-2 py-1 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500"
       >
         <option value="all">All Grades</option>
         <option value="A">A</option>
@@ -925,7 +925,7 @@
       <input
         type="checkbox"
         bind:checked={onlyUnpublishedFilter}
-        class="rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+        class="rounded-sm border-stroke bg-surface text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
       />
       <span>Show only with unpublished changes</span>
     </label>
@@ -972,7 +972,7 @@
       <p class="text-sm text-red-600">{error}</p>
       <button
         type="button"
-        class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
+        class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-xs"
         on:click={() => refresh()}
       >
         Retry
@@ -982,13 +982,13 @@
     <!-- CSS Pulse Skeleton Loader -->
     <div class="card overflow-hidden">
       <div class="animate-pulse space-y-4 p-4 bg-surface">
-        <div class="h-8 bg-surface-alt rounded w-1/4"></div>
+        <div class="h-8 bg-surface-alt rounded-sm w-1/4"></div>
         <div class="space-y-3">
-          <div class="h-4 bg-surface-alt rounded"></div>
-          <div class="h-4 bg-surface-alt rounded w-5/6"></div>
-          <div class="h-4 bg-surface-alt rounded w-2/3"></div>
-          <div class="h-4 bg-surface-alt rounded"></div>
-          <div class="h-4 bg-surface-alt rounded w-3/4"></div>
+          <div class="h-4 bg-surface-alt rounded-sm"></div>
+          <div class="h-4 bg-surface-alt rounded-sm w-5/6"></div>
+          <div class="h-4 bg-surface-alt rounded-sm w-2/3"></div>
+          <div class="h-4 bg-surface-alt rounded-sm"></div>
+          <div class="h-4 bg-surface-alt rounded-sm w-3/4"></div>
         </div>
       </div>
     </div>
@@ -1015,7 +1015,7 @@
                         indeterminate={$table.getIsSomePageRowsSelected() &&
                           !$table.getIsAllPageRowsSelected()}
                         on:change={$table.getToggleAllPageRowsSelectedHandler()}
-                        class="rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
+                        class="rounded-sm border-stroke bg-surface text-blue-600 focus:ring-blue-500"
                         aria-label="Select all visible rows"
                       />
                     {:else}
@@ -1082,7 +1082,7 @@
                         checked={tableRow.getIsSelected()}
                         disabled={!tableRow.getCanSelect()}
                         on:change={tableRow.getToggleSelectedHandler()}
-                        class="rounded border-stroke bg-surface text-blue-600 focus:ring-blue-500"
+                        class="rounded-sm border-stroke bg-surface text-blue-600 focus:ring-blue-500"
                         aria-label="Select row {row.race_id}"
                       />
                     {:else if cell.column.id === "race_id"}
@@ -1092,7 +1092,7 @@
                         <span>{cell.getValue()}</span>
                         {#if row.status === "running"}
                           <span
-                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
+                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
                           >
                             <svg
                               class="animate-spin h-2.5 w-2.5"
@@ -1118,7 +1118,7 @@
                           </span>
                         {:else if row.status === "queued"}
                           <span
-                            class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"
                           >
                             queued
                           </span>
@@ -1215,7 +1215,7 @@
                       >
                         <button
                           type="button"
-                          class="min-w-[72px] rounded border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+                          class="min-w-[72px] rounded-sm border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
                           disabled={!previewUrl(row)}
                           title={hasDraft(row)
                             ? "Open draft preview"
@@ -1228,7 +1228,7 @@
                         </button>
                         <select
                           bind:value={rowActionChoice[row.race_id]}
-                          class="w-[150px] rounded border border-stroke bg-surface px-2 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-wait disabled:opacity-50"
+                          class="w-[150px] rounded-sm border border-stroke bg-surface px-2 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-wait disabled:opacity-50"
                           disabled={!!rowActionLoading[row.race_id]}
                           aria-label="Actions for {row.race_id}"
                         >
@@ -1243,7 +1243,7 @@
                         </select>
                         <button
                           type="button"
-                          class="rounded border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
+                          class="rounded-sm border border-stroke bg-surface px-2.5 py-1.5 text-xs font-medium text-content transition-colors hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-40"
                           disabled={!!rowActionLoading[row.race_id] ||
                             !isValidRowAction(
                               row,

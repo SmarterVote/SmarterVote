@@ -356,6 +356,8 @@
 </div>
 
 <style lang="postcss">
+  @reference "../../../../app.css";
+
   .compare-header {
     @apply mb-5 sm:mb-6;
   }

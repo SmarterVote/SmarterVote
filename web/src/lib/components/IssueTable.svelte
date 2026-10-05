@@ -139,7 +139,7 @@
                   <span class="relative inline-block">
                     <button
                       type="button"
-                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                       aria-label="About this issue name"
                       title="About this issue name"
                       aria-expanded={visibleTooltip === issue}
@@ -195,7 +195,7 @@
             </td>
             <td class="py-4 pl-4">
               {#if stance.sources?.length > 0}
-                <div class="space-y-0.5 break-words">
+                <div class="space-y-0.5 wrap-break-word">
                   {#each visibleSources(stance, expandedSources.has(issue)) as source}
                     <div>
                       <SourceLink {source} />
@@ -240,7 +240,7 @@
          its own section strip (stickyPicker=false): only one secondary bar
          may stick, and none on short (zoomed or landscape) viewports. -->
     <div
-      class="issue-picker rounded-lg border border-stroke bg-surface p-3 shadow-sm"
+      class="issue-picker rounded-lg border border-stroke bg-surface p-3 shadow-xs"
       class:issue-picker--sticky={stickyPicker}
     >
       <label
@@ -252,7 +252,7 @@
       <select
         id={issueSelectId}
         bind:value={selectedIssue}
-        class="min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-base font-semibold text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        class="min-h-11 w-full rounded-lg border border-stroke bg-surface px-3 py-2 text-base font-semibold text-content focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500"
       >
         {#each issueEntries as [issue]}
           <option value={issue}>{getIssueDisplayName(issue)}</option>
@@ -268,7 +268,7 @@
               <span class="relative inline-block">
                 <button
                   type="button"
-                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-primary hover:text-primary-700 dark:hover:text-primary-300 leading-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   aria-label="About this issue name"
                   aria-expanded={visibleTooltip === issue + "-mobile"}
                   aria-controls={visibleTooltip === issue + "-mobile"
@@ -374,6 +374,8 @@
 {/if}
 
 <style lang="postcss">
+  @reference "../../app.css";
+
   .issue-picker--sticky {
     @apply sticky z-20;
     top: var(--site-header-height, 0px);

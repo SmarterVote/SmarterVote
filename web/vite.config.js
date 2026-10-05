@@ -1,10 +1,12 @@
 import { sveltekit } from "@sveltejs/kit/vite";
+import tailwindcss from "@tailwindcss/vite";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig, loadEnv } from "vite";
 import { cspHeadersPlugin } from "./scripts/csp-headers.mjs";
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    tailwindcss(),
     sveltekit(),
     svelteTesting(),
     // Must follow sveltekit(): rewrites build/_headers after the adapter runs.

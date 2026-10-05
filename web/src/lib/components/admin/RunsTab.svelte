@@ -967,7 +967,7 @@
       </div>
       <button
         type="button"
-        class="shrink-0 rounded border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 dark:border-red-700 dark:hover:bg-red-900/40"
+        class="shrink-0 rounded-sm border border-red-300 px-3 py-1.5 text-xs font-semibold hover:bg-red-100 dark:border-red-700 dark:hover:bg-red-900/40"
         on:click={() => dispatch("refresh")}
         disabled={isRefreshing}
       >
@@ -1039,9 +1039,9 @@
         {#each TIME_RANGES as range}
           <button
             type="button"
-            class="px-2 py-0.5 rounded text-xs font-medium transition-colors
+            class="px-2 py-0.5 rounded-sm text-xs font-medium transition-colors
               {selectedHours === range.value
-              ? 'bg-surface text-content shadow-sm'
+              ? 'bg-surface text-content shadow-xs'
               : 'text-content-subtle hover:text-content-muted'}"
             on:click={() => handleRangeChange(range.value)}
           >
@@ -1056,8 +1056,8 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
         {#each Array(4) as _}
           <div class="card p-4 space-y-2">
-            <div class="h-3 bg-surface-alt rounded w-2/3"></div>
-            <div class="h-6 bg-surface-alt rounded w-1/2"></div>
+            <div class="h-3 bg-surface-alt rounded-sm w-2/3"></div>
+            <div class="h-6 bg-surface-alt rounded-sm w-1/2"></div>
           </div>
         {/each}
       </div>
@@ -1070,7 +1070,7 @@
         </p>
         <button
           type="button"
-          class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm"
+          class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-xs"
           on:click={() => fetchMetrics(selectedHours)}
         >
           Retry
@@ -1102,7 +1102,7 @@
               {#if pipelineSummary.cheap_runs > 0}
                 <div class="flex items-center justify-between">
                   <span
-                    class="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
                     >cheap</span
                   >
                   <span class="text-sm font-bold text-content"
@@ -1113,7 +1113,7 @@
               {#if pipelineSummary.full_runs > 0}
                 <div class="flex items-center justify-between">
                   <span
-                    class="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
+                    class="text-xs px-1.5 py-0.5 rounded-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300"
                     >full</span
                   >
                   <span class="text-sm font-bold text-content"
@@ -1169,7 +1169,7 @@
           <span class="text-xs text-content-muted shrink-0">Run modes:</span>
           {#if pipelineSummary.cheap_runs > 0}
             <div class="flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block"
+              <span class="w-2.5 h-2.5 rounded-xs bg-blue-500 inline-block"
               ></span>
               <span class="text-xs text-content-muted"
                 ><strong>{pipelineSummary.cheap_runs}</strong> cheap ({formatUsd(
@@ -1180,7 +1180,7 @@
           {/if}
           {#if pipelineSummary.full_runs > 0}
             <div class="flex items-center gap-1.5">
-              <span class="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block"
+              <span class="w-2.5 h-2.5 rounded-xs bg-purple-500 inline-block"
               ></span>
               <span class="text-xs text-content-muted"
                 ><strong>{pipelineSummary.full_runs}</strong> full ({formatUsd(
@@ -1194,7 +1194,7 @@
               <span class="text-xs text-content-faint">Models:</span>
               {#each topModels as [model, count]}
                 <span
-                  class="text-xs px-1.5 py-0.5 rounded bg-surface-alt text-content-muted font-mono"
+                  class="text-xs px-1.5 py-0.5 rounded-sm bg-surface-alt text-content-muted font-mono"
                 >
                   {model} x{count}
                 </span>
@@ -1224,7 +1224,7 @@
                  swallows the other's keyboard activation. -->
             <button
               type="button"
-              class="block flex-1 min-w-0 text-left rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              class="block flex-1 min-w-0 text-left rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500"
               aria-label="Open run details for {raceId(run)}"
               on:click={(e) =>
                 openRunDrawer(run.run_id, raceId(run), e.currentTarget)}
@@ -1294,7 +1294,7 @@
             </button>
             <button
               type="button"
-              class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
+              class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-sm transition-colors font-medium whitespace-nowrap flex items-center gap-1"
               disabled={cancellingRunIds.has(run.run_id)}
               aria-label="Cancel run for {raceId(run)}"
               on:click={() => handleCancelRun(run.run_id)}
@@ -1393,7 +1393,7 @@
           aria-label="Filter run history by race ID or run ID"
           bind:value={runSearchQuery}
           placeholder="Filter history by Race ID or Run ID..."
-          class="w-full px-3 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
+          class="w-full px-3 py-1.5 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500"
         />
       </div>
 
@@ -1401,7 +1401,7 @@
       <select
         aria-label="Filter run history by status"
         bind:value={runStatusFilter}
-        class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
+        class="px-2.5 py-1.5 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500"
       >
         <option value="all">All Statuses</option>
         <option value="completed">Completed</option>
@@ -1413,7 +1413,7 @@
       <select
         aria-label="Filter run history by mode"
         bind:value={runModeFilter}
-        class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500"
+        class="px-2.5 py-1.5 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500"
       >
         <option value="all">All Modes</option>
         <option value="cheap">Cheap Mode (Mini)</option>
@@ -1425,7 +1425,7 @@
         <select
           aria-label="Filter run history by model"
           bind:value={runModelNameFilter}
-          class="px-2.5 py-1.5 text-xs border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 font-mono"
+          class="px-2.5 py-1.5 text-xs border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500 font-mono"
         >
           <option value="all">All Models</option>
           {#each uniqueModels as model}
@@ -1479,7 +1479,7 @@
           {@const metrics = getRunMetrics(run, metricsByRunId)}
           <button
             type="button"
-            class="block w-full text-left px-4 py-3 hover:bg-surface-alt transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            class="block w-full text-left px-4 py-3 hover:bg-surface-alt transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
             on:click={(e) =>
               openRunDrawer(run.run_id, raceId(run), e.currentTarget)}
           >
@@ -1537,12 +1537,12 @@
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <div
-    class="fixed inset-0 bg-black/45 backdrop-blur-sm z-40"
+    class="fixed inset-0 bg-black/45 backdrop-blur-xs z-40"
     on:click={closeRunDrawer}
   ></div>
   <div
     bind:this={drawerEl}
-    class="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface border-l border-stroke shadow-2xl z-50 flex flex-col transition-transform duration-300 focus:outline-none"
+    class="fixed inset-y-0 right-0 w-full max-w-2xl bg-surface border-l border-stroke shadow-2xl z-50 flex flex-col transition-transform duration-300 focus:outline-hidden"
     role="dialog"
     aria-modal="true"
     aria-labelledby="run-drawer-title"
@@ -1569,7 +1569,7 @@
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="px-2.5 py-1 text-xs border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/10 rounded transition-colors font-medium whitespace-nowrap"
+          class="px-2.5 py-1 text-xs border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/10 rounded-sm transition-colors font-medium whitespace-nowrap"
           disabled={downloadingDiagnosticsRunId === selectedRunId}
           on:click={() => handleDownloadDiagnostics(selectedRunId ?? "")}
           title="Download a sanitized run, queue, log, metrics, and draft bundle"
@@ -1581,7 +1581,7 @@
         {#if selectedRunDetail && (selectedRunDetail.status === "running" || selectedRunDetail.status === "pending")}
           <button
             type="button"
-            class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded transition-colors font-medium whitespace-nowrap flex items-center gap-1"
+            class="px-2.5 py-1 text-xs border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-sm transition-colors font-medium whitespace-nowrap flex items-center gap-1"
             disabled={selectedRunId !== null &&
               cancellingRunIds.has(selectedRunId)}
             on:click={() => handleCancelRun(selectedRunId ?? "")}
@@ -1646,13 +1646,13 @@
           {/if}
           {#if id === selectedRunId}
             <span
-              class="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded font-bold"
+              class="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-sm font-bold"
               >{id}</span
             >
           {:else}
             <button
               type="button"
-              class="px-1.5 py-0.5 hover:bg-surface text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 rounded underline decoration-dotted transition-colors"
+              class="px-1.5 py-0.5 hover:bg-surface text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 rounded-sm underline decoration-dotted transition-colors"
               on:click={() => void openRunDrawer(id, selectedRunRaceId)}
             >
               {id}
@@ -1666,11 +1666,11 @@
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
       {#if loadingDrawerDetails}
         <div class="animate-pulse space-y-4">
-          <div class="h-20 bg-surface-alt rounded"></div>
-          <div class="h-10 bg-surface-alt rounded w-1/3"></div>
+          <div class="h-20 bg-surface-alt rounded-sm"></div>
+          <div class="h-10 bg-surface-alt rounded-sm w-1/3"></div>
           <div class="space-y-2">
-            <div class="h-4 bg-surface-alt rounded"></div>
-            <div class="h-4 bg-surface-alt rounded w-5/6"></div>
+            <div class="h-4 bg-surface-alt rounded-sm"></div>
+            <div class="h-4 bg-surface-alt rounded-sm w-5/6"></div>
           </div>
         </div>
       {:else if drawerError}
@@ -1694,7 +1694,7 @@
           <p class="text-xs opacity-80">{drawerError}</p>
           <button
             type="button"
-            class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors font-medium shadow-sm"
+            class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-sm transition-colors font-medium shadow-xs"
             on:click={() =>
               openRunDrawer(selectedRunId ?? "", selectedRunRaceId)}
           >
@@ -1708,7 +1708,7 @@
           <div>
             <span class="text-content-faint">Status:</span>
             <span
-              class="ml-1 px-1.5 py-0.5 rounded font-medium {getStatusClass(
+              class="ml-1 px-1.5 py-0.5 rounded-sm font-medium {getStatusClass(
                 selectedRunDetail.status,
               )}"
             >
@@ -1760,7 +1760,7 @@
             <div class="col-span-2">
               <span class="text-content-faint">Goal:</span>
               <p
-                class="mt-1 p-2 bg-surface-alt rounded text-content text-[0.6875rem] font-mono whitespace-pre-wrap"
+                class="mt-1 p-2 bg-surface-alt rounded-sm text-content text-[0.6875rem] font-mono whitespace-pre-wrap"
               >
                 {selectedRunDetail.options.goal}
               </p>
@@ -1777,7 +1777,7 @@
             <div class="space-y-1.5">
               {#each selectedRunDetail.steps as step}
                 <div
-                  class="flex items-center justify-between text-xs p-2 rounded bg-surface border border-stroke"
+                  class="flex items-center justify-between text-xs p-2 rounded-sm bg-surface border border-stroke"
                 >
                   <div class="flex flex-col">
                     <span class="font-medium capitalize"
@@ -1829,12 +1829,12 @@
               aria-label="Search logs"
               bind:value={logSearchQuery}
               placeholder="Search logs..."
-              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded bg-surface text-content focus:outline-none focus:border-blue-500 w-32"
+              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded-sm bg-surface text-content focus:outline-hidden focus:border-blue-500 w-32"
             />
             <!-- Level filter -->
             <select
               bind:value={drawerLogFilter}
-              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded bg-surface text-content"
+              class="text-[0.625rem] px-2 py-0.5 border border-stroke rounded-sm bg-surface text-content"
               aria-label="Filter logs by level"
             >
               <option value="all">All Levels</option>
@@ -1859,7 +1859,7 @@
         >
           {#each filteredDrawerLogs as log}
             <div
-              class="py-1 px-2 border-b border-stroke/40 whitespace-pre-wrap rounded-sm border-l-4 {getLogClass(
+              class="py-1 px-2 border-b border-stroke/40 whitespace-pre-wrap rounded-xs border-l-4 {getLogClass(
                 log.level,
               )}"
             >

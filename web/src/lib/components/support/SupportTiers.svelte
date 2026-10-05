@@ -67,7 +67,7 @@
         aria-pressed={mode === "payment"}
         class="min-h-11 flex-1 rounded-md py-2 transition-colors {mode ===
         'payment'
-          ? 'bg-surface text-content shadow-sm'
+          ? 'bg-surface text-content shadow-xs'
           : 'text-content-muted hover:text-content'}"
         on:click={() => (mode = "payment")}
       >
@@ -78,7 +78,7 @@
         aria-pressed={mode === "subscription"}
         class="min-h-11 flex-1 rounded-md py-2 transition-colors {mode ===
         'subscription'
-          ? 'bg-surface text-content shadow-sm'
+          ? 'bg-surface text-content shadow-xs'
           : 'text-content-muted hover:text-content'}"
         on:click={() => (mode = "subscription")}
       >
@@ -98,7 +98,7 @@
           class="rounded-lg border py-3 text-sm font-semibold transition-colors {selectedAmount ===
           amount
             ? 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-950 dark:text-primary-300'
-            : 'border-stroke bg-surface text-content hover:border-primary-400 hover:bg-surface-alt'} focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+            : 'border-stroke bg-surface text-content hover:border-primary-400 hover:bg-surface-alt'} focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
           on:click={() => selectPreset(amount)}
         >
           ${amount}
@@ -122,7 +122,7 @@
       max="1000"
       step="1"
       placeholder="Custom amount"
-      class="min-h-11 w-full rounded-lg border border-stroke bg-surface py-2.5 pl-7 pr-3 text-sm text-content placeholder:text-content-muted focus:border-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page {selectedAmount ===
+      class="min-h-11 w-full rounded-lg border border-stroke bg-surface py-2.5 pl-7 pr-3 text-sm text-content placeholder:text-content-muted focus:border-primary-500 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page {selectedAmount ===
         null && customAmount
         ? 'border-primary-500'
         : ''}"

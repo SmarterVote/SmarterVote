@@ -31,7 +31,7 @@
       on:click={() => (activeChartType = "buckets")}
       class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "buckets"
-          ? "bg-surface text-content shadow-sm border border-stroke/20"
+          ? "bg-surface text-content shadow-xs border border-stroke/20"
           : "text-content-subtle hover:text-content"
       }`}
     >
@@ -41,7 +41,7 @@
       on:click={() => (activeChartType = "histogram")}
       class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "histogram"
-          ? "bg-surface text-content shadow-sm border border-stroke/20"
+          ? "bg-surface text-content shadow-xs border border-stroke/20"
           : "text-content-subtle hover:text-content"
       }`}
     >
@@ -51,7 +51,7 @@
       on:click={() => (activeChartType = "curve")}
       class={`flex-1 text-center py-1 text-xs font-bold rounded-md transition-all ${
         activeChartType === "curve"
-          ? "bg-surface text-content shadow-sm border border-stroke/20"
+          ? "bg-surface text-content shadow-xs border border-stroke/20"
           : "text-content-subtle hover:text-content"
       }`}
     >
@@ -98,7 +98,7 @@
               <div class="flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2">
                   <span
-                    class={`w-3.5 h-3.5 rounded ${bucket.colorClass} border border-stroke/20`}
+                    class={`w-3.5 h-3.5 rounded-sm ${bucket.colorClass} border border-stroke/20`}
                   ></span>
                   <span class="font-bold text-content">{bucket.label}</span>
                 </div>
@@ -230,7 +230,7 @@
                 class="pointer-events-none hidden group-hover/point:block overflow-visible z-50"
               >
                 <div
-                  class="bg-surface border border-stroke p-1 rounded shadow-md text-xs font-black text-center leading-tight"
+                  class="bg-surface border border-stroke p-1 rounded-sm shadow-md text-xs font-black text-center leading-tight"
                 >
                   <div>{pt.dSeats}D - {pt.rSeats}R</div>
                   <div class="text-blue-700 dark:text-blue-400 mt-0.5">

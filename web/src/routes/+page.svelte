@@ -53,7 +53,7 @@
     class="relative border-b border-stroke bg-surface py-10 sm:py-12 lg:py-14"
   >
     <div
-      class="absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,theme(colors.blue.100)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.blue.100)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_right,black,transparent_75%)] dark:opacity-10"
+      class="absolute inset-0 opacity-60 bg-[linear-gradient(to_right,var(--color-blue-100)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-blue-100)_1px,transparent_1px)] bg-size-[56px_56px] mask-[linear-gradient(to_right,black,transparent_75%)] dark:opacity-10"
       aria-hidden="true"
     ></div>
     <div
@@ -65,12 +65,12 @@
           <p class="eyebrow">Know your candidates</p>
         </div>
         <h1
-          class="mt-6 max-w-2xl text-5xl font-extrabold leading-[.98] tracking-[-0.045em] text-content sm:text-6xl lg:text-6xl xl:text-7xl"
+          class="mt-6 max-w-2xl text-5xl font-extrabold leading-[.98] tracking-[-0.045em] text-content sm:text-6xl sm:leading-none lg:text-6xl xl:text-7xl"
         >
           Understand your ballot.
         </h1>
         <p
-          class="mt-6 max-w-xl text-lg leading-8 text-content-muted sm:text-xl"
+          class="mt-6 max-w-xl text-lg leading-8 text-content-muted sm:text-xl sm:leading-7"
         >
           Smarter.Vote turns candidate records, issue positions, and original
           sources into clear, nonpartisan election research you can examine for
@@ -81,7 +81,7 @@
         >
           <a
             href="/my-ballot/"
-            class="group rounded-xl bg-primary-700 px-5 py-4 text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500"
+            class="group rounded-xl bg-primary-700 px-5 py-4 text-white shadow-xs transition hover:-translate-y-0.5 hover:bg-primary-800 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:bg-primary-600 dark:hover:bg-primary-500"
           >
             <span class="flex items-center justify-between font-bold"
               >Explore my ballot <span
@@ -95,7 +95,7 @@
           </a>
           <a
             href="/elections/"
-            class="group rounded-xl border border-stroke bg-surface px-5 py-4 text-content shadow-sm transition hover:-translate-y-0.5 hover:border-primary-400 hover:shadow-md"
+            class="group rounded-xl border border-stroke bg-surface px-5 py-4 text-content shadow-xs transition hover:-translate-y-0.5 hover:border-primary-400 hover:shadow-md"
           >
             <span class="flex items-center justify-between font-bold"
               >Browse all elections <span
@@ -121,7 +121,7 @@
     class="relative overflow-hidden border-t border-stroke bg-primary-700 py-20 text-white sm:py-28 dark:bg-primary-950"
   >
     <div
-      class="absolute inset-0 opacity-10 [background-image:radial-gradient(circle_at_20%_20%,white_1px,transparent_1px)] [background-size:30px_30px]"
+      class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_20%_20%,white_1px,transparent_1px)] bg-size-[30px_30px]"
       aria-hidden="true"
     ></div>
     <div class="page-container relative text-center">
@@ -138,7 +138,7 @@
       </p>
       <a
         href="/my-ballot/"
-        class="mt-9 inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-7 py-3 font-semibold text-primary-800 shadow-sm transition hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        class="mt-9 inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-7 py-3 font-semibold text-primary-800 shadow-xs transition hover:bg-primary-50 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >Find my elections <UiIcon name="arrow-right" /></a
       >
     </div>

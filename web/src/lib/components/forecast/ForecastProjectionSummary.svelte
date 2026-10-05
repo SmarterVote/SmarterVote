@@ -110,7 +110,7 @@
       <span>Majority line: {threshold}</span>
     </div>
     {#if expectedSeats}
-      <p class="mt-3 text-xs text-content-subtle">
+      <p class="text-xs text-content-subtle">
         Expected seats: {expectedSeatsText}
       </p>
     {/if}

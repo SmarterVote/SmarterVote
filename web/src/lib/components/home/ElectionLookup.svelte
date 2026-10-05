@@ -354,7 +354,7 @@
               ? `address-suggestion-${suggestions[activeSuggestionIndex].id}`
               : undefined}
             placeholder="301 W 2nd St, Austin, TX 78701"
-            class="mt-2 min-h-[60px] scroll-mt-24 w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-sm transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-500/15"
+            class="mt-2 min-h-[60px] scroll-mt-24 w-full rounded-xl border border-stroke bg-surface px-5 text-base text-content shadow-xs transition placeholder:text-content-subtle hover:border-primary-300 focus:border-primary-500 focus:outline-hidden focus:ring-4 focus:ring-primary-500/15"
           />
           {#if suggestionsOpen}
             <div
@@ -371,7 +371,7 @@
                   on:mouseenter={() => (activeSuggestionIndex = index)}
                   on:click={() => selectSuggestion(suggestion)}
                   class:bg-surface-alt={index === activeSuggestionIndex}
-                  class="block min-h-11 w-full px-4 py-3 text-left text-sm text-content hover:bg-surface-alt focus:bg-surface-alt focus:outline-none"
+                  class="block min-h-11 w-full px-4 py-3 text-left text-sm text-content hover:bg-surface-alt focus:bg-surface-alt focus:outline-hidden"
                   >{suggestion.text}</button
                 >
               {/each}
@@ -449,7 +449,7 @@
             id="ballot-results-heading"
             bind:this={resultsHeading}
             tabindex="-1"
-            class="h-page mt-2 focus:outline-none"
+            class="h-page mt-2 focus:outline-hidden"
           >
             Your election guide
           </h1>

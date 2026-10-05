@@ -16,7 +16,7 @@
         </p>
         <h2
           id="trust-heading"
-          class="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl"
+          class="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl sm:leading-none"
         >
           Don't take our word for it.
         </h2>

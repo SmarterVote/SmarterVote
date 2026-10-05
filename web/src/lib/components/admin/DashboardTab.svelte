@@ -312,7 +312,7 @@
         type="button"
         class="px-3 py-1 rounded-md text-sm font-medium transition-colors
           {selectedHours === range.value
-          ? 'bg-surface text-content shadow-sm'
+          ? 'bg-surface text-content shadow-xs'
           : 'text-content-subtle hover:text-content-muted'}"
         on:click={() => handleRangeChange(range.value)}
       >
@@ -447,7 +447,7 @@
       <div class="flex items-center gap-1.5 shrink-0 flex-wrap">
         {#each discoveryOnlyRaces.slice(0, 4) as r}
           <span
-            class="text-xs font-mono bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200 rounded px-1.5 py-0.5 border border-violet-200 dark:border-violet-800"
+            class="text-xs font-mono bg-violet-100 dark:bg-violet-900/40 text-violet-800 dark:text-violet-200 rounded-sm px-1.5 py-0.5 border border-violet-200 dark:border-violet-800"
           >
             {r.race_id}
           </span>
@@ -563,7 +563,7 @@
             <div class="flex flex-wrap gap-1.5">
               {#each traffic.countries.slice(0, 6) as item}
                 <span
-                  class="rounded bg-surface-alt px-2 py-1 text-xs text-content-muted"
+                  class="rounded-sm bg-surface-alt px-2 py-1 text-xs text-content-muted"
                   >{item.name} {item.visits}</span
                 >
               {/each}
@@ -574,7 +574,7 @@
             <div class="flex flex-wrap gap-1.5">
               {#each traffic.devices.slice(0, 6) as item}
                 <span
-                  class="rounded bg-surface-alt px-2 py-1 text-xs text-content-muted"
+                  class="rounded-sm bg-surface-alt px-2 py-1 text-xs text-content-muted"
                   >{item.name} {item.visits}</span
                 >
               {/each}

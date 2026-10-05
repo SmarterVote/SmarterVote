@@ -83,7 +83,7 @@
       {#each candidates as candidate}
         <li class="flex min-w-0 items-center gap-2">
           <!-- Avatar -->
-          <div class="relative flex-shrink-0">
+          <div class="relative shrink-0">
             {#if avatarSrc(candidate.image_url) && !imageErrors.has(candidate.name)}
               <!-- headshotFallback also catches images that failed before
                    hydration, so a broken headshot still shows initials. -->

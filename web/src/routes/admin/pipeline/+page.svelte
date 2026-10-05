@@ -351,7 +351,7 @@
         <div class="flex items-center gap-3 text-sm text-content-muted">
           <button
             type="button"
-            class="rounded border border-stroke px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-alt disabled:opacity-50"
+            class="rounded-sm border border-stroke px-3 py-1.5 text-xs font-medium text-content hover:bg-surface-alt disabled:opacity-50"
             disabled={!apiService}
             on:click={refreshAllAdminState}
           >
@@ -423,7 +423,7 @@
             {@const candidate = forceRemoveCandidate}
             <button
               type="button"
-              class="rounded border border-red-400 px-3 py-1 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:hover:bg-red-900/40"
+              class="rounded-sm border border-red-400 px-3 py-1 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 dark:border-red-700 dark:hover:bg-red-900/40"
               disabled={cancellingItemId === candidate.id}
               on:click={() => forceRemoveQueueItem(candidate)}
               >Force remove</button
@@ -460,7 +460,7 @@
       role="tabpanel"
       aria-labelledby={tabId(activeTab)}
       tabindex="0"
-      class="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
+      class="focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 rounded-lg"
     >
       {#if !apiService}
         <p

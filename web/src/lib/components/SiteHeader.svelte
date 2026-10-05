@@ -256,7 +256,7 @@
 
 <header
   bind:this={siteHeader}
-  class="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-sm border-b border-stroke/50"
+  class="sticky top-0 z-50 bg-surface/90 backdrop-blur-md shadow-xs border-b border-stroke/50"
 >
   <div class="page-container py-3">
     <!-- Below lg the header is compact (search icon + menu); from lg up the
@@ -391,7 +391,7 @@
             if (open) void ensureSearchRaces();
           }}
           on:keydown={handleKeydown}
-          class="min-h-11 w-full rounded-full border border-stroke bg-surface-alt py-2 pl-4 pr-12 text-sm text-content focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          class="min-h-11 w-full rounded-full border border-stroke bg-surface-alt py-2 pl-4 pr-12 text-sm text-content focus:border-primary focus:outline-hidden focus:ring-2 focus:ring-primary"
           placeholder="Search elections or candidates"
           autocomplete="off"
           role="combobox"
@@ -601,8 +601,11 @@
       font-size: 0.875rem;
       line-height: 1.25rem;
     }
-    .sh-nav > :global(:not([hidden]) ~ :not([hidden])) {
+    /* Undo the mobile divide-y separators (Tailwind v4 draws them as a
+       border-bottom on every child but the last). */
+    .sh-nav > :global(*) {
       border-top-width: 0;
+      border-bottom-width: 0;
     }
     .sh-nav-link {
       padding: 0 0.25rem;

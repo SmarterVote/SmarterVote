@@ -100,7 +100,7 @@
 </script>
 
 <div
-  class="relative overflow-hidden rounded-xl border border-stroke bg-surface shadow-sm lg:hidden"
+  class="relative overflow-hidden rounded-xl border border-stroke bg-surface shadow-xs lg:hidden"
 >
   {#if showQuality && race.validation_grade}
     <div
@@ -129,7 +129,7 @@
           ? '?draft=true'
           : ''}"
         aria-label={candidate.name}
-        class="flex w-1/2 min-w-[9.5rem] max-w-[13rem] shrink-0 snap-start flex-col items-center border-r border-stroke px-3 py-4 text-center last:border-0"
+        class="flex w-1/2 min-w-38 max-w-52 shrink-0 snap-start flex-col items-center border-r border-stroke px-3 py-4 text-center last:border-0"
       >
         <CandidateAvatar
           name={candidate.name}
@@ -182,7 +182,7 @@
         id={issueSelectId}
         bind:value={selectedIssue}
         disabled={issueKeys.length === 0}
-        class="mt-2 min-h-12 w-full rounded-lg border border-stroke bg-surface px-4 font-bold text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+        class="mt-2 min-h-12 w-full rounded-lg border border-stroke bg-surface px-4 font-bold text-content focus:border-primary-500 focus:outline-hidden focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {#if issueKeys.length === 0}
           <option>No researched issues available</option>

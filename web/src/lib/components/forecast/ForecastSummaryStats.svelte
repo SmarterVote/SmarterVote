@@ -34,7 +34,7 @@
     <div class="flex flex-wrap items-center gap-1.5">
       <!-- Control Status Badge -->
       <span
-        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold shadow-sm border
+        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-extrabold shadow-xs border
       {controlParty === 'Democratic'
           ? 'bg-blue-500/10 text-blue-700 border-blue-500/20 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/40'
           : controlParty === 'Republican'
@@ -94,7 +94,7 @@
 
     <!-- Most Likely Outcome -->
     <div
-      class="order-last col-span-2 rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center sm:order-none sm:col-span-1"
+      class="order-last col-span-2 rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center sm:order-0 sm:col-span-1"
     >
       <div class="mb-1 text-xs font-semibold text-content-subtle">
         Most likely exact split
