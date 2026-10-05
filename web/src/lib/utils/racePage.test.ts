@@ -382,6 +382,16 @@ describe("splitSourcedText", () => {
 });
 
 describe("raceLocationLabel", () => {
+  it('drops a district the data spelled as the string "null"', () => {
+    expect(
+      raceLocationLabel({
+        office: "Governor of Massachusetts",
+        district: "null",
+        jurisdiction: "Massachusetts",
+      }),
+    ).toBe("Governor of Massachusetts");
+  });
+
   it("does not repeat the same place twice", () => {
     expect(
       raceLocationLabel({

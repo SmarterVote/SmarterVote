@@ -71,7 +71,11 @@
     {/if}
 
     {#if financeSources.length > 0}
-      <div class="source-list" aria-label="Campaign finance sources">
+      <div
+        class="source-list"
+        role="group"
+        aria-label="Campaign finance sources"
+      >
         <p class="source-list-title">Sources</p>
         <div class="source-links">
           {#each financeSources as source}

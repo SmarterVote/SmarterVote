@@ -1007,6 +1007,9 @@ export function splitSourcedText(
   return { paragraphs, sources };
 }
 
+/** Placeholder strings research data sometimes carries instead of a null. */
+const PLACEHOLDER_TEXT = new Set(["null", "none", "undefined", "n/a"]);
+
 /**
  * "Office · District · Jurisdiction" without repeating a place (for Senate
  * races the district is the seat class from `senateSeatLabel`): a part that
@@ -1027,7 +1030,7 @@ export function raceLocationLabel(
     : race.district;
   const parts = [race.office, district, race.jurisdiction]
     .map((part) => (part ?? "").trim())
-    .filter(Boolean);
+    .filter((part) => part && !PLACEHOLDER_TEXT.has(part.toLowerCase()));
   const kept = parts.filter((part, index) => {
     const lower = part.toLowerCase();
     return !parts.some((other, otherIndex) => {
