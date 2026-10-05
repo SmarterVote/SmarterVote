@@ -7,6 +7,7 @@ import {
   legacyCandidateSlug as scriptLegacySlug,
   preparePublicData,
   redirectStubHtml,
+  removedCandidateName,
   removedCandidateSlugs,
 } from "../../../scripts/prepare-public-data.mjs";
 import { candidateSlug, legacyCandidateSlug } from "./format";
@@ -88,6 +89,52 @@ describe("removedCandidateSlugs", () => {
         }),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("removedCandidateName", () => {
+  it.each([
+    ["Mike Cox", "Mike Cox"],
+    ["Carl Harris Sr. (D) - lost Democratic primary", "Carl Harris Sr."],
+    [
+      "Xavier Phillips (Independent) - withdrew/disqualified",
+      "Xavier Phillips",
+    ],
+    ["Markwayne Mullin (resigned, not running)", "Markwayne Mullin"],
+    [
+      "Brian Shortsleeve — lost the September 1, 2026 primary",
+      "Brian Shortsleeve",
+    ],
+    ["Kevin Ades; not on the certified list", "Kevin Ades"],
+    ["Mary-Kate O'Brien – withdrew", "Mary-Kate O'Brien"],
+  ])("reads %j as %j", (entry, name) => {
+    expect(removedCandidateName(entry)).toBe(name);
+  });
+
+  it.each([
+    "lost the September 1, 2026 Republican primary for Governor of Massachusetts",
+    "See https://ballotpedia.org/x",
+    "  ",
+    7,
+    null,
+  ])("rejects %j", (entry) => {
+    expect(removedCandidateName(entry)).toBeNull();
+  });
+
+  it("slugs the name, not the recorded reason", () => {
+    expect(
+      removedCandidateSlugs(
+        race({
+          pipeline_state: {
+            race_identity: {
+              known_ineligible_or_not_running: [
+                "Mike Cox (R) - lost Republican primary",
+              ],
+            },
+          },
+        }),
+      ),
+    ).toEqual(["mike-cox"]);
   });
 });
 
