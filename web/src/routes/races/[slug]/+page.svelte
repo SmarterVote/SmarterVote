@@ -639,6 +639,7 @@
           {#if activeCandidates.length > 0}
             <div
               class="overview-candidates"
+              role="group"
               aria-label="Candidates in this race"
             >
               {#each activeCandidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}

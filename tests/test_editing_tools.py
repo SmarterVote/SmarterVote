@@ -1545,6 +1545,21 @@ def test_set_race_identity_records_primary_date():
     assert race_json["pipeline_state"]["race_identity"]["primary_date"] == "2026-09-08"
 
 
+def test_set_race_identity_drops_null_placeholder_strings():
+    """A model sending district="null" must not put the word "null" on the race page."""
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"id": "ma-governor-2026", "candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+
+    result = handlers["set_race_identity"](_identity_args(district="null", known_incumbent=" None "))
+
+    assert result == "Recorded race identity brief."
+    identity = race_json["pipeline_state"]["race_identity"]
+    assert "district" not in identity and "known_incumbent" not in identity
+    assert "district" not in race_json
+
+
 def test_set_race_identity_ignores_unparseable_primary_date():
     """A bad date must not block identity locking — it is optional metadata."""
     from pipeline_client.agent.agent import _make_editing_handlers

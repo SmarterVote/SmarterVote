@@ -1201,8 +1201,10 @@ def _make_editing_handlers(
             "known_incumbent",
         ):
             value = args.get(key)
-            if value not in (None, ""):
-                identity[key] = value
+            # Models sometimes send the string "null" for a field that doesn't apply.
+            if value in (None, "") or (isinstance(value, str) and value.strip().lower() in ("null", "none", "n/a")):
+                continue
+            identity[key] = value
         # The date this contest's primary was held (or is scheduled for). Stored so a
         # catalogue sweep can ask "which races have had their primary since the roster
         # was last built" directly, instead of that being calendar knowledge carried in

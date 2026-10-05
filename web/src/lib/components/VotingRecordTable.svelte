@@ -71,7 +71,7 @@
     {/if}
 
     {#if votingSourceLinks.length > 0}
-      <div class="source-list" aria-label="Voting record sources">
+      <div class="source-list" role="group" aria-label="Voting record sources">
         <p class="source-list-title">Sources</p>
         <div class="source-links">
           {#each votingSourceLinks as source}

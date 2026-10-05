@@ -17,6 +17,9 @@ from shared.run_health import StepFailure
 # ---------------------------------------------------------------------------
 
 
+_PLACEHOLDER_STRINGS = frozenset({"", "null", "none", "undefined", "n/a"})
+
+
 class SourceType(str, Enum):
     """Types of data sources."""
 
@@ -575,6 +578,14 @@ class RaceJSON(BaseModel):
     schema_version: str = Field(default="0.3", description="RaceJSON schema version")
     id: str = Field(..., description="Race slug like 'mo-senate-2024'")
     election_date: str = Field(..., description="Election date in YYYY-MM-DD or ISO format")
+
+    @field_validator("title", "office", "jurisdiction", "state", "district", mode="before")
+    @classmethod
+    def blank_placeholder_metadata(cls, value):
+        """Research output sometimes writes the string "null" for a missing field."""
+        if isinstance(value, str) and value.strip().lower() in _PLACEHOLDER_STRINGS:
+            return None
+        return value
 
     @field_validator("id")
     @classmethod

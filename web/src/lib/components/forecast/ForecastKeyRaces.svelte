@@ -99,7 +99,7 @@
 
     <div
       bind:this={keyRacesContainer}
-      class="flex gap-4 overflow-x-auto pb-3 motion-safe:scroll-smooth snap-x snap-mandatory hide-scrollbar"
+      class="relative flex gap-4 overflow-x-auto pb-3 motion-safe:scroll-smooth snap-x snap-mandatory hide-scrollbar"
       style="-ms-overflow-style: none; scrollbar-width: none;"
     >
       {#each races as race}
