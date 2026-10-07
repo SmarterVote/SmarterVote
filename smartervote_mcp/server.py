@@ -10,7 +10,9 @@ from urllib.parse import quote, unquote
 
 from mcp.server.mcpserver import MCPServer
 
+from shared.forecast_math import forecast_probability_shift, poll_identity
 from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL, normalize_profile_name
+from shared.text_quality import summary_contains_polling
 from smartervote_mcp.client import RacesApiClient, compact_options
 
 mcp = MCPServer("SmarterVote Races")
@@ -903,8 +905,11 @@ def _stance_quality(draft: Dict[str, Any]) -> Dict[str, Any]:
     stance_count = 0
     no_position_count = 0
     finance_missing: List[str] = []
+    summary_polling: List[str] = []
     for candidate in candidates:
         name = str(candidate.get("name") or "?")
+        if summary_contains_polling(candidate.get("summary")):
+            summary_polling.append(name)
         issues = candidate.get("issues") if isinstance(candidate.get("issues"), dict) else {}
         for issue, stance_obj in issues.items():
             stance = stance_obj.get("stance") if isinstance(stance_obj, dict) else stance_obj
@@ -930,7 +935,23 @@ def _stance_quality(draft: Dict[str, Any]) -> Dict[str, Any]:
         "no_position_count": no_position_count,
         "no_position_ratio": round(no_position_count / stance_count, 3) if stance_count else None,
         "finance_missing_candidates": finance_missing,
+        "summary_polling_candidates": summary_polling,
     }
+
+
+#: A draft forecast that moves more than this from the published one on an
+#: identical poll set is re-reasoning, not new evidence (AR-02 went 58% -> 66%).
+_FORECAST_SHIFT_WARNING = 0.05
+
+
+def _forecast_shift_without_new_polls(draft: Dict[str, Any], published: Dict[str, Any]) -> float | None:
+    """The probability shift between published and draft forecasts when their poll sets match, if it is large."""
+    if poll_identity(draft.get("polling")) != poll_identity(published.get("polling")):
+        return None
+    shift = forecast_probability_shift(published.get("forecast"), draft.get("forecast"))
+    if shift is None or shift <= _FORECAST_SHIFT_WARNING:
+        return None
+    return round(shift, 4)
 
 
 @mcp.tool(structured_output=False)
@@ -942,7 +963,10 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     changes — including blocking a draft that drops a published candidate without
     being able to evidence the roster it kept. A race is ``ready`` only when it has
     no blockers. Warnings still require human review but do not claim the API would
-    reject publication.
+    reject publication. Among them: ``summary_contains_polling`` (candidate
+    summaries quoting polls; see ``summary_polling_candidates``) and
+    ``forecast_moved_without_new_polls`` (the draft forecast moved more than five
+    points from the published one on an identical poll set).
     """
     client = _client()
     rows: List[Dict[str, Any]] = []
@@ -1026,6 +1050,9 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
                 warnings.append("finance_summaries_missing")
             if stance_quality["no_position_ratio"] is not None and stance_quality["no_position_ratio"] >= 0.5:
                 warnings.append("mostly_no_public_position")
+            if stance_quality["summary_polling_candidates"]:
+                # Summaries are biographies; poll numbers there go stale within days.
+                warnings.append("summary_contains_polling")
             step_failures = pipeline_state.get("step_failures") or []
             if any(
                 isinstance(failure, dict) and failure.get("reason") == "roster_verification_failed"
@@ -1034,6 +1061,11 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
                 blockers.append("roster_verification_failed")
 
         published_names = _candidate_names(published)
+        if isinstance(draft, dict) and isinstance(published, dict):
+            forecast_shift = _forecast_shift_without_new_polls(draft, published)
+            if forecast_shift is not None:
+                stance_quality["forecast_probability_shift"] = forecast_shift
+                warnings.append("forecast_moved_without_new_polls")
         if published_lookup_failed:
             pass  # already a blocker; roster comparison is impossible
         elif published is None:

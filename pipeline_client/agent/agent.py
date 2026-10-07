@@ -50,6 +50,7 @@ from .phases import (  # noqa: F401 - re-exported for backward compat
     _scale_iterations,
     _select_target_candidates,
 )
+from .phases.forecast import STABILIZED_PANEL_METHOD
 from .polling_quality import polling_semantic_problem
 from .review import (
     build_review_change_manifest,
@@ -669,6 +670,11 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
         forecast_changes.append("Forecast added.")
     elif before_forecast and not after_forecast:
         forecast_changes.append("Forecast removed.")
+    if isinstance(after_forecast, dict) and after_forecast.get("method") == STABILIZED_PANEL_METHOD:
+        forecast_changes.append(
+            "Stability guard applied: polls, roster and contest stage were unchanged since the baseline forecast, "
+            "so the move in win probability was capped."
+        )
     if not forecast_changes:
         forecast_changes.append("No forecast headline changes detected.")
 

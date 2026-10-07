@@ -24,13 +24,16 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from shared.forecast_math import (
     RATING_BANDS,
+    STABILITY_MAX_SHIFT,
     aggregate_panel,
+    cap_probability_shift,
     confidence_for,
     consensus_margin,
     leading_party,
     normalize_party_label,
     normalize_probabilities,
     panel_spread,
+    poll_identity,
     rating_for,
 )
 from shared.forecast_summary import seat_control_note
@@ -55,6 +58,11 @@ from ._common import _await_with_run_budget, _classify_exception, _race_identity
 from .context import PhaseContext
 
 PANEL_METHOD = "panel_median_v1"
+#: The panel median, with its move from the baseline forecast capped by the
+#: stability guard because nothing the forecast reads had changed.
+STABILIZED_PANEL_METHOD = "panel_median_v1_stabilized"
+#: Companion cap on the margin, in points, when the stability guard applies.
+STABILITY_MAX_MARGIN_SHIFT = 2.0
 SINGLE_MODEL_METHOD = "single_model"
 
 #: Output budgets. The writer used to get 4096 tokens, and on some races a model
@@ -356,6 +364,83 @@ def build_consensus(
         "panel_spread": spread,
         "members": list(members),
     }
+
+
+def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
+    """What a forecast reads that can legitimately move it: the poll set, the roster, and the contest stage.
+
+    Prediction-market prices are left out on purpose: they tick continuously, so
+    including them would mean the guard never applies.
+    """
+    roster = frozenset(
+        (_name_key(candidate.get("name")), normalize_party_label(candidate.get("party")))
+        for candidate in _active_candidates(race_json)
+    )
+    return (poll_identity(race_json.get("polling")), roster, str(race_json.get("contest_stage") or ""))
+
+
+def apply_stability_guard(
+    consensus: Dict[str, Any],
+    baseline_forecast: Optional[Dict[str, Any]],
+    baseline_evidence: Any,
+    race_json: Dict[str, Any],
+) -> Optional[str]:
+    """Cap the consensus's move from the baseline forecast when the evidence is unchanged.
+
+    Reruns on an identical poll set used to move ratings materially just from
+    re-reasoning (AR-02 58% -> 66%, tilt_r -> lean_r). When the baseline had a
+    forecast and the poll set, roster and contest stage all match it, the
+    baseline leader's probability may move at most ``STABILITY_MAX_SHIFT``.
+    The rating is re-derived from the capped probability, so it stays the
+    baseline rating unless the capped move genuinely crosses a band threshold.
+
+    Mutates *consensus* in place and returns a human-readable note, or None
+    when the guard does not apply. Same-party (candidate-level) races are left
+    alone: their numbers describe candidates, not parties.
+    """
+    if not isinstance(baseline_forecast, dict) or baseline_evidence is None:
+        return None
+    if consensus.get("candidate_probabilities"):
+        return None
+    if forecast_evidence_key(race_json) != baseline_evidence:
+        return None
+    prior_probs = normalize_probabilities(baseline_forecast.get("party_probabilities") or {})
+    prior_leader = leading_party(prior_probs)
+    if prior_leader is None:
+        return None
+    capped = cap_probability_shift(prior_probs, consensus["party_probabilities"])
+    if capped is None:
+        return None
+    proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)
+    leader = leading_party(capped)
+    rating = rating_for(capped)
+    margin = consensus.get("margin_estimate")
+    prior_margin = baseline_forecast.get("margin_estimate")
+    if (
+        leader == prior_leader
+        and isinstance(margin, (int, float))
+        and isinstance(prior_margin, (int, float))
+        and not isinstance(margin, bool)
+        and not isinstance(prior_margin, bool)
+    ):
+        margin = round(
+            min(max(float(margin), prior_margin - STABILITY_MAX_MARGIN_SHIFT), prior_margin + STABILITY_MAX_MARGIN_SHIFT), 1
+        )
+    consensus.update(
+        {
+            "party_probabilities": capped,
+            "rating": rating,
+            "leading_party": leader,
+            "predicted_winner_party": "Toss-up" if rating == "tossup" else leader,
+            "win_probability": capped.get(leader) if leader else None,
+            "margin_estimate": margin,
+        }
+    )
+    return (
+        f"Stability guard: poll set, roster and contest stage unchanged since the baseline forecast, so the "
+        f"{prior_leader} probability was held to {capped[prior_leader]:.2f} (baseline {prior_probs[prior_leader]:.2f}, "
+        f"panel {proposed:.2f}, max move {STABILITY_MAX_SHIFT:.2f}); rating {baseline_forecast.get('rating')} -> {rating}."
+    )
 
 
 def _consensus_for_prompt(consensus: Dict[str, Any]) -> Dict[str, Any]:
@@ -705,12 +790,21 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
         members = await run_forecast_panel(ctx, _agent_loop, panel_prompt, same_party=same_party)
         poll_count = _head_to_head_poll_count(race_json)
         consensus = build_consensus(members, poll_count, same_party=same_party) if members else None
+        stability_note = None
         if consensus:
             log(
                 "info",
                 f"  Forecast panel: {len(members)}/{len(FORECAST_PANEL_MODELS)} members, consensus "
                 f"{consensus['rating']} (largest gap {consensus['panel_spread']:.2f})",
             )
+            if not ctx.resume_partial:
+                # A resumed partial run's "baseline" is its own checkpoint, whose
+                # polling may already include this run's new polls.
+                stability_note = apply_stability_guard(
+                    consensus, ctx.baseline_forecast, ctx.baseline_forecast_evidence, race_json
+                )
+            if stability_note:
+                log("info", f"  Forecast {stability_note}")
         else:
             log("warning", "  Forecast panel produced no estimates; the writer will set the numbers itself")
 
@@ -747,7 +841,7 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
         forecast["model"] = writer_model
         forecast["market_signals"] = market_signals
         if consensus:
-            forecast["method"] = PANEL_METHOD
+            forecast["method"] = STABILIZED_PANEL_METHOD if stability_note else PANEL_METHOD
             forecast["panel"] = [
                 {
                     "model": member["model"],
