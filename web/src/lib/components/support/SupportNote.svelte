@@ -10,7 +10,7 @@
 >
   <p>
     <strong class="font-semibold text-content"
-      >Smarter.Vote is 100% founder-funded.</strong
+      >So far, Smarter.Vote has been funded entirely by its founder.</strong
     >
     No ads, sponsors, or campaign money. Expanding to state and local races, and keeping
     this research going into 2028, won't be possible without reader support.

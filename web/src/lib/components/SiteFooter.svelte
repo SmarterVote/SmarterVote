@@ -31,8 +31,8 @@
           Always confirm voting information with official election authorities.
         </p>
         <p class="mt-2 text-sm text-content-muted">
-          Independently and solely funded by its founder. Expanding to local
-          races and continuing in 2028 depends on
+          Funded so far entirely by its founder. Expanding to local races and
+          continuing in 2028 depends on
           <a
             href="/support/"
             class="font-medium text-primary underline hover:no-underline"

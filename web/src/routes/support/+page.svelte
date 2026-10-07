@@ -15,7 +15,7 @@
 >
   <PolicySection title="Why support matters right now">
     <p>
-      Smarter.Vote is currently funded 100% by its founder. There are no
+      So far, Smarter.Vote has been funded entirely by its founder. There are no
       advertisers, sponsors, or campaign dollars behind it, and every race guide
       carries real research, data, and hosting costs.
     </p>
