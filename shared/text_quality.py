@@ -206,8 +206,10 @@ def clean_prose_field(text: Any) -> Optional[Any]:
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
 _PERCENT = re.compile(r"\b\d{1,3}(?:\.\d+)?\s*(?:%|percent\b|per cent\b)", re.I)
 #: Poll vocabulary that never describes an election result. "polling place",
-#: "polling station", "polling location" and "poll worker" are biography.
+#: "polling station", "polling location" and "poll worker" are biography, and
+#: "constituent polling" is a platform plank (voting as constituents direct).
 _POLL_WORD = re.compile(
+    r"(?<!constituent )(?<!constituents' )"
     r"\b(?:polls?|polled|pollsters?|polling)\b(?!\s+(?:places?|stations?|locations?|sites?|workers?|booths?|hours?))",
     re.I,
 )

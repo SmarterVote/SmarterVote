@@ -37,6 +37,7 @@ def test_lint_flags_poll_content(text):
         "He led the effort to pass the bill 52-48.",
         "A former state senator, she chairs the appropriations committee.",
         "He opened a new polling place for rural voters as county auditor.",
+        "His campaign emphasizes ending PAC money and voting based on verified constituent polling.",
         "",
     ],
 )
