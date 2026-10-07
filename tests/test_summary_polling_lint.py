@@ -89,3 +89,29 @@ def test_update_prompt_no_longer_preserves_non_compliant_summaries():
 def test_forecast_writer_is_told_not_to_label_polls_partisan():
     assert "Republican-leaning" in prompts.FORECAST_SYSTEM
     assert "campaign-sponsored poll" in prompts.FORECAST_SYSTEM
+
+
+RACE_DESCRIPTION_PROMPTS = {
+    "DISCOVERY_USER": prompts.DISCOVERY_USER,
+    "REFINE_META_USER": prompts.REFINE_META_USER,
+    "UPDATE_META_USER": prompts.UPDATE_META_USER,
+    "ITERATE_META_USER": prompts.ITERATE_META_USER,
+}
+
+
+@pytest.mark.parametrize("name", sorted(RACE_DESCRIPTION_PROMPTS))
+def test_every_race_description_prompt_carries_the_race_balance_rules(name):
+    template = RACE_DESCRIPTION_PROMPTS[name]
+    assert prompts.RACE_BALANCE_RULES in template
+    assert "@@RACE_BALANCE@@" not in template
+
+
+def test_race_balance_rules_are_format_safe_and_require_rewrites():
+    rules = prompts.RACE_BALANCE_RULES
+    assert "MUST be rewritten" in rules and "same standard" in rules
+    assert "{" not in rules and "}" not in rules
+
+
+def test_forecast_writer_is_told_not_to_lean_on_one_candidates_controversy():
+    assert "controversy, scandal, gaffe, or leaked remark" in prompts.FORECAST_SYSTEM
+    assert "weak or poor fit" in prompts.FORECAST_SYSTEM
