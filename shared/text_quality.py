@@ -190,3 +190,65 @@ def clean_prose_field(text: Any) -> Optional[Any]:
     if isinstance(text, str) and text.strip() and is_placeholder_text(text):
         return None
     return clean_pipeline_language(text)
+
+
+# ---------------------------------------------------------------------------
+# Candidate-summary polling lint
+# ---------------------------------------------------------------------------
+#
+# A candidate summary is a short biography. Audit 5 (2026-10-07) found published
+# summaries quoting polls ("a CNN/SSRS poll showed him at 47%", "leads 48%-44%"),
+# which go stale within days and belong in the polling section. The prompts say
+# so; this lint is the cheap deterministic check that they were obeyed. It is
+# deliberately narrow so that election *results* ("won the primary with 77% of
+# the vote") are never flagged.
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])")
+_PERCENT = re.compile(r"\b\d{1,3}(?:\.\d+)?\s*(?:%|percent\b|per cent\b)", re.I)
+#: Poll vocabulary that never describes an election result. "polling place",
+#: "polling station", "polling location" and "poll worker" are biography.
+_POLL_WORD = re.compile(
+    r"\b(?:polls?|polled|pollsters?|polling)\b(?!\s+(?:places?|stations?|locations?|sites?|workers?|booths?|hours?))",
+    re.I,
+)
+#: "Survey" also names agencies (U.S. Geological Survey), so it counts only beside
+#: a percentage or survey-of-voters wording.
+_SURVEY_WORD = re.compile(r"\b(?:survey|surveys|surveyed)\b", re.I)
+_SURVEY_CONTEXT = re.compile(r"\b(?:voters|respondents|likely|registered|electorate|margin of error)\b", re.I)
+_SURVEY_AGENCY = re.compile(r"\b(?:geological|land|coast and geodetic)\s+survey\b", re.I)
+#: "leads 48%-44%", "trails Smith 41 to 45", "ahead 47-42".
+_MATCHUP_LEAD = re.compile(
+    r"\b(?:leads?|leading|trails?|trailing|ahead|behind)\b[^.;]{0,40}?"
+    r"\b\d{1,2}(?:\.\d)?\s*%?\s*(?:-|–|—|to)\s*\d{1,2}(?:\.\d)?\s*%?",
+    re.I,
+)
+#: Approval/favorability numbers are poll output too.
+_APPROVAL = re.compile(r"\b(?:approval|favorability|favourability|favorable)\s+(?:rating|ratings|numbers?)\b", re.I)
+
+
+def find_summary_polling_content(text: Any) -> list[str]:
+    """Sentences of *text* that report opinion-poll content. Empty when the text is clean.
+
+    Flags a sentence that mentions a poll or pollster, a survey of voters or with
+    a percentage, a numeric "leads/trails X-Y" matchup, or an approval rating
+    with a percentage. Election results with percentages are not flagged.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return []
+    hits: list[str] = []
+    for sentence in _SENTENCE_SPLIT.split(text.strip()):
+        has_percent = bool(_PERCENT.search(sentence))
+        survey = bool(_SURVEY_WORD.search(sentence)) and not _SURVEY_AGENCY.search(sentence)
+        if (
+            _POLL_WORD.search(sentence)
+            or (survey and (has_percent or _SURVEY_CONTEXT.search(sentence)))
+            or _MATCHUP_LEAD.search(sentence)
+            or (has_percent and _APPROVAL.search(sentence))
+        ):
+            hits.append(sentence.strip())
+    return hits
+
+
+def summary_contains_polling(text: Any) -> bool:
+    """Whether a candidate summary reports opinion-poll content (see :func:`find_summary_polling_content`)."""
+    return bool(find_summary_polling_content(text))

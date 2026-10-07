@@ -52,6 +52,12 @@ class PhaseContext:
     refine_iters: int = 1
     resume_partial: bool = False
     continue_incomplete_work: bool = False
+    #: The forecast the run started from, and the evidence it read (see
+    #: ``forecast.forecast_evidence_key``). Both are captured before any phase
+    #: runs, because the polling phase rewrites ``race_json["polling"]`` before
+    #: the forecast phase sees it. None for a fresh run.
+    baseline_forecast: Optional[Dict[str, Any]] = None
+    baseline_forecast_evidence: Any = None
 
     @property
     def prefix(self) -> str:

@@ -73,6 +73,35 @@ RULES (apply to every response):
    extremist, fringe, firebrand) unless quoting and attributing a named source."""
 
 # ------------------------------------------------------------------
+# Candidate-summary rules shared by every prompt that writes a summary
+# ------------------------------------------------------------------
+
+#: Inserted (via the ``@@SUMMARY_BALANCE@@`` marker) into every prompt that
+#: writes or rewrites a candidate ``summary``: discovery, refinement, the update
+#: metadata refresh, and review iteration. Contains no ``str.format`` braces.
+SUMMARY_BALANCE_RULES = """\
+SUMMARY BALANCE — a summary is a short biography, not campaign news:
+- Lead with who the candidate is: office or occupation, background, how they won
+  the nomination, and the platform they themselves emphasize.
+- Do not build a summary around an opponent's attack line, a single gotcha quote,
+  or one news cycle. Mention a controversy only when it is major and lasting
+  (criminal charge, ethics investigation, withdrawal, disqualification), state
+  it in neutral terms, and include the candidate's response.
+- Give every candidate in the race the same kind of content at the same depth;
+  do not add an unflattering detail to one candidate without holding the others
+  to the same standard.
+- Leave poll numbers, race ratings, and "who leads" out of summaries; polling and
+  forecast have their own sections.
+- Leave out single news-cycle items: an apology, a debate commitment or refusal,
+  a residency story, an ad buy or outside-spending booking, a campaign-trail
+  remark. Leave out endorsement tallies and lists of endorsers.
+- An existing summary that breaks any rule above (poll numbers or ratings, a
+  single news-cycle item, an opponent's attack line, an endorsement tally) MUST
+  be rewritten into a compliant biography, even when nothing new has happened.
+  A balance violation is itself a substantive reason to change the summary; the
+  rules against minor polish and needless rephrasing never protect it."""
+
+# ------------------------------------------------------------------
 # Phase 1: Discovery prompt (enhanced with career & images)
 # ------------------------------------------------------------------
 
@@ -192,6 +221,8 @@ For each candidate from Step 1:
 Gather:
 - What office is this for? What state/district?
 - Each candidate: summary (2-3 sentences), career history, education.
+
+@@SUMMARY_BALANCE@@
 - A 3-4 sentence nonpartisan description of this race — what office is being
   contested, why this race matters, political context, and key contrasts.
 
@@ -312,6 +343,7 @@ Research and improve this ONE candidate:
    - NEVER write stance text that describes the pipeline state (e.g. "Pending update", "Updating to reflect...", "Under review").
    - If a stance is genuinely unknown, use "No public position found" with confidence "low" and sources: [].
 4. Improve the summary — plain prose, nonpartisan, 2-3 sentences. No inline "Sources:". Sources go in summary_sources.
+   Follow SUMMARY BALANCE below; rewrite a summary that breaks it.
 5. Ensure all canonical issues are covered: {all_issues}
 6. Fill gaps in career_history and education if better data exists.
 7. If image_url is missing or null, search for a direct image file URL:
@@ -323,6 +355,8 @@ Research and improve this ONE candidate:
    it here if it is empty and you already have the data from a prior search.
 9. Add any high-value reference links you've discovered (Ballotpedia,
    Wikipedia, OpenSecrets, VoteSmart, legislature page) using add_candidate_link.
+
+@@SUMMARY_BALANCE@@
 
 Use your editing tools to record every improvement directly. When you are satisfied
 that the profile is accurate and complete, reply with a short plain-text summary
@@ -368,22 +402,15 @@ WHAT COUNTS AS "NEW" — be precise:
 - A development is new if it appears in articles published AFTER {last_updated}:
   new endorsements, policy announcements, primary results, candidate debates,
   campaign finance filings, major funding milestones, significant controversy.
-- A summary is worth updating only if a notable new event changes the candidate's
-  story — not if you could merely rephrase the existing text differently.
+- A summary is worth updating if a notable new event changes the candidate's
+  story, or if the existing summary breaks SUMMARY BALANCE below — not if you
+  could merely rephrase compliant text differently.
 
-SUMMARY BALANCE — a summary is a short biography, not campaign news:
-- Lead with who the candidate is: office or occupation, background, how they won
-  the nomination, and the platform they themselves emphasize.
-- Do not build a summary around an opponent's attack line, a single gotcha quote,
-  or one news cycle. Mention a controversy only when it is major and lasting
-  (criminal charge, ethics investigation, withdrawal, disqualification), state
-  it in neutral terms, and include the candidate's response.
-- Give every candidate in the race the same kind of content at the same depth;
-  do not add an unflattering detail to one candidate without holding the others
-  to the same standard.
-- Leave poll numbers, race ratings, and "who leads" out of summaries; polling and
-  forecast have their own sections.
-- Do not update a field just to add minor wording polish.
+@@SUMMARY_BALANCE@@
+
+OTHER LIMITS:
+- Do not update a field just to add minor wording polish (a SUMMARY BALANCE
+  rewrite is not polish).
 - Never search for, infer, or record the result of an election scheduled after
   {current_date}. If a runoff or election is still upcoming, state that once
   if relevant and continue with other research; do not repeatedly poll for a
@@ -392,11 +419,13 @@ SUMMARY BALANCE — a summary is a short biography, not campaign news:
 WHEN TO MAKE NO CHANGES:
 - Existing substantive text may be retained, but it must still be included with
   supporting sources in finalize_metadata. Do not exit with findings only in prose.
-- Do not rephrase existing summaries without a substantive new reason.
+- Do not rephrase existing summaries without a substantive new reason. A summary
+  that breaks SUMMARY BALANCE is a substantive reason: rewrite it.
 
 When you do find improvements, use your editing tools to record them:
 - update_race_field for description
-- set_candidate_summary for updated summaries (new events only)
+- set_candidate_summary for updated summaries (new events, or to bring a
+  summary into SUMMARY BALANCE)
 - set_donor_summary if new funding milestone or FEC filing is available
 - set_candidate_field for other candidate fields
 
@@ -457,7 +486,12 @@ Rules:
 7. Only the candidates in the roster are running. A primary that has produced
    the roster's nominees is decided: never describe it as unresolved, upcoming,
    or ongoing, and never present primary-election polling as the current
-   state of the general election."""
+   state of the general election.
+8. Do not characterize individual pollsters or polls as partisan,
+   "Republican-leaning", "Democratic-leaning", or a party's "outlier".
+   Describe a poll by its pollster name and sponsor instead (for example,
+   "a campaign-sponsored poll" or "an internal poll released by the Smith
+   campaign")."""
 
 FORECAST_USER = """\
 Race: "{race_id}"
@@ -1070,6 +1104,10 @@ For EACH flag above:
 3. If the flag identifies weak sourcing, find better/additional sources.
 4. If the flag identifies bias, rewrite the text to be neutral.
 5. If the flag is informational only (severity "info"), address if easily fixable.
+6. Whether or not a flag names it, if the candidate's summary breaks SUMMARY
+   BALANCE below, rewrite it with set_candidate_summary.
+
+@@SUMMARY_BALANCE@@
 
 SPECIAL CASES (see system prompt for full rules):
 - CAREER HISTORY flags: search for the specific organization + candidate + dates.
@@ -1359,6 +1397,10 @@ _CONTEST_STAGES_TEXT = "|".join(stage.value for stage in ContestStage)
 if "@@CONTEST_STAGES@@" not in DISCOVERY_USER:  # pragma: no cover - guards against silent drift
     raise RuntimeError("DISCOVERY_USER is missing the @@CONTEST_STAGES@@ slot")
 DISCOVERY_USER = DISCOVERY_USER.replace("@@CONTEST_STAGES@@", _CONTEST_STAGES_TEXT)
+DISCOVERY_USER = DISCOVERY_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
+REFINE_USER = REFINE_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
+UPDATE_META_USER = UPDATE_META_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
+ITERATE_USER = ITERATE_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
 
 for _token, _rendered in (
     ("@@MEMBERSHIP_EVIDENCE_RULES@@", render_membership_rules()),

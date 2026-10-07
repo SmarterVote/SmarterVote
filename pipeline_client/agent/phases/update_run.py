@@ -1,5 +1,6 @@
 """Update run (existing race): roster sync -> meta update -> shared phases."""
 
+import copy
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -42,6 +43,7 @@ from ._common import (
 )
 from .context import PhaseContext
 from .discovery import _backfill_source_timestamps, _record_provisional_roster, _sanitize_roster
+from .forecast import forecast_evidence_key
 from .fresh_run import _run_fresh
 from .shared_runner import _run_shared_phases
 
@@ -194,6 +196,8 @@ async def _run_update(
     race_json: Dict[str, Any] = existing
     _backfill_source_timestamps(race_json)
     _sanitize_roster(race_json, log)
+    baseline_forecast = copy.deepcopy(race_json.get("forecast")) if isinstance(race_json.get("forecast"), dict) else None
+    baseline_forecast_evidence = forecast_evidence_key(race_json)
     fast_probe_reason = _fast_probe_baseline_reason(race_json) if allow_fast_no_change and not resume_partial else None
     await _await_advisory_with_run_budget(
         _sync_ballotpedia_roster(race_json, race_id, log),
@@ -574,6 +578,8 @@ async def _run_update(
             refine_iters=refine_iters,
             resume_partial=resume_partial,
             continue_incomplete_work=continue_incomplete_work,
+            baseline_forecast=baseline_forecast,
+            baseline_forecast_evidence=baseline_forecast_evidence,
         )
     )
     _sanitize_roster(race_json, log)

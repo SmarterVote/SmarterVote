@@ -338,7 +338,9 @@ class RaceForecast(BaseModel):
     evidence_lineage: Optional[List[ForecastEvidence]] = None
     market_signals: List[ForecastMarketSignal] = Field(default_factory=list)
     #: "panel_median_v1" when the numbers are the median of an independent
-    #: model panel; "single_model" when one model set them.
+    #: model panel; "panel_median_v1_stabilized" when that median's move from the
+    #: previous forecast was capped because the polls, roster and contest stage
+    #: were unchanged; "single_model" when one model set them.
     method: Optional[str] = None
     panel: Optional[List[ForecastPanelEstimate]] = None
     #: Largest gap between members on the consensus leader's probability.
