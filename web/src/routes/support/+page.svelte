@@ -13,6 +13,18 @@
   path="/support/"
   eyebrow="Get involved"
 >
+  <PolicySection title="Why support matters right now">
+    <p>
+      So far, Smarter.Vote has been funded entirely by its founder. There are no
+      advertisers, sponsors, or campaign dollars behind it, and every race guide
+      carries real research, data, and hosting costs.
+    </p>
+    <p>
+      The next steps are expanding beyond national races to state and local
+      contests, and keeping coverage going through the 2028 cycle. Neither is
+      possible on one person's budget. Reader support is what makes them happen.
+    </p>
+  </PolicySection>
   {#if paymentsEnabled}
     <SupportTiers />
   {:else}

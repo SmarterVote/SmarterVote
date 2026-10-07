@@ -141,6 +141,16 @@
         class="mt-9 inline-flex min-h-12 items-center gap-2 rounded-lg bg-white px-7 py-3 font-semibold text-primary-800 shadow-xs transition hover:bg-primary-50 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >Find my elections <UiIcon name="arrow-right" /></a
       >
+      <p class="mx-auto mt-10 max-w-lg text-sm leading-6 text-primary-100">
+        So far, Smarter.Vote has been funded entirely by its founder. Reader
+        support is what will let us cover state and local races and keep going
+        into 2028.
+        <a
+          href="/support/"
+          class="font-semibold text-white underline underline-offset-2 hover:no-underline"
+          >Support the project</a
+        >.
+      </p>
     </div>
   </section>
 </div>
