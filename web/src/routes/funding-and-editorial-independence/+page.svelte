@@ -18,6 +18,13 @@
       accept individual donations; any future funding will follow the rules on
       this page.
     </p>
+    <p>
+      Expanding coverage to state and local races and continuing through 2028
+      will depend on outside support. If you value this work, you can
+      <a class="text-primary underline hover:no-underline" href="/support/"
+        >support Smarter.Vote</a
+      >.
+    </p>
   </PolicySection>
   <PolicySection title="Editorial control">
     <p>

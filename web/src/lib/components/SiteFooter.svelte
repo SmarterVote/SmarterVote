@@ -2,6 +2,7 @@
   const links = [
     { href: "/about/", label: "About" },
     { href: "/about/#methodology", label: "Methodology" },
+    { href: "/support/", label: "Support" },
     { href: "/partners/", label: "Partners" },
     { href: "/corrections/", label: "Corrections" },
     {
@@ -28,6 +29,15 @@
         <p class="mt-2 text-sm text-content-muted">
           Independent, sourced election research for informational purposes.
           Always confirm voting information with official election authorities.
+        </p>
+        <p class="mt-2 text-sm text-content-muted">
+          Independently and solely funded by its founder. Expanding to local
+          races and continuing in 2028 depends on
+          <a
+            href="/support/"
+            class="font-medium text-primary underline hover:no-underline"
+            >reader support</a
+          >.
         </p>
       </div>
       <nav

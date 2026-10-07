@@ -11,6 +11,7 @@
   import IssueTable from "$lib/components/IssueTable.svelte";
   import DonorTable from "$lib/components/DonorTable.svelte";
   import VotingRecordTable from "$lib/components/VotingRecordTable.svelte";
+  import SupportNote from "$lib/components/support/SupportNote.svelte";
   import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
   import { candidateSlug, careerYears } from "$lib/utils/format";
@@ -861,6 +862,8 @@
             information.
           </p>
         </div>
+
+        <SupportNote />
       </div>
     </div>
   {/if}

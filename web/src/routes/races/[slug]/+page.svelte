@@ -7,6 +7,7 @@
   import CandidateCard from "$lib/components/CandidateCard.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import ReviewPanel from "$lib/components/ReviewPanel.svelte";
+  import SupportNote from "$lib/components/support/SupportNote.svelte";
   import ValidationGradeBadge from "$lib/components/ValidationGradeBadge.svelte";
   import Card from "$lib/components/Card.svelte";
   import ElectionCountdown from "$lib/components/ElectionCountdown.svelte";
@@ -1216,6 +1217,8 @@
       candidateNames={(race.candidates ?? []).map((c) => c.name)}
       models={researchModels}
     />
+
+    <SupportNote class="mt-8" />
 
     <!-- Back to Top -->
     <div class="back-to-top">
