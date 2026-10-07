@@ -172,6 +172,104 @@ def consensus_margin(
     return round(max(0.0, statistics.median(signed)), 1)
 
 
+#: Largest move in the reference party's win probability a rerun may make when
+#: nothing it reads has changed. Reruns on an identical poll set moved AR-02 from
+#: 58% to 66% and CA-06 from 60% to 77.5% purely by re-reasoning; the panel's
+#: run-to-run noise is real, but publishing it as a shift in the race is not.
+STABILITY_MAX_SHIFT = 0.04
+
+
+def _poll_key_text(value: object) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
+def poll_identity(polls: object) -> frozenset:
+    """The identity of a poll set: one ``(pollster, date)`` per poll, order-insensitive.
+
+    Two races whose polling lists differ only in order, casing, or duplicated
+    entries have the same identity. A poll with neither pollster nor date falls
+    back to its source URL so it is still counted.
+    """
+    keys = set()
+    for poll in polls if isinstance(polls, list) else []:
+        if not isinstance(poll, dict):
+            continue
+        pollster = _poll_key_text(poll.get("pollster"))
+        date = _poll_key_text(poll.get("date"))[:10]
+        if pollster or date:
+            keys.add((pollster, date))
+        elif poll.get("source_url"):
+            keys.add(("", _poll_key_text(poll.get("source_url"))))
+    return frozenset(keys)
+
+
+def _forecast_probabilities(forecast: Mapping[str, object]) -> Dict[str, float]:
+    candidate = forecast.get("candidate_probabilities")
+    if isinstance(candidate, Mapping) and candidate:
+        values = {
+            str(name): float(value)
+            for name, value in candidate.items()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        }
+        total = sum(values.values())
+        return {name: value / total for name, value in values.items()} if total > 0 else {}
+    parties = forecast.get("party_probabilities")
+    return normalize_probabilities(parties) if isinstance(parties, Mapping) else {}
+
+
+def forecast_probability_shift(before: object, after: object) -> Optional[float]:
+    """How far *after* moved the probability of *before*'s leader. None when either side is unusable."""
+    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
+        return None
+    before_probs = _forecast_probabilities(before)
+    after_probs = _forecast_probabilities(after)
+    if before_probs and after_probs:
+        reference = leading_party(before_probs)
+        if reference is not None:
+            return abs(after_probs.get(reference, 0.0) - before_probs[reference])
+    before_p, after_p = before.get("win_probability"), after.get("win_probability")
+    if (
+        isinstance(before_p, (int, float))
+        and isinstance(after_p, (int, float))
+        and before.get("predicted_winner_party") == after.get("predicted_winner_party")
+    ):
+        return abs(float(after_p) - float(before_p))
+    return None
+
+
+def cap_probability_shift(
+    prior: Mapping[object, object], new: Mapping[object, object], max_shift: float = STABILITY_MAX_SHIFT
+) -> Optional[Dict[str, float]]:
+    """*new* party probabilities with the prior leader's probability held within *max_shift* of *prior*.
+
+    Returns None when no cap is needed (the move is already within the band) or
+    either side is unusable. Other parties are rescaled proportionally so the
+    result still sums to 1.
+    """
+    prior_probs = normalize_probabilities(prior)
+    new_probs = normalize_probabilities(new)
+    reference = leading_party(prior_probs)
+    if not prior_probs or not new_probs or reference is None:
+        return None
+    anchor = prior_probs[reference]
+    proposed = new_probs.get(reference, 0.0)
+    capped = min(max(proposed, anchor - max_shift), anchor + max_shift)
+    capped = min(max(capped, 0.0), 1.0)
+    if abs(capped - proposed) < 1e-9:
+        return None
+    others = {party: value for party, value in new_probs.items() if party != reference}
+    others_total = sum(others.values())
+    if others_total <= 0:
+        # The new estimate gave everyone else zero; split the remainder as the prior did.
+        others = {party: value for party, value in prior_probs.items() if party != reference}
+        others_total = sum(others.values())
+    result = {reference: capped}
+    if others_total > 0:
+        for party, value in others.items():
+            result[party] = (1.0 - capped) * value / others_total
+    return {party: round(value, 4) for party, value in result.items()}
+
+
 def _grid(national_sd: float) -> List[tuple[float, float]]:
     weights = [math.exp(-0.5 * z * z) for z in _GRID_Z]
     total = sum(weights)

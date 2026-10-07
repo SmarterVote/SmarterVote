@@ -1660,3 +1660,56 @@ def test_require_mcp_sdk_fails_in_ci_but_skips_locally(monkeypatch):
     monkeypatch.delenv("CI")
     with pytest.raises(pytest.skip.Exception):
         _require_mcp_sdk()
+
+
+@pytest.mark.asyncio
+async def test_assess_publish_readiness_warns_on_polling_summaries_and_forecast_churn(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    base = {
+        "validation_grade": {"passed": True},
+        "run_health": {"status": "healthy"},
+        "pipeline_state": {"complete": True},
+    }
+    polls = [{"pollster": "Talk Business", "date": "2026-09-15", "matchups": []}]
+    published_forecast = {"rating": "tilt_r", "party_probabilities": {"Republican": 0.58, "Democratic": 0.42}}
+    churned_forecast = {"rating": "lean_r", "party_probabilities": {"Republican": 0.66, "Democratic": 0.34}}
+    candidates = [
+        {"name": "Hill", "summary": "Hill is a three-term congressman. A Talk Business poll showed him at 47%."},
+        {"name": "Jones", "summary": "Jones won the primary with 77% of the vote."},
+    ]
+    responses = {
+        "/api/races/ar-house-02-2026/data": {
+            **base,
+            "candidates": candidates,
+            "polling": polls,
+            "forecast": churned_forecast,
+        },
+        "/races/ar-house-02-2026": {"candidates": candidates, "polling": list(polls), "forecast": published_forecast},
+        # New poll since publication: the move is evidence-driven, so no churn warning.
+        "/api/races/ar-house-03-2026/data": {
+            **base,
+            "candidates": [{"name": "Jones", "summary": "Jones is a rancher."}],
+            "polling": polls + [{"pollster": "Emerson", "date": "2026-10-01", "matchups": []}],
+            "forecast": churned_forecast,
+        },
+        "/races/ar-house-03-2026": {
+            "candidates": [{"name": "Jones"}],
+            "polling": polls,
+            "forecast": published_forecast,
+        },
+    }
+    monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
+
+    result = await server.assess_publish_readiness(["ar-house-02-2026", "ar-house-03-2026"])
+    churned, evidence_driven = result["rows"]
+
+    assert churned["ready"] is True  # both are warnings, never blockers
+    assert churned["summary_polling_candidates"] == ["Hill"]
+    assert {"summary_contains_polling", "forecast_moved_without_new_polls"} <= set(churned["warnings"])
+    assert churned["forecast_probability_shift"] == pytest.approx(0.08)
+    assert evidence_driven["ready"] is True
+    assert "summary_contains_polling" not in evidence_driven["warnings"]
+    assert "forecast_moved_without_new_polls" not in evidence_driven["warnings"]
