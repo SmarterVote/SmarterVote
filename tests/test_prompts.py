@@ -386,10 +386,12 @@ def test_forecast_prompt_formats_and_disallows_search():
         polling_note="No public polling found.",
         polling_json="[]",
         market_signals_json="[]",
+        facts_block="Seat and incumbency:",
         consensus_json="null",
     )
 
     assert "ga-senate-2026" in result
+    assert "Pre-computed facts" in result and "Seat and incumbency:" in result
     assert "Panel consensus" in result
     assert "Prediction market signals" in result
     assert "Do not search the web" in FORECAST_SYSTEM
