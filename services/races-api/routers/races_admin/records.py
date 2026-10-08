@@ -217,6 +217,10 @@ async def _host_resolves_public(url: str) -> bool:
 _ASSET_PROBE_CONCURRENCY = 16
 
 
+_GENERIC_BINARY_CONTENT_TYPES = frozenset({"binary/octet-stream", "application/octet-stream"})
+_IMAGE_EXTENSION = re.compile(r"\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)", re.IGNORECASE)
+
+
 async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[str, Any]:
     if not _safe_public_asset_url(url) or not await _host_resolves_public(url):
         return {"kind": kind, "url": url, "status": "blocked", "reachable": False}
@@ -229,6 +233,10 @@ async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[s
             if kind != "image" or response.status_code in {401, 403, 405, 429} or not content_type
             else content_type.startswith("image/")
         )
+        if image_valid is False and content_type in _GENERIC_BINARY_CONTENT_TYPES:
+            # Some CDNs (e.g. civicengine headshots) serve real JPEGs as binary/octet-stream;
+            # browsers sniff and render them. Trust an image file extension, otherwise stay unknown.
+            image_valid = True if _IMAGE_EXTENSION.search(url) else None
         content_length = int(response.headers.get("content-length") or 0) or None
         thumbnail_match = re.search(r"(?:^|[-_/])(\d{2,4})x(\d{2,4})(?:[-_.?/]|$)", url, re.IGNORECASE) or re.search(
             r"/thumbs/(\d{2,4})/(\d{2,4})/", url, re.IGNORECASE

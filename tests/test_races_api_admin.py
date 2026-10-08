@@ -1928,6 +1928,30 @@ async def test_asset_probe_judges_declared_thumbnail_size_before_byte_size():
     assert (await probe("https://example.com/headshot.jpg"))["image_quality"] == "suspicious_small"
 
 
+@pytest.mark.asyncio
+async def test_asset_probe_accepts_octet_stream_image_with_image_extension():
+    from routers.races_admin.records import _probe_asset
+
+    response = MagicMock()
+    response.status_code = 200
+    response.headers = {"content-type": "binary/octet-stream", "content-length": "29130"}
+    client = MagicMock()
+    client.head = AsyncMock(return_value=response)
+
+    async def probe(url):
+        with patch("routers.races_admin.records._host_resolves_public", AsyncMock(return_value=True)):
+            return await _probe_asset(client, "image", url)
+
+    jpg = await probe("https://assets.civicengine.com/uploads/candidate/headshot/942926/942926.jpg")
+    assert jpg["image_content_type_valid"] is True
+    assert jpg["image_quality"] == "content_type_valid"
+    unknown = await probe("https://example.com/photo")
+    assert unknown["image_content_type_valid"] is None
+    assert unknown["image_quality"] is None
+    response.headers = {"content-type": "text/html", "content-length": "29130"}
+    assert (await probe("https://example.com/photo.jpg"))["image_quality"] == "invalid_content_type"
+
+
 def test_list_races_exposes_public_and_draft_quality_separately():
     """Admin/MCP records should keep draft and published catalog metadata separate."""
     os.environ["SKIP_AUTH"] = "true"
