@@ -230,18 +230,18 @@ async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[s
             else content_type.startswith("image/")
         )
         content_length = int(response.headers.get("content-length") or 0) or None
-        thumbnail_match = re.search(r"(?:^|[-_/])(\d{2,4})x(\d{2,4})(?:[-_.?/]|$)", url, re.IGNORECASE)
-        suspicious_thumbnail = bool(
-            thumbnail_match and min(int(thumbnail_match.group(1)), int(thumbnail_match.group(2))) < 150
+        thumbnail_match = re.search(r"(?:^|[-_/])(\d{2,4})x(\d{2,4})(?:[-_.?/]|$)", url, re.IGNORECASE) or re.search(
+            r"/thumbs/(\d{2,4})/(\d{2,4})/", url, re.IGNORECASE
         )
+        declared_min_side = min(int(thumbnail_match.group(1)), int(thumbnail_match.group(2))) if thumbnail_match else None
+        suspicious_thumbnail = declared_min_side is not None and declared_min_side < 150
+        # A URL that declares adequate dimensions (e.g. Ballotpedia's 200x300 headshot thumbs) is
+        # judged by those, not by byte size: a well-compressed 200x300 JPEG is often under 10 KB.
+        small_payload = declared_min_side is None and content_length is not None and content_length < 10_000
         image_quality = None
         if kind == "image" and image_valid is False:
             image_quality = "invalid_content_type"
-        elif (
-            kind == "image"
-            and image_valid is True
-            and (suspicious_thumbnail or (content_length is not None and content_length < 10_000))
-        ):
+        elif kind == "image" and image_valid is True and (suspicious_thumbnail or small_payload):
             image_quality = "suspicious_small"
         elif kind == "image" and image_valid is True:
             image_quality = "content_type_valid"

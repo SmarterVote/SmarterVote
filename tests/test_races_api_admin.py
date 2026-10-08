@@ -1908,6 +1908,26 @@ async def test_asset_probe_blocks_private_targets_and_validates_image_content_ty
     assert limited["image_quality"] is None
 
 
+@pytest.mark.asyncio
+async def test_asset_probe_judges_declared_thumbnail_size_before_byte_size():
+    from routers.races_admin.records import _probe_asset
+
+    response = MagicMock()
+    response.status_code = 200
+    response.headers = {"content-type": "image/jpeg", "content-length": "8388"}
+    client = MagicMock()
+    client.head = AsyncMock(return_value=response)
+
+    async def probe(url):
+        with patch("routers.races_admin.records._host_resolves_public", AsyncMock(return_value=True)):
+            return await _probe_asset(client, "image", url)
+
+    bp_thumb = "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Cory_Booker.jpg"
+    assert (await probe(bp_thumb))["image_quality"] == "content_type_valid"
+    assert (await probe("https://example.com/headshot-100x100.jpg"))["image_quality"] == "suspicious_small"
+    assert (await probe("https://example.com/headshot.jpg"))["image_quality"] == "suspicious_small"
+
+
 def test_list_races_exposes_public_and_draft_quality_separately():
     """Admin/MCP records should keep draft and published catalog metadata separate."""
     os.environ["SKIP_AUTH"] = "true"
