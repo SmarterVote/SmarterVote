@@ -168,8 +168,9 @@ jobs:
       TF_VAR_auth0_domain: ${{ vars.AUTH0_DOMAIN }}
       TF_VAR_auth0_audience: ${{ vars.AUTH0_AUDIENCE }}
       TF_VAR_cloudflare_analytics_api_token: ${{ secrets.CLOUDFLARE_ANALYTICS_API_TOKEN }}
-      TF_VAR_cloudflare_analytics_account_tag: ${{ vars.CLOUDFLARE_ANALYTICS_ACCOUNT_TAG }}
-      TF_VAR_cloudflare_analytics_site_tag: ${{ vars.CLOUDFLARE_ANALYTICS_SITE_TAG }}
+      # Cloudflare account and Web Analytics site tags are public identifiers (the
+      # site tag is in the page's analytics beacon), so they live as defaults in
+      # infra/variables.tf rather than as repository variables.
       # Optional operational guardrails. Unset repository variables arrive as "",
       # which infra/variables.tf treats as "disabled".
       TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
@@ -194,8 +195,6 @@ jobs:
           REQUIRED_AUTH0_AUDIENCE: ${{ vars.AUTH0_AUDIENCE }}
           REQUIRED_ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
           REQUIRED_CLOUDFLARE_ANALYTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_API_TOKEN }}
-          REQUIRED_CLOUDFLARE_ANALYTICS_ACCOUNT_TAG: ${{ vars.CLOUDFLARE_ANALYTICS_ACCOUNT_TAG }}
-          REQUIRED_CLOUDFLARE_ANALYTICS_SITE_TAG: ${{ vars.CLOUDFLARE_ANALYTICS_SITE_TAG }}
         run: |
           MISSING=()
           [ -z "$REQUIRED_GCP_PROJECT_ID" ]    && MISSING+=("GCP_PROJECT_ID")
@@ -209,8 +208,6 @@ jobs:
           [ -z "$REQUIRED_AUTH0_AUDIENCE" ]    && MISSING+=("AUTH0_AUDIENCE")
           [ -z "$REQUIRED_ADMIN_API_KEY" ]      && MISSING+=("ADMIN_API_KEY")
           [ -z "$REQUIRED_CLOUDFLARE_ANALYTICS_API_TOKEN" ] && MISSING+=("CLOUDFLARE_ANALYTICS_API_TOKEN")
-          [ -z "$REQUIRED_CLOUDFLARE_ANALYTICS_ACCOUNT_TAG" ] && MISSING+=("CLOUDFLARE_ANALYTICS_ACCOUNT_TAG")
-          [ -z "$REQUIRED_CLOUDFLARE_ANALYTICS_SITE_TAG" ] && MISSING+=("CLOUDFLARE_ANALYTICS_SITE_TAG")
 
           if [ ${#MISSING[@]} -ne 0 ]; then
             echo "::error::Required GitHub secrets are missing: ${MISSING[*]}"

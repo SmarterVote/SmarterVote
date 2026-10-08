@@ -105,15 +105,15 @@ variable "cloudflare_analytics_api_token" {
 }
 
 variable "cloudflare_analytics_account_tag" {
-  description = "Cloudflare account ID containing the Web Analytics site"
+  description = "Cloudflare account ID containing the Web Analytics site (public identifier)"
   type        = string
-  default     = ""
+  default     = "b9e75903377dcca73a27a5d6be4e4384"
 }
 
 variable "cloudflare_analytics_site_tag" {
-  description = "Cloudflare Web Analytics site token used to filter GraphQL data"
+  description = "Cloudflare Web Analytics siteTag for smarter.vote (the automatic-setup site, not the unused JS-snippet site); public identifier"
   type        = string
-  default     = ""
+  default     = "854451134dd54a9f913de6af2a660161"
 }
 
 variable "create_firestore_database" {

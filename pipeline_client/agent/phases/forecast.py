@@ -373,10 +373,33 @@ def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
     including them would mean the guard never applies.
     """
     roster = frozenset(
-        (_name_key(candidate.get("name")), normalize_party_label(candidate.get("party")))
+        (_name_key(candidate.get("name")), _evidence_party(candidate.get("party")))
         for candidate in _active_candidates(race_json)
     )
     return (poll_identity(race_json.get("polling")), roster, str(race_json.get("contest_stage") or ""))
+
+
+#: Ballot labels for a candidate with no party. Discovery re-verification
+#: relabels between them (NE-Sen: "Independent" -> "Nonpartisan") without the
+#: field changing, so the stability guard must not read that as a new roster.
+_UNAFFILIATED_LABELS = frozenset(
+    {
+        "independent",
+        "nonpartisan",
+        "non-partisan",
+        "unaffiliated",
+        "no party",
+        "no party affiliation",
+        "no party preference",
+        "no political party",
+        "npa",
+    }
+)
+
+
+def _evidence_party(label: Any) -> str:
+    party = normalize_party_label(label)
+    return "Independent" if party.casefold() in _UNAFFILIATED_LABELS else party
 
 
 def apply_stability_guard(

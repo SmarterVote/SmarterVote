@@ -122,6 +122,28 @@ def test_guard_stands_aside_when_evidence_changed(change):
     assert consensus["rating"] == "lean_r"
 
 
+@pytest.mark.parametrize("relabel", ["Nonpartisan", "No Party Affiliation", "unaffiliated", "Independent Party"])
+def test_guard_treats_unaffiliated_ballot_labels_as_the_same_roster(relabel):
+    # NE-Sen: discovery relabeled Dan Osborn "Independent" -> "Nonpartisan" and the
+    # guard read it as a roster change, letting the forecast drift 0.58 -> 0.64.
+    race = _ar02()
+    race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["candidates"][-1]["party"] = relabel
+    consensus = build_consensus([_member(0.34)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, evidence, race)
+    assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.62)
+
+
+def test_guard_still_sees_a_real_party_change():
+    race = _ar02()
+    race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})
+    evidence = forecast_evidence_key(race)
+    race["candidates"][-1]["party"] = "Democratic"
+    assert forecast_evidence_key(race) != evidence
+
+
 def test_guard_does_nothing_without_a_baseline_or_inside_the_band():
     race = _ar02()
     evidence = forecast_evidence_key(race)
