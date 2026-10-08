@@ -45,7 +45,7 @@ For deployed dashboard traffic reporting, configure the races API with:
 
 - `CLOUDFLARE_ANALYTICS_API_TOKEN`: read-only Cloudflare GraphQL token
 - `CLOUDFLARE_ANALYTICS_ACCOUNT_TAG`: Cloudflare account ID
-- `CLOUDFLARE_ANALYTICS_SITE_TAG`: Web Analytics site/beacon token
+- `CLOUDFLARE_ANALYTICS_SITE_TAG`: Web Analytics `siteTag` (the `siteTag~in=` value in the dashboard URL, not the beacon token). Deployed values for both tags are Terraform defaults in `infra/variables.tf`
 
 Without all three values, `/analytics/traffic` returns `configured: false` so the dashboard does not mistake missing
 configuration for zero traffic.
