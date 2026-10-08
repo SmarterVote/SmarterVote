@@ -36,7 +36,7 @@ from shared.forecast_math import (
     poll_identity,
     rating_for,
 )
-from shared.forecast_summary import seat_control_note
+from shared.forecast_summary import _seat_holder, seat_control_note
 from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
 from shared.run_health import RunFailureReason
 
@@ -214,6 +214,107 @@ def _head_to_head_poll_count(race_json: Dict[str, Any]) -> int:
         ):
             count += 1
     return count
+
+
+def _share_text(value: float) -> str:
+    return f"{round(value, 1):g}"
+
+
+def poll_facts(race_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Pre-computed arithmetic for each head-to-head poll of the current candidates, newest first.
+
+    The writer used to read raw percentages and subtract them itself, and got it
+    wrong: California's governor "18-point lead" from a 61-36 poll, Kansas's
+    NYT/Siena 44-49 written with the sides swapped, a 53-44 Fox poll counted
+    among "double-digit" leads. Each fact carries the shares, the leader and the
+    margin already computed, so the prose only has to copy them.
+    """
+    roster = {_name_key(candidate["name"]): candidate["name"] for candidate in _active_candidates(race_json)}
+    facts: List[Dict[str, Any]] = []
+    for poll in race_json.get("polling") or []:
+        if not isinstance(poll, dict):
+            continue
+        for matchup in poll.get("matchups") or []:
+            if not isinstance(matchup, dict):
+                continue
+            names = matchup.get("candidates") or []
+            shares = matchup.get("percentages") or []
+            if len(names) != len(shares):
+                continue
+            pairs = []
+            for name, share in zip(names, shares):
+                full = roster.get(_name_key(name))
+                value = _numeric(share)
+                if full and value is not None:
+                    pairs.append((full, value))
+            if len(pairs) < 2:
+                continue
+            ranked = sorted(pairs, key=lambda pair: pair[1], reverse=True)
+            margin = round(ranked[0][1] - ranked[1][1], 1)
+            facts.append(
+                {
+                    "pollster": str(poll.get("pollster") or "").strip() or "Unnamed pollster",
+                    "end_date": str(poll.get("date") or "").strip()[:10] or "undated",
+                    "shares": dict(pairs),
+                    "leader": ranked[0][0] if margin > 0 else None,
+                    "margin_points": margin,
+                    "margin": f"{ranked[0][0]} +{_share_text(margin)}" if margin > 0 else "tied",
+                }
+            )
+            break  # One matchup per poll: the first with two current candidates.
+    facts.sort(key=lambda fact: "" if fact["end_date"] == "undated" else fact["end_date"], reverse=True)
+    return facts
+
+
+def _poll_fact_line(fact: Dict[str, Any]) -> str:
+    shares = ", ".join(f"{name} {_share_text(value)}" for name, value in fact["shares"].items())
+    return f"- {fact['pollster']}, ended {fact['end_date']}: {shares} -> margin {fact['margin']}"
+
+
+def _seat_fact_lines(race_json: Dict[str, Any]) -> List[str]:
+    """Seat status, who may be said to "hold" it, and each candidate's incumbent flag.
+
+    The fact-check caught "a safe Democratic hold" for a Republican seat, a
+    Republican "hold" of an open seat, and "both nominees are incumbents" when
+    the roster marked one as a challenger.
+    """
+    holder, incumbent_running = _seat_holder(race_json)
+    lines = [f"- Seat status: {seat_control_note(race_json)}."]
+    if holder is None:
+        lines.append(
+            "- No party is recorded as holding this seat: never say a party will hold, keep, retain or defend it; "
+            "call it an open seat."
+        )
+    else:
+        side = "independent" if holder == "Other" else holder
+        lines.append(
+            f"- Only the {side} side holds this seat now, so only it can hold, keep, retain or defend it; "
+            "a win by anyone else is a pickup (flip)."
+        )
+        if not incumbent_running:
+            lines.append("- No incumbent is on the ballot: this is an open seat.")
+    for candidate in _active_candidates(race_json):
+        status = "incumbent" if candidate.get("incumbent") else "not an incumbent"
+        lines.append(f"- {candidate['name']} ({candidate.get('party') or 'no party listed'}): {status}.")
+    return lines
+
+
+def forecast_facts_block(race_json: Dict[str, Any]) -> str:
+    """The pre-computed facts the forecast writer and its fact-check use instead of their own arithmetic."""
+    facts = poll_facts(race_json)
+    lines = ["Seat and incumbency:", *_seat_fact_lines(race_json), ""]
+    if facts:
+        lines.append(
+            f"Head-to-head polls of the current candidates, newest first ({_plural(len(facts), 'poll')}, "
+            "margins already computed):"
+        )
+        lines.extend(_poll_fact_line(fact) for fact in facts)
+    else:
+        lines.append(
+            "Head-to-head polls of the current candidates: none logged. Do not describe a poll of these candidates "
+            "or a poll margin."
+        )
+    return "\n".join(lines)
 
 
 async def _panel_member(
@@ -544,8 +645,13 @@ async def _write_forecast(
     handlers: Dict[str, Any],
     consensus: Optional[Dict[str, Any]],
     writer_models: Sequence[str],
+    phase_suffix: str = "",
 ) -> Optional[str]:
-    """Run the writer, falling back through *writer_models*. Returns the model that wrote, or None."""
+    """Run the writer, falling back through *writer_models*. Returns the model that wrote, or None.
+
+    *phase_suffix* separates a revision's tokens and cost from the first draft's
+    in the run's phase breakdown, so how often the repair runs is visible.
+    """
     for model in writer_models:
         written: Dict[str, bool] = {}
         tool_handlers = {
@@ -560,7 +666,7 @@ async def _write_forecast(
                 on_log=ctx.on_log,
                 race_id=ctx.race_id,
                 max_iterations=min(ctx.max_iterations, 4),
-                phase_name=_phase_name(ctx),
+                phase_name=_phase_name(ctx, phase_suffix),
                 max_tokens=WRITER_MAX_TOKENS,
                 extra_tools=FORECAST_TOOLS + [READ_PROFILE_TOOL],
                 extra_tool_handlers=tool_handlers,
@@ -578,6 +684,14 @@ async def _write_forecast(
             return model
         ctx.log("warning", f"  Forecast writer {model} finished without setting a forecast")
     return None
+
+
+_WRITTEN_TEXT_FIELDS = ("rationale", "takeaway", "key_reasons", "uncertainty")
+
+
+def _written_text(forecast: Dict[str, Any]) -> Dict[str, Any]:
+    """The prose a revision must correct, so it fixes the flagged claims instead of starting over."""
+    return {field: forecast.get(field) for field in _WRITTEN_TEXT_FIELDS}
 
 
 def _checked_forecast(forecast: Dict[str, Any], fields: Sequence[str], race_json: Dict[str, Any]) -> Dict[str, Any]:
@@ -618,6 +732,7 @@ async def _check_forecast_text(ctx: PhaseContext, agent_loop: Callable) -> List[
         current_date=datetime.now(timezone.utc).date().isoformat(),
         contest_stage=race_json.get("contest_stage") or "unknown",
         seat_control=seat_control_note(race_json),
+        facts_block=forecast_facts_block(race_json),
         description=(race_json.get("description") or "")[:_MAX_CHECK_DESCRIPTION_CHARS],
         roster_json=json.dumps(roster, indent=2),
         polling_json=json.dumps((race_json.get("polling") or [])[:_MAX_CHECK_POLLS], indent=2, default=str),
@@ -833,6 +948,7 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
 
         writer_prompt = FORECAST_USER.format(
             **fields,
+            facts_block=forecast_facts_block(race_json),
             consensus_json=json.dumps(_consensus_for_prompt(consensus), indent=2) if consensus else "null",
         )
         if same_party:
@@ -845,13 +961,25 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
         text_unverified = False
         issues = await _check_forecast_text(ctx, _agent_loop)
         if issues:
-            log("warning", f"  Forecast check flagged {len(issues)} issue(s); revising: {issues}")
+            # Exactly one repair: the same writer model, shown its own text and
+            # the objections, then one re-check. A second failure falls back to
+            # the plain numeric summary below.
+            log("warning", f"  Forecast check flagged {len(issues)} issue(s); revising once: {issues}")
             revision_prompt = (
-                writer_prompt + "\n\n" + FORECAST_REVISION_USER.format(issues="\n".join(f"- {issue}" for issue in issues))
+                writer_prompt
+                + "\n\n"
+                + FORECAST_REVISION_USER.format(
+                    previous_text_json=json.dumps(_written_text(race_json.get("forecast") or {}), indent=2, default=str),
+                    issues="\n".join(f"- {issue}" for issue in issues),
+                )
             )
-            revised_by = await _write_forecast(ctx, _agent_loop, revision_prompt, handlers, consensus, [writer_model])
+            revised_by = await _write_forecast(
+                ctx, _agent_loop, revision_prompt, handlers, consensus, [writer_model], phase_suffix="-revision"
+            )
             remaining = await _check_forecast_text(ctx, _agent_loop) if revised_by else issues
-            if remaining:
+            if not remaining:
+                log("info", "  Forecast text passed its fact-check after one revision")
+            else:
                 text_unverified = True
                 _record_step_failure(
                     race_json,

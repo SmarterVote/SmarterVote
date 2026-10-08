@@ -675,6 +675,15 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
             "Stability guard applied: polls, roster and contest stage were unchanged since the baseline forecast, "
             "so the move in win probability was capped."
         )
+    pipeline_state_for_audit = race_json.get("pipeline_state")
+    step_failures = pipeline_state_for_audit.get("step_failures") if isinstance(pipeline_state_for_audit, dict) else None
+    if any(
+        isinstance(failure, dict) and failure.get("reason") == "forecast_text_unverified" for failure in step_failures or []
+    ):
+        forecast_changes.append(
+            "Forecast text did not pass its fact-check after one revision; the written explanation is a plain "
+            "summary of the numbers."
+        )
     if not forecast_changes:
         forecast_changes.append("No forecast headline changes detected.")
 

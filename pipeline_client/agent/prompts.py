@@ -518,7 +518,17 @@ Rules:
    fundraising, incumbency, partisan lean, and the candidate field. Do not cite
    one candidate's controversy, scandal, gaffe, or leaked remark as a reason or
    a wildcard, and do not call a candidate a weak or poor fit for the
-   electorate. Do not speculate about how a news event will move voters."""
+   electorate. Do not speculate about how a news event will move voters.
+10. Take every poll number, margin, leader and date from the pre-computed
+   facts block. Never subtract shares yourself, never swap which candidate
+   has which share, and never describe a poll that is not listed there.
+11. Never generalize across polls ("all", "every", "each", "double-digit",
+   "late-September", "has not narrowed", "one survey") unless every poll you
+   cite or count satisfies it in the facts block; otherwise name the polls.
+12. Only the party that currently holds the seat can "hold", "keep", "retain"
+   or "defend" it. For any other party a win is a pickup or flip. For an open
+   seat, say "open seat". Call a candidate an incumbent only when the facts
+   block says so."""
 
 FORECAST_USER = """\
 Race: "{race_id}"
@@ -537,6 +547,9 @@ Candidates:
 Polling note: {polling_note}
 Polling:
 {polling_json}
+
+Pre-computed facts (authoritative; copy margins, leaders and dates from here):
+{facts_block}
 
 Prediction market signals:
 {market_signals_json}
@@ -679,15 +692,25 @@ Candidate roster (everyone who is running):
 Polling:
 {polling_json}
 
+Pre-computed facts (the margins and leaders here are correct; check the prose
+against them, and flag any generalization across polls that a listed poll
+contradicts):
+{facts_block}
+
 Forecast to check:
 {forecast_json}"""
 
 FORECAST_REVISION_USER = """\
-A fact-check found these problems in the forecast text you wrote:
+You already wrote this forecast text:
+{previous_text_json}
+
+A fact-check found these problems in it:
 {issues}
 
-Call set_forecast again with corrected rationale, takeaway, key_reasons and
-uncertainty. Keep every number exactly as before."""
+Call set_forecast again. Correct only the flagged claims, using the
+pre-computed facts above for every poll margin, leader, date and seat-control
+word; if a flagged claim cannot be stated correctly from those facts, drop it.
+Keep the rest of the text and every number exactly as before."""
 
 VOTER_RESOURCES_SYSTEM = f"""\
 You are a nonpartisan election-resource researcher. Your only task is to verify
