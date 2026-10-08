@@ -101,6 +101,20 @@ SUMMARY BALANCE — a summary is a short biography, not campaign news:
   A balance violation is itself a substantive reason to change the summary; the
   rules against minor polish and needless rephrasing never protect it."""
 
+RACE_BALANCE_RULES = """\
+RACE DESCRIPTION BALANCE — the race description is a neutral overview:
+- Describe the race through the office, the candidates' backgrounds and
+  platforms, partisan lean, incumbency, fundraising, and published polling.
+- Do not frame the race around one candidate's controversy, gaffe, leaked
+  remark, or attack line. Mention a controversy only when it is major and
+  lasting (criminal charge, ethics investigation, withdrawal, disqualification),
+  state it in neutral terms with the candidate's response, and hold every
+  candidate to the same standard.
+- Use labels only as the candidates or their parties use them; do not
+  characterize a candidate as a weak or poor fit for the electorate.
+- An existing description that breaks these rules MUST be rewritten, even when
+  nothing new has happened."""
+
 # ------------------------------------------------------------------
 # Phase 1: Discovery prompt (enhanced with career & images)
 # ------------------------------------------------------------------
@@ -225,6 +239,8 @@ Gather:
 @@SUMMARY_BALANCE@@
 - A 3-4 sentence nonpartisan description of this race — what office is being
   contested, why this race matters, political context, and key contrasts.
+
+@@RACE_BALANCE@@
 
 ## Image URL strategy
 For each candidate's headshot, try:
@@ -370,6 +386,8 @@ Current description: {race_description}
 Search for a better or more accurate race description: 3-4 sentences covering
 the office, why the race matters, partisan context, and key contrasts.
 
+@@RACE_BALANCE@@
+
 Use update_race_field only for description. Do not research or modify polling
 or voter-resource links in this phase. When done, briefly describe the change."""
 
@@ -391,6 +409,10 @@ Search for NEW information since {last_updated}:
 1. Any major news, announcements, or developments for each candidate.
 2. Updated or corrected candidate summaries (keep them 2-3 sentences, nonpartisan).
 3. Updated race description (office context, why it matters, key contrasts).
+   A description that breaks RACE DESCRIPTION BALANCE is a substantive reason:
+   rewrite it.
+
+@@RACE_BALANCE@@
 
 Completeness takes priority over recency: if any active candidate has an empty,
 placeholder, or thin summary, research and write a sourced 2-3 sentence biography
@@ -491,7 +513,12 @@ Rules:
    "Republican-leaning", "Democratic-leaning", or a party's "outlier".
    Describe a poll by its pollster name and sponsor instead (for example,
    "a campaign-sponsored poll" or "an internal poll released by the Smith
-   campaign")."""
+   campaign").
+9. Ground the rationale, takeaway, key reasons, and uncertainty in polls,
+   fundraising, incumbency, partisan lean, and the candidate field. Do not cite
+   one candidate's controversy, scandal, gaffe, or leaked remark as a reason or
+   a wildcard, and do not call a candidate a weak or poor fit for the
+   electorate. Do not speculate about how a news event will move voters."""
 
 FORECAST_USER = """\
 Race: "{race_id}"
@@ -1168,6 +1195,8 @@ Current polling: {polling_json}
 Review flags to address:
 {review_flags}
 
+@@RACE_BALANCE@@
+
 Search and fix any flagged issues with the description or polling, PLUS perform
 these data-hygiene checks unconditionally:
 
@@ -1401,6 +1430,10 @@ DISCOVERY_USER = DISCOVERY_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_R
 REFINE_USER = REFINE_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
 UPDATE_META_USER = UPDATE_META_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
 ITERATE_USER = ITERATE_USER.replace("@@SUMMARY_BALANCE@@", SUMMARY_BALANCE_RULES)
+DISCOVERY_USER = DISCOVERY_USER.replace("@@RACE_BALANCE@@", RACE_BALANCE_RULES)
+REFINE_META_USER = REFINE_META_USER.replace("@@RACE_BALANCE@@", RACE_BALANCE_RULES)
+UPDATE_META_USER = UPDATE_META_USER.replace("@@RACE_BALANCE@@", RACE_BALANCE_RULES)
+ITERATE_META_USER = ITERATE_META_USER.replace("@@RACE_BALANCE@@", RACE_BALANCE_RULES)
 
 for _token, _rendered in (
     ("@@MEMBERSHIP_EVIDENCE_RULES@@", render_membership_rules()),
