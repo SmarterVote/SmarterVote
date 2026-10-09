@@ -221,16 +221,21 @@ _GENERIC_BINARY_CONTENT_TYPES = frozenset({"binary/octet-stream", "application/o
 _IMAGE_EXTENSION = re.compile(r"\.(?:jpe?g|png|gif|webp|avif)(?:[?#]|$)", re.IGNORECASE)
 
 
+# Live pages that refuse an anonymous HEAD: auth walls, bot blocks, rate
+# limits, and Gannett's 402 paywall (registerguard.com, statesmanjournal.com).
+_BOT_BLOCKED_STATUSES = frozenset({401, 402, 403, 405, 429})
+
+
 async def _probe_asset(client: httpx.AsyncClient, kind: str, url: str) -> Dict[str, Any]:
     if not _safe_public_asset_url(url) or not await _host_resolves_public(url):
         return {"kind": kind, "url": url, "status": "blocked", "reachable": False}
     try:
         response = await client.head(url, follow_redirects=False)
         content_type = response.headers.get("content-type", "").split(";")[0].lower()
-        reachable = response.status_code < 400 or response.status_code in {401, 403, 405, 429}
+        reachable = response.status_code < 400 or response.status_code in _BOT_BLOCKED_STATUSES
         image_valid = (
             None
-            if kind != "image" or response.status_code in {401, 403, 405, 429} or not content_type
+            if kind != "image" or response.status_code in _BOT_BLOCKED_STATUSES or not content_type
             else content_type.startswith("image/")
         )
         if image_valid is False and content_type in _GENERIC_BINARY_CONTENT_TYPES:

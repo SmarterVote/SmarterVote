@@ -1907,6 +1907,13 @@ async def test_asset_probe_blocks_private_targets_and_validates_image_content_ty
     assert limited["image_content_type_valid"] is None
     assert limited["image_quality"] is None
 
+    # Gannett papers answer an anonymous HEAD with a 402 paywall; the page is live.
+    response.status_code = 402
+    response.headers = {"content-type": "text/html", "content-length": "254"}
+    with patch("routers.races_admin.records._host_resolves_public", AsyncMock(return_value=True)):
+        paywalled = await _probe_asset(client, "source", "https://www.registerguard.com/story/news/politics/x/")
+    assert paywalled["reachable"] is True
+
 
 @pytest.mark.asyncio
 async def test_asset_probe_judges_declared_thumbnail_size_before_byte_size():
