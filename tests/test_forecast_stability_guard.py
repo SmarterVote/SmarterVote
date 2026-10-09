@@ -204,3 +204,16 @@ async def test_phase_does_not_cap_a_resumed_partial_run():
     await _run_with_baseline(race, fake, resume_partial=True)
     assert race["forecast"]["rating"] == "lean_d"
     assert race["forecast"]["method"] == PANEL_METHOD
+
+
+def test_guard_ignores_a_numberless_poll_that_cleanup_will_drop():
+    # NJ-02: the polling step stored a GQR entry with matchups=[] mid-run; cleanup
+    # dropped it before save, but the guard had already read it as new evidence
+    # and let the forecast move 0.82 -> 0.74 on an unchanged poll set.
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["polling"].append({"pollster": "GQR", "date": "2026-09-19", "matchups": [], "source_url": "https://example.org/gqr"})
+    assert forecast_evidence_key(race) == evidence
+    consensus = build_consensus([_member(0.34)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, evidence, race)
