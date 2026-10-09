@@ -477,7 +477,28 @@ def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
         (_name_key(candidate.get("name")), _evidence_party(candidate.get("party")))
         for candidate in _active_candidates(race_json)
     )
-    return (poll_identity(race_json.get("polling")), roster, str(race_json.get("contest_stage") or ""))
+    return (poll_identity(_usable_polls(race_json.get("polling"))), roster, str(race_json.get("contest_stage") or ""))
+
+
+def _usable_polls(polls: Any) -> list:
+    """Polls that survive end-of-run cleanup: at least one matchup naming two candidates.
+
+    The polling step can store a numberless entry mid-run (NJ-02: a GQR memo with
+    ``matchups=[]``) that ``shared.race_cleanup`` drops before the draft is saved.
+    Counting it here read as new evidence and switched the guard off for a run
+    whose saved poll set never changed.
+    """
+    return [
+        poll
+        for poll in (polls if isinstance(polls, list) else [])
+        if not isinstance(poll, dict)
+        or not isinstance(poll.get("matchups"), list)
+        or any(
+            isinstance(matchup, dict)
+            and len([name for name in (matchup.get("candidates") or []) if str(name or "").strip()]) >= 2
+            for matchup in poll["matchups"]
+        )
+    ]
 
 
 #: Ballot labels for a candidate with no party. Discovery re-verification
