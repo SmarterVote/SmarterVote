@@ -376,6 +376,29 @@ def _correct_general_election_date(race_data: Dict[str, Any]) -> int:
     return 1
 
 
+_TEXT_PROXY_PREFIX = re.compile(r"^https?://r\.jina\.ai/(?=https?://)", re.IGNORECASE)
+
+
+def _unwrap_text_proxy_urls(node: Any) -> int:
+    """Strip the r.jina.ai reader prefix the fetch tool adds, in place; return how many URLs changed.
+
+    The pipeline reads some pages through the text proxy and the model sometimes
+    cites the proxied address (MA roster sources: ``https://r.jina.ai/https://www.sec.state.ma.us/...``).
+    Readers should see the real page, and the asset audit cannot probe the proxy.
+    """
+    changed = 0
+    items = node.items() if isinstance(node, dict) else enumerate(node) if isinstance(node, list) else ()
+    for key, value in list(items):
+        if isinstance(value, str):
+            unwrapped = _TEXT_PROXY_PREFIX.sub("", value, count=1)
+            if unwrapped != value:
+                node[key] = unwrapped
+                changed += 1
+        else:
+            changed += _unwrap_text_proxy_urls(value)
+    return changed
+
+
 def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
     """Apply safe text/source normalization and return mutation counts."""
     text_changes = 0
@@ -385,6 +408,7 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
     placeholder_fields_cleared = 0
     schema_invalid_entries_removed = 0
     fabricated_lineage_removed = 0
+    proxy_urls_unwrapped = _unwrap_text_proxy_urls(race_data)
     incomplete_matchups_removed = _prune_incomplete_poll_matchups(race_data)
     wix_thumbnails_upgraded = _normalize_wix_candidate_images(race_data)
     ballotpedia_thumbnails_upgraded = _normalize_ballotpedia_candidate_images(race_data)
@@ -600,6 +624,7 @@ def cleanup_race_data(race_data: Dict[str, Any]) -> Dict[str, int]:
         "election_dates_corrected": election_dates_corrected,
         "schema_invalid_entries_removed": schema_invalid_entries_removed,
         "poll_count_corrections": poll_count_corrections,
+        "proxy_urls_unwrapped": proxy_urls_unwrapped,
     }
 
 

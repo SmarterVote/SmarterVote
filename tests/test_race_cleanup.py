@@ -601,3 +601,26 @@ def test_non_ballotpedia_hundred_square_thumbnails_are_left_alone():
 
     assert result["ballotpedia_thumbnails_upgraded"] == 0
     assert race["candidates"][0]["image_url"] == url
+
+
+def test_text_proxy_prefix_is_stripped_from_stored_urls():
+    """MA roster sources cited the r.jina.ai reader address instead of the real page."""
+    real = "https://www.sec.state.ma.us/divisions/elections/research-and-statistics/2026-state-election-candidates.htm"
+    race = {
+        "candidates": [
+            {
+                "name": "A",
+                "summary": "Mentions https://r.jina.ai/ in prose.",
+                "roster_sources": [{"url": f"https://r.jina.ai/{real}"}],
+            }
+        ],
+        "polling": [],
+        "forecast": {"source_urls": [f"https://r.jina.ai/{real}"]},
+    }
+
+    result = cleanup_race_data(race)
+
+    assert result["proxy_urls_unwrapped"] == 2
+    assert race["candidates"][0]["roster_sources"][0]["url"] == real
+    assert real in race["forecast"]["source_urls"]
+    assert race["candidates"][0]["summary"] == "Mentions https://r.jina.ai/ in prose."
