@@ -954,6 +954,24 @@ def _forecast_shift_without_new_polls(draft: Dict[str, Any], published: Dict[str
     return round(shift, 4)
 
 
+_SINGLE_POLL_SHIFT_WARNING = 0.10
+
+
+def _forecast_shift_on_one_new_poll(draft: Dict[str, Any], published: Dict[str, Any]) -> float | None:
+    """The probability shift when exactly one poll is new since publication and the move is large.
+
+    One added survey (often a near-tie) rarely justifies a double-digit swing; a large move
+    then usually means the forecast panel drifted, so the draft deserves a human look.
+    """
+    new_polls = poll_identity(draft.get("polling")) - poll_identity(published.get("polling"))
+    if len(new_polls) != 1:
+        return None
+    shift = forecast_probability_shift(published.get("forecast"), draft.get("forecast"))
+    if shift is None or shift <= _SINGLE_POLL_SHIFT_WARNING:
+        return None
+    return round(shift, 4)
+
+
 @mcp.tool(structured_output=False)
 async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     """Build a conservative batch publish plan without changing production data.
@@ -966,7 +984,8 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     reject publication. Among them: ``summary_contains_polling`` (candidate
     summaries quoting polls; see ``summary_polling_candidates``) and
     ``forecast_moved_without_new_polls`` (the draft forecast moved more than five
-    points from the published one on an identical poll set).
+    points from the published one on an identical poll set) and
+    ``forecast_large_move_on_one_new_poll`` (more than ten points on a single new poll).
     """
     client = _client()
     rows: List[Dict[str, Any]] = []
@@ -1066,6 +1085,10 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
             if forecast_shift is not None:
                 stance_quality["forecast_probability_shift"] = forecast_shift
                 warnings.append("forecast_moved_without_new_polls")
+            single_poll_shift = _forecast_shift_on_one_new_poll(draft, published)
+            if single_poll_shift is not None:
+                stance_quality["forecast_probability_shift"] = single_poll_shift
+                warnings.append("forecast_large_move_on_one_new_poll")
         if published_lookup_failed:
             pass  # already a blocker; roster comparison is impossible
         elif published is None:
