@@ -1713,3 +1713,46 @@ async def test_assess_publish_readiness_warns_on_polling_summaries_and_forecast_
     assert evidence_driven["ready"] is True
     assert "summary_contains_polling" not in evidence_driven["warnings"]
     assert "forecast_moved_without_new_polls" not in evidence_driven["warnings"]
+    assert "forecast_large_move_on_one_new_poll" not in evidence_driven["warnings"]  # 8 points is under 10
+
+
+@pytest.mark.asyncio
+async def test_assess_publish_readiness_warns_on_large_move_from_one_new_poll(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    base = {
+        "validation_grade": {"passed": True},
+        "run_health": {"status": "healthy"},
+        "pipeline_state": {"complete": True},
+        "candidates": [{"name": "Flanagan"}, {"name": "Tafoya"}],
+    }
+    old_polls = [
+        {"pollster": "SurveyUSA", "date": "2026-08-18", "matchups": []},
+        {"pollster": "InsiderAdvantage", "date": "2026-09-29", "matchups": []},
+    ]
+    published = {
+        "candidates": base["candidates"],
+        "polling": old_polls,
+        "forecast": {"rating": "tilt_d", "party_probabilities": {"Democratic": 0.58, "Republican": 0.42}},
+    }
+    jumped = {"rating": "lean_d", "party_probabilities": {"Democratic": 0.77, "Republican": 0.23}}
+    one_new = old_polls[1:] + [{"pollster": "Big Data Poll", "date": "2026-09-30", "matchups": []}]
+    two_new = one_new + [{"pollster": "Marist", "date": "2026-10-03", "matchups": []}]
+    responses = {
+        "/api/races/mn-senate-2026/data": {**base, "polling": one_new, "forecast": jumped},
+        "/races/mn-senate-2026": published,
+        "/api/races/mn-house-02-2026/data": {**base, "polling": two_new, "forecast": jumped},
+        "/races/mn-house-02-2026": published,
+    }
+    monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
+
+    result = await server.assess_publish_readiness(["mn-senate-2026", "mn-house-02-2026"])
+    single, multiple = result["rows"]
+
+    assert single["ready"] is True  # warning, never a blocker
+    assert "forecast_large_move_on_one_new_poll" in single["warnings"]
+    assert single["forecast_probability_shift"] == pytest.approx(0.19)
+    assert "forecast_moved_without_new_polls" not in single["warnings"]
+    assert "forecast_large_move_on_one_new_poll" not in multiple["warnings"]
