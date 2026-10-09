@@ -218,6 +218,17 @@ def _is_placeholder_candidate_name(name: str) -> bool:
     return name.strip().lower() in _PLACEHOLDER_CANDIDATE_NAMES
 
 
+def _poll_cycle_start_year(race_json: Dict[str, Any]) -> int | None:
+    """First calendar year whose polls can measure this election: the year before election day."""
+    match = re.match(r"\s*(\d{4})", str(race_json.get("election_date") or ""))
+    return int(match.group(1)) - 1 if match else None
+
+
+def _poll_year(poll: Dict[str, Any]) -> int | None:
+    match = re.match(r"\s*(\d{4})-\d{2}", str(poll.get("date") or poll.get("end_date") or ""))
+    return int(match.group(1)) if match else None
+
+
 def _sanitize_polling(race_json: Dict[str, Any], log: Any | None = None) -> None:
     """Normalize malformed polling entries before validation and draft save."""
     polling = race_json.get("polling")
@@ -235,6 +246,7 @@ def _sanitize_polling(race_json: Dict[str, Any], log: Any | None = None) -> None
     }
     kept_polls: List[Dict[str, Any]] = []
     dropped_polls = 0
+    cycle_start_year = _poll_cycle_start_year(race_json)
 
     for poll_index, poll in enumerate(polling):
         if not isinstance(poll, dict):
@@ -245,6 +257,14 @@ def _sanitize_polling(race_json: Dict[str, Any], log: Any | None = None) -> None
             dropped_polls += 1
             if log:
                 log("warning", f"Dropping non-poll entry at polling[{poll_index}]: {semantic_problem}")
+            continue
+        poll_year = _poll_year(poll)
+        if cycle_start_year is not None and poll_year is not None and poll_year < cycle_start_year:
+            # A rematch makes a previous cycle's poll look relevant (same two names), but it
+            # measured a different election; il-house-06-2026 carried a June 2024 poll.
+            dropped_polls += 1
+            if log:
+                log("warning", f"Dropping prior-cycle poll at polling[{poll_index}] ({poll.get('pollster')}, {poll_year})")
             continue
         matchups = poll.get("matchups")
         if matchups is None:

@@ -2125,6 +2125,37 @@ def test_sanitize_polling_drops_non_roster_placeholder_poll():
     assert race_json["polling"] == []
 
 
+def test_sanitize_polling_drops_prior_cycle_polls():
+    matchup = {"candidates": ["Sean Casten", "Niki Conforti"], "percentages": [44.0, 35.0]}
+    race_json = {
+        "id": "il-house-06-2026",
+        "election_date": "2026-11-03",
+        "candidates": [{"name": "Sean Casten"}, {"name": "Niki Conforti"}],
+        "polling": [
+            {"pollster": "COR Strategies", "date": "2024-06-03", "matchups": [dict(matchup)]},
+            {"pollster": "Early Survey", "date": "2025-11-20", "matchups": [dict(matchup)]},
+            {"pollster": "Fall Survey", "date": "2026-09-30", "matchups": [dict(matchup)]},
+        ],
+    }
+
+    _sanitize_polling(race_json)
+
+    assert [p["pollster"] for p in race_json["polling"]] == ["Early Survey", "Fall Survey"]
+
+
+def test_sanitize_polling_keeps_polls_when_election_date_unknown():
+    race_json = {
+        "candidates": [{"name": "A"}, {"name": "B"}],
+        "polling": [
+            {"pollster": "Old", "date": "2024-06-03", "matchups": [{"candidates": ["A", "B"], "percentages": [50, 40]}]}
+        ],
+    }
+
+    _sanitize_polling(race_json)
+
+    assert len(race_json["polling"]) == 1
+
+
 def test_sanitize_polling_requires_exact_roster_names():
     race_json = {
         "candidates": [{"name": "Alice Smith"}, {"name": "Bob Jones"}],
