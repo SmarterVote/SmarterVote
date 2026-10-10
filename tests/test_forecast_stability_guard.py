@@ -15,7 +15,7 @@ from pipeline_client.agent.phases.forecast import (
     build_consensus,
     forecast_evidence_key,
 )
-from shared.forecast_math import cap_probability_shift, forecast_probability_shift, poll_identity
+from shared.forecast_math import cap_probability_shift, forecast_probability_shift, poll_identity, rating_band_bounds
 from tests.test_forecast_panel_phase import _ctx, _fake_loop, _race
 
 
@@ -95,13 +95,32 @@ def test_guard_caps_churn_on_an_unchanged_poll_set_and_keeps_the_rating():
     assert consensus["margin_estimate"] == 6.0  # held within 2 points of the baseline's 4.0
 
 
-def test_guard_lets_a_capped_move_cross_a_band_threshold():
+def test_guard_keeps_the_baseline_band_on_unchanged_evidence():
+    # A capped move may not carry the rating across a band by itself.
     race = _ar02()
     race["forecast"]["party_probabilities"] = {"Republican": 0.63, "Democratic": 0.37}
     consensus = build_consensus([_member(0.25), _member(0.25), _member(0.25)], poll_count=1)
     apply_stability_guard(consensus, copy.deepcopy(race["forecast"]), forecast_evidence_key(race), race)
-    assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.67)
-    assert consensus["rating"] == "lean_r"
+    assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.6499)
+    assert consensus["rating"] == "tilt_r"
+
+
+def test_guard_stops_small_uncapped_drift_across_a_band():
+    # NC-10 / MO-06: 0.93 -> 0.96 is inside the 0.04 cap but read Likely -> Safe.
+    race = _ar02()
+    race["forecast"]["party_probabilities"] = {"Republican": 0.93, "Democratic": 0.07}
+    baseline = copy.deepcopy(race["forecast"])
+    consensus = build_consensus([_member(0.04)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
+    assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.9499)
+    assert consensus["rating"] == "likely_r"
+
+
+def test_rating_band_bounds():
+    assert rating_band_bounds(0.97) == (0.95, 1.0)
+    assert rating_band_bounds(0.93) == (0.80, 0.9499)
+    assert rating_band_bounds(0.60) == (0.55, 0.6499)
+    assert rating_band_bounds(0.52) == (0.0, 0.5499)
 
 
 @pytest.mark.parametrize(
