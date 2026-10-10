@@ -50,6 +50,11 @@ def test_obituary_repository_image_is_rejected_even_when_it_is_a_direct_photo():
     assert _looks_like_non_photo("https://d1q40j6jx1d8h6.cloudfront.net/Obituaries/46739509/Image_1.jpg")
     assert _looks_like_non_photo("https://example.com/funeral-home/portraits/alex-smith.webp")
     assert not _looks_like_non_photo("https://candidate.example/photos/alex-smith-headshot.jpg")
+    # A news-site obituary photo filed outside an /obituary/ path.
+    assert _looks_like_non_photo(
+        "https://www.wkbn.com/wp-content/uploads/sites/48/2019/12/justine-ula-keller-struthers-ohio-obit.jpg?w=1280"
+    )
+    assert not _looks_like_non_photo("https://example.com/photos/orbit-smith-headshot.jpg")
 
 
 def test_ballotpedia_submit_photo_placeholder_is_rejected():
@@ -1583,3 +1588,60 @@ async def test_known_page_image_lookup_caps_html_bytes(monkeypatch):
 
     assert result == "https://example.org/media/jane-doe-headshot.jpg"
     assert sent["bytes"] < 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_resolve_candidate_images_keeps_previous_photo_when_no_replacement_survives(monkeypatch):
+    """Cloud Run called official Wikimedia portraits "dead"; the search found nothing usable."""
+    from pipeline_client.agent import images
+
+    official = "https://upload.wikimedia.org/wikipedia/commons/1/19/Vivek_Ramaswamy_2026_%28cropped%29.jpg"
+    rejected_by_inspection = "https://candidate.example/photos/ramaswamy-portrait.jpg"
+
+    async def replace_with_unusable(candidate, **_kwargs):
+        if candidate["name"] == "Vivek Ramaswamy":
+            candidate["image_url"] = rejected_by_inspection
+        elif candidate["name"] == "Jon Husted":
+            candidate["image_url"] = None
+        # Amy Acton keeps her own photo; the inspection below rejects it.
+
+    async def inspect(candidate, **_kwargs):
+        if candidate.get("image_url") in (rejected_by_inspection, "https://candidate.example/acton-logo.jpg"):
+            candidate["image_url"] = None
+
+    async def keep_thumbnail(candidate, log):
+        return None
+
+    monkeypatch.setattr(images, "_resolve_single_image", replace_with_unusable)
+    monkeypatch.setattr(images, "_discard_if_not_a_headshot", inspect)
+    monkeypatch.setattr(images, "_prefer_wikimedia_thumbnail", keep_thumbnail)
+    race = {
+        "candidates": [
+            {"name": "Vivek Ramaswamy", "image_url": official},
+            {"name": "Jon Husted", "image_url": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Jon_Husted.jpg"},
+            {"name": "Amy Acton", "image_url": "https://candidate.example/acton-logo.jpg"},
+            {"name": "Ron Ula", "image_url": None},
+        ]
+    }
+
+    await images.resolve_candidate_images(race, agent_loop_fn=None, model="test", race_id="oh-governor-2026")
+
+    by_name = {c["name"]: c["image_url"] for c in race["candidates"]}
+    assert by_name["Vivek Ramaswamy"] == official
+    assert by_name["Jon Husted"].endswith("Jon_Husted.jpg")
+    assert by_name["Amy Acton"] is None  # the inspection rejected her stored photo itself
+    assert by_name["Ron Ula"] is None
+
+
+def test_previous_photo_is_not_restored_when_a_content_guard_rejects_it():
+    from pipeline_client.agent import images
+
+    candidate = {"name": "Ron Ula", "image_url": None}
+    images._restore_previous_image_if_cleared(
+        candidate,
+        "https://www.wkbn.com/wp-content/uploads/2019/12/justine-ula-keller-obit.jpg",
+        replaced_by=None,
+        race_id="oh-governor-2026",
+        log=lambda *_: None,
+    )
+    assert candidate["image_url"] is None
