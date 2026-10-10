@@ -473,11 +473,28 @@ def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
     Prediction-market prices are left out on purpose: they tick continuously, so
     including them would mean the guard never applies.
     """
-    roster = frozenset(
-        (_name_key(candidate.get("name")), _evidence_party(candidate.get("party")))
-        for candidate in _active_candidates(race_json)
+    roster = tuple(
+        sorted(
+            (_evidence_surname(candidate.get("name")), _evidence_party(candidate.get("party")))
+            for candidate in _active_candidates(race_json)
+        )
     )
     return (poll_identity(_usable_polls(race_json.get("polling"))), roster, str(race_json.get("contest_stage") or ""))
+
+
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _evidence_surname(name: Any) -> str:
+    """Surname for the guard's roster identity, so a nickname is not a new candidate.
+
+    Discovery re-verification renames without the field changing (MI-Sen:
+    "Timothy Long" -> "Tim Long"), which read as a new roster, switched the guard
+    off, and let a no-new-poll rerun drift from Lean D to Tilt D. A sorted list
+    of (surname, party) still counts two same-surname candidates separately.
+    """
+    tokens = [token for token in re.findall(r"[^\W\d_]+", _name_key(name)) if token not in _NAME_SUFFIXES]
+    return tokens[-1] if tokens else _name_key(name)
 
 
 def _usable_polls(polls: Any) -> list:

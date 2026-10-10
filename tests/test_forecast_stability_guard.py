@@ -155,6 +155,29 @@ def test_guard_treats_unaffiliated_ballot_labels_as_the_same_roster(relabel):
     assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.62)
 
 
+@pytest.mark.parametrize("renamed", ["Tim Long", "Timothy J. Long", "TIM LONG", "Tim Long Jr."])
+def test_guard_treats_a_first_name_variant_as_the_same_roster(renamed):
+    # MI-Sen: discovery renamed "Timothy Long" -> "Tim Long", the guard read a new
+    # roster, and a no-new-poll rerun drifted from Lean D to Tilt D.
+    race = _ar02()
+    race["candidates"].append({"name": "Timothy Long", "party": "U.S. Taxpayers"})
+    evidence = forecast_evidence_key(race)
+    race["candidates"][-1]["name"] = renamed
+    assert forecast_evidence_key(race) == evidence
+
+
+def test_guard_counts_two_candidates_who_share_a_surname():
+    # AK-Sen lists Daniel S. Sullivan and Dan J. Sullivan; dropping one is a roster change.
+    race = _ar02()
+    race["candidates"] += [
+        {"name": "Daniel S. Sullivan", "party": "Republican"},
+        {"name": "Dan J. Sullivan", "party": "Republican"},
+    ]
+    evidence = forecast_evidence_key(race)
+    race["candidates"].pop()
+    assert forecast_evidence_key(race) != evidence
+
+
 def test_guard_still_sees_a_real_party_change():
     race = _ar02()
     race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})
