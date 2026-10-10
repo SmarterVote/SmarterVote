@@ -39,6 +39,7 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
+from shared.name_variants import canonical_given_name, text_names_given_name
 
 logger = logging.getLogger("pipeline")
 
@@ -288,8 +289,27 @@ def _canonical_roster_name(name: str) -> str:
     # Only double quotes and parentheses are stripped; apostrophes are left alone
     # so O'Donnell-style surnames keep their tokens.
     without_nickname = re.sub(r"\"[^\"]*\"|“[^”]*”|\([^)]*\)", " ", str(name))
-    tokens = re.findall(r"[a-z0-9]+", without_nickname.casefold())
-    return " ".join(token for token in tokens if len(token) > 1 and token not in suffixes)
+    tokens = [
+        token for token in re.findall(r"[a-z0-9]+", without_nickname.casefold()) if len(token) > 1 and token not in suffixes
+    ]
+    # "Tim Long" on the state list and "Timothy Long" in the roster are one candidate.
+    if len(tokens) > 1:
+        tokens[0] = canonical_given_name(tokens[0])
+    return " ".join(tokens)
+
+
+def _text_names_candidate(candidate_name: str, text: str) -> bool:
+    """Whether lower-case *text* carries every word of *candidate_name*.
+
+    The given name may appear as a common variant ("Tim" for "Timothy"); every
+    other word, the surname included, must appear as written.
+    """
+    words = re.findall(r"[a-z0-9]+", candidate_name.casefold())
+    if not words:
+        return False
+    first, rest = words[0], words[1:]
+    first_ok = first in text or (bool(rest) and text_names_given_name(first, text))
+    return first_ok and all(word in text for word in rest)
 
 
 def _source_proves_different_contest(source: Dict[str, Any], *, candidate_name: str, race_id: str) -> bool:
@@ -583,9 +603,8 @@ def _roster_source_rejection_reason(source: Dict[str, Any], *, candidate_name: s
         return "source needs a title"
     if not source.get("evidence"):
         return "source needs an 'evidence' (or 'text') quote naming the candidate and contest"
-    name_words = re.findall(r"[a-z0-9]+", candidate_name.lower())
     evidence_text = f"{source.get('title', '')} {source.get('evidence', '')}".lower()
-    if not name_words or not all(word in evidence_text for word in name_words):
+    if not _text_names_candidate(candidate_name, evidence_text):
         return f"evidence text does not contain the full candidate name {candidate_name!r}"
     year_match = re.search(r"(?:19|20)\d{2}", race_id)
     published_year = _published_year(source.get("published_at"))
@@ -1455,8 +1474,7 @@ def _make_editing_handlers(
         uncovered_names = []
         for candidate in active_candidates:
             name = str(candidate.get("name") or "").strip()
-            name_words = re.findall(r"[a-z0-9]+", name.casefold())
-            if not name_words or not all(word in combined_evidence for word in name_words):
+            if not _text_names_candidate(name, combined_evidence):
                 uncovered_names.append(name)
         # A retrieved exact-contest page that explicitly reports the field size
         # establishes that it is describing the field even when its compact

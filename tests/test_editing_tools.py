@@ -1480,6 +1480,31 @@ def test_canonical_roster_name_ignores_nicknames_but_keeps_apostrophes():
     assert "donnell" in _canonical_roster_name("Marty O'Donnell")
 
 
+def test_roster_name_checks_accept_a_given_name_variant():
+    """MI-Sen: the state list says "Tim Long", the roster "Timothy Long".
+
+    Every roster-evidence check required each word verbatim, rejected the source
+    three times, and escalated roster sync to a frontier model ($0.79 vs ~$0.10).
+    """
+    from pipeline_client.agent.handlers import _canonical_roster_name, _text_names_candidate
+
+    assert _canonical_roster_name("Tim Long") == _canonical_roster_name("Timothy Long")
+    assert _canonical_roster_name("Bob Smith Jr.") == _canonical_roster_name("Robert Smith")
+    assert _text_names_candidate("Timothy Long", "u.s. senate: tim long (u.s. taxpayers)")
+    assert _text_names_candidate("Mike Rogers", "michael j. rogers, republican")
+
+
+def test_roster_name_checks_still_require_the_surname_and_a_real_given_name():
+    from pipeline_client.agent.handlers import _canonical_roster_name, _text_names_candidate
+
+    assert _canonical_roster_name("Tim Long") != _canonical_roster_name("Tim Short")
+    assert _canonical_roster_name("Timothy Long") != _canonical_roster_name("Thomas Long")
+    assert not _text_names_candidate("Timothy Long", "thomas long, u.s. taxpayers")
+    assert not _text_names_candidate("Timothy Long", "tim short, u.s. taxpayers")
+    # A variant must be a whole word: "tim" inside "time" does not name Timothy.
+    assert not _text_names_candidate("Timothy Long", "a long time on the ballot")
+
+
 def test_finalize_roster_allows_quoted_nickname_in_extracted_source_name():
     """Delaware publishes `Michael "Dr. Mike" Katz`; the roster carries `Michael Katz`.
 
