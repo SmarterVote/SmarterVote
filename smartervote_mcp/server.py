@@ -12,6 +12,7 @@ from mcp.server.mcpserver import MCPServer
 
 from shared.forecast_math import forecast_probability_shift, poll_identity
 from shared.model_catalog import DEFAULT_CHAMBER_FORECAST_MODEL, normalize_profile_name
+from shared.neutrality import find_loaded_language, iter_site_voice_text
 from shared.text_quality import summary_contains_polling
 from smartervote_mcp.client import RacesApiClient, compact_options
 
@@ -929,7 +930,11 @@ def _stance_quality(draft: Dict[str, Any]) -> Dict[str, Any]:
     finance_expected = stance_count > 0 or len(finance_missing) < len(candidates)
     if not finance_expected:
         finance_missing = []
+    # The review step grades loaded wording, but forecast- and polling-only runs
+    # skip review, so check the site's own voice again before publishing.
+    loaded_wording = [field for field, text in iter_site_voice_text(draft) if find_loaded_language(text)]
     return {
+        "loaded_wording_fields": loaded_wording,
         "placeholder_stances": placeholder_stances,
         "stance_count": stance_count,
         "no_position_count": no_position_count,
@@ -982,7 +987,9 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
     being able to evidence the roster it kept. A race is ``ready`` only when it has
     no blockers. Warnings still require human review but do not claim the API would
     reject publication. Among them: ``summary_contains_polling`` (candidate
-    summaries quoting polls; see ``summary_polling_candidates``) and
+    summaries quoting polls; see ``summary_polling_candidates``),
+    ``loaded_wording_in_site_voice`` (loaded or party-aligned labels; see
+    ``loaded_wording_fields``) and
     ``forecast_moved_without_new_polls`` (the draft forecast moved more than five
     points from the published one on an identical poll set) and
     ``forecast_large_move_on_one_new_poll`` (more than ten points on a single new poll).
@@ -1072,6 +1079,9 @@ async def assess_publish_readiness(race_ids: List[str]) -> Dict[str, Any]:
             if stance_quality["summary_polling_candidates"]:
                 # Summaries are biographies; poll numbers there go stale within days.
                 warnings.append("summary_contains_polling")
+            if stance_quality["loaded_wording_fields"]:
+                # "far-right", "Trump-aligned" and the like in the site's voice.
+                warnings.append("loaded_wording_in_site_voice")
             step_failures = pipeline_state.get("step_failures") or []
             if any(
                 isinstance(failure, dict) and failure.get("reason") == "roster_verification_failed"

@@ -107,6 +107,9 @@ def test_fallback_forecast_text_validates_against_the_schema():
         "a proxy battle between the socialist left and moderates",
         "the controversial Republican congressman",
         "MAGA extremists in the House blocked the bill.",
+        "Kiley's Trump-aligned voting record undercuts his independent branding.",
+        "The only poll was released by a Democratic-aligned group.",
+        "heavy GOP-aligned outside spending keeps the race close",
     ],
 )
 def test_loaded_wording_in_the_sites_voice_is_flagged(text):
@@ -130,6 +133,9 @@ def test_loaded_wording_in_the_sites_voice_is_flagged(text):
         "Oklahoma's first openly democratic socialist Senate nominee",
         "a controversial mid-cycle redistricting plan",
         "He wants to keep guns from dangerous people.",
+        # A candidate's own label, attributed.
+        "He describes himself as a MAGA-aligned Republican.",
+        "She has aligned her platform with the governor's housing plan.",
     ],
 )
 def test_attributed_quoted_and_named_wording_is_not_flagged(text):
@@ -321,6 +327,14 @@ def test_set_issue_stance_stores_the_marker_for_a_variant():
     assert not str(result).startswith("ERROR"), result
     stored = race["candidates"][0]["issues"]["Healthcare"]
     assert stored["stance"] == NO_POSITION_MARKER and stored["confidence"] == "low"
+
+
+def test_prompts_forbid_party_aligned_labels():
+    from pipeline_client.agent.prompts import _SHARED_RULES, FORECAST_SYSTEM, RACE_BALANCE_RULES
+
+    for rules in (_SHARED_RULES, FORECAST_SYSTEM, RACE_BALANCE_RULES):
+        assert "Trump-aligned" in rules and "Democratic-aligned" in rules
+    assert "GOP-aligned" in FORECAST_SYSTEM  # pollsters and sponsors, rule 8
 
 
 def test_shared_prompt_rules_require_the_exact_marker_and_neutral_voice():
