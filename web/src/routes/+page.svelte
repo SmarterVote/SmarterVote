@@ -142,9 +142,9 @@
         >Find my elections <UiIcon name="arrow-right" /></a
       >
       <p class="mx-auto mt-10 max-w-lg text-sm leading-6 text-primary-100">
-        So far, Smarter.Vote has been funded entirely by its founder. Reader
-        support is what will let us cover state and local races and keep going
-        into 2028.
+        Smarter.Vote is funded mostly by its founder, with help from readers.
+        Reader support is what will let us cover state and local races and keep
+        going into 2028.
         <a
           href="/support/"
           class="font-semibold text-white underline underline-offset-2 hover:no-underline"
