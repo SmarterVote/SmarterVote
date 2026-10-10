@@ -43,6 +43,10 @@ _NON_PHOTO_TOKENS = frozenset(
         "herobg",
         "homepage",
         "icon",
+        # A news site's obituary photo of a namesake ("justine-ula-keller-...-obit.jpg"
+        # was attached to OH-Gov candidate Ron Ula); the path carries no /obituary/.
+        "obit",
+        "obituary",
         "landscape",
         "logo",
         "mountain",
@@ -2156,6 +2160,38 @@ def _drop_shared_candidate_images(candidates: List[Dict[str, Any]], log: Callabl
     return cleared
 
 
+def _restore_previous_image_if_cleared(
+    candidate: Dict[str, Any],
+    previous_url: Optional[str],
+    *,
+    replaced_by: Optional[str],
+    race_id: Optional[str],
+    log: Callable[[str, str], None],
+) -> None:
+    """Put back a stored photo that a replacement search discarded and failed to replace.
+
+    A failed reachability probe is weak evidence: on 2026-10-10 Cloud Run reported
+    the official Wikimedia portraits of Husted, Sullivan and Ramaswamy "dead",
+    the searches that followed found a signature graphic or nothing, and three
+    published races lost a good headshot. When the run ends with no photo, a
+    stored URL that passes every content guard is better than none. A photo the
+    inspection rejected itself (resolution kept it unchanged) stays cleared.
+    """
+    if candidate.get("image_url") or not previous_url or replaced_by == previous_url:
+        return
+    name = str(candidate.get("name") or "")
+    if (
+        _is_rejected_candidate_image(previous_url, name)
+        or _looks_like_govtrack_reference_headshot(previous_url)
+        or _looks_like_social_profile_avatar(previous_url)
+        or is_partisan_image_host(previous_url)
+        or _host_names_another_state(previous_url, race_id)
+    ):
+        return
+    candidate["image_url"] = previous_url
+    log("info", f"  [{name or 'unknown'}] No replacement found - keeping the previous image {previous_url[:80]}")
+
+
 async def resolve_candidate_images(
     race_json: Dict[str, Any],
     *,
@@ -2185,6 +2221,7 @@ async def resolve_candidate_images(
 
     async def _resolve_with_progress(c: Dict[str, Any]) -> None:
         nonlocal done
+        previous_url = c.get("image_url") or None
         resolve_call = _resolve_single_image(
             c,
             agent_loop_fn=agent_loop_fn,
@@ -2202,6 +2239,7 @@ async def resolve_candidate_images(
         else:
             await resolve_call
         await _prefer_wikimedia_thumbnail(c, log)
+        resolved_url = c.get("image_url") or None
         if is_denied_image(c.get("image_url")):
             log("info", f"  [{c.get('name', 'unknown')}] Resolved image was rejected by a human audit - clearing")
             c["image_url"] = None
@@ -2213,6 +2251,7 @@ async def resolve_candidate_images(
                 logger.info("Candidate image inspection timed out; keeping the resolved image")
         else:
             await _discard_if_not_a_headshot(c, model=image_vision_model, on_log=on_log)
+        _restore_previous_image_if_cleared(c, previous_url, replaced_by=resolved_url, race_id=race_id, log=log)
         done += 1
         if on_progress:
             try:
