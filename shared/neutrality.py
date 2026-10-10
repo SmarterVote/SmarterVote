@@ -4,7 +4,8 @@ Model reviewers miss loaded framing more often than factual errors, because a
 phrase like "far-right Republican" reads as description rather than opinion.
 Audit 4 found it on the live site in a voting summary and race overview
 (IL-15), a forecast ("fringe standing", CO-Sen) and a race description
-("radically reshaped", TN-05).
+("radically reshaped", TN-05). Party-aligned labels ("Trump-aligned record",
+"a Democratic-aligned group") recurred in forecasts and summaries in October.
 
 The lint only looks at the site's own voice. Text inside quotation marks, and
 words a candidate or outlet is reported as using ("what he calls radical
@@ -46,6 +47,18 @@ _LOADED_TERMS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("uncompromising", re.compile(r"\buncompromising\b", re.I)),
     ("firebrand", re.compile(r"\bfirebrands?\b", re.I)),
     ("MAGA extremist", re.compile(r"\bMAGA[- ]extremists?\b", re.I)),
+    # "Trump-aligned record", "Democratic-aligned group": a partisan label pinned on
+    # a candidate, pollster or group instead of the endorsement, vote or sponsor
+    # behind it. Recurred in forecasts and summaries through October 2026 (CA-06,
+    # NY-03, TX-35, AL-02, TX-26, WY-AL).
+    (
+        "party-aligned label",
+        re.compile(
+            r"\b(?:Trump|MAGA|Biden|Harris|Democratic|Democrat|Republican|GOP|progressive|conservative|liberal|"
+            r"left|right)[- ]aligned\b",
+            re.I,
+        ),
+    ),
     (
         "controversial (person)",
         re.compile(rf"\bcontroversial\s+(?:(?:former|freshman|first-term|longtime|veteran)\s+)?{_PERSON_NOUNS}\b", re.I),
@@ -61,6 +74,10 @@ _LOADED_TERMS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
 )
+
+#: Terms that start with a capitalized party or person name, so the proper-name
+#: guard ("the Defeat Extremists PAC") must not skip them.
+_CAPITALIZED_TERMS = frozenset({"party-aligned label"})
 
 #: Party and organisation names that contain a flagged word.
 _ALLOWLIST = re.compile(
@@ -125,7 +142,7 @@ def find_loaded_language(text: Any) -> List[Dict[str, str]]:
         for match in pattern.finditer(scrubbed):
             if match.start() in seen:
                 continue
-            if _is_proper_name(scrubbed, match.start()):
+            if label not in _CAPITALIZED_TERMS and _is_proper_name(scrubbed, match.start()):
                 continue
             if _ATTRIBUTION.search(_clause_before(scrubbed, match.start())):
                 continue

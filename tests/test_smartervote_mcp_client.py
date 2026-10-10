@@ -1717,6 +1717,42 @@ async def test_assess_publish_readiness_warns_on_polling_summaries_and_forecast_
 
 
 @pytest.mark.asyncio
+async def test_assess_publish_readiness_warns_on_loaded_wording(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    base = {
+        "validation_grade": {"passed": True},
+        "run_health": {"status": "healthy"},
+        "pipeline_state": {"complete": True},
+        "candidates": [{"name": "Kiley", "summary": "Kiley is a two-term congressman."}],
+    }
+    responses = {
+        # A forecast-only run skips review, so readiness is the last check.
+        "/api/races/ca-house-06-2026/data": {
+            **base,
+            "forecast": {"rationale": "Kiley's Trump-aligned voting record undercuts his branding."},
+        },
+        "/races/ca-house-06-2026": {"candidates": [{"name": "Kiley"}]},
+        "/api/races/ca-house-07-2026/data": {
+            **base,
+            "forecast": {"rationale": "He describes himself as a MAGA-aligned Republican."},
+        },
+        "/races/ca-house-07-2026": {"candidates": [{"name": "Kiley"}]},
+    }
+    monkeypatch.setattr(server, "_client", lambda: _StubRacesClient(responses))
+
+    flagged, attributed = (await server.assess_publish_readiness(["ca-house-06-2026", "ca-house-07-2026"]))["rows"]
+
+    assert flagged["ready"] is True  # a warning, never a blocker
+    assert "loaded_wording_in_site_voice" in flagged["warnings"]
+    assert flagged["loaded_wording_fields"] == ["forecast.rationale"]
+    assert "loaded_wording_in_site_voice" not in attributed["warnings"]
+    assert attributed["loaded_wording_fields"] == []
+
+
+@pytest.mark.asyncio
 async def test_assess_publish_readiness_warns_on_large_move_from_one_new_poll(monkeypatch):
     _require_mcp_sdk()
 

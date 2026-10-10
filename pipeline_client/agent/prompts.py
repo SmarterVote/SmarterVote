@@ -70,7 +70,10 @@ RULES (apply to every response):
    "available sources" if you must. When no position was found, the stance is
    exactly "No public position found" — no other wording. Do not describe a
    candidate or party with loaded labels (far-right, far-left, radical,
-   extremist, fringe, firebrand) unless quoting and attributing a named source."""
+   extremist, fringe, firebrand) unless quoting and attributing a named source.
+   Do not label a candidate, pollster, poll sponsor or group as "Trump-aligned",
+   "Democratic-aligned", "GOP-aligned" or similar; name the endorsement, vote
+   record, sponsor or organization instead."""
 
 # ------------------------------------------------------------------
 # Candidate-summary rules shared by every prompt that writes a summary
@@ -111,7 +114,8 @@ RACE DESCRIPTION BALANCE — the race description is a neutral overview:
   state it in neutral terms with the candidate's response, and hold every
   candidate to the same standard.
 - Use labels only as the candidates or their parties use them; do not
-  characterize a candidate as a weak or poor fit for the electorate.
+  characterize a candidate as a weak or poor fit for the electorate, and do not
+  call a candidate or group "Trump-aligned", "Democratic-aligned" or similar.
 - An existing description that breaks these rules MUST be rewritten, even when
   nothing new has happened."""
 
@@ -510,15 +514,18 @@ Rules:
    or ongoing, and never present primary-election polling as the current
    state of the general election.
 8. Do not characterize individual pollsters or polls as partisan,
-   "Republican-leaning", "Democratic-leaning", or a party's "outlier".
+   "Republican-leaning", "Democratic-leaning", "Democratic-aligned",
+   "GOP-aligned", or a party's "outlier".
    Describe a poll by its pollster name and sponsor instead (for example,
    "a campaign-sponsored poll" or "an internal poll released by the Smith
    campaign").
 9. Ground the rationale, takeaway, key reasons, and uncertainty in polls,
    fundraising, incumbency, partisan lean, and the candidate field. Do not cite
    one candidate's controversy, scandal, gaffe, or leaked remark as a reason or
-   a wildcard, and do not call a candidate a weak or poor fit for the
-   electorate. Do not speculate about how a news event will move voters.
+   a wildcard, do not call a candidate a weak or poor fit for the
+   electorate, and do not label a candidate, record, platform or outside group
+   as "Trump-aligned", "Democratic-aligned" or similar; name the endorsement,
+   vote or organization instead. Do not speculate about how a news event will move voters.
 10. Take every poll number, margin, leader and date from the pre-computed
    facts block. Never subtract shares yourself, never swap which candidate
    has which share, and never describe a poll that is not listed there.
