@@ -237,13 +237,28 @@ def forecast_probability_shift(before: object, after: object) -> Optional[float]
     return None
 
 
+def rating_band_bounds(probability: float) -> tuple[float, float]:
+    """The ``[low, high]`` leader-probability range that keeps *probability*'s rating band."""
+    upper = 1.0
+    for threshold, _band in RATING_BANDS:
+        if probability >= threshold:
+            return threshold, upper
+        upper = round(threshold - 0.0001, 4)
+    return 0.0, upper
+
+
 def cap_probability_shift(
-    prior: Mapping[object, object], new: Mapping[object, object], max_shift: float = STABILITY_MAX_SHIFT
+    prior: Mapping[object, object],
+    new: Mapping[object, object],
+    max_shift: float = STABILITY_MAX_SHIFT,
+    keep_band: bool = False,
 ) -> Optional[Dict[str, float]]:
     """*new* party probabilities with the prior leader's probability held within *max_shift* of *prior*.
 
-    Returns None when no cap is needed (the move is already within the band) or
-    either side is unusable. Other parties are rescaled proportionally so the
+    With *keep_band*, the prior leader's probability is also held inside the
+    prior's rating band, so a small move cannot change the rating by itself.
+    Returns None when no cap is needed (the move is already within the limits)
+    or either side is unusable. Other parties are rescaled proportionally so the
     result still sums to 1.
     """
     prior_probs = normalize_probabilities(prior)
@@ -253,7 +268,11 @@ def cap_probability_shift(
         return None
     anchor = prior_probs[reference]
     proposed = new_probs.get(reference, 0.0)
-    capped = min(max(proposed, anchor - max_shift), anchor + max_shift)
+    low, high = anchor - max_shift, anchor + max_shift
+    if keep_band:
+        band_low, band_high = rating_band_bounds(anchor)
+        low, high = max(low, band_low), min(high, band_high)
+    capped = min(max(proposed, low), high)
     capped = min(max(capped, 0.0), 1.0)
     if abs(capped - proposed) < 1e-9:
         return None

@@ -536,8 +536,9 @@ def apply_stability_guard(
     re-reasoning (AR-02 58% -> 66%, tilt_r -> lean_r). When the baseline had a
     forecast and the poll set, roster and contest stage all match it, the
     baseline leader's probability may move at most ``STABILITY_MAX_SHIFT``.
-    The rating is re-derived from the capped probability, so it stays the
-    baseline rating unless the capped move genuinely crosses a band threshold.
+    The capped probability is also held inside the baseline's rating band:
+    with no new evidence, re-reasoning alone may not change the rating (NC-05,
+    GA-01, IN-09 drifted Likely -> Safe on unchanged inputs).
 
     Mutates *consensus* in place and returns a human-readable note, or None
     when the guard does not apply. Same-party (candidate-level) races are left
@@ -553,7 +554,7 @@ def apply_stability_guard(
     prior_leader = leading_party(prior_probs)
     if prior_leader is None:
         return None
-    capped = cap_probability_shift(prior_probs, consensus["party_probabilities"])
+    capped = cap_probability_shift(prior_probs, consensus["party_probabilities"], keep_band=True)
     if capped is None:
         return None
     proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)
