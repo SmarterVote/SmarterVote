@@ -13,9 +13,9 @@
 >
   <PolicySection title="Current funding">
     <p>
-      Smarter.Vote is funded mostly by its founder, Jacob Loukota, with support
-      from individual readers. It has no institutional funders, sponsors, or
-      advertisers. All funding follows the rules on this page.
+      Smarter.Vote is funded mostly by its founder, with support from individual
+      readers. It has no institutional funders, sponsors, or advertisers. All
+      funding follows the rules on this page.
     </p>
     <p>
       Expanding coverage to state and local races and continuing through 2028
