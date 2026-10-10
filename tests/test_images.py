@@ -16,6 +16,7 @@ from pipeline_client.agent.images import (
     _looks_like_social_profile_avatar,
     _lookup_ballotpedia_image,
     _lookup_known_page_image,
+    _lookup_serper_image,
     _lookup_wikipedia_image,
     _name_tokens,
     _resolve_single_image,
@@ -1645,3 +1646,39 @@ def test_previous_photo_is_not_restored_when_a_content_guard_rejects_it():
         log=lambda *_: None,
     )
     assert candidate["image_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_serper_lookup_requires_the_surname_somewhere(monkeypatch):
+    """A search hit that never names the candidate is someone else's photo."""
+    from pipeline_client.agent import images
+
+    unrelated = "https://twt-thumbs.washtimes.com/media/image/2023/07/18/Immigration_Florida_97240_s885x516.jpg"
+    named = "https://news.example.com/photos/ron-ula-headshot.jpg"
+
+    async def search(query, **_kwargs):
+        return [
+            {"imageUrl": unrelated, "title": "Florida immigration law", "source": "Washington Times"},
+            {"imageUrl": named, "title": "Candidate profile", "source": "Example News"},
+        ]
+
+    async def reachable(url):
+        return True, url
+
+    monkeypatch.setattr(images, "_serper_image_search", search)
+    monkeypatch.setattr(images, "_check_url_accessible", reachable)
+    assert await _lookup_serper_image("Ron Ula") == named
+
+    async def only_unrelated(query, **_kwargs):
+        return [{"imageUrl": unrelated, "title": "Florida immigration law", "source": "Washington Times"}]
+
+    monkeypatch.setattr(images, "_serper_image_search", only_unrelated)
+    assert await _lookup_serper_image("Ron Ula") is None
+
+
+def test_search_surname_skips_generational_suffixes():
+    from pipeline_client.agent.images import _surname_for_search_match
+
+    assert _surname_for_search_match("Vicente Gonzalez Jr.") == "gonzalez"
+    assert _surname_for_search_match("Thomas Kean III") == "kean"
+    assert _surname_for_search_match("Ron Ula") == "ula"

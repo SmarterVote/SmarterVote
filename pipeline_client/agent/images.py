@@ -143,6 +143,15 @@ def _name_tokens(candidate_name: str) -> set[str]:
     return {token for token in re.findall(r"[a-z0-9]+", _fold_accents(candidate_name).lower()) if len(token) >= 3}
 
 
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "esq"})
+
+
+def _surname_for_search_match(candidate_name: str) -> Optional[str]:
+    """Lower-cased surname, skipping generational suffixes ("Vicente Gonzalez Jr." -> "gonzalez")."""
+    tokens = [t for t in re.findall(r"[a-z0-9]+", _fold_accents(candidate_name).lower()) if t not in _NAME_SUFFIXES]
+    return tokens[-1] if tokens and len(tokens[-1]) >= 2 else None
+
+
 def _candidate_surname_token(candidate_name: str) -> Optional[str]:
     """Return the candidate's surname (last name token, by naming convention), or None."""
     tokens = [t for t in re.findall(r"[a-zA-Z0-9]+", candidate_name) if len(t) >= 3]
@@ -1662,6 +1671,7 @@ async def _lookup_serper_image(
     prefers portrait-shaped images, then returns the best accessible one.
     """
     name_tokens = _name_tokens(candidate_name)
+    surname = _surname_for_search_match(candidate_name)
     queries: List[str] = []
     if context:
         queries.append(f"{candidate_name} {context} headshot")
@@ -1683,7 +1693,12 @@ async def _lookup_serper_image(
                 meta = f"{r.get('title', '')} {r.get('source', '')} {r.get('link', '') or r.get('domain', '')}"
                 if not _is_valid_image_url(img_url) or _looks_like_non_photo(img_url, meta):
                     continue
-                meta_tokens = set(re.findall(r"[a-z0-9]+", meta.lower()))
+                meta_tokens = set(re.findall(r"[a-z0-9]+", _fold_accents(meta).lower()))
+                url_tokens = set(re.findall(r"[a-z0-9]+", _fold_accents(unquote(img_url)).lower()))
+                if surname and surname not in meta_tokens | url_tokens:
+                    # Nothing ties the image to this candidate. OH-Gov's Ron Ula was
+                    # given a Washington Times "Immigration_Florida" news photo.
+                    continue
                 overlap = len(name_tokens & meta_tokens)
                 score = overlap * 10
                 if is_partisan_image_host(img_url):
