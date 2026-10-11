@@ -470,16 +470,46 @@ def build_consensus(
 def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
     """What a forecast reads that can legitimately move it: the poll set, the roster, and the contest stage.
 
+    The roster counts Democratic and Republican candidates plus anyone a poll
+    names; an unpolled minor-party or write-in candidate does not move it.
+
     Prediction-market prices are left out on purpose: they tick continuously, so
     including them would mean the guard never applies.
     """
+    polls = _usable_polls(race_json.get("polling"))
+    polled = _polled_surnames(polls)
     roster = tuple(
         sorted(
-            (_evidence_surname(candidate.get("name")), _evidence_party(candidate.get("party")))
+            (surname, party)
             for candidate in _active_candidates(race_json)
+            for surname, party in [(_evidence_surname(candidate.get("name")), _evidence_party(candidate.get("party")))]
+            if party in _MAJOR_PARTIES or surname in polled
         )
     )
-    return (poll_identity(_usable_polls(race_json.get("polling"))), roster, str(race_json.get("contest_stage") or ""))
+    return (poll_identity(polls), roster, str(race_json.get("contest_stage") or ""))
+
+
+_MAJOR_PARTIES = frozenset({"Democratic", "Republican"})
+
+
+def _polled_surnames(polls: list) -> set:
+    """Surnames named in any poll matchup: the only minor-party candidates the guard's roster counts.
+
+    Discovery re-verification adds and drops unpolled write-ins and minor-party
+    candidates (NY-21: a write-in independent added; WY-AL: Libertarian and
+    Constitution swapped in for an independent). Counting them read as a new
+    roster, switched the guard off, and let an unchanged poll set drift NY-21
+    from Tilt D 0.55 to Toss-up 0.52. A polled independent still counts.
+    """
+    return {
+        _evidence_surname(name)
+        for poll in polls
+        if isinstance(poll, dict) and isinstance(poll.get("matchups"), list)
+        for matchup in poll["matchups"]
+        if isinstance(matchup, dict)
+        for name in (matchup.get("candidates") or [])
+        if str(name or "").strip()
+    }
 
 
 _NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
