@@ -247,16 +247,44 @@ def rating_band_bounds(probability: float) -> tuple[float, float]:
     return 0.0, upper
 
 
+#: How far renormalizing rounded stored probabilities can move a value; a stored
+#: rating further than this from its own probability is not trusted.
+_RATING_ROUNDING_TOLERANCE = 0.001
+
+
+def _rating_bounds(rating: Optional[str], leader: str, probability: float) -> Optional[tuple[float, float]]:
+    """The range of a stored rating such as ``"lean_d"``, when it fits *leader* and, up to rounding, *probability*."""
+    if not isinstance(rating, str):
+        return None
+    if rating == "tossup":
+        bounds = rating_band_bounds(0.0)
+    else:
+        band, _, suffix = rating.partition("_")
+        threshold = next((threshold for threshold, name in RATING_BANDS if name == band), None)
+        if threshold is None or suffix != {"Democratic": "d", "Republican": "r"}.get(leader):
+            return None
+        bounds = rating_band_bounds(threshold)
+    low, high = bounds
+    if not low - _RATING_ROUNDING_TOLERANCE <= probability <= high + _RATING_ROUNDING_TOLERANCE:
+        return None
+    return bounds
+
+
 def cap_probability_shift(
     prior: Mapping[object, object],
     new: Mapping[object, object],
     max_shift: float = STABILITY_MAX_SHIFT,
     keep_band: bool = False,
+    prior_rating: Optional[str] = None,
 ) -> Optional[Dict[str, float]]:
     """*new* party probabilities with the prior leader's probability held within *max_shift* of *prior*.
 
     With *keep_band*, the prior leader's probability is also held inside the
     prior's rating band, so a small move cannot change the rating by itself.
+    Pass the prior's published *prior_rating* when there is one: stored
+    probabilities are rounded, so renormalizing them can nudge a value on a band
+    edge into the band below (FL-25: Lean D at 0.65 summed to 1.0001, read as
+    0.64994, and the guard let a no-new-poll rerun fall to Tilt D).
     Returns None when no cap is needed (the move is already within the limits)
     or either side is unusable. Other parties are rescaled proportionally so the
     result still sums to 1.
@@ -270,7 +298,7 @@ def cap_probability_shift(
     proposed = new_probs.get(reference, 0.0)
     low, high = anchor - max_shift, anchor + max_shift
     if keep_band:
-        band_low, band_high = rating_band_bounds(anchor)
+        band_low, band_high = _rating_bounds(prior_rating, reference, anchor) or rating_band_bounds(anchor)
         low, high = max(low, band_low), min(high, band_high)
     capped = min(max(proposed, low), high)
     capped = min(max(capped, 0.0), 1.0)
