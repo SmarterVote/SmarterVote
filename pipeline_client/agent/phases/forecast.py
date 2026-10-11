@@ -571,7 +571,9 @@ def apply_stability_guard(
     prior_leader = leading_party(prior_probs)
     if prior_leader is None:
         return None
-    capped = cap_probability_shift(prior_probs, consensus["party_probabilities"], keep_band=True)
+    capped = cap_probability_shift(
+        prior_probs, consensus["party_probabilities"], keep_band=True, prior_rating=baseline_forecast.get("rating")
+    )
     if capped is None:
         return None
     proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)

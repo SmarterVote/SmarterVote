@@ -259,3 +259,34 @@ def test_guard_ignores_a_numberless_poll_that_cleanup_will_drop():
     assert forecast_evidence_key(race) == evidence
     consensus = build_consensus([_member(0.34)] * 3, poll_count=1)
     assert apply_stability_guard(consensus, baseline, evidence, race)
+
+
+def test_guard_keeps_a_rating_on_the_band_edge_despite_rounding():
+    # FL-25: stored Lean D at 0.65 summed to 1.0001, renormalized to 0.64994, and
+    # the guard read the baseline as Tilt D and let a no-new-poll rerun fall to 0.61.
+    prior = {"Democratic": 0.65, "Republican": 0.3461, "Libertarian": 0.0038, "Independent": 0.0002}
+    new = {"Democratic": 0.47, "Republican": 0.51, "Libertarian": 0.02}
+    capped = cap_probability_shift(prior, new, keep_band=True, prior_rating="lean_d")
+    assert capped["Democratic"] == pytest.approx(0.65)
+    without_rating = cap_probability_shift(prior, new, keep_band=True)
+    assert without_rating["Democratic"] < 0.65
+
+
+def test_guard_ignores_a_stored_rating_that_disagrees_with_its_probabilities():
+    prior = {"Republican": 0.93, "Democratic": 0.07}
+    capped = cap_probability_shift(prior, {"Republican": 0.96, "Democratic": 0.04}, keep_band=True, prior_rating="tilt_r")
+    assert capped["Republican"] == pytest.approx(0.9499)
+    wrong_party = cap_probability_shift(
+        prior, {"Republican": 0.96, "Democratic": 0.04}, keep_band=True, prior_rating="likely_d"
+    )
+    assert wrong_party["Republican"] == pytest.approx(0.9499)
+
+
+def test_stability_guard_passes_the_baseline_rating():
+    race = _ar02()
+    race["forecast"]["party_probabilities"] = {"Republican": 0.65, "Democratic": 0.3461, "Libertarian": 0.0040}
+    race["forecast"]["rating"] = "lean_r"
+    baseline = copy.deepcopy(race["forecast"])
+    consensus = build_consensus([_member(0.40)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
+    assert consensus["rating"] == "lean_r"
