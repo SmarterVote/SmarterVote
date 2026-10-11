@@ -47,15 +47,22 @@ _LOADED_TERMS: Tuple[Tuple[str, re.Pattern[str]], ...] = (
     ("uncompromising", re.compile(r"\buncompromising\b", re.I)),
     ("firebrand", re.compile(r"\bfirebrands?\b", re.I)),
     ("MAGA extremist", re.compile(r"\bMAGA[- ]extremists?\b", re.I)),
-    # "Trump-aligned record", "Democratic-aligned group": a partisan label pinned on
-    # a candidate, pollster or group instead of the endorsement, vote or sponsor
-    # behind it. Recurred in forecasts and summaries through October 2026 (CA-06,
-    # NY-03, TX-35, AL-02, TX-26, WY-AL).
+    # "Trump-aligned record", "a Trump-aligned conservative": a partisan label pinned
+    # on a candidate or campaign instead of the endorsement or vote behind it.
+    # Recurred in forecasts and summaries through October 2026 (CA-06, NY-03, TX-35,
+    # AL-02, TX-26, WY-AL). Pollsters, poll sponsors and other groups are never
+    # labelled this way either. Describing outside money is accurate and allowed
+    # ("the Republican-aligned Senate Leadership Fund", "Democratic-aligned PACs",
+    # "GOP-aligned outside spending"): the lookahead skips up to four capitalized
+    # name words and then a money noun.
     (
         "party-aligned label",
         re.compile(
             r"\b(?:Trump|MAGA|Biden|Harris|Democratic|Democrat|Republican|GOP|progressive|conservative|liberal|"
-            r"left|right)[- ]aligned\b",
+            r"left|right)[- ]aligned\b"
+            r"(?!\s+(?:(?-i:[A-Z][\w.'&-]*)\s+){0,4}"
+            r"(?:super\s+PACs?|PACs?|funds?|committees?|(?:outside\s+)?spending|money|donors?|givers?|contributors?|"
+            r"ads|advertising)\b)",
             re.I,
         ),
     ),

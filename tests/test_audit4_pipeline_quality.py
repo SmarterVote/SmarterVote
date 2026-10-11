@@ -108,12 +108,48 @@ def test_fallback_forecast_text_validates_against_the_schema():
         "the controversial Republican congressman",
         "MAGA extremists in the House blocked the bill.",
         "Kiley's Trump-aligned voting record undercuts his independent branding.",
-        "The only poll was released by a Democratic-aligned group.",
-        "heavy GOP-aligned outside spending keeps the race close",
     ],
 )
 def test_loaded_wording_in_the_sites_voice_is_flagged(text):
     assert find_loaded_language(text), text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Trump-aligned campaign",
+        "a Trump-aligned conservative",
+        "Trump-aligned Secretary of State Chuck Gray",
+        "runs on a Trump-aligned platform",
+        "voted with Trump-aligned positions",
+        "a strongly Democratic-aligned voting record",
+        "the GOP-aligned independent Eliopoulos",
+        # Polls, poll sponsors and groups are never described as party-aligned.
+        "The only poll was released by a Democratic-aligned group.",
+        "national Republican-aligned groups planned spending",
+        "drew criticism from some Democratic-aligned groups",
+    ],
+)
+def test_party_aligned_label_on_a_person_campaign_or_group_is_flagged(text):
+    assert [hit["term"] for hit in find_loaded_language(text)] == ["party-aligned label"], text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Trump-aligned super PAC MAGA Inc. spent $5 million.",
+        "the Trump-aligned No Going Back PAC",
+        "Republican-aligned PACs have continued funding",
+        "The Republican-aligned Senate Leadership Fund has reserved",
+        "heavy Republican-aligned outside spending",
+        "Her donor base skews toward Democratic-aligned PACs and individual donors",
+        "Republican-aligned givers",
+        "expected national GOP-aligned spending behind her",
+        "heavy GOP-aligned outside spending keeps the race close",
+    ],
+)
+def test_party_aligned_label_on_outside_money_is_not_flagged(text):
+    assert find_loaded_language(text) == [], text
 
 
 @pytest.mark.parametrize(
