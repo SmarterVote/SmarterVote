@@ -127,7 +127,7 @@ def test_rating_band_bounds():
     "change",
     [
         lambda race: race["polling"].append(_poll("Siena", "2026-10-01")),
-        lambda race: race["candidates"].append({"name": "New Independent", "party": "Independent"}),
+        lambda race: race["candidates"].append({"name": "New Republican", "party": "Republican"}),
         lambda race: race.update({"contest_stage": "runoff"}),
     ],
 )
@@ -183,6 +183,45 @@ def test_guard_still_sees_a_real_party_change():
     race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})
     evidence = forecast_evidence_key(race)
     race["candidates"][-1]["party"] = "Democratic"
+    assert forecast_evidence_key(race) != evidence
+
+
+def test_guard_ignores_an_unpolled_write_in_independent():
+    # NY-21: discovery added write-in independent Christopher Schmidt, whom no poll
+    # names; the guard read a new roster and an unchanged poll set drifted the
+    # rating Tilt D 0.55 -> Toss-up 0.52.
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["candidates"].append({"name": "Christopher Schmidt", "party": "Independent"})
+    assert forecast_evidence_key(race) == evidence
+    consensus = build_consensus([_member(0.34)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, evidence, race)
+    assert consensus["rating"] == "tilt_r"
+
+
+def test_guard_ignores_swapped_unpolled_minor_party_candidates():
+    # WY-AL: discovery added Libertarian and Constitution candidates and dropped an
+    # independent, none of them named in any poll.
+    race = _ar02()
+    race["candidates"].append({"name": "Pat Jones", "party": "Independent"})
+    evidence = forecast_evidence_key(race)
+    race["candidates"].pop()
+    race["candidates"] += [
+        {"name": "Lee Smith", "party": "Libertarian"},
+        {"name": "Sam Brown", "party": "Constitution Party"},
+    ]
+    assert forecast_evidence_key(race) == evidence
+
+
+def test_guard_counts_a_polled_independent():
+    # A serious independent who appears in a poll matchup is real roster evidence.
+    race = _ar02()
+    race["polling"][0]["matchups"].append(
+        {"candidates": ["Stefany Shaheen", "Anthony DiLorenzo", "dan OSBORN"], "percentages": [44, 42, 8]}
+    )
+    evidence = forecast_evidence_key(race)
+    race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})
     assert forecast_evidence_key(race) != evidence
 
 
