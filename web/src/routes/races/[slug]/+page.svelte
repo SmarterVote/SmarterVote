@@ -19,6 +19,7 @@
   import { formatModelName, candidateSlug } from "$lib/utils/format";
   import { partyAbbr, partyKey } from "$lib/utils/party";
   import { isExternalUrl } from "$lib/utils/url";
+  import { ballotReturnHref } from "$lib/utils/ballotSession";
   import { formatRating } from "$lib/utils/forecast";
   import {
     marketAsOf,
@@ -299,6 +300,10 @@
     activeCandidates.every(hasNoResearchedPositions);
   $: jsonLd = race && !notFound ? jsonLdScript(raceJsonLd(race)) : "";
 
+  // Voters who arrived from their address-matched ballot get a way back to it
+  // (with this race still selected).
+  $: ballotHref = browser && race ? ballotReturnHref(race.id) : null;
+
   // Derive ballotpedia URL: race-level field first, then fall back to any
   // candidate link. Only http(s) URLs qualify.
   $: ballotpediaUrl =
@@ -429,6 +434,14 @@
       </button>
     </div>
   {:else if race}
+    {#if ballotHref}
+      <a
+        href={ballotHref}
+        class="mb-4 inline-flex min-h-11 items-center gap-2 rounded-full border border-stroke bg-surface px-4 py-2 text-sm font-bold text-content transition hover:border-primary-300 hover:text-primary-700 dark:hover:text-primary-300"
+      >
+        <UiIcon name="arrow-left" size="sm" /> Back to your ballot
+      </a>
+    {/if}
     {#if isDraftPreview}
       <div class="alert-warn mb-4 flex items-center gap-2">
         <svg

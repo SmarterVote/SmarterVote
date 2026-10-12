@@ -28,6 +28,15 @@
     return office;
   }
 
+  /** Second line on each race tab, so similar offices stay distinguishable. */
+  function raceDetail(race: RaceSummary): string {
+    const count = race.candidates.length;
+    const candidates = `${count} ${count === 1 ? "candidate" : "candidates"}`;
+    return race.contest_stage === "special"
+      ? `Special election · ${candidates}`
+      : candidates;
+  }
+
   /** A side-by-side comparison needs at least this many candidates. */
   const MIN_COMPARED = 2;
 
@@ -162,33 +171,62 @@
       <p class="eyebrow">Explore your races</p>
       <h2 class="mt-1 text-xl font-bold text-content">Your matched races</h2>
       <p class="mt-2 max-w-3xl text-sm leading-6 text-content-muted">
-        Choose a race to compare candidates and sourced positions without
-        leaving this page.
+        Pick a race to compare its candidates' sourced positions side by side.
+        Each race's full page adds polling, the forecast, and complete candidate
+        profiles.
       </p>
     </div>
 
     <div
-      class="border-b border-stroke bg-surface/95 px-4 py-3 backdrop-blur-sm sm:px-7 lg:sticky lg:top-[65px] lg:z-20"
-      role="tablist"
-      aria-label="Your matched races"
+      class="border-b border-stroke bg-surface/95 px-4 py-4 backdrop-blur-sm sm:px-7 lg:sticky lg:top-[65px] lg:z-20"
     >
-      <div class="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+      <p
+        id="ballot-race-tabs-label"
+        class="mb-2 text-xs font-bold uppercase tracking-wider text-content-subtle"
+      >
+        Your races ({races.length})
+      </p>
+      <div
+        class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
+        role="tablist"
+        aria-labelledby="ballot-race-tabs-label"
+      >
         {#each races as race, index}
+          {@const selected = selectedId === race.id}
           <button
             id="ballot-race-tab-{race.id}"
             type="button"
             role="tab"
-            aria-selected={selectedId === race.id}
+            aria-selected={selected}
             aria-controls="ballot-race-panel"
-            tabindex={selectedId === race.id ? 0 : -1}
+            aria-label={officeLabel(race)}
+            aria-describedby="ballot-race-tab-detail-{race.id}"
+            tabindex={selected ? 0 : -1}
             on:click={() => selectRace(race.id)}
             on:keydown={(event) => handleTabKeydown(event, index)}
-            class="min-h-11 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition {selectedId ===
-            race.id
-              ? 'border-content bg-content text-surface'
-              : 'border-stroke bg-surface text-content-muted hover:border-content-subtle hover:text-content'}"
+            class="relative min-h-14 rounded-xl border-2 px-3 py-2.5 text-left transition sm:px-4 {selected
+              ? 'border-primary-600 bg-primary-50 shadow-sm dark:border-primary-400 dark:bg-primary-950'
+              : 'border-stroke bg-surface-alt hover:border-primary-300 hover:bg-surface dark:hover:border-primary-700'}"
           >
-            {officeLabel(race)}
+            <span
+              class="block text-sm font-bold sm:text-base {selected
+                ? 'text-primary-800 dark:text-primary-200'
+                : 'text-content'}"
+            >
+              {officeLabel(race)}
+            </span>
+            <span
+              id="ballot-race-tab-detail-{race.id}"
+              class="mt-0.5 block text-xs text-content-muted"
+            >
+              {raceDetail(race)}
+            </span>
+            {#if selected}
+              <span
+                class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-primary-600 dark:bg-primary-400"
+                aria-hidden="true"
+              ></span>
+            {/if}
           </button>
         {/each}
       </div>
@@ -236,10 +274,15 @@
               {formatElectionDate(selectedRace.election_date)}
             </p>
           </div>
-          <div class="shrink-0 text-sm font-bold">
-            <a href="/races/{selectedRace.id}/" class="btn-primary"
-              >View full race guide <UiIcon name="arrow-right" size="sm" /></a
+          <div class="shrink-0 sm:text-right">
+            <a
+              href="/races/{selectedRace.id}/"
+              class="btn-primary text-sm font-bold"
+              >Open full race page <UiIcon name="arrow-right" size="sm" /></a
             >
+            <p class="mt-1.5 text-xs text-content-muted">
+              Polling, forecast, and complete candidate profiles
+            </p>
           </div>
         </div>
 

@@ -45,6 +45,20 @@ test.describe("my-ballot address lookup", () => {
     ).toBeVisible();
     await expect(page.getByText("Casey Whitfield").first()).toBeVisible();
 
+    // The full race page links straight back to this ballot, with the same
+    // race still selected.
+    await page.getByRole("link", { name: /Open full race page/ }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/races/${FIXTURE_RACE_IDS.senate}/`),
+    );
+    await page.getByRole("link", { name: "Back to your ballot" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Your election guide" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "U.S. Senate" }),
+    ).toHaveAttribute("aria-selected", "true");
+
     await page.getByRole("button", { name: "Search another address" }).click();
     await expect(
       page.getByRole("heading", { name: "Where are you registered to vote?" }),
