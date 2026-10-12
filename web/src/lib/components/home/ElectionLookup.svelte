@@ -16,6 +16,11 @@
   } from "$lib/services/googlePlaces";
   import { debounce } from "$lib/utils/debounce";
   import { canonicalStateName } from "$lib/utils/states";
+  import {
+    clearSavedBallot,
+    readSavedBallot,
+    writeSavedBallot,
+  } from "$lib/utils/ballotSession";
   import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[] = [];
@@ -35,39 +40,11 @@
   let activeSuggestionIndex = -1;
   let suggestionRequest = 0;
 
-  const SESSION_KEY = "smarterVote.ballot";
-
   let addressInput: HTMLInputElement | undefined;
   let resultsHeading: HTMLHeadingElement | undefined;
   // Persistent polite live region: its text changes, the element never does,
   // so screen readers reliably announce lookup outcomes.
   let announcement = "";
-
-  // sessionStorage can throw (privacy modes, blocked site data); the ballot
-  // must keep working without it.
-  function readSession(): string | null {
-    try {
-      return sessionStorage.getItem(SESSION_KEY);
-    } catch {
-      return null;
-    }
-  }
-
-  function writeSession(value: string) {
-    try {
-      sessionStorage.setItem(SESSION_KEY, value);
-    } catch {
-      // Ignore: restoring the ballot on reload is a convenience.
-    }
-  }
-
-  function clearSession() {
-    try {
-      sessionStorage.removeItem(SESSION_KEY);
-    } catch {
-      // Ignore.
-    }
-  }
 
   function resultsAnnouncement(count: number): string {
     if (loadError && races.length === 0)
@@ -182,7 +159,17 @@
     });
     submitted = true;
     dispatch("exploring", true);
+    rememberBallot();
     return true;
+  }
+
+  /** Lets race guides link back to this ballot. */
+  function rememberBallot() {
+    writeSavedBallot({
+      state,
+      district,
+      raceIds: results.map((race) => race.id),
+    });
   }
 
   function updateShareableUrl() {
@@ -213,13 +200,8 @@
     }
 
     try {
-      const saved = JSON.parse(readSession() ?? "null") as {
-        state?: string;
-        district?: string;
-        raceIds?: string[];
-      } | null;
-      if (!saved?.state || !saved.district || !Array.isArray(saved.raceIds))
-        return;
+      const saved = readSavedBallot();
+      if (!saved) return;
       const restored = saved.raceIds
         .map((id) => races.find((race) => race.id === id))
         .filter((race): race is RaceSummary => Boolean(race));
@@ -232,7 +214,7 @@
       // SvelteKit initializes its router immediately after component mount.
       window.setTimeout(updateShareableUrl);
     } catch {
-      clearSession();
+      clearSavedBallot();
     }
   });
 
@@ -260,13 +242,7 @@
       results = matchingNationalRaces(races, geography);
       submitted = true;
       dispatch("exploring", true);
-      writeSession(
-        JSON.stringify({
-          state,
-          district,
-          raceIds: results.map((race) => race.id),
-        }),
-      );
+      rememberBallot();
       updateShareableUrl();
       address = "";
       announcement = resultsAnnouncement(results.length);
@@ -295,7 +271,7 @@
     district = "";
     error = "";
     announcement = "";
-    clearSession();
+    clearSavedBallot();
     const url = new URL(window.location.href);
     url.searchParams.delete("state");
     url.searchParams.delete("district");
