@@ -244,4 +244,53 @@ describe("forecast presentation utilities", () => {
     expect(tooltips.Texas.badge).toBe("Closest race: Likely R");
     expect(tooltips.Texas.badge).not.toContain("bellwether");
   });
+
+  it("colors a state by party control, not a same-party contest's candidate rating", () => {
+    const forecast = (
+      rating: "tossup" | "likely_d",
+      party_probabilities: Record<string, number>,
+    ) => ({
+      predicted_winner_party: "Democratic",
+      party_probabilities,
+      win_probability: 0.54,
+      rating,
+      confidence: "medium" as const,
+      rationale: "",
+      based_on_poll_count: 1,
+      generated_at: "2026-07-01T00:00:00Z",
+      model: "test",
+      source_urls: [],
+      key_reasons: [],
+      market_signals: [],
+    });
+    const races: RaceSummary[] = [
+      {
+        id: "ca-house-07-2026",
+        title: "California House 7",
+        office: "U.S. House",
+        state: "California",
+        election_date: "2026-11-03",
+        updated_utc: "2026-07-01T00:00:00Z",
+        candidates: [],
+        forecast: forecast("tossup", { Democratic: 1 }),
+      },
+      {
+        id: "ca-house-13-2026",
+        title: "California House 13",
+        office: "U.S. House",
+        state: "California",
+        election_date: "2026-11-03",
+        updated_utc: "2026-07-01T00:00:00Z",
+        candidates: [],
+        forecast: forecast("likely_d", { Democratic: 0.85, Republican: 0.15 }),
+      },
+    ];
+
+    const { colors, tooltips } = buildStateMapData(races, "house");
+    expect(colors.California).toBe("var(--color-likely-d)");
+    expect(tooltips.California.badge).toBe("Closest race: Likely D");
+    expect(tooltips.California.details).toContain(
+      "0 competitive forecasted seats",
+    );
+  });
 });

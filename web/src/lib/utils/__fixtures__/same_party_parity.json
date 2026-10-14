@@ -1,0 +1,52 @@
+{
+  "description": "Shared by tests/test_forecast_summary.py and web/src/lib/utils/forecastParity.test.ts: which party_probabilities mark a same-party contest whose seat control is certain.",
+  "cases": [
+    {
+      "name": "two Democrats",
+      "party_probabilities": { "Democratic": 1.0 },
+      "expected": "Democratic"
+    },
+    {
+      "name": "two Republicans",
+      "party_probabilities": { "Republican": 1 },
+      "expected": "Republican"
+    },
+    {
+      "name": "abbreviated key",
+      "party_probabilities": { "D": 1.0 },
+      "expected": "Democratic"
+    },
+    {
+      "name": "zero opposing key",
+      "party_probabilities": { "Republican": 1.0, "Democratic": 0.0 },
+      "expected": "Republican"
+    },
+    {
+      "name": "unnormalized single party",
+      "party_probabilities": { "Democratic": 0.5 },
+      "expected": "Democratic"
+    },
+    {
+      "name": "at the threshold",
+      "party_probabilities": { "Democratic": 0.999, "Republican": 0.001 },
+      "expected": "Democratic"
+    },
+    {
+      "name": "safe but contested",
+      "party_probabilities": { "Democratic": 0.97, "Republican": 0.03 },
+      "expected": null
+    },
+    {
+      "name": "toss-up",
+      "party_probabilities": { "Democratic": 0.5, "Republican": 0.5 },
+      "expected": null
+    },
+    {
+      "name": "independent only",
+      "party_probabilities": { "Independent": 1.0 },
+      "expected": null
+    },
+    { "name": "empty", "party_probabilities": {}, "expected": null },
+    { "name": "missing", "party_probabilities": null, "expected": null }
+  ]
+}

@@ -14,6 +14,7 @@ from shared.forecast_summary import (
     is_chamber_control_race,
     office_group,
     race_state,
+    same_party_contest_party,
     summarize_chamber,
 )
 from shared.race_catalog import build_race_summary_fields
@@ -726,3 +727,92 @@ def test_race_state_matches_the_frontend_resolution_order():
     assert race_state({"state": "DC"}) is None
     assert race_state({"id": "dc-house-2026"}) is None
     assert race_state({"state": "Guam"}) == "Guam"
+
+
+SAME_PARTY_FIXTURE = PARITY_FIXTURE.with_name("same_party_parity.json")
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(SAME_PARTY_FIXTURE.read_text(encoding="utf-8"))["cases"],
+    ids=lambda case: case["name"],
+)
+def test_same_party_contest_detection_matches_the_shared_parity_fixture(case):
+    """The same fixture drives web/src/lib/utils/forecastParity.test.ts."""
+    assert same_party_contest_party({"party_probabilities": case["party_probabilities"]}) == case["expected"]
+
+
+def _same_party_house_races():
+    return [
+        {
+            "id": "ca-house-07-2026",
+            "title": "California's 7th District",
+            "office": "U.S. House",
+            "state": "California",
+            "forecast": {
+                "rating": "tossup",
+                "predicted_winner_party": "Democratic",
+                "win_probability": 0.54,
+                "party_probabilities": {"Democratic": 1.0},
+            },
+            "candidates": [
+                {"name": "Doris Matsui", "party": "Democratic", "incumbent": True},
+                {"name": "Vang", "party": "Democratic"},
+            ],
+        },
+        {
+            "id": "ca-house-40-2026",
+            "title": "California's 40th District",
+            "office": "U.S. House",
+            "state": "California",
+            "forecast": {
+                "rating": "tilt_r",
+                "predicted_winner_party": "Republican",
+                "win_probability": 0.56,
+                "party_probabilities": {"Republican": 1.0},
+            },
+            "candidates": [
+                {"name": "Ken Calvert", "party": "Republican", "incumbent": True},
+                {"name": "Young Kim", "party": "Republican", "incumbent": True},
+            ],
+        },
+        {
+            "id": "pa-house-07-2026",
+            "title": "Pennsylvania's 7th District",
+            "office": "U.S. House",
+            "state": "Pennsylvania",
+            "forecast": {
+                "rating": "tossup",
+                "predicted_winner_party": "Republican",
+                "win_probability": 0.52,
+                "party_probabilities": {"Democratic": 0.48, "Republican": 0.52},
+            },
+        },
+    ]
+
+
+def test_same_party_contest_is_a_safe_seat_for_chamber_control():
+    """Regression: the House narrative counted CA-07 (two Democrats) as a toss-up
+    and listed same-party contests among the competitive races."""
+    summary = summarize_chamber(_same_party_house_races(), "house")
+
+    assert summary["tossup_count"] == 1
+    assert summary["competitive_race_count"] == 1
+    assert summary["competitive_races"] == ["Pennsylvania's 7th District"]
+    assert "California" not in summary["key_uncertainty"]
+    # Seat math already used the probabilities and is unchanged.
+    assert summary["expected_seats"] == {"Democratic": 1.5, "Republican": 1.5, "Other": 0.0}
+
+
+def test_chamber_context_counts_a_same_party_contest_as_a_safe_win():
+    from shared.forecast_summary import build_chamber_context
+
+    races = _same_party_house_races()
+    context = build_chamber_context(races, "US House", summarize_chamber(races, "house"))
+
+    assert "Toss-up Races: 1" in context
+    assert "Projected Democratic Wins (among published non-tossups): 1" in context
+    assert "Projected Republican Wins (among published non-tossups): 1" in context
+    assert "California's 7th" not in context
+    assert "California's 40th" not in context
+    assert "Pennsylvania's 7th District: Toss-up" in context

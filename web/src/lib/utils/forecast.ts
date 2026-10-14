@@ -244,6 +244,65 @@ export function forecastWinnerParty(
   return null;
 }
 
+const SAME_PARTY_PROBABILITY = 0.999;
+
+/**
+ * The major party certain to hold the seat, or null. Mirrors
+ * `same_party_contest_party` in shared/forecast_summary.py (the shared
+ * same_party_parity.json fixture checks both).
+ *
+ * A top-two general between co-partisans (California's 7th: two Democrats)
+ * publishes `party_probabilities` like {"Democratic": 1}, while its rating and
+ * win probability describe the candidates. Party control of that seat is
+ * certain, so chamber tallies must count it as safe, never as a toss-up.
+ */
+export function samePartyContestParty(
+  probs?: Record<string, number> | null,
+): "Democratic" | "Republican" | null {
+  if (!probs) return null;
+  const totals = new Map<ForecastParty, number>();
+  for (const [key, raw] of Object.entries(probs)) {
+    const prob = Number(raw);
+    const keyParty =
+      key.trim().toLowerCase() === "other" ? "Other" : partyFromLabel(key);
+    if (!keyParty || !Number.isFinite(prob) || prob <= 0) continue;
+    totals.set(keyParty, (totals.get(keyParty) ?? 0) + prob);
+  }
+  let total = 0;
+  let best: ForecastParty | null = null;
+  let bestProb = 0;
+  for (const [keyParty, prob] of totals) {
+    total += prob;
+    if (prob > bestProb) {
+      best = keyParty;
+      bestProb = prob;
+    }
+  }
+  if (total <= 0 || bestProb / total < SAME_PARTY_PROBABILITY) return null;
+  return best === "Democratic" || best === "Republican" ? best : null;
+}
+
+/**
+ * The rating for party-control purposes (chamber tallies, competitive lists,
+ * map fills): a same-party contest is safe for its party. A race's own page
+ * keeps the candidate-level rating.
+ */
+export function controlRating(
+  forecast:
+    | {
+        rating?: ForecastRating | null;
+        party_probabilities?: Record<string, number> | null;
+      }
+    | null
+    | undefined,
+): ForecastRating | null {
+  if (!forecast) return null;
+  const party = samePartyContestParty(forecast.party_probabilities);
+  if (party === "Democratic") return "safe_d";
+  if (party === "Republican") return "safe_r";
+  return forecast.rating ?? null;
+}
+
 /**
  * Backward-compatible wrapper around {@link forecastWinnerParty} for display
  * code that needs a single bucket. Unknown resolves to "Other" (never the
@@ -510,13 +569,15 @@ export function aggregateForecasts(
       uncountedForecasts += 1;
       uncountedSeats += 1;
     }
-    const rating = race.forecast.rating;
+    // A same-party contest counts as safe: control of the seat is certain.
+    const rating = controlRating(race.forecast);
     if (rating) ratingCounts[rating] = (ratingCounts[rating] ?? 0) + 1;
   }
 
   forecasted.sort((a, b) => {
     const ratingDelta =
-      ratingSortValue(a.forecast.rating) - ratingSortValue(b.forecast.rating);
+      ratingSortValue(controlRating(a.forecast)) -
+      ratingSortValue(controlRating(b.forecast));
     if (ratingDelta !== 0) return ratingDelta;
     return (
       (a.forecast.win_probability ?? 1) - (b.forecast.win_probability ?? 1)
@@ -847,6 +908,10 @@ export function getControlRelevanceScore(
   race: RaceSummary,
   chamberSummary: ChamberForecastDetails | undefined,
 ): number {
+  // Party control of a same-party contest is certain: it can never move the
+  // chamber, whatever its candidate-level rating says.
+  if (samePartyContestParty(race.forecast?.party_probabilities)) return 2000;
+
   const title = race.title || "";
   const id = race.id || "";
   const isKey = chamberSummary?.competitive_races?.some(
@@ -955,7 +1020,8 @@ export function filterForecastRaces(
     if (selectedState && getRaceState(race) !== selectedState) return false;
 
     if (filterRating !== "all") {
-      const rating = (race.forecast.rating ?? "").toLowerCase();
+      // Filters match the ratings breakdown tiles, which count control ratings.
+      const rating = (controlRating(race.forecast) ?? "").toLowerCase();
       if (filterRating === "tossup" && !rating.includes("tossup")) return false;
       if (filterRating === "tilt" && !rating.startsWith("tilt_")) return false;
       if (filterRating === "lean" && !rating.startsWith("lean_")) return false;

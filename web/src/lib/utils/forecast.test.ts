@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ForecastRating, RaceSummary } from "$lib/types";
 import {
   aggregateForecasts,
+  controlRating,
   filterForecastRaces,
+  samePartyContestParty,
   getControlRelevanceScore,
   getMostLikelySeatOutcome,
   isRaceInForecastTab,
@@ -783,5 +785,102 @@ describe("summary forecasts without a rating", () => {
   it("sorts a missing rating after every rated race", () => {
     expect(ratingSortIndex(null)).toBe(FORECAST_RATING_ORDER.length);
     expect(ratingSortValue(undefined)).toBe(5);
+  });
+});
+
+describe("same-party contests for chamber control", () => {
+  function houseRace(
+    id: string,
+    forecast: Partial<ForecastRace["forecast"]>,
+  ): ForecastRace {
+    return {
+      ...baseRace,
+      id,
+      title: id,
+      office: "U.S. House",
+      state: id.startsWith("ca-") ? "California" : "Pennsylvania",
+      forecast: {
+        party_probabilities: {},
+        rating: "tossup",
+        confidence: "medium",
+        rationale: "test",
+        based_on_poll_count: 1,
+        generated_at: "2026-06-20T00:00:00Z",
+        model: "test",
+        source_urls: [],
+        ...forecast,
+      },
+    } as ForecastRace;
+  }
+
+  // CA-07: Matsui vs Vang, both Democrats; a toss-up between candidates only.
+  const ca07 = houseRace("ca-house-07-2026", {
+    rating: "tossup",
+    predicted_winner_party: "Democratic",
+    win_probability: 0.54,
+    party_probabilities: { Democratic: 1 },
+  });
+  const ca40 = houseRace("ca-house-40-2026", {
+    rating: "tilt_r",
+    predicted_winner_party: "Republican",
+    win_probability: 0.56,
+    party_probabilities: { Republican: 1 },
+  });
+  const pa07 = houseRace("pa-house-07-2026", {
+    rating: "tossup",
+    predicted_winner_party: "Republican",
+    win_probability: 0.52,
+    party_probabilities: { Democratic: 0.48, Republican: 0.52 },
+  });
+
+  it("detects a same-party contest and rates it safe for control", () => {
+    expect(samePartyContestParty(ca07.forecast.party_probabilities)).toBe(
+      "Democratic",
+    );
+    expect(controlRating(ca07.forecast)).toBe("safe_d");
+    expect(controlRating(ca40.forecast)).toBe("safe_r");
+    expect(controlRating(pa07.forecast)).toBe("tossup");
+  });
+
+  it("counts same-party contests as safe seats in the ratings tally", () => {
+    const aggregate = aggregateForecasts([ca07, ca40, pa07], "house");
+    expect(aggregate.ratingCounts.tossup).toBe(1);
+    expect(aggregate.ratingCounts.tilt_r).toBe(0);
+    expect(aggregate.ratingCounts.safe_d).toBe(1);
+    expect(aggregate.ratingCounts.safe_r).toBe(1);
+    expect(aggregate.projected).toMatchObject({ Democratic: 1, Republican: 2 });
+  });
+
+  it("gives same-party contests the lowest control relevance", () => {
+    const safe = houseRace("tx-house-01-2026", {
+      rating: "safe_r",
+      win_probability: 0.99,
+      party_probabilities: { Democratic: 0.01, Republican: 0.99 },
+    });
+    const summary = { competitive_races: ["ca-house-07-2026"] };
+    expect(getControlRelevanceScore(ca07, summary as never)).toBeGreaterThan(
+      getControlRelevanceScore(safe, summary as never),
+    );
+    expect(
+      sortForecastRaces([ca07, safe, pa07], "control_relevance", undefined).map(
+        (race) => race.id,
+      ),
+    ).toEqual(["pa-house-07-2026", "tx-house-01-2026", "ca-house-07-2026"]);
+  });
+
+  it("keeps same-party contests out of the toss-up filter", () => {
+    const options = { selectedState: null, filterParty: "all" };
+    expect(
+      filterForecastRaces([ca07, ca40, pa07], {
+        ...options,
+        filterRating: "tossup",
+      }).map((race) => race.id),
+    ).toEqual(["pa-house-07-2026"]);
+    expect(
+      filterForecastRaces([ca07, ca40, pa07], {
+        ...options,
+        filterRating: "likely_safe",
+      }).map((race) => race.id),
+    ).toEqual(["ca-house-07-2026", "ca-house-40-2026"]);
   });
 });

@@ -467,6 +467,37 @@ def _party_probability_totals(forecast: Dict[str, Any]) -> Dict[Party, float]:
     return totals
 
 
+SAME_PARTY_PROBABILITY = 0.999
+
+
+def same_party_contest_party(forecast: Dict[str, Any]) -> Optional[Party]:
+    """The major party certain to hold the seat, or None. Mirrors `samePartyContestParty` in forecast.ts.
+
+    A top-two general between co-partisans (California's 7th: two Democrats)
+    publishes `party_probabilities` like {"Democratic": 1.0}, while its rating
+    and win probability describe the candidates. Party control of that seat is
+    certain, so chamber tallies must count it as safe, never as a toss-up.
+    """
+    totals = {party: prob for party, prob in _party_probability_totals(forecast).items() if prob > 0}
+    total = sum(totals.values())
+    if total <= 0:
+        return None
+    party, prob = max(totals.items(), key=lambda item: item[1])
+    if party in ("Democratic", "Republican") and prob / total >= SAME_PARTY_PROBABILITY:
+        return party
+    return None
+
+
+def control_rating(forecast: Dict[str, Any]) -> str:
+    """The rating for party-control purposes: a same-party contest is safe for its party."""
+    party = same_party_contest_party(forecast)
+    if party == "Democratic":
+        return "safe_d"
+    if party == "Republican":
+        return "safe_r"
+    return str(forecast.get("rating") or "")
+
+
 def _probable_party(forecast: Dict[str, Any]) -> Optional[Party]:
     """The single most likely party from explicit probabilities, or None on a tie/no data."""
     totals = _party_probability_totals(forecast)
@@ -610,7 +641,8 @@ def summarize_chamber(
             projected[party] += 1
         for key, value in _race_party_probabilities(forecast).items():
             expected[key] += value
-        rating = str(forecast.get("rating") or "")
+        # A same-party contest's rating is candidate-level; control of its seat is certain.
+        rating = control_rating(forecast)
         if "tossup" in rating.lower() or "toss-up" in rating.lower():
             tossups += 1
         if any(key in rating.lower() for key in ("tossup", "tilt", "lean")):
@@ -844,7 +876,7 @@ def _holder_summary_lines(races: list[dict[str, Any]]) -> list[str]:
     """
     held: Dict[str, list[str]] = {}
     for race in races:
-        rating = str((race.get("forecast") or {}).get("rating") or "").lower()
+        rating = control_rating(race.get("forecast") or {}).lower()
         if not any(key in rating for key in ("toss", "tilt", "lean", "likely")):
             continue
         holder, _ = _seat_holder(race)
@@ -864,7 +896,7 @@ def build_chamber_context(races: list[dict[str, Any]], name: str, summary: dict[
     competitive_list = []
     for race in races:
         forecast = race.get("forecast") or {}
-        rating = str(forecast.get("rating") or "").lower()
+        rating = control_rating(forecast).lower()
         winner_party = str(forecast.get("predicted_winner_party") or "").lower()
         prob = forecast.get("win_probability") or 0.5
         title = race.get("title") or race.get("id")
