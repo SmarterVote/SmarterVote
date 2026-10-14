@@ -1,5 +1,6 @@
 import type { ForecastRating, RaceSummary } from "$lib/types";
 import {
+  controlRating,
   electionCycleYear,
   formatRating,
   getRaceState,
@@ -175,8 +176,8 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
     const aForecast = a.forecast!;
     const bForecast = b.forecast!;
     const priority =
-      ratingCompetitiveness(aForecast.rating) -
-      ratingCompetitiveness(bForecast.rating);
+      ratingCompetitiveness(controlRating(aForecast)) -
+      ratingCompetitiveness(controlRating(bForecast));
     if (priority !== 0) return priority;
     return (
       Math.abs((aForecast.win_probability ?? 0.5) - 0.5) -
@@ -188,7 +189,7 @@ export function summarizeStateForecast(stateRaces: RaceSummary[]) {
     primary: sorted[0],
     forecastedCount: forecasted.length,
     competitiveCount: forecasted.filter(
-      (race) => ratingCompetitiveness(race.forecast!.rating) <= 2,
+      (race) => ratingCompetitiveness(controlRating(race.forecast)) <= 2,
     ).length,
     details: sorted.slice(0, 3).map((race) => {
       const forecast = race.forecast!;
@@ -475,7 +476,7 @@ export function buildStateMapData(
       if (!state) continue;
 
       if (r.forecast) {
-        const rating = r.forecast.rating;
+        const rating = controlRating(r.forecast);
         colors[state] = colorForRating(rating);
         const { lead, rationale } = forecastDetails(
           r.forecast,
@@ -556,7 +557,7 @@ export function buildStateMapData(
         : null;
 
       if (r.forecast) {
-        const rating = r.forecast.rating;
+        const rating = controlRating(r.forecast);
         colors[state] = colorForRating(rating);
         const { lead, rationale } = forecastDetails(
           r.forecast,
@@ -601,17 +602,17 @@ export function buildStateMapData(
       const summary = summarizeStateForecast(stateRaces);
 
       colors[state] = summary.primary?.forecast
-        ? colorForRating(summary.primary.forecast.rating)
+        ? colorForRating(controlRating(summary.primary.forecast))
         : NO_FORECAST_FILL;
 
       tooltips[state] = {
         title: state,
         subtitle: `${count} House race${count > 1 ? "s" : ""} in scope`,
         badge: summary.primary?.forecast
-          ? `Closest race: ${formatRating(summary.primary.forecast.rating)}`
+          ? `Closest race: ${formatRating(controlRating(summary.primary.forecast))}`
           : `${summary.forecastedCount}/${count} Forecasted`,
         badgeClass: summary.primary?.forecast
-          ? forecastBadgeClass(summary.primary.forecast.rating)
+          ? forecastBadgeClass(controlRating(summary.primary.forecast))
           : "bg-slate-500! text-white!",
         details:
           summary.details.length > 0
