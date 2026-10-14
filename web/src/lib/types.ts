@@ -297,6 +297,7 @@ export interface PipelineState {
   roster_research?: RosterResearchAudit | null;
   metadata_research?: MetadataResearchAudit | null;
   removed_source_urls: RemovedSourceUrl[];
+  neutrality_unfixed: string[];
 }
 
 export interface RemovedSourceUrl {
@@ -357,6 +358,7 @@ export interface RunAudit {
   forecast_changes: string[];
   remaining_uncertainty: string[];
   publish_attention: string[];
+  neutrality_unfixed: string[];
 }
 
 export interface Race {

@@ -523,6 +523,8 @@ class RunAudit(BaseModel):
     forecast_changes: List[str] = Field(default_factory=list)
     remaining_uncertainty: List[str] = Field(default_factory=list)
     publish_attention: List[str] = Field(default_factory=list)
+    #: Fields refinement had to rewrite for loaded wording but left loaded, with the flagged terms.
+    neutrality_unfixed: List[str] = Field(default_factory=list)
 
 
 class RosterResearchAudit(BaseModel):
@@ -572,6 +574,8 @@ class PipelineState(BaseModel):
     roster_research: Optional[RosterResearchAudit] = None
     metadata_research: Optional[MetadataResearchAudit] = None
     removed_source_urls: List[RemovedSourceUrl] = Field(default_factory=list)
+    #: Field paths refinement was required to rewrite for loaded wording but left loaded.
+    neutrality_unfixed: List[str] = Field(default_factory=list)
 
 
 class RaceJSON(BaseModel):

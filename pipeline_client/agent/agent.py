@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from shared.neutrality import find_loaded_language, iter_site_voice_text
 from shared.pipeline_config import DEFAULT_UPDATE_PIPELINE_STEPS, PIPELINE_STEP_IDS, REVIEW_PROVIDERS, PipelineRuntimeConfig
 from shared.race_cleanup import cleanup_race_data, validate_forecast_evidence
 from shared.run_health import clear_step_failures
@@ -645,6 +646,25 @@ def _candidate_names_for_audit(race_json: Dict[str, Any] | None) -> set[str]:
     }
 
 
+def _neutrality_unfixed_for_audit(race_json: Dict[str, Any]) -> List[str]:
+    """Refinement's unfixed must-fix fields that are still loaded now, with the flagged terms.
+
+    Re-linted here because later phases (iteration, review cleanup) may have fixed
+    them, and a carried-over list must not report text that has since changed.
+    """
+    pipeline_state = race_json.get("pipeline_state")
+    fields = pipeline_state.get("neutrality_unfixed") if isinstance(pipeline_state, dict) else None
+    if not fields:
+        return []
+    current = dict(iter_site_voice_text(race_json))
+    unfixed: List[str] = []
+    for field in fields:
+        hits = find_loaded_language(current.get(field))
+        if hits:
+            unfixed.append(f"{field}: " + ", ".join(dict.fromkeys(f'"{hit["match"]}"' for hit in hits)))
+    return unfixed
+
+
 def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, Any]) -> Dict[str, Any]:
     """Build non-gating notes that make future data-quality audits faster."""
     before_names = _candidate_names_for_audit(existing_data)
@@ -737,6 +757,12 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
             f"{len(unobserved)} issue stance citation(s) were never fetched or seen in search results this run "
             "(possible fabricated or injected URL): " + "; ".join(unobserved[:5])
         )
+    neutrality_unfixed = _neutrality_unfixed_for_audit(race_json)
+    if neutrality_unfixed:
+        publish_attention.append(
+            f"{len(neutrality_unfixed)} field(s) still use loaded wording in the site's own voice after refinement: "
+            + "; ".join(neutrality_unfixed[:5])
+        )
 
     return {
         "contest_stage": contest_stage,
@@ -745,6 +771,7 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
         "forecast_changes": forecast_changes,
         "remaining_uncertainty": remaining_uncertainty,
         "publish_attention": publish_attention,
+        "neutrality_unfixed": neutrality_unfixed,
     }
 
 

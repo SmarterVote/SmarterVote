@@ -395,6 +395,32 @@ the office, why the race matters, partisan context, and key contrasts.
 Use update_race_field only for description. Do not research or modify polling
 or voter-resource links in this phase. When done, briefly describe the change."""
 
+# Appended to the refinement prompts when the neutrality lint (shared/neutrality.py)
+# flags a field. Refinement otherwise revisits only weak or unsourced fields, so a
+# well-sourced stance with loaded wording was left verbatim run after run.
+NEUTRALITY_MUST_FIX = """\
+MUST-FIX (neutrality lint): these fields use loaded wording in the site's own
+voice. Rewrite each one in this pass, even if it is otherwise accurate and well
+sourced:
+{fields}
+
+For each field, rewrite only the loaded characterization. Replace it with
+neutral factual wording (the position, vote, endorsement or affiliation behind
+it), or attribute it to a named source in the same clause. Keep every other
+fact, direct quote and source, and keep the confidence. Use the matching tool:
+issues.<issue>.stance -> set_issue_stance (same issue name); summary ->
+set_candidate_summary; voting_summary -> set_voting_summary; donor_summary ->
+set_donor_summary; description -> update_race_field. Omitting sources keeps the
+existing ones."""
+
+NEUTRALITY_RETRY_USER = """\
+Race "{race_id}": an editing pass left loaded wording in the fields below.
+Fix only these fields now. Do not research or change anything else.
+
+{must_fix}
+
+When done, reply with one line naming the fields you rewrote."""
+
 # ------------------------------------------------------------------
 # Update prompts — phase-based (mirrors fresh run)
 # ------------------------------------------------------------------
