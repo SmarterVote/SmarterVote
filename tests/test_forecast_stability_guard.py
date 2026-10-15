@@ -178,6 +178,19 @@ def test_guard_counts_two_candidates_who_share_a_surname():
     assert forecast_evidence_key(race) != evidence
 
 
+@pytest.mark.parametrize("relabel", ["Democratic-Farmer-Labor", "DFL", "Democratic-NPL", "Democratic Party"])
+def test_guard_treats_a_state_affiliate_relabel_as_the_same_roster(relabel):
+    # MN-Sen: discovery labels Flanagan "Democratic-Farmer-Labor" on one run and
+    # "Democratic" on the next; that is not a roster change.
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["candidates"][0]["party"] = relabel
+    assert forecast_evidence_key(race) == evidence
+    consensus = build_consensus([_member(0.34)] * 3, poll_count=1)
+    assert apply_stability_guard(consensus, baseline, evidence, race)
+
+
 def test_guard_still_sees_a_real_party_change():
     race = _ar02()
     race["candidates"].append({"name": "Dan Osborn", "party": "Independent"})

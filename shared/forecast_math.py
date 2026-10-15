@@ -36,23 +36,37 @@ NATIONAL_SWING_LOGIT_SD = 0.6
 _GRID_STEP = 0.4
 _GRID_Z = [i * _GRID_STEP for i in range(-10, 11)]
 
+# One major-party vocabulary for the pipeline and the chamber roll-up
+# (`shared.forecast_summary.classify_party`), mirrored by `partyFromLabel` in
+# web/src/lib/utils/forecast.ts. State affiliates of the two major parties
+# ("Democratic-Farmer-Labor", "Democratic-NPL", "Republican Party") are the
+# national party: kept as labels of their own they split a race's probability
+# mass and rate the Democratic nominee "other" (MN Senate 2026).
+DEMOCRATIC_PARTY_LABELS = frozenset({"d", "dem", "dfl"})
+REPUBLICAN_PARTY_LABELS = frozenset({"r", "rep", "gop"})
+
 _PARTY_ALIASES = {
-    "d": "Democratic",
-    "dem": "Democratic",
-    "democrat": "Democratic",
-    "democratic": "Democratic",
-    "r": "Republican",
-    "rep": "Republican",
-    "gop": "Republican",
-    "republican": "Republican",
     "i": "Independent",
     "ind": "Independent",
     "independent": "Independent",
 }
 
 
+def major_party(label: object) -> Optional[str]:
+    """The canonical "Democratic" or "Republican" when *label* names either party or a state affiliate of one, else None."""
+    value = str(label or "").strip().casefold()
+    if value in DEMOCRATIC_PARTY_LABELS or "democrat" in value:
+        return "Democratic"
+    if value in REPUBLICAN_PARTY_LABELS or "republican" in value:
+        return "Republican"
+    return None
+
+
 def normalize_party_label(label: object) -> str:
-    """Map "Democrat", "GOP", "Libertarian Party" and friends onto one label."""
+    """Map "Democrat", "GOP", "Democratic-Farmer-Labor", "Libertarian Party" and friends onto one label."""
+    major = major_party(label)
+    if major:
+        return major
     raw = str(label or "").strip()
     key = raw.casefold()
     # "No Political Party" is a label, not "No Political" plus a suffix.
