@@ -119,7 +119,7 @@ describe("BallotExplorer", () => {
         }) as HTMLInputElement
       ).checked,
     ).toBe(true);
-    expect(screen.getAllByText("Healthcare")).toHaveLength(2);
+    expect(screen.getByRole("rowheader", { name: "Healthcare" })).toBeTruthy();
     expect(
       screen.getAllByText(
         /No (sourced position available|stance researched) yet\./,
@@ -150,7 +150,7 @@ describe("BallotExplorer", () => {
         name: "Libby Libertarian",
       }),
     ).toBeNull();
-    expect(screen.getAllByText("Healthcare")).toHaveLength(2);
+    expect(screen.getByRole("rowheader", { name: "Healthcare" })).toBeTruthy();
     expect(
       screen.queryAllByText(
         /No (sourced position available|stance researched) yet\./,
