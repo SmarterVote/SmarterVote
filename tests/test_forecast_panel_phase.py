@@ -315,6 +315,48 @@ def test_same_party_contest_ignores_withdrawn_candidates():
     assert same_party_contest(unknown) is None
 
 
+def _mn_senate_race():
+    race = _race()
+    race.update(id="mn-senate-2026", state="Minnesota", office="U.S. Senate")
+    race["candidates"] = [
+        {"name": "Peggy Flanagan", "party": "Democratic-Farmer-Labor"},
+        {"name": "Royce White", "party": "Republican Party"},
+        {"name": "Libby Tarian", "party": "Libertarian"},
+    ]
+    return race
+
+
+def test_a_dfl_nominee_is_forecast_as_the_democratic_party():
+    from pipeline_client.agent.phases.forecast import _to_party_probabilities
+
+    race = _mn_senate_race()
+    raw_members = [
+        {"Peggy Flanagan": 0.78, "Royce White": 0.21, "Libertarian": 0.01},
+        {"Democratic-Farmer-Labor": 0.75, "Democratic": 0.03, "Republican": 0.21, "Libby Tarian": 0.01},
+        {"Democratic": 0.80, "Republican Party": 0.19, "Libertarian Party": 0.01},
+    ]
+    members = [
+        {"model": f"m{i}", "party_probabilities": _to_party_probabilities(raw, race), "margin_estimate": 12.0}
+        for i, raw in enumerate(raw_members)
+    ]
+    for member in members:
+        assert set(member["party_probabilities"]) == {"Democratic", "Republican", "Libertarian"}
+    consensus = build_consensus(members, poll_count=4)
+    assert set(consensus["party_probabilities"]) == {"Democratic", "Republican", "Libertarian"}
+    assert consensus["leading_party"] == "Democratic"
+    assert consensus["predicted_winner_party"] == "Democratic"
+    assert consensus["rating"] == "lean_d"
+    assert same_party_contest(race) is None
+
+
+def test_same_party_contest_reads_a_state_affiliate_as_its_national_party():
+    race = _same_party_race()
+    race["candidates"][1]["party"] = "Democratic-Farmer-Labor"
+    assert same_party_contest(race) == "Democratic"
+    race["candidates"][1]["party"] = "Green Party"
+    assert same_party_contest(race) is None
+
+
 @pytest.mark.asyncio
 async def test_a_same_party_race_forecasts_candidates_not_parties():
     # The three shapes members answered California's 11th in; before this fix

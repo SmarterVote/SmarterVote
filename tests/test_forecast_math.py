@@ -40,6 +40,66 @@ def test_normalize_keeps_no_party_labels_whole():
     assert normalize_party_label("No Party Affiliation") == "No Party Affiliation"
 
 
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        ("Democratic-Farmer-Labor", "Democratic"),
+        ("DFL", "Democratic"),
+        ("Democratic–NPL", "Democratic"),
+        ("Democratic-NPL", "Democratic"),
+        ("Democratic Party", "Democratic"),
+        ("Republican Party", "Republican"),
+        ("Green Party", "Green"),
+        ("Libertarian", "Libertarian"),
+        ("Independent", "Independent"),
+    ],
+)
+def test_normalize_collapses_major_party_affiliates_only(label, expected):
+    from shared.forecast_math import normalize_party_label
+
+    assert normalize_party_label(label) == expected
+
+
+def test_major_party_affiliate_labels_agree_with_the_chamber_rollup():
+    from shared.forecast_math import major_party
+    from shared.forecast_summary import classify_party
+
+    for label in ("Democratic-Farmer-Labor", "Democratic-NPL", "DFL", "Republican Party", "GOP", "Green", "Libertarian"):
+        assert (major_party(label) or "Other") == classify_party(label)
+
+
+def test_dfl_nominee_gets_the_democratic_probability_and_a_normal_rating():
+    # MN-Sen 2026: Flanagan's "Democratic-Farmer-Labor" label rated the race "other".
+    probs = normalize_probabilities(
+        {
+            "Democratic": 0.0001,
+            "Democratic-Farmer-Labor": 0.7878,
+            "Independent": 0.005,
+            "Libertarian": 0.005,
+            "Republican": 0.202,
+        }
+    )
+    assert set(probs) == {"Democratic", "Independent", "Libertarian", "Republican"}
+    assert probs["Democratic"] == pytest.approx(0.7879, abs=1e-4)
+    assert probs["Libertarian"] == pytest.approx(0.005, abs=1e-4)
+    assert leading_party(probs) == "Democratic"
+    assert rating_for(probs) == "lean_d"
+
+
+def test_aggregate_panel_sums_canonical_and_affiliate_keys():
+    consensus = aggregate_panel(
+        [
+            {"Democratic-Farmer-Labor": 0.4, "Democratic": 0.2, "Republican": 0.4},
+            {"Democratic-Farmer-Labor": 0.6, "Republican": 0.38, "Green Party": 0.02},
+            {"DFL": 0.6, "Republican Party": 0.4},
+        ]
+    )
+    assert "Democratic-Farmer-Labor" not in consensus and "DFL" not in consensus
+    assert consensus["Democratic"] == pytest.approx(0.6, abs=0.01)
+    assert "Green" in consensus
+    assert rating_for(consensus) == "tilt_d"
+
+
 def test_aggregate_panel_takes_the_median_so_one_outlier_cannot_move_it():
     consensus = aggregate_panel(
         [

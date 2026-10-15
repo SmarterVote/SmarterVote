@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Literal, Optional
 
-from shared.forecast_math import NATIONAL_SWING_LOGIT_SD, correlated_seat_distribution
+from shared.forecast_math import NATIONAL_SWING_LOGIT_SD, correlated_seat_distribution, major_party
 
 Party = Literal["Democratic", "Republican", "Other"]
 Chamber = Literal["house", "senate", "governors"]
@@ -236,12 +236,11 @@ ABBR_TO_STATE = {
 }
 
 
-# One party-label vocabulary shared with `partyFromLabel` in
+# One party-label vocabulary (`shared.forecast_math.major_party`, which the
+# pipeline's forecast phase also uses) shared with `partyFromLabel` in
 # web/src/lib/utils/forecast.ts; tests/fixtures/forecast_parity.json pins both
 # sides to the same answers. A label the two sides read differently counts the
 # same seat for different parties on the API and on the forecast page.
-DEMOCRATIC_PARTY_LABELS = frozenset({"d", "dem", "dfl"})
-REPUBLICAN_PARTY_LABELS = frozenset({"r", "rep", "gop"})
 UNSPECIFIED_WINNER_LABELS = frozenset(
     {"", "other", "unknown", "none", "n/a", "na", "null", "tbd", "undecided", "tossup", "toss-up"}
 )
@@ -256,11 +255,7 @@ def classify_party(party: Any) -> Optional[Party]:
     value = str(party or "").strip().lower()
     if value in UNSPECIFIED_WINNER_LABELS:
         return None
-    if value in DEMOCRATIC_PARTY_LABELS or "democrat" in value:
-        return "Democratic"
-    if value in REPUBLICAN_PARTY_LABELS or "republican" in value:
-        return "Republican"
-    return "Other"
+    return major_party(value) or "Other"
 
 
 def normalize_party(party: Any) -> Party:
