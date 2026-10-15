@@ -42,6 +42,7 @@
   export let selectedIssue: CanonicalIssue = "Healthcare";
 
   let expandedSources: Record<string, boolean> = {};
+  let selectedCompactIssue: CanonicalIssue = "Healthcare";
 
   /**
    * Which layout to keep in the DOM. Server-rendered HTML carries both (CSS
@@ -114,13 +115,17 @@
     },
   ];
 
+  $: sourcedIssueKeys = CANONICAL_ISSUES.filter((key) =>
+    candidates.some((candidate) => {
+      const stance = candidate.issues?.[key];
+      return hasStance(stance) && (stance?.sources?.length ?? 0) > 0;
+    }),
+  );
+  $: if (!sourcedIssueKeys.includes(selectedCompactIssue))
+    selectedCompactIssue = sourcedIssueKeys[0] ?? "Healthcare";
+  $: issueSelectId = `desktop-compare-issue-${race.id}`;
   $: issueKeys = compact
-    ? CANONICAL_ISSUES.filter((key) =>
-        candidates.some((candidate) => {
-          const stance = candidate.issues?.[key];
-          return hasStance(stance) && (stance?.sources?.length ?? 0) > 0;
-        }),
-      ).slice(0, 1)
+    ? sourcedIssueKeys.filter((key) => key === selectedCompactIssue)
     : CANONICAL_ISSUES.filter(
         (key) =>
           // Rows where nobody compared states a position collapse into one line.
@@ -371,7 +376,30 @@
               class="section-label"
               style="grid-column: 1 / -1"
             >
-              Positions on Key Issues
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <span>Positions on Key Issues</span>
+                {#if compact}
+                  <div class="flex items-center gap-2">
+                    <label for={issueSelectId}>Compare an issue</label>
+                    <select
+                      id={issueSelectId}
+                      bind:value={selectedCompactIssue}
+                      disabled={sourcedIssueKeys.length === 0}
+                      class="min-h-11 rounded-lg border border-stroke bg-surface px-3 text-sm font-semibold normal-case tracking-normal text-content focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {#if sourcedIssueKeys.length === 0}
+                        <option>No sourced issues available</option>
+                      {:else}
+                        {#each sourcedIssueKeys as issue}
+                          <option value={issue}
+                            >{getIssueDisplayName(issue)}</option
+                          >
+                        {/each}
+                      {/if}
+                    </select>
+                  </div>
+                {/if}
+              </div>
             </div>
           </div>
           {#if noPositionIssues.length > 0}
