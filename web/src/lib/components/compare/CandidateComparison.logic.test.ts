@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Candidate, IssueStance, Race, RaceForecast } from "$lib/types";
 import CandidateComparison from "./CandidateComparison.svelte";
@@ -184,14 +184,74 @@ describe("CandidateComparison compact mode", () => {
     expect(container.textContent).toContain("Local Issues");
   });
 
-  it("limits compact mode to four issues", () => {
+  it("lets desktop visitors select each sourced issue in compact mode", async () => {
     const { container } = render(CandidateComparison, {
       race: race({ candidates: [withIssues] }),
       candidates: [withIssues],
       compact: true,
     });
 
-    expect(container.textContent).not.toContain("Local Issues");
+    const desktop = within(
+      container.querySelector("[data-desktop-candidate-comparison]")!,
+    );
+    const selector = desktop.getByRole("combobox", {
+      name: "Compare an issue",
+    });
+    expect(within(selector).getAllByRole("option")).toHaveLength(5);
+    expect(desktop.getByText("Healthcare stance")).toBeTruthy();
+    expect(desktop.queryByText("Economy stance")).toBeNull();
+
+    await fireEvent.change(selector, { target: { value: "Economy" } });
+    expect(desktop.getByText("Economy stance")).toBeTruthy();
+    expect(desktop.queryByText("Healthcare stance")).toBeNull();
+
+    await fireEvent.change(selector, { target: { value: "Tech & AI" } });
+    expect(desktop.getByText("Tech stance")).toBeTruthy();
+    expect(desktop.queryByText("Economy stance")).toBeNull();
+    expect(desktop.queryByText("Local Issues")).toBeNull();
+    expect(
+      within(selector).queryByRole("option", { name: "Foreign Policy" }),
+    ).toBeNull();
+  });
+
+  it("falls back to an available issue when the compared candidates change", async () => {
+    const { container, rerender } = render(CandidateComparison, {
+      race: race({ candidates: [withIssues] }),
+      candidates: [withIssues],
+      compact: true,
+    });
+    const desktop = within(
+      container.querySelector("[data-desktop-candidate-comparison]")!,
+    );
+    await fireEvent.change(desktop.getByRole("combobox"), {
+      target: { value: "Economy" },
+    });
+    const next = candidate("John Roe", {
+      issues: {
+        Education: sourced("Education proposal"),
+      } as Candidate["issues"],
+    });
+    await rerender({ race: race({ candidates: [next] }), candidates: [next] });
+    expect((desktop.getByRole("combobox") as HTMLSelectElement).value).toBe(
+      "Education",
+    );
+    expect(desktop.getByText("Education proposal")).toBeTruthy();
+  });
+
+  it("disables the desktop selector when no sourced issues are available", () => {
+    const jane = candidate("Jane Doe");
+    const { container } = render(CandidateComparison, {
+      race: race({ candidates: [jane] }),
+      candidates: [jane],
+      compact: true,
+    });
+    const desktop = within(
+      container.querySelector("[data-desktop-candidate-comparison]")!,
+    );
+    expect((desktop.getByRole("combobox") as HTMLSelectElement).disabled).toBe(
+      true,
+    );
+    expect(desktop.getByText("No sourced issues available")).toBeTruthy();
   });
 
   // Compact mode is for previews, so it only surfaces issues backed by a
