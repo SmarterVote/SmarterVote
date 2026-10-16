@@ -6,7 +6,7 @@ import asyncio
 import os
 import re
 from typing import Any, Dict, List, Literal, Tuple
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 from mcp.server.mcpserver import MCPServer
 
@@ -143,23 +143,38 @@ def _catalog_research_tier(race: Dict[str, Any]) -> str:
 
 
 async def _optional_api_get(path: str, *, params: Dict[str, Any]) -> Dict[str, Any]:
-    """Return an optional analytics payload without making catalog scans brittle."""
+    """Return an optional analytics payload without making catalog scans brittle.
+
+    A failed fetch (rate limit, timeout, auth) must not abort the scan, but it must
+    not look like "no traffic" either: the error is returned so callers can surface
+    it instead of silently reporting zero pageviews for every race.
+    """
     try:
         response = await _client().get(path, params=params)
-        return response if isinstance(response, dict) else {}
-    except Exception:
-        return {}
+    except Exception as exc:
+        return {"error": f"{path} unavailable: {exc}"}
+    return response if isinstance(response, dict) else {}
 
 
 def _race_pageviews(traffic: Dict[str, Any]) -> Dict[str, int]:
+    """Sum Cloudflare ``top_pages`` pageviews per race.
+
+    Every path whose first two segments are ``/races/<race_id>`` counts toward that
+    race (trailing slash, ``/compare/`` and candidate subpaths included). The race id
+    is a whole path segment, so ``fl-senate-2026`` never absorbs
+    ``fl-senate-2026-special``. Query strings and fragments are ignored.
+    """
     totals: Dict[str, int] = {}
-    for page in traffic.get("top_pages", []):
+    for page in traffic.get("top_pages") or []:
         if not isinstance(page, dict):
             continue
-        match = re.match(r"^/races/([^/?#]+)", str(page.get("name") or ""))
-        if not match:
+        raw_path = str(page.get("name") or page.get("path") or "").strip()
+        segments = [segment for segment in urlsplit(raw_path).path.split("/") if segment]
+        if len(segments) < 2 or segments[0] != "races":
             continue
-        race_id = unquote(match.group(1))
+        race_id = unquote(segments[1]).strip().lower()
+        if not race_id:
+            continue
         try:
             pageviews = max(0, int(page.get("pageviews") or 0))
         except (TypeError, ValueError):
@@ -381,6 +396,7 @@ async def scan_catalog(
             "traffic_hours": traffic_hours,
             "traffic_configured": bool(traffic.get("configured")),
             "traffic_error": traffic.get("error"),
+            "api_analytics_error": api_analytics.get("error"),
         },
     }
 
@@ -820,6 +836,7 @@ async def audit_issue_research_readiness(
         "missing_race_ids": list(dict.fromkeys(missing_race_ids)),
         "traffic_hours": traffic_hours,
         "traffic_configured": traffic.get("configured") is True,
+        "traffic_error": traffic.get("error"),
         "primary_result_verified": False,
         "primary_result_note": (
             "This audit measures stored data only. Verify official primary results and the complete advancing roster "
