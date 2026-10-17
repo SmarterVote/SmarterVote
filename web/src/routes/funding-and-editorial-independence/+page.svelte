@@ -9,13 +9,14 @@
   description="The rules separating Smarter.Vote funding from its election research and publication decisions."
   path="/funding-and-editorial-independence/"
   eyebrow="Accountability"
-  updated="2026-10-10"
+  updated="2026-10-17"
 >
   <PolicySection title="Current funding">
     <p>
-      Smarter.Vote is funded mostly by its founder, with support from individual
-      readers. It has no institutional funders, sponsors, or advertisers. All
-      funding follows the rules on this page.
+      Smarter.Vote's 2026 research was funded entirely by its founder. Reader
+      support now helps keep coverage current. Smarter.Vote currently has no
+      institutional funders or advertisers. All funding follows the rules on
+      this page.
     </p>
     <p>
       Expanding coverage to state and local races and continuing through 2028
