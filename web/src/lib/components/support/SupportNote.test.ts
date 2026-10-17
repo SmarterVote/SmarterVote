@@ -6,7 +6,9 @@ describe("SupportNote", () => {
   it("explains founder funding and links to the support page", () => {
     render(SupportNote);
 
-    expect(screen.getByText(/funded mostly by its founder/)).toBeTruthy();
+    expect(
+      screen.getByText(/2026 research was funded entirely by its founder/),
+    ).toBeTruthy();
     expect(
       screen
         .getByRole("link", { name: "Help keep it running" })
