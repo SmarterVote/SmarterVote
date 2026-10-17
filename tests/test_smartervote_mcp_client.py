@@ -284,6 +284,72 @@ async def test_scan_catalog_returns_compact_ranked_health_rows(monkeypatch):
     assert result["summary"]["traffic_configured"] is True
 
 
+def test_race_pageviews_sums_all_race_subpaths_by_exact_segment():
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    traffic = {
+        "top_pages": [
+            {"name": "/races/co-senate-2026/compare/", "pageviews": 209, "visits": 80},
+            {"name": "/races/co-senate-2026/", "pageviews": 115, "visits": 60},
+            {"name": "/races/co-senate-2026", "pageviews": 5},
+            {"name": "/races/co-senate-2026/?ref=share", "pageviews": 3},
+            {"name": "/races/fl-senate-2026-special/neil-gillespie/", "pageviews": 58},
+            {"name": "/races/fl-senate-2026/", "pageviews": 7},
+            {"path": "/races/fl-senate-2026/compare/", "pageviews": 2},
+            {"name": "https://smartervote.org/races/ga-senate-2026/#issues", "pageviews": 4},
+            {"name": "/elections/", "pageviews": 900},
+            {"name": "/my-ballot/", "pageviews": 400},
+            {"name": "/races/", "pageviews": 50},
+            {"name": "/", "pageviews": 1000},
+            {"name": "/forecast/races/co-senate-2026/", "pageviews": 999},
+            {"name": "/races/bad-count/", "pageviews": "n/a"},
+            "not-a-row",
+        ]
+    }
+
+    assert server._race_pageviews(traffic) == {
+        "co-senate-2026": 332,
+        "fl-senate-2026-special": 58,
+        "fl-senate-2026": 9,
+        "ga-senate-2026": 4,
+        "bad-count": 0,
+    }
+    assert server._race_pageviews({}) == {}
+    assert server._race_pageviews({"top_pages": None}) == {}
+
+
+@pytest.mark.asyncio
+async def test_scan_catalog_surfaces_failed_traffic_fetch_instead_of_silent_zero(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    monkeypatch.setattr(
+        server,
+        "list_admin_races",
+        AsyncMock(return_value={"races": [{"race_id": "co-senate-2026", "published_exists": True}]}),
+    )
+    monkeypatch.setattr(
+        server,
+        "_client",
+        lambda: _StubRacesClient(
+            {
+                "/analytics/traffic": RuntimeError("races-api 429 for GET /analytics/traffic: rate limited"),
+                "/analytics/races": RuntimeError("races-api 503"),
+            }
+        ),
+    )
+
+    result = await server.scan_catalog()
+
+    assert result["rows"][0]["pageviews"] == 0
+    assert result["summary"]["traffic_configured"] is False
+    assert "429" in result["summary"]["traffic_error"]
+    assert "503" in result["summary"]["api_analytics_error"]
+
+
 @pytest.mark.asyncio
 async def test_plan_repairs_forwards_bounded_read_only_request(monkeypatch):
     _require_mcp_sdk()
