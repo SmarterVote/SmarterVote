@@ -15,9 +15,9 @@
 >
   <PolicySection title="Why support matters right now">
     <p>
-      Smarter.Vote is funded mostly by its founder, with help from readers.
-      There are no advertisers, sponsors, or campaign dollars behind it, and
-      every race guide carries real research, data, and hosting costs.
+      Smarter.Vote's 2026 research was funded entirely by its founder. There are
+      no advertisers or campaign dollars behind it, and every race guide carries
+      real research, data, and hosting costs.
     </p>
     <p>
       The next steps are expanding beyond national races to state and local
