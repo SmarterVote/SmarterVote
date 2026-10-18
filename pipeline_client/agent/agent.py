@@ -15,7 +15,7 @@ Phases (fresh run):
 Update run adds Phase 0 (roster sync) before Phase 1 (meta update).
 
 Uses a SQLite search cache (``pipeline_client.agent.search_cache``) to avoid
-redundant Serper API calls across runs.  Token usage and estimated USD cost
+redundant search API calls across runs.  Token usage and estimated USD cost
 are attached to the output JSON under ``agent_metrics``.
 """
 
