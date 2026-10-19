@@ -266,6 +266,46 @@ async def test_await_with_run_budget_returns_timeout_result_on_timeout():
     assert result is sentinel
 
 
+@pytest.mark.asyncio
+async def test_await_with_run_budget_raises_timeout_exception_at_full_ceiling():
+    async def slow():
+        await asyncio.sleep(1.0)
+
+    with pytest.raises(RuntimeError, match="provider down after 0.01s"):
+        await _await_with_run_budget(
+            slow(),
+            run_budget=None,
+            requested_timeout=0.01,
+            operation="test op",
+            timeout_result=[],
+            timeout_exception=lambda t: RuntimeError(f"provider down after {t}s"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_await_with_run_budget_budget_shortened_timeout_keeps_timeout_result():
+    """When the run budget, not the tool, cut the wait short, the provider is not blamed."""
+
+    async def slow():
+        await asyncio.sleep(1.0)
+
+    fake_budget = MagicMock()
+    fake_budget.bounded_timeout.return_value = 0.01
+    on_timeout = MagicMock()
+
+    result = await _await_with_run_budget(
+        slow(),
+        run_budget=fake_budget,
+        requested_timeout=30.0,
+        operation="test op",
+        timeout_result=[],
+        timeout_exception=on_timeout,
+    )
+
+    assert result == []
+    on_timeout.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # _normalize_source / _normalize_candidate
 # ---------------------------------------------------------------------------

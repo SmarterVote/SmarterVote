@@ -9,7 +9,7 @@ import os
 import random
 import time
 import weakref
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from .ballotpedia import lookup_candidate_data as _ballotpedia_lookup
 from .ballotpedia import lookup_election_page as _ballotpedia_election_lookup
@@ -37,7 +37,14 @@ from .tools import (
     SEARCH_TOOL,
 )
 from .utils import _extract_json, iso_timestamp_or_now, make_logger
-from .web_tools import _fetch_page, _page_fetch_log_hint, _serper_image_search, _serper_search
+from .web_tools import (
+    SEARCH_TOOL_TIMEOUT_SECONDS,
+    _fetch_page,
+    _page_fetch_log_hint,
+    _serper_image_search,
+    _serper_search,
+    search_timeout_unavailable,
+)
 
 logger = logging.getLogger("pipeline")
 
@@ -242,8 +249,16 @@ async def _await_with_run_budget(
     requested_timeout: float,
     operation: str,
     timeout_result: Any,
+    timeout_exception: Callable[[float], BaseException] | None = None,
 ) -> Any:
-    """Await a tool request and turn isolated tool timeouts into model-visible failures."""
+    """Await a tool request and turn isolated tool timeouts into model-visible failures.
+
+    When *timeout_exception* is given, a timeout at the full requested ceiling
+    raises the exception it builds instead of returning *timeout_result*. Search
+    uses this so a hung provider fails the phase rather than feeding the model an
+    empty result list per query. A timeout the run budget shortened still returns
+    *timeout_result*: there the run, not the tool, is out of time.
+    """
     timeout = requested_timeout
     if run_budget:
         timeout = run_budget.bounded_timeout(requested_timeout, minimum_seconds=2.0, operation=operation)
@@ -251,6 +266,9 @@ async def _await_with_run_budget(
         return await asyncio.wait_for(awaitable, timeout=timeout)
     except asyncio.TimeoutError:
         record_retry_metric("deadline_exits")
+        if timeout_exception is not None and timeout >= requested_timeout:
+            logger.error("%s timed out after %.1fs; treating it as a provider failure", operation, timeout)
+            raise timeout_exception(timeout) from None
         logger.warning("%s timed out after %.1fs; continuing the agent loop", operation, timeout)
         return timeout_result
 
@@ -903,9 +921,10 @@ async def _agent_loop(
                             **({"run_budget": run_budget} if run_budget else {}),
                         ),
                         run_budget=run_budget,
-                        requested_timeout=30.0,
-                        operation="Serper search",
+                        requested_timeout=SEARCH_TOOL_TIMEOUT_SECONDS,
+                        operation="Searlo search",
                         timeout_result=[],
+                        timeout_exception=search_timeout_unavailable,
                     )
                     log("debug", f"    🔍 got {len(search_results)} results")
                     for search_result in search_results:
@@ -931,9 +950,10 @@ async def _agent_loop(
                             **({"run_budget": run_budget} if run_budget else {}),
                         ),
                         run_budget=run_budget,
-                        requested_timeout=30.0,
-                        operation="Serper image search",
+                        requested_timeout=SEARCH_TOOL_TIMEOUT_SECONDS,
+                        operation="Searlo image search",
                         timeout_result=[],
+                        timeout_exception=search_timeout_unavailable,
                     )
                     log("debug", f"    🖼️ got {len(search_results)} results")
                     messages.append(

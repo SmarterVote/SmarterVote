@@ -1664,7 +1664,7 @@ async def _resolve_wikimedia_commons(url: str) -> Optional[str]:
 async def _lookup_serper_image(
     candidate_name: str, context: Optional[str] = None, run_budget: RunBudget | None = None
 ) -> Optional[str]:
-    """Search for a candidate headshot via Serper Images, ranked by relevance.
+    """Search for a candidate headshot via Searlo image search, ranked by relevance.
 
     Runs a few query variants, scores each result by how strongly its title/source
     references the candidate (to avoid generic party graphics or the wrong person),
@@ -1727,7 +1727,7 @@ async def _lookup_serper_image(
             if accessible:
                 return final_url if _is_valid_image_url(final_url) else img_url
     except Exception as e:
-        logger.debug("Serper image fast path failed: %s", e)
+        logger.debug("Image search fast path failed: %s", e)
     return None
 
 
@@ -2020,7 +2020,7 @@ async def _resolve_single_image(
         serper_img = None
     if serper_img:
         candidate["image_url"] = serper_img
-        log("info", f"  [{name}] Serper image confirmed -> {serper_img[:80]}")
+        log("info", f"  [{name}] Searlo image confirmed -> {serper_img[:80]}")
         return
     log("info", f"  [{name}] Serper Images found no accessible photo - falling back to agent search")
 

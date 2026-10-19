@@ -1,5 +1,6 @@
-"""Tests for web tools: Serper search, page fetching, and content analysis."""
+"""Tests for web tools: Searlo search, page fetching, and content analysis."""
 
+import asyncio
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -30,35 +31,63 @@ def hermetic_dns(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Serper search tests
+# Searlo search tests
 # ---------------------------------------------------------------------------
+
+_SEARLO_WEB = "https://api.searlo.tech/api/v1/search/web"
+_SEARLO_IMAGES = "https://api.searlo.tech/api/v1/search/images"
+
+
+@pytest.fixture
+def run_acc():
+    """Run-scoped cost accumulator, which is where the sticky outage flag lives."""
+    from pipeline_client.agent import cost as cost_module
+
+    acc = {"prompt_tokens": 0, "completion_tokens": 0, "serper_calls": 0, "searlo_calls": 0}
+    token = cost_module._cost_ctx.set(acc)
+    try:
+        yield acc
+    finally:
+        cost_module._cost_ctx.reset(token)
+
+
+def _searlo_ok(title="Primary", url=_SEARLO_WEB):
+    return httpx.Response(
+        200,
+        request=httpx.Request("GET", url),
+        json={"organic": [{"title": title, "snippet": "Evidence", "link": "https://example.com"}]},
+    )
+
+
+def _searlo_status(status, url=_SEARLO_WEB):
+    return httpx.Response(status, request=httpx.Request("GET", url), text="upstream error")
+
+
+def _search_client(*responses):
+    client = MagicMock()
+    client.get = AsyncMock(side_effect=list(responses))
+    client.post = AsyncMock()
+    return client
 
 
 @pytest.mark.asyncio
-async def test_search_raises_when_no_provider_is_configured():
-    """With neither provider configured, searching must fail loudly.
+@pytest.mark.parametrize("search", [_serper_search, _serper_image_search])
+async def test_search_raises_when_searlo_key_is_missing(search):
+    """With no Searlo key, searching must fail loudly.
 
     Handing the agent a soft error dict here would invite it to answer from
     unsourced model knowledge, which is the one failure this module exists to
     prevent.
     """
-    env = os.environ.copy()
-    env.pop("SERPER_API_KEY", None)
-    env.pop("SEARLO_API_KEY", None)
     with (
-        patch.dict(os.environ, env, clear=True),
         patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
         pytest.raises(SearchProviderUnavailable, match="SEARLO_API_KEY"),
     ):
-        await _serper_search("test query")
+        await search("test query")
 
 
 def test_search_provider_env_is_isolated_from_dotenv():
-    """Guards the conftest fixture that keeps a developer's .env out of these tests.
-
-    Without it, an ambient SEARLO_API_KEY sends the Serper-path tests down the
-    Searlo fallback and they fail only in a full local run.
-    """
+    """Guards the conftest fixture that keeps a developer's .env out of these tests."""
     assert os.environ.get("SERPER_API_KEY") is None
     assert os.environ.get("SEARLO_API_KEY") is None
 
@@ -77,257 +106,271 @@ async def test_serper_search_uses_cache():
 
 
 @pytest.mark.asyncio
-async def test_serper_search_returns_tool_error_on_http_400():
-    """Bad model-generated search queries should not fail the whole pipeline."""
-    request = httpx.Request("POST", "https://google.serper.dev/search")
-    response = httpx.Response(400, request=request, text="bad request")
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=response)
+async def test_searlo_request_and_response_contract():
+    client = _search_client(_searlo_ok("Race guide"))
+    mock_cache = MagicMock()
+    mock_cache.get.return_value = None
 
     with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key"}),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=mock_cache),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
     ):
-        results = await _serper_search("bad query")
+        results = await _serper_search(" Arizona   Senate 2026 ", num_results=4, race_id="az-senate-2026")
 
-    assert results == [{"error": "Serper search failed: HTTP 400"}]
+    request = client.get.call_args
+    assert request.args[0] == _SEARLO_WEB
+    assert request.kwargs["headers"] == {"x-api-key": "k"}
+    assert request.kwargs["params"] == {"q": "Arizona Senate 2026", "limit": 4, "gl": "us", "hl": "en"}
+    assert results == [{"title": "Race guide", "snippet": "Evidence", "url": "https://example.com"}]
+    mock_cache.set.assert_called_once_with("Arizona Senate 2026", results, race_id="az-senate-2026", provider="searlo")
+    client.post.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_serper_search_falls_back_to_searlo_when_credits_are_exhausted():
-    request = httpx.Request("POST", "https://google.serper.dev/search")
-    response = httpx.Response(400, request=request, text='{"message":"Not enough credits"}')
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=response)
-    mock_client.get = AsyncMock(
-        return_value=httpx.Response(
-            200,
-            request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/web"),
-            json={"organic": [{"title": "Fallback", "snippet": "Evidence", "link": "https://example.com"}]},
-        )
-    )
-
-    with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key", "SEARLO_API_KEY": "fallback-key"}),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-    ):
-        results = await _serper_search("important evidence")
-
-    assert results == [{"title": "Fallback", "snippet": "Evidence", "url": "https://example.com"}]
-    assert mock_client.get.call_args.kwargs["headers"] == {"x-api-key": "fallback-key"}
-
-
-@pytest.mark.asyncio
-async def test_serper_search_stops_when_credits_exhausted_without_searlo_key():
-    response = httpx.Response(
-        400,
-        request=httpx.Request("POST", "https://google.serper.dev/search"),
-        text='{"message":"Not enough credits"}',
-    )
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=response)
-    env = os.environ.copy()
-    env["SERPER_API_KEY"] = "test-key"
-    env.pop("SEARLO_API_KEY", None)
-
-    with (
-        patch.dict(os.environ, env, clear=True),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-        pytest.raises(SearchProviderUnavailable, match="SEARLO_API_KEY is not configured"),
-    ):
-        await _serper_search("important evidence")
-
-
-@pytest.mark.asyncio
-async def test_serper_search_retries_transient_failure_once():
-    request = httpx.Request("POST", "https://google.serper.dev/search")
-    unavailable = httpx.Response(503, request=request, text="unavailable")
-    success = httpx.Response(
-        200,
-        request=request,
-        json={"organic": [{"title": "Result", "snippet": "Evidence", "link": "https://example.com"}]},
-    )
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(side_effect=[unavailable, success])
-
-    with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key"}),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-        patch("pipeline_client.agent.web_tools.random.uniform", return_value=1.0),
-        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-    ):
-        results = await _serper_search("retry query")
-
-    assert results == [{"title": "Result", "snippet": "Evidence", "url": "https://example.com"}]
-    assert mock_client.post.call_count == 2
-    mock_sleep.assert_awaited_once_with(1.0)
-
-
-@pytest.mark.asyncio
-async def test_serper_search_request_and_response_contract():
-    response = httpx.Response(
-        200,
-        request=httpx.Request("POST", "https://google.serper.dev/search"),
-        json={
-            "organic": [{"title": "Race guide", "snippet": "Candidate evidence", "link": "https://example.com/race"}],
-            "knowledgeGraph": {
-                "title": "Arizona Senate",
-                "description": "2026 election",
-                "website": "https://example.com/election",
-            },
-        },
-    )
-    client = MagicMock()
-    client.post = AsyncMock(return_value=response)
-
-    with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key"}),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=client),
-    ):
-        results = await _serper_search(" Arizona   Senate 2026 ", num_results=4)
-
-    request = client.post.call_args
-    assert request.args[0] == "https://google.serper.dev/search"
-    assert request.kwargs["headers"] == {"X-API-KEY": "test-key", "Content-Type": "application/json"}
-    assert request.kwargs["json"] == {"q": "Arizona Senate 2026", "num": 4}
-    assert results[0] == {
-        "title": "Arizona Senate",
-        "snippet": "2026 election",
-        "url": "https://example.com/election",
-        "type": "knowledge_graph",
-    }
-    assert results[1]["url"] == "https://example.com/race"
-
-
-@pytest.mark.asyncio
-async def test_serper_search_truncates_oversized_queries():
-    """Oversized queries are trimmed before calling Serper."""
-    response = httpx.Response(200, json={"organic": []}, request=httpx.Request("POST", "https://google.serper.dev/search"))
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=response)
+async def test_search_truncates_oversized_queries():
+    client = _search_client(httpx.Response(200, json={"organic": []}, request=httpx.Request("GET", _SEARLO_WEB)))
     long_query = " ".join(["georgia governor"] * 80)
 
     with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key"}),
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
         patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
     ):
         results = await _serper_search(long_query)
 
-    sent_query = mock_client.post.call_args.kwargs["json"]["q"]
     assert results == []
-    assert len(sent_query) <= 500
+    assert len(client.get.call_args.kwargs["params"]["q"]) <= 500
 
 
 @pytest.mark.asyncio
-async def test_image_search_raises_when_no_provider_is_configured():
-    """The image path fails loudly for the same reason the web path does."""
-    env = os.environ.copy()
-    env.pop("SERPER_API_KEY", None)
-    env.pop("SEARLO_API_KEY", None)
-    with (
-        patch.dict(os.environ, env, clear=True),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        pytest.raises(SearchProviderUnavailable, match="SEARLO_API_KEY"),
-    ):
-        await _serper_image_search("test query")
-
-
-@pytest.mark.asyncio
-async def test_serper_image_search_success():
-    """_serper_image_search returns image URLs correctly."""
+async def test_image_search_uses_searlo_images_endpoint():
     response = httpx.Response(
         200,
-        json={"images": [{"title": "Image Title", "imageUrl": "https://example.com/img.jpg", "link": "https://example.com"}]},
-        request=httpx.Request("POST", "https://google.serper.dev/images"),
+        request=httpx.Request("GET", _SEARLO_IMAGES),
+        json={
+            "images": [
+                {"title": "Candidate", "imageUrl": "https://example.com/photo.jpg", "sourceUrl": "https://example.com/c"}
+            ]
+        },
     )
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=response)
+    client = _search_client(response)
 
     with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key"}),
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
         patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
     ):
         results = await _serper_image_search("candidate headshot")
 
-    assert results == [{"title": "Image Title", "imageUrl": "https://example.com/img.jpg", "url": "https://example.com"}]
+    assert client.get.call_args.args[0] == _SEARLO_IMAGES
+    assert results == [{"title": "Candidate", "imageUrl": "https://example.com/photo.jpg", "url": "https://example.com/c"}]
+    client.post.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_serper_image_search_falls_back_to_searlo_when_credits_are_exhausted():
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(
-        return_value=httpx.Response(
-            400,
-            request=httpx.Request("POST", "https://google.serper.dev/images"),
-            text='{"message":"Not enough credits"}',
-        )
-    )
-    mock_client.get = AsyncMock(
-        return_value=httpx.Response(
-            200,
-            request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/images"),
-            json={
-                "images": [
-                    {
-                        "title": "Candidate",
-                        "imageUrl": "https://example.com/photo.jpg",
-                        "sourceUrl": "https://example.com/candidate",
-                    }
-                ]
-            },
-        )
-    )
-
-    with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key", "SEARLO_API_KEY": "fallback-key"}),
-        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-    ):
-        results = await _serper_image_search("candidate headshot")
-
-    assert results == [
-        {
-            "title": "Candidate",
-            "imageUrl": "https://example.com/photo.jpg",
-            "url": "https://example.com/candidate",
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_searlo_fallback_accepts_documented_items_shape():
+async def test_searlo_accepts_documented_items_shape():
     """Keep compatibility with Searlo's documented response during API rollout."""
-    mock_client = MagicMock()
-    mock_client.post = AsyncMock(
-        return_value=httpx.Response(
-            400,
-            request=httpx.Request("POST", "https://google.serper.dev/search"),
-            text='{"message":"Not enough credits"}',
-        )
+    response = httpx.Response(
+        200,
+        request=httpx.Request("GET", _SEARLO_WEB),
+        json={"items": [{"title": "Item", "snippet": "Evidence", "link": "https://example.com"}]},
     )
-    mock_client.get = AsyncMock(
-        return_value=httpx.Response(
-            200,
-            request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/web"),
-            json={"items": [{"title": "Fallback", "snippet": "Evidence", "link": "https://example.com"}]},
-        )
-    )
+    client = _search_client(response)
 
     with (
-        patch.dict(os.environ, {"SERPER_API_KEY": "test-key", "SEARLO_API_KEY": "fallback-key"}),
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
         patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-        patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
     ):
         results = await _serper_search("important evidence")
 
-    assert results == [{"title": "Fallback", "snippet": "Evidence", "url": "https://example.com"}]
+    assert results == [{"title": "Item", "snippet": "Evidence", "url": "https://example.com"}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [429, 503, 520, 521, 522, 523, 524])
+async def test_searlo_retries_transient_status_and_succeeds(run_acc, status):
+    """Transient statuses, including Cloudflare's 52x origin errors, are retried.
+
+    The 2026-10-18 outage answered with 521, which used to be treated as
+    terminal.
+    """
+    client = _search_client(_searlo_status(status), _searlo_ok())
+
+    with (
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        results = await _serper_search("query")
+
+    assert results[0]["title"] == "Primary"
+    assert client.get.await_count == 2
+    # The retry is the same question asked again, so it must not be billed twice.
+    assert run_acc["searlo_calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_searlo_outage_raises_after_retries_and_is_sticky(run_acc):
+    """A persistent outage raises, then every later search fails without a request."""
+    from pipeline_client.agent.cost import search_provider_exhausted
+
+    client = _search_client(*[_searlo_status(521)] * 3)
+    mock_cache = MagicMock()
+    mock_cache.get.return_value = None
+
+    with (
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=mock_cache),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        with pytest.raises(SearchProviderUnavailable, match="HTTP 521"):
+            await _serper_search("first")
+        assert client.get.await_count == 3
+        assert mock_sleep.await_count == 2
+        assert search_provider_exhausted("searlo") is True
+
+        mock_cache.get.reset_mock()
+        with pytest.raises(SearchProviderUnavailable, match="earlier in this run"):
+            await _serper_search("second")
+        with pytest.raises(SearchProviderUnavailable, match="earlier in this run"):
+            await _serper_image_search("candidate headshot")
+
+    # No further network call, no cache lookup, no backoff.
+    assert client.get.await_count == 3
+    assert mock_sleep.await_count == 2
+    mock_cache.get.assert_not_called()
+    client.post.assert_not_awaited()
+    assert run_acc["searlo_calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_searlo_network_failures_raise_after_retries(run_acc):
+    """A hung or refused connection is an outage too, not an empty result."""
+    request = httpx.Request("GET", _SEARLO_WEB)
+    client = MagicMock()
+    client.get = AsyncMock(side_effect=httpx.ReadTimeout("timed out", request=request))
+
+    with (
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
+        pytest.raises(SearchProviderUnavailable, match="after 3 attempts"),
+    ):
+        await _serper_image_search("candidate headshot")
+
+    assert client.get.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_searlo_auth_failure_is_not_retried(run_acc):
+    """A rejected key will not heal by waiting, so spend nothing on backoff."""
+    client = _search_client(_searlo_status(403))
+
+    with (
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        pytest.raises(SearchProviderUnavailable, match="HTTP 403"),
+    ):
+        await _serper_search("query")
+
+    assert client.get.await_count == 1
+    mock_sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_searlo_outage_never_falls_back_to_serper(run_acc):
+    """Searlo is the only provider: even with a Serper key present, nothing dials Serper."""
+    seen_hosts = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_hosts.append(request.url.host)
+        return httpx.Response(521, text="origin down")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        with (
+            patch.dict(os.environ, {"SEARLO_API_KEY": "k", "SERPER_API_KEY": "legacy"}),
+            patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+            patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+            patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
+        ):
+            with pytest.raises(SearchProviderUnavailable):
+                await _serper_search("query")
+            with pytest.raises(SearchProviderUnavailable):
+                await _serper_image_search("query")
+    finally:
+        await client.aclose()
+
+    assert seen_hosts == ["api.searlo.tech"] * 3
+    assert "google.serper.dev" not in seen_hosts
+
+
+def test_searlo_worst_case_fits_inside_the_outer_tool_timeout():
+    """Searlo's full retry schedule must finish before the agent loop's per-call timeout.
+
+    When it did not (3 x 10s + backoff ~= 33s > 30s), the outer timeout always
+    fired first during an outage and returned a silent [] instead of
+    SearchProviderUnavailable.
+    """
+    from pipeline_client.agent import web_tools
+
+    worst = web_tools.searlo_worst_case_seconds()
+    assert worst == pytest.approx(3 * 7.0 + 1.2 + 2.4)
+    assert worst <= web_tools.SEARCH_TOOL_TIMEOUT_SECONDS - 5.0
+    # The jittered backoff can never exceed what the budget assumes.
+    with patch("pipeline_client.agent.web_tools.random.uniform", return_value=web_tools._SEARLO_BACKOFF_MAX_JITTER):
+        actual_backoff = sum(web_tools._searlo_backoff_seconds(i) for i in range(web_tools._SEARLO_MAX_ATTEMPTS - 1))
+    assert actual_backoff + web_tools._SEARLO_MAX_ATTEMPTS * web_tools._SEARLO_ATTEMPT_TIMEOUT_SECONDS == pytest.approx(worst)
+
+
+@pytest.mark.asyncio
+async def test_searlo_requests_use_the_budgeted_per_attempt_timeout(run_acc):
+    from pipeline_client.agent import web_tools
+
+    client = _search_client(_searlo_status(521), _searlo_ok())
+
+    with (
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k"}),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=client),
+        patch("pipeline_client.agent.web_tools.random.uniform", return_value=1.2),
+        patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+    ):
+        await _serper_search("query")
+
+    assert [c.kwargs["timeout"] for c in client.get.await_args_list] == [web_tools._SEARLO_ATTEMPT_TIMEOUT_SECONDS] * 2
+    mock_sleep.assert_awaited_once_with(pytest.approx(1.2))
+
+
+@pytest.mark.asyncio
+async def test_outer_search_timeout_raises_and_marks_searlo_unavailable(run_acc):
+    """If a search still outlives the outer ceiling, it fails the phase instead of returning []."""
+    from pipeline_client.agent.cost import search_provider_exhausted
+    from pipeline_client.agent.llm import _await_with_run_budget
+    from pipeline_client.agent.web_tools import search_timeout_unavailable
+
+    async def hung():
+        await asyncio.sleep(1.0)
+
+    with pytest.raises(SearchProviderUnavailable, match="did not answer"):
+        await _await_with_run_budget(
+            hung(),
+            run_budget=None,
+            requested_timeout=0.01,
+            operation="Searlo search",
+            timeout_result=[],
+            timeout_exception=search_timeout_unavailable,
+        )
+    assert search_provider_exhausted("searlo") is True
+    with pytest.raises(SearchProviderUnavailable, match="earlier in this run"):
+        await _serper_search("next query")
 
 
 # ---------------------------------------------------------------------------
@@ -790,196 +833,50 @@ def test_xlsx_extraction_reads_rows_without_a_spreadsheet_dependency():
 
 
 @pytest.mark.asyncio
-async def test_searlo_serves_every_search_without_probing_serper():
-    """Searlo is the primary provider, so the backup is never dialled.
-
-    The budget accounting is the point: each logical search must reserve one
-    slot, not two. Probing a backup that is not needed would halve the run's
-    effective research depth.
-    """
-    from pipeline_client.agent import cost as cost_module
+async def test_each_logical_search_reserves_one_budget_slot(run_acc):
+    """Three logical searches cost three budget slots, all on Searlo."""
     from pipeline_client.agent.web_tools import _serper_search
 
-    quota_response = httpx.Response(
-        400,
-        request=httpx.Request("POST", "https://google.serper.dev/search"),
-        text='{"message":"Not enough credits"}',
-    )
-    searlo_response = httpx.Response(
-        200,
-        request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/web"),
-        json={"organic": [{"title": "Fallback", "snippet": "Evidence", "link": "https://example.com"}]},
-    )
     mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=quota_response)
-    mock_client.get = AsyncMock(return_value=searlo_response)
+    mock_client.get = AsyncMock(return_value=_searlo_ok())
+    mock_client.post = AsyncMock()
 
-    acc = {"prompt_tokens": 0, "completion_tokens": 0, "serper_calls": 0, "searlo_calls": 0}
-    token = cost_module._cost_ctx.set(acc)
-    env = os.environ.copy()
-    env["SERPER_API_KEY"] = "test-key"
-    env["SEARLO_API_KEY"] = "fallback-key"
-    try:
-        with (
-            patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-            patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-            patch.dict(os.environ, env, clear=True),
-        ):
-            first = await _serper_search("first query")
-            second = await _serper_search("second query")
-            third = await _serper_search("third query")
-    finally:
-        cost_module._cost_ctx.reset(token)
+    with (
+        patch("pipeline_client.agent.web_tools._get_search_client", return_value=mock_client),
+        patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
+        patch.dict(os.environ, {"SEARLO_API_KEY": "k", "SERPER_API_KEY": "legacy"}),
+    ):
+        first = await _serper_search("first query")
+        second = await _serper_search("second query")
+        third = await _serper_search("third query")
 
-    assert first and second and third, "every search returns Searlo evidence"
-    # Serper is the backup and Searlo never failed, so it is never called.
+    assert first and second and third
     assert mock_client.post.await_count == 0
     assert mock_client.get.await_count == 3
-    # Three logical searches must cost three budget slots, not six.
-    assert acc["serper_calls"] == 0
-    assert acc["searlo_calls"] == 3
+    assert run_acc["serper_calls"] == 0
+    assert run_acc["searlo_calls"] == 3
 
 
 @pytest.mark.asyncio
-async def test_serper_exhaustion_does_not_leak_between_runs():
-    """A fresh run re-probes Serper in case the account was topped up."""
+async def test_searlo_outage_flag_does_not_leak_between_runs():
+    """A fresh run re-probes Searlo in case the outage has cleared."""
     from pipeline_client.agent import cost as cost_module
     from pipeline_client.agent.cost import mark_search_provider_exhausted, search_provider_exhausted
 
-    first_run = {"serper_calls": 0}
+    first_run = {"searlo_calls": 0}
     token = cost_module._cost_ctx.set(first_run)
     try:
-        mark_search_provider_exhausted("serper")
-        assert search_provider_exhausted("serper") is True
+        mark_search_provider_exhausted("searlo")
+        assert search_provider_exhausted("searlo") is True
     finally:
         cost_module._cost_ctx.reset(token)
 
-    second_run = {"serper_calls": 0}
+    second_run = {"searlo_calls": 0}
     token = cost_module._cost_ctx.set(second_run)
     try:
-        assert search_provider_exhausted("serper") is False
+        assert search_provider_exhausted("searlo") is False
     finally:
         cost_module._cost_ctx.reset(token)
-
-
-def _searlo_ok(title="Primary"):
-    return httpx.Response(
-        200,
-        request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/web"),
-        json={"organic": [{"title": title, "snippet": "Evidence", "link": "https://example.com"}]},
-    )
-
-
-def _searlo_status(status):
-    return httpx.Response(
-        status,
-        request=httpx.Request("GET", "https://api.searlo.tech/api/v1/search/web"),
-        text="upstream error",
-    )
-
-
-@pytest.mark.asyncio
-async def test_searlo_retries_a_transient_503_and_succeeds():
-    """A single 503 must not cost the caller its search.
-
-    Searlo answered ~99.4% of requests during the outage that prompted this,
-    yet each stray 503 aborted an entire research step, because the failure
-    surfaced as a non-retryable provider error.
-    """
-    from pipeline_client.agent import cost as cost_module
-
-    mock_client = MagicMock()
-    mock_client.get = AsyncMock(side_effect=[_searlo_status(503), _searlo_ok()])
-    mock_client.post = AsyncMock()
-
-    acc = {"serper_calls": 0, "searlo_calls": 0}
-    token = cost_module._cost_ctx.set(acc)
-    env = {"SEARLO_API_KEY": "k", "SERPER_API_KEY": "s"}
-    try:
-        with (
-            patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-            patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-            patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
-            patch.dict(os.environ, env, clear=True),
-        ):
-            results = await _serper_search("query")
-    finally:
-        cost_module._cost_ctx.reset(token)
-
-    assert results[0]["title"] == "Primary"
-    assert mock_client.get.await_count == 2
-    assert mock_client.post.await_count == 0, "the backup is not needed when the retry succeeds"
-    # The retry is the same question asked again, so it must not be billed twice.
-    assert acc["searlo_calls"] == 1
-
-
-@pytest.mark.asyncio
-async def test_persistent_searlo_outage_falls_back_to_serper():
-    """When Searlo is genuinely down, the backup provider carries the run."""
-    from pipeline_client.agent import cost as cost_module
-
-    serper_response = httpx.Response(
-        200,
-        request=httpx.Request("POST", "https://google.serper.dev/search"),
-        json={"organic": [{"title": "Backup", "snippet": "Evidence", "link": "https://example.com"}]},
-    )
-    mock_client = MagicMock()
-    mock_client.get = AsyncMock(return_value=_searlo_status(503))
-    mock_client.post = AsyncMock(return_value=serper_response)
-
-    acc = {"serper_calls": 0, "searlo_calls": 0}
-    token = cost_module._cost_ctx.set(acc)
-    env = {"SEARLO_API_KEY": "k", "SERPER_API_KEY": "s"}
-    try:
-        with (
-            patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-            patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-            patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
-            patch.dict(os.environ, env, clear=True),
-        ):
-            first = await _serper_search("first")
-            second = await _serper_search("second")
-    finally:
-        cost_module._cost_ctx.reset(token)
-
-    assert first[0]["title"] == "Backup"
-    assert second[0]["title"] == "Backup"
-    # Searlo is retried within one search, then written off for the run rather
-    # than re-probed on every later query.
-    assert mock_client.get.await_count == 3
-    assert acc["searlo_calls"] == 1
-
-
-@pytest.mark.asyncio
-async def test_searlo_auth_failure_is_not_retried():
-    """A rejected key will not heal by waiting, so spend nothing on backoff."""
-    from pipeline_client.agent import cost as cost_module
-
-    serper_response = httpx.Response(
-        200,
-        request=httpx.Request("POST", "https://google.serper.dev/search"),
-        json={"organic": [{"title": "Backup", "snippet": "Evidence", "link": "https://example.com"}]},
-    )
-    mock_client = MagicMock()
-    mock_client.get = AsyncMock(return_value=_searlo_status(403))
-    mock_client.post = AsyncMock(return_value=serper_response)
-
-    acc = {"serper_calls": 0, "searlo_calls": 0}
-    token = cost_module._cost_ctx.set(acc)
-    env = {"SEARLO_API_KEY": "k", "SERPER_API_KEY": "s"}
-    try:
-        with (
-            patch("pipeline_client.agent.web_tools._get_serper_client", return_value=mock_client),
-            patch("pipeline_client.agent.web_tools._get_search_cache", return_value=None),
-            patch("pipeline_client.agent.web_tools.asyncio.sleep", new_callable=AsyncMock),
-            patch.dict(os.environ, env, clear=True),
-        ):
-            results = await _serper_search("query")
-    finally:
-        cost_module._cost_ctx.reset(token)
-
-    assert results[0]["title"] == "Backup"
-    assert mock_client.get.await_count == 1, "403 is terminal; no backoff"
 
 
 # ---------------------------------------------------------------------------
