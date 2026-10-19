@@ -157,6 +157,39 @@ describe("partyProbabilitySegments", () => {
       "Party win probabilities: Democratic 60%, Republican 30%, Independent 10%",
     );
   });
+
+  it("allocates whole percents that sum to 100 for a complete distribution", () => {
+    const segments = partyProbabilitySegments({
+      Republican: 0.9,
+      Democratic: 0.095,
+      Libertarian: 0.005,
+    });
+    expect(segments.map((s) => [s.party, s.label])).toEqual([
+      ["Republican", "90%"],
+      ["Democratic", "10%"],
+      ["Libertarian", "<1%"],
+    ]);
+    // Per-value rounding would have read 90% + 10% + 1% = 101%.
+    expect(
+      segments.reduce((sum, s) => sum + (Number.parseInt(s.label, 10) || 0), 0),
+    ).toBe(100);
+  });
+
+  it("splits a two-party half point so the labels sum to 100", () => {
+    const segments = partyProbabilitySegments({
+      Democratic: 0.555,
+      Republican: 0.445,
+    });
+    expect(segments.map((s) => s.label)).toEqual(["56%", "44%"]);
+  });
+
+  it("labels each value on its own when the data is partial", () => {
+    const segments = partyProbabilitySegments({
+      Democratic: 0.095,
+      Libertarian: 0.005,
+    });
+    expect(segments.map((s) => s.label)).toEqual(["10%", "1%"]);
+  });
 });
 
 describe("candidateForecastProbability", () => {
