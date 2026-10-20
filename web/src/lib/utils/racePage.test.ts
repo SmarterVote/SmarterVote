@@ -14,6 +14,7 @@ import {
   comparePreview,
   forecastHeadline,
   formatPollDate,
+  formatProbabilitySet,
   formatWinProbability,
   pollDateLabel,
   isNoPositionStance,
@@ -573,6 +574,41 @@ describe("formatWinProbability", () => {
     expect(formatWinProbability(undefined)).toBe("n/a");
     expect(formatWinProbability(null)).toBe("n/a");
     expect(formatWinProbability(Number.NaN)).toBe("n/a");
+  });
+});
+
+describe("formatProbabilitySet", () => {
+  it("allocates labels that sum to 100 for a complete set, in input order", () => {
+    expect(formatProbabilitySet([0.9, 0.095, 0.005])).toEqual([
+      "90%",
+      "10%",
+      "<1%",
+    ]);
+    expect(formatProbabilitySet([0.005, 0.9, 0.095])).toEqual([
+      "<1%",
+      "90%",
+      "10%",
+    ]);
+  });
+
+  it("keeps the certainty clamps", () => {
+    expect(formatProbabilitySet([0.996, 0.004])).toEqual([">99%", "<1%"]);
+  });
+
+  it("labels each value on its own when the set is partial", () => {
+    expect(formatProbabilitySet([0.095, 0.005])).toEqual(["10%", "1%"]);
+    expect(formatProbabilitySet([0.9, 0.095, undefined])).toEqual([
+      "90%",
+      "10%",
+      "n/a",
+    ]);
+    expect(formatProbabilitySet([0.9, null, 0.095, 0.005])).toEqual([
+      "90%",
+      "n/a",
+      "10%",
+      "1%",
+    ]);
+    expect(formatProbabilitySet([])).toEqual([]);
   });
 });
 

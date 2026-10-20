@@ -468,6 +468,55 @@ describe("CandidateComparison forecast probability", () => {
     expect(desktopText(container)).not.toContain("97%");
   });
 
+  // ar-senate-2026: per-value rounding read 90% + 10% + 1% = 101%.
+  it("labels a complete set of probabilities so they sum to 100", () => {
+    const r = candidate("Rex Red", { party: "Republican" });
+    const d = candidate("Dee Blue", { party: "Democratic" });
+    const l = candidate("Lee Gold", { party: "Libertarian" });
+    const { container } = renderRace([r, d, l], {
+      party_probabilities: { R: 0.9, D: 0.095, L: 0.005 },
+    });
+
+    const labels = Array.from(
+      container.querySelectorAll(
+        "[data-desktop-candidate-comparison] .text-2xl.font-extrabold",
+      ),
+    ).map((element) => element.textContent?.trim());
+    expect(labels).toEqual(["90%", "10%", "<1%"]);
+    expect(
+      labels.reduce(
+        (sum, label) => sum + (Number.parseInt(label ?? "", 10) || 0),
+        0,
+      ),
+    ).toBe(100);
+  });
+
+  it("labels a deselected-candidate subset on its own", () => {
+    const r = candidate("Rex Red", { party: "Republican" });
+    const d = candidate("Dee Blue", { party: "Democratic" });
+    const l = candidate("Lee Gold", { party: "Libertarian" });
+    const forecast: RaceForecast = {
+      party_probabilities: { R: 0.9, D: 0.095, L: 0.005 },
+      rating: "safe_r",
+      confidence: "medium",
+      rationale: "Test rationale",
+      key_reasons: [],
+      based_on_poll_count: 0,
+      generated_at: "2026-01-01T00:00:00Z",
+      model: "test",
+      source_urls: [],
+      market_signals: [],
+    };
+    const { container } = render(CandidateComparison, {
+      race: race({ candidates: [r, d, l], forecast }),
+      candidates: [d, l],
+    });
+
+    expect(desktopText(container)).toContain("10%");
+    expect(desktopText(container)).toContain("1%");
+    expect(desktopText(container)).not.toContain("<1%");
+  });
+
   it("does not fuzzy-match an unrelated minor party", () => {
     const minor = candidate("Pat Peace", { party: "Peace and Freedom" });
     const { container } = renderRace([minor], {

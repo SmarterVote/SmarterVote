@@ -440,6 +440,36 @@ function allocateWholePercents(values: readonly number[]): number[] {
   return allocations;
 }
 
+/**
+ * Labels for a set of win probabilities, in input order. A complete
+ * distribution (every value a number, summing to ~1) gets whole percents that
+ * sum to 100; partial data can't, so each value is labelled on its own.
+ */
+export function formatProbabilitySet(
+  values: readonly (number | null | undefined)[],
+): string[] {
+  const numbers = values.filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value),
+  );
+  const total = numbers.reduce((sum, value) => sum + value, 0);
+  const allocations =
+    numbers.length === values.length && Math.abs(total - 1) <= 0.002
+      ? allocateWholePercents(numbers)
+      : null;
+  return values.map((value, index) => {
+    const percent = allocations?.[index];
+    const label = formatWinProbability(value);
+    // The >99% / <1% extremes of formatWinProbability still win.
+    if (percent === undefined || label === ">99%" || label === "<1%") {
+      return label;
+    }
+    if (percent <= 0) return "<1%";
+    if (percent >= 100) return ">99%";
+    return `${percent}%`;
+  });
+}
+
 /** Every positive party probability, largest first, for the probability bar. */
 export function partyProbabilitySegments(
   probabilities: Record<string, number> | null | undefined,
@@ -452,22 +482,13 @@ export function partyProbabilitySegments(
         entry[1] > 0,
     )
     .sort((a, b) => b[1] - a[1]);
-  const values = entries.map(([, value]) => value);
-  const total = values.reduce((sum, value) => sum + value, 0);
-  // Partial data can't sum to 100, so label each value on its own.
-  const allocations =
-    Math.abs(total - 1) <= 0.002 ? allocateWholePercents(values) : null;
-  return entries.map(([party, value], index) => {
-    const percent = allocations?.[index];
-    let label = formatWinProbability(value);
-    // The >99% / <1% extremes of formatWinProbability still win.
-    if (percent !== undefined && value < 0.995 && value >= 0.005) {
-      if (percent <= 0) label = "<1%";
-      else if (percent >= 100) label = ">99%";
-      else label = `${percent}%`;
-    }
-    return { party, key: partyKey(party), value, label };
-  });
+  const labels = formatProbabilitySet(entries.map(([, value]) => value));
+  return entries.map(([party, value], index) => ({
+    party,
+    key: partyKey(party),
+    value,
+    label: labels[index],
+  }));
 }
 
 /** Accessible summary of every segment in the probability bar. */

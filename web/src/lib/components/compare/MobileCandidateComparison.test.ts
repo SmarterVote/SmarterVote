@@ -142,4 +142,26 @@ describe("MobileCandidateComparison", () => {
     });
     expect(screen.getByText("57%")).toBeTruthy();
   });
+
+  it("labels a complete set of probabilities so they sum to 100", () => {
+    const red = { ...candidate, name: "Rex Red", party: "Republican" };
+    const blue = { ...candidate, name: "Dee Blue", party: "Democratic" };
+    const gold = { ...candidate, name: "Lee Gold", party: "Libertarian" };
+    const arRace = {
+      ...race,
+      candidates: [red, blue, gold],
+      forecast: {
+        rating: "safe_r",
+        party_probabilities: { R: 0.9, D: 0.095, L: 0.005 },
+      },
+    } as unknown as Race;
+    const { container } = render(MobileCandidateComparison, {
+      race: arRace,
+      candidates: [red, blue, gold],
+    });
+    const labels = Array.from(container.querySelectorAll("dl dd")).map(
+      (element) => element.textContent?.trim(),
+    );
+    expect(labels).toEqual(["90%", "10%", "<1%"]);
+  });
 });

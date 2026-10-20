@@ -20,7 +20,7 @@
     candidateForecastProbability,
     cleanDisplayText,
     comparePreview,
-    formatWinProbability,
+    formatProbabilitySet,
     isNoPositionStance,
     isUncontestedRace,
   } from "$lib/utils/racePage";
@@ -156,13 +156,21 @@
   // No forecast for an uncontested race (the race page has none to link to).
   $: uncontested = isUncontestedRace(race, activeCandidates.length);
 
-  function forecastProbability(candidate: Candidate): number | undefined {
-    return candidateForecastProbability(
-      candidate,
-      race.forecast,
-      activeCandidates,
+  $: forecastProbabilities = candidates.map((candidate) =>
+    candidateForecastProbability(candidate, race.forecast, activeCandidates),
+  );
+  // Label the shown probabilities as one set so a complete one sums to 100%.
+  $: forecastLabels = (() => {
+    const labels = formatProbabilitySet(
+      forecastProbabilities.filter(
+        (probability): probability is number => probability != null,
+      ),
     );
-  }
+    let next = 0;
+    return forecastProbabilities.map((probability) =>
+      probability != null ? labels[next++] : null,
+    );
+  })();
 </script>
 
 {#if onToggle}
@@ -660,14 +668,14 @@
                 >
               </div>
               {#each candidates as candidate, index (`${index}-${candidateSlug(candidate.name)}`)}
-                {@const probability = forecastProbability(candidate)}
+                {@const probabilityLabel = forecastLabels[index]}
                 <div
                   role="cell"
                   class="border-r border-stroke p-5 last:border-none"
                 >
-                  {#if probability != null}
+                  {#if probabilityLabel != null}
                     <div class="text-2xl font-extrabold text-content">
-                      {formatWinProbability(probability)}
+                      {probabilityLabel}
                     </div>
                     <p class="mt-1 text-xs text-content-muted">
                       estimated win probability
