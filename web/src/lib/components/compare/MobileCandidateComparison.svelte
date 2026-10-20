@@ -20,7 +20,7 @@
     candidateForecastProbability,
     cleanDisplayText,
     comparePreview,
-    formatWinProbability,
+    formatProbabilitySet,
     isNoPositionStance,
     isUncontestedRace,
   } from "$lib/utils/racePage";
@@ -73,6 +73,10 @@
             row.probability != null,
         )
     : [];
+  // Label the shown probabilities as one set so a complete one sums to 100%.
+  $: forecastLabels = formatProbabilitySet(
+    forecastRows.map((row) => row.probability),
+  );
   $: issueSelectId = `mobile-compare-issue-${race.id}`;
 
   function stanceKey(candidate: Candidate): string {
@@ -313,7 +317,7 @@
                 {row.name}
               </dt>
               <dd class="text-lg font-extrabold text-content">
-                {formatWinProbability(row.probability)}
+                {forecastLabels[index]}
               </dd>
             </div>
           {/each}
