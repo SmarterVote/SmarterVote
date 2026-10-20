@@ -415,24 +415,59 @@ export interface PartyProbabilitySegment {
   label: string;
 }
 
+/**
+ * Whole percents that sum to exactly 100 (largest-remainder rounding), so a
+ * complete distribution never reads 101%. Ties go to the larger value, then
+ * the earlier entry.
+ */
+function allocateWholePercents(values: readonly number[]): number[] {
+  const scaled = values.map((value) => value * 100);
+  const allocations = scaled.map((value) => Math.floor(value + 1e-9));
+  let remaining = 100 - allocations.reduce((sum, value) => sum + value, 0);
+  const order = scaled
+    .map((value, index) => ({ index, remainder: value - allocations[index] }))
+    .sort(
+      (a, b) =>
+        b.remainder - a.remainder ||
+        values[b.index] - values[a.index] ||
+        a.index - b.index,
+    );
+  for (const { index } of order) {
+    if (remaining <= 0) break;
+    allocations[index] += 1;
+    remaining -= 1;
+  }
+  return allocations;
+}
+
 /** Every positive party probability, largest first, for the probability bar. */
 export function partyProbabilitySegments(
   probabilities: Record<string, number> | null | undefined,
 ): PartyProbabilitySegment[] {
-  return Object.entries(probabilities ?? {})
+  const entries = Object.entries(probabilities ?? {})
     .filter(
       (entry): entry is [string, number] =>
         typeof entry[1] === "number" &&
         Number.isFinite(entry[1]) &&
         entry[1] > 0,
     )
-    .sort((a, b) => b[1] - a[1])
-    .map(([party, value]) => ({
-      party,
-      key: partyKey(party),
-      value,
-      label: formatWinProbability(value),
-    }));
+    .sort((a, b) => b[1] - a[1]);
+  const values = entries.map(([, value]) => value);
+  const total = values.reduce((sum, value) => sum + value, 0);
+  // Partial data can't sum to 100, so label each value on its own.
+  const allocations =
+    Math.abs(total - 1) <= 0.002 ? allocateWholePercents(values) : null;
+  return entries.map(([party, value], index) => {
+    const percent = allocations?.[index];
+    let label = formatWinProbability(value);
+    // The >99% / <1% extremes of formatWinProbability still win.
+    if (percent !== undefined && value < 0.995 && value >= 0.005) {
+      if (percent <= 0) label = "<1%";
+      else if (percent >= 100) label = ">99%";
+      else label = `${percent}%`;
+    }
+    return { party, key: partyKey(party), value, label };
+  });
 }
 
 /** Accessible summary of every segment in the probability bar. */
