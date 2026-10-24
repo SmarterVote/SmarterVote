@@ -34,7 +34,9 @@ What is checked (these fail)
 5. Every escalation edge climbs the **intelligence index**. A lateral or
    downward edge means a stalled model "escalates" into something no better.
 6. For each role, `premium` is not worse than `default` — never a lower
-   intelligence score, and never older when both come from the same provider.
+   intelligence score, and never older when both come from the same provider
+   unless premium is strictly more capable on the index (a newer small model
+   below an older large one, e.g. Haiku 5.5 under Sonnet 5.5, is a real tier).
 7. The roster adjudicator differs from the `primary` and `roster` model of every
    profile. That separation is the gate's entire claim to independence, and it
    is load-bearing on a publish path.
@@ -261,6 +263,10 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
       deepseek-v4-flash-0731 says nothing about which is stronger. Restricting
       to one provider is exactly the shape of the grok bug, where 4.20 and 4.3
       were the same price from the same provider and only the date revealed it.
+      Recency is a tiebreaker for when capability does not decide: a premium
+      model *strictly* above the default on the index passes even when older,
+      because a lab's newer small tier (Haiku 5.5, 43) legitimately sits below
+      its slightly older mid tier (Sonnet 5.5, 56).
     """
     errors: List[str] = []
     default, premium = PROFILE_DEFAULTS.get("default", {}), PROFILE_DEFAULTS.get("premium", {})
@@ -268,6 +274,7 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
         cheap_id, good_id = default.get(role), premium.get(role)
         if not cheap_id or not good_id or cheap_id == good_id:
             continue
+        strictly_stronger = False
         if cheap_id in MODEL_CATALOG and good_id in MODEL_CATALOG:
             cheap_iq, good_iq = MODEL_CATALOG[cheap_id].intelligence, MODEL_CATALOG[good_id].intelligence
             if good_iq < cheap_iq:
@@ -275,7 +282,8 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
                     f"role {role!r}: premium uses {good_id} ({good_iq}) which is LESS capable "
                     f"than default's {cheap_id} ({cheap_iq})"
                 )
-        if _provider(cheap_id) != _provider(good_id):
+            strictly_stronger = good_iq > cheap_iq
+        if strictly_stronger or _provider(cheap_id) != _provider(good_id):
             continue
         cheap_date, good_date = _released(live.get(cheap_id)), _released(live.get(good_id))
         if cheap_date and good_date and good_date < cheap_date:
