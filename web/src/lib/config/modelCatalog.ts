@@ -98,6 +98,16 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "intelligence": 39.0,
     "maxCompletionTokens": 393216
   },
+  "deepseek/deepseek-v4.1-flash-1017": {
+    "id": "deepseek/deepseek-v4.1-flash-1017",
+    "label": "DeepSeek V4.1 Flash (10-17)",
+    "inputPerM": 0.098,
+    "outputPerM": 0.294,
+    "cachedInputPerM": 0.00294,
+    "contextWindowTokens": 1048576,
+    "intelligence": 45.0,
+    "maxCompletionTokens": 131072
+  },
   "google/gemini-3.1-flash-lite": {
     "id": "google/gemini-3.1-flash-lite",
     "label": "Gemini 3.1 Flash Lite",
@@ -270,6 +280,7 @@ export const MODEL_LABELS: Record<string, string> = {
   "openai/gpt-5.6-sol": "GPT-5.6 Sol",
   "deepseek/deepseek-v4-flash-0731": "DeepSeek V4 Flash (07-31)",
   "deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+  "deepseek/deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash (10-17)",
   "google/gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
   "google/gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
   "google/gemini-3.6-flash": "Gemini 3.6 Flash",
@@ -310,6 +321,7 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "gpt-5.6-sol": "openai/gpt-5.6-sol",
   "deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
   "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+  "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
   "gpt-6-luna": "openai/gpt-6-luna",
   "gpt-6-sol": "openai/gpt-6-sol",
   "gpt-6.1-sol": "openai/gpt-6.1-sol",

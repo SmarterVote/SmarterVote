@@ -230,6 +230,22 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         39.0,
         393_216,
     ),
+    # The 2026-10-17 snapshot of V4.1 Flash: 45 on the index, six points above
+    # the default. In the catalog for a live A/B trial through research_model
+    # overrides only; no profile role uses it. Pinned to DeepInfra fp8 with Sail
+    # Research as fallback (see MODEL_PROVIDER_PREFERENCES); the price and
+    # completion limit below are DeepInfra's standard fp8 endpoint, which is
+    # what a bare ``deepinfra`` pin bills, not OpenRouter's headline figure.
+    "deepseek/deepseek-v4.1-flash-1017": ModelSpec(
+        "deepseek/deepseek-v4.1-flash-1017",
+        "DeepSeek V4.1 Flash (10-17)",
+        0.098,
+        0.294,
+        0.00294,
+        1_048_576,
+        45.0,
+        131_072,
+    ),
     # --- Google ------------------------------------------------------------
     "google/gemini-3.1-flash-lite": ModelSpec(
         "google/gemini-3.1-flash-lite",
@@ -647,6 +663,8 @@ MODEL_ESCALATION: Dict[str, str] = {
     DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 39.0 -> 52.0
     # The previous research model, still reachable through model_overrides.
     "deepseek/deepseek-v4-flash-0731": PREMIUM_RESEARCH_MODEL,  # 34.0 -> 52.0
+    # The 10-17 snapshot, on trial through model_overrides; climbs like the default.
+    "deepseek/deepseek-v4.1-flash-1017": PREMIUM_RESEARCH_MODEL,  # 45.0 -> 52.0
     SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 52.0
     # PREMIUM_RESEARCH_MODEL deliberately has no edge: premium is the ceiling,
     # and a premium loop that stalls fails rather than climbing to a frontier
@@ -683,6 +701,12 @@ MODEL_ESCALATION: Dict[str, str] = {
 #: Decart ($0.09/$0.18/$0.018) is deliberately absent: OpenRouter's tool
 #: compatibility filter drops it from any request with a forced tool_choice.
 #:
+#: The V4.1 Flash 10-17 snapshot (override-only trial) pins DeepInfra fp8
+#: ($0.098/$0.294/$0.00294), then Sail Research fp4 ($0.101/$0.15/$0.006735);
+#: both returned a forced tool call with fallbacks disabled on 2026-10-24.
+#: DeepSeek's own endpoint cannot force a tool call, and Baidu charges $0.28
+#: input for this snapshot, so neither is pinned.
+#:
 #: Keys are catalog model IDs; values are OpenRouter provider slugs (the
 #: endpoint ``tag`` without its ``/variant`` suffix; ``provider.order`` takes
 #: the bare slug and matches every endpoint of that provider). The catalog guard
@@ -690,6 +714,7 @@ MODEL_ESCALATION: Dict[str, str] = {
 #: against the first slug's endpoint.
 MODEL_PROVIDER_PREFERENCES: Dict[str, tuple[str, ...]] = {
     "deepseek/deepseek-v4.1-flash": ("baidu", "sail-research", "inference-net"),
+    "deepseek/deepseek-v4.1-flash-1017": ("deepinfra", "sail-research"),
 }
 
 #: Old model strings that still appear in stored run options and race records.
@@ -702,6 +727,7 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "gpt-5.6-sol": "openai/gpt-5.6-sol",
     "deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
     "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+    "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
     "gpt-6-luna": "openai/gpt-6-luna",
     "gpt-6-sol": "openai/gpt-6-sol",
     "gpt-6.1-sol": "openai/gpt-6.1-sol",
