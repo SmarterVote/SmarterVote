@@ -10,7 +10,14 @@ from openai import APIConnectionError
 from pipeline_client.agent.agent import _agent_loop
 from pipeline_client.agent.errors import RetryableProviderError
 from pipeline_client.agent.llm import _await_with_run_budget, _call_openrouter, _provider_usage_cost
-from pipeline_client.agent.model_registry import DEFAULT_RESEARCH_MODEL, SMALL_MODEL, escalation_for
+from pipeline_client.agent.model_registry import (
+    DEFAULT_RESEARCH_MODEL,
+    MODEL_CATALOG,
+    MODEL_ESCALATION,
+    SMALL_MODEL,
+    accepts_forced_tool_choice,
+    escalation_for,
+)
 
 FAKE_RACE_JSON = {
     "id": "mo-senate-2024",
@@ -1322,3 +1329,136 @@ def test_parse_tool_arguments_rejects_non_object_payloads():
         _parse_tool_arguments("[1, 2]")
     with pytest.raises(ValueError):
         _parse_tool_arguments('{"a": ')
+
+
+# ---------------------------------------------------------------------------
+# Forced final tool call on a model that rejects a forced tool_choice
+# ---------------------------------------------------------------------------
+
+_UNFORCEABLE_MODEL = next(model_id for model_id, spec in MODEL_CATALOG.items() if not spec.forced_tool_choice)
+_FINAL_TOOL = {
+    "type": "function",
+    "function": {"name": "set_issue_stance", "description": "Record result", "parameters": {"type": "object"}},
+}
+
+
+def _final_tool_call_response():
+    return _mock_openai_response(
+        tool_calls=[
+            {
+                "id": "call_final",
+                "function": {"name": "set_issue_stance", "arguments": json.dumps({"stance": "No public position found"})},
+            }
+        ]
+    )
+
+
+async def _run_forced_final(model, responses, *, max_iterations=15):
+    handler = MagicMock(return_value="OK")
+    with (
+        patch("pipeline_client.agent.llm.total_token_budget_reached", return_value=True),
+        patch("pipeline_client.agent.llm._call_openrouter", new_callable=AsyncMock) as call,
+    ):
+        call.side_effect = responses
+        result = await _agent_loop(
+            "system",
+            "user",
+            model=model,
+            phase_name="issue-test",
+            tools_mode=True,
+            extra_tools=[_FINAL_TOOL],
+            extra_tool_handlers={"set_issue_stance": handler},
+            required_final_tool_name="set_issue_stance",
+            return_tool_trace=True,
+            max_iterations=max_iterations,
+        )
+    return call, handler, result
+
+
+def _last_user_text(call_args) -> str:
+    return [m for m in call_args.args[0] if m.get("role") == "user"][-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_forced_final_tool_call_is_unchanged_for_a_model_that_accepts_it():
+    assert accepts_forced_tool_choice(SMALL_MODEL)
+    call, handler, result = await _run_forced_final(SMALL_MODEL, [_final_tool_call_response()])
+
+    assert call.call_count == 1
+    assert call.call_args.kwargs["tool_choice"] == {"type": "function", "function": {"name": "set_issue_stance"}}
+    assert "You must call the set_issue_stance function" not in _last_user_text(call.call_args)
+    assert handler.call_count == 1
+    assert result["_tool_trace"]["required_final_tool_succeeded"] is True
+
+
+@pytest.mark.asyncio
+async def test_unforceable_model_is_asked_by_instruction_and_complies():
+    call, handler, result = await _run_forced_final(_UNFORCEABLE_MODEL, [_final_tool_call_response()])
+
+    assert call.call_count == 1
+    # Never send the forced shape the provider rejects with a 400.
+    assert call.call_args.kwargs["tool_choice"] is None
+    assert [t["function"]["name"] for t in call.call_args.kwargs["tools"]] == ["set_issue_stance"]
+    assert "You must call the set_issue_stance function now" in _last_user_text(call.call_args)
+    assert handler.call_count == 1
+    assert result["_tool_trace"]["required_final_tool_succeeded"] is True
+
+
+@pytest.mark.asyncio
+async def test_unforceable_model_gets_one_firmer_retry_within_the_same_iteration():
+    call, handler, result = await _run_forced_final(
+        _UNFORCEABLE_MODEL,
+        [_mock_openai_response(content="Here is my answer in prose."), _final_tool_call_response()],
+        max_iterations=1,
+    )
+
+    assert call.call_count == 2
+    assert all(c.kwargs["tool_choice"] is None for c in call.call_args_list)
+    assert "You did not call set_issue_stance" in _last_user_text(call.call_args_list[1])
+    assert handler.call_count == 1
+    assert result["_tool_trace"]["required_final_tool_succeeded"] is True
+
+
+@pytest.mark.asyncio
+async def test_unforceable_model_that_never_complies_falls_through_to_existing_failure():
+    call, handler, result = await _run_forced_final(
+        _UNFORCEABLE_MODEL,
+        [_mock_openai_response(content="prose"), _mock_openai_response(content="still prose")],
+        max_iterations=1,
+    )
+
+    # Exactly one retry, then the ordinary "stopped before the required tool"
+    # path, which with no iterations left ends the loop unfinalized.
+    assert call.call_count == 2
+    assert handler.call_count == 0
+    assert result["_tool_trace"]["required_final_tool_succeeded"] is False
+    assert result["_tool_trace"]["max_iterations_reached"] is True
+
+
+@pytest.mark.asyncio
+async def test_escalation_onto_an_unforceable_model_uses_the_fallback():
+    # GPT-6 Sol escalates to FRONTIER_MODEL (Opus 5.5), which cannot be forced.
+    source = next(src for src, dst in MODEL_ESCALATION.items() if not accepts_forced_tool_choice(dst))
+    target = escalation_for(source)
+    bad_json = _mock_openai_response(content="not json")
+    call = AsyncMock(side_effect=[bad_json, _final_tool_call_response()])
+    with (
+        # The ceiling is reached after the first (unparseable) turn, so the
+        # escalated second turn is also the forced finalization turn.
+        patch("pipeline_client.agent.llm.total_token_budget_reached", side_effect=lambda: call.await_count >= 1),
+        patch("pipeline_client.agent.llm._call_openrouter", call),
+    ):
+        await _agent_loop(
+            "system",
+            "user",
+            model=source,
+            phase_name="issue-test",
+            extra_tools=[_FINAL_TOOL],
+            extra_tool_handlers={"set_issue_stance": MagicMock(return_value="OK")},
+            required_final_tool_name="set_issue_stance",
+            max_iterations=3,
+        )
+
+    escalated = call.call_args_list[1].kwargs
+    assert escalated["model"] == target
+    assert escalated["tool_choice"] is None

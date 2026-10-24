@@ -24,7 +24,13 @@ from .cost import (
     total_token_budget_reached,
 )
 from .errors import PermanentProviderError, RetryableProviderError
-from .model_registry import MODEL_CATALOG, escalation_for, normalize_model_id, provider_routing_for
+from .model_registry import (
+    MODEL_CATALOG,
+    accepts_forced_tool_choice,
+    escalation_for,
+    normalize_model_id,
+    provider_routing_for,
+)
 from .roster_adjudicator import collect_roster_adjudications
 from .run_budget import RunBudget
 from .source_types import normalize_source_type
@@ -589,6 +595,23 @@ def _normalize_candidate(candidate: Dict[str, Any], now_iso: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _calls_tool(message: Any, name: Optional[str]) -> bool:
+    """Whether an assistant *message* includes a call to the function *name*."""
+    return any(getattr(getattr(call, "function", None), "name", None) == name for call in message.tool_calls or [])
+
+
+def _unforced_final_tool_message(name: Optional[str], *, firm: bool) -> Dict[str, str]:
+    """The instruction that stands in for a forced ``tool_choice`` on a model that rejects one."""
+    if firm:
+        content = (
+            f"You did not call {name}. Call the {name} function now. Your reply must be exactly one {name} "
+            "function call and nothing else: no text, no other tool."
+        )
+    else:
+        content = f"You must call the {name} function now, in this reply. Respond with that function call only, not text."
+    return {"role": "user", "content": content}
+
+
 def _ensure_dict(result: Any, phase_name: str, log: Any) -> Dict[str, Any]:
     """Unwrap a single-element list or raise if the result is not a dict."""
     if isinstance(result, dict):
@@ -816,57 +839,83 @@ async def _agent_loop(
             )
             tools_for_call = (base_tools + _extra_tools) if (base_tools or _extra_tools) else None
 
-        t_call = time.perf_counter()
-        # OpenRouter reports an upstream provider failure as HTTP 200 carrying
-        # finish_reason "error" with no content and no usage, so the empty-response
-        # guard below never sees it. Treated as an ordinary empty turn it silently
-        # consumed one of the loop's iterations: ma-house-02-2026 lost 3 of its 12
-        # that way and ran out of budget before it could finalize. Retry the call
-        # rather than spending the turn on a response the provider never produced.
-        for provider_error_attempt in range(PROVIDER_ERROR_RETRIES + 1):
-            try:
-                prepared = context.prepare_messages(messages, tools=tools_for_call)
-                record_context_metrics(
-                    estimated_input_tokens=prepared.estimated_input_tokens,
-                    context_window_tokens=context_budget.context_window_tokens,
-                    deduplicated_results=prepared.deduplicated_results,
-                    compacted_results=prepared.compacted_results,
-                    truncated_results=prepared.truncated_results,
-                    dropped_tool_turns=prepared.dropped_tool_turns,
-                )
-                result = await _call_openrouter(
-                    prepared.messages,
-                    model=active_model,
-                    tools=tools_for_call,
-                    tool_choice=(
-                        {"type": "function", "function": {"name": required_final_tool_name}} if force_final_tool else None
-                    ),
-                    max_retries=max_request_retries,
-                    max_tokens=context_budget.max_output_tokens,
-                    run_budget=run_budget,
-                )
-            except RuntimeError as e:
-                if "policy violation" in str(e).lower():
-                    log("error", f"  [{phase_name}] policy violation detected; exiting iteration loop")
-                    raise
-                raise
+        # Some models reject a forced tool_choice with HTTP 400 (ModelSpec.
+        # forced_tool_choice). For those the final call is requested by
+        # instruction under tool_choice "auto", with one firmer retry; a model
+        # that still does not call the tool falls through to the same handling
+        # as a forced call that came back without one.
+        unforced_final_tool = bool(force_final_tool and tools_for_call and not accepts_forced_tool_choice(active_model))
+        if unforced_final_tool:
+            messages.append(_unforced_final_tool_message(required_final_tool_name, firm=False))
+            log(
+                "info",
+                f"  [{phase_name}] {active_model} rejects a forced tool_choice; "
+                f"requesting {required_final_tool_name} by instruction",
+            )
 
-            if not result or not getattr(result, "choices", None) or len(result.choices) == 0:
-                raise RuntimeError(f"[{phase_name}] OpenRouter returned an empty or invalid response: {result}")
-            choice = result.choices[0]
-            message = choice.message
-            finish_reason = choice.finish_reason or "?"
-            usage = result.usage
-            produced_nothing = not message.tool_calls and not str(message.content or "").strip()
-            if finish_reason != "error" or not produced_nothing:
+        t_call = time.perf_counter()
+        for unforced_attempt in range(2 if unforced_final_tool else 1):
+            if unforced_attempt:
+                messages.append(_unforced_final_tool_message(required_final_tool_name, firm=True))
+            # OpenRouter reports an upstream provider failure as HTTP 200 carrying
+            # finish_reason "error" with no content and no usage, so the empty-response
+            # guard below never sees it. Treated as an ordinary empty turn it silently
+            # consumed one of the loop's iterations: ma-house-02-2026 lost 3 of its 12
+            # that way and ran out of budget before it could finalize. Retry the call
+            # rather than spending the turn on a response the provider never produced.
+            for provider_error_attempt in range(PROVIDER_ERROR_RETRIES + 1):
+                try:
+                    prepared = context.prepare_messages(messages, tools=tools_for_call)
+                    record_context_metrics(
+                        estimated_input_tokens=prepared.estimated_input_tokens,
+                        context_window_tokens=context_budget.context_window_tokens,
+                        deduplicated_results=prepared.deduplicated_results,
+                        compacted_results=prepared.compacted_results,
+                        truncated_results=prepared.truncated_results,
+                        dropped_tool_turns=prepared.dropped_tool_turns,
+                    )
+                    result = await _call_openrouter(
+                        prepared.messages,
+                        model=active_model,
+                        tools=tools_for_call,
+                        tool_choice=(
+                            {"type": "function", "function": {"name": required_final_tool_name}}
+                            if force_final_tool and not unforced_final_tool
+                            else None
+                        ),
+                        max_retries=max_request_retries,
+                        max_tokens=context_budget.max_output_tokens,
+                        run_budget=run_budget,
+                    )
+                except RuntimeError as e:
+                    if "policy violation" in str(e).lower():
+                        log("error", f"  [{phase_name}] policy violation detected; exiting iteration loop")
+                        raise
+                    raise
+
+                if not result or not getattr(result, "choices", None) or len(result.choices) == 0:
+                    raise RuntimeError(f"[{phase_name}] OpenRouter returned an empty or invalid response: {result}")
+                choice = result.choices[0]
+                message = choice.message
+                finish_reason = choice.finish_reason or "?"
+                usage = result.usage
+                produced_nothing = not message.tool_calls and not str(message.content or "").strip()
+                if finish_reason != "error" or not produced_nothing:
+                    break
+                if provider_error_attempt < PROVIDER_ERROR_RETRIES:
+                    log(
+                        "warning",
+                        f"  [{phase_name}] provider returned finish=error with no content; "
+                        f"retrying without spending iteration {iteration + 1} "
+                        f"({provider_error_attempt + 1}/{PROVIDER_ERROR_RETRIES})",
+                    )
+            if not unforced_final_tool or _calls_tool(message, required_final_tool_name):
                 break
-            if provider_error_attempt < PROVIDER_ERROR_RETRIES:
-                log(
-                    "warning",
-                    f"  [{phase_name}] provider returned finish=error with no content; "
-                    f"retrying without spending iteration {iteration + 1} "
-                    f"({provider_error_attempt + 1}/{PROVIDER_ERROR_RETRIES})",
-                )
+            log(
+                "warning",
+                f"  [{phase_name}] {active_model} did not call {required_final_tool_name} under tool_choice=auto"
+                + ("; retrying once with a firmer instruction" if unforced_attempt == 0 else ""),
+            )
         elapsed_call = time.perf_counter() - t_call
         log(
             "info",

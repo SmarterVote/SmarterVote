@@ -71,7 +71,7 @@ LEGACY_PROFILE_ALIASES: Dict[str, str] = {
 class ModelSpec:
     """One model, priced per million tokens.
 
-    ``intelligence`` is the Artificial Analysis Intelligence Index v4.1 score.
+    ``intelligence`` is the Artificial Analysis Intelligence Index v4.3.2 score.
     It is the field the escalation guard reasons about — see the module
     docstring for why output price cannot stand in for it.
     """
@@ -86,6 +86,14 @@ class ModelSpec:
     context_window_tokens: int
     intelligence: float
     max_completion_tokens: Optional[int] = None
+    #: Whether the provider accepts a ``tool_choice`` that forces a specific
+    #: function. Some models reject it with HTTP 400 ("tool_choice: type tool
+    #: and any are not supported for this model"). For those, the agent loop's
+    #: forced final tool call falls back to ``tool_choice: "auto"`` plus an
+    #: explicit instruction naming the function (``pipeline_client/agent/llm.py``).
+    #: Set from a live probe, not from OpenRouter's endpoint metadata: that
+    #: metadata reports Haiku 5.5 as unforceable, yet it honours a forced call.
+    forced_tool_choice: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +143,8 @@ class ModelSpec:
 # Prices, context windows, and completion limits verified against OpenRouter
 # live 2026-10-24 (for a model with a provider preference, against the endpoint
 # we route to). Intelligence is AA Intelligence Index v4.3.2, captured
-# 2026-09-26; GPT-6.1 Sol and Haiku 5.5 added from their AA pages 2026-10-24.
+# 2026-09-26; GPT-6.1 Sol, Haiku 5.5, Sonnet 5.5, Opus 5.5 and Gemini 4 Argon
+# added from their AA pages (all labelled v4.3.2) 2026-10-24.
 
 MODEL_CATALOG: Dict[str, ModelSpec] = {
     # --- OpenAI: GPT-6 family (2026-09-22) ---------------------------------
@@ -246,6 +255,14 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     # repriced); 3.8 was raised 10% to $0.825/$4.125 in October 2026. The index
     # still climbs 34 -> 39 -> 41, and 3.8 returns forced tool calls, which 3.7
     # failed 6 of 6 times.
+    #
+    # 3.8 Flash is the default Gemini reviewer (2026-10-24), replacing 3.5 Flash
+    # Lite: 41 against 22 for ~2.7x the input price. Reviews run a few times
+    # per full run, so that is ~$0.05 a run, and it is offset by the Claude seat
+    # moving from Haiku 4.5 ($1/$5) to Haiku 5.5 ($0.10/$0.50). The $0.825
+    # headline is Vertex US; AI Studio and Vertex global charge $0.75/$3.75 and
+    # a pinned AI Studio probe billed $0.75, but pinning is not done because a
+    # bare ``google-ai-studio`` slug also matches the /flex and /priority tiers.
     "google/gemini-3.6-flash": ModelSpec(
         "google/gemini-3.6-flash",
         "Gemini 3.6 Flash",
@@ -276,12 +293,35 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         41.0,
         65_536,
     ),
+    # Gemini 4 Argon (2026-10-13): Google's flagship, 53 on the index at
+    # $2/$10 with $0.10 cached reads, i.e. GPT-6.1 Sol's price. The premium
+    # Gemini reviewer and, through DEFAULT_CHAMBER_FORECAST_MODEL, the
+    # single-model chamber writer. Live-probed 2026-10-24: forced tool call and
+    # plain JSON both pass. It is *not* the roster completeness reviewer: on the
+    # labelled completeness cases it read the subject as the whole roster and
+    # rejected 2 of 3 sound bundles, where Opus 5.5 got 3 of 3.
+    "google/gemini-4-argon": ModelSpec(
+        "google/gemini-4-argon",
+        "Gemini 4 Argon",
+        2.00,
+        10.00,
+        0.10,
+        1_048_576,
+        53.0,
+        943_718,
+    ),
     # --- Anthropic ---------------------------------------------------------
-    # Haiku 4.5 is old (2025-10-15) and weak. It was kept because it was the
-    # only sub-$2 Anthropic model OpenRouter served: the review panel wants
-    # three *different* houses more than it wants three strong models. Haiku
-    # 5.5 (below) now beats it on every axis but is not yet the default
-    # reviewer; see its note.
+    # Anthropic models do no implicit prompt caching through OpenRouter (Haiku
+    # 5.5 re-measured 2026-10-24: 0 cached tokens on an identical warm prefix)
+    # and their tokenizer counts ~1.6x the tokens OpenAI's does for the same
+    # text (10,832 vs 6,826). So for a long tool loop that re-sends its prefix
+    # every turn, an Anthropic model at OpenAI's list price costs several times
+    # more. They earn their seats on single-shot calls: review, adjudication,
+    # chamber narratives.
+    #
+    # Haiku 4.5 is old (2025-10-15) and weak, and no longer fills any role. It
+    # was kept as the default Claude reviewer because it was the only sub-$2
+    # Anthropic model OpenRouter served. Kept so stored runs still price.
     "anthropic/claude-haiku-4.5": ModelSpec(
         "anthropic/claude-haiku-4.5",
         "Claude Haiku 4.5",
@@ -293,12 +333,11 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         64_000,
     ),
     # Haiku 5.5 (2026-10-07): $0.10/$0.50 against Haiku 4.5's $1/$5, index 43
-    # against 17 (AA v4.3.2, read 2026-10-24), and it returned a forced tool
-    # call and plain JSON output in a live probe on 2026-10-24. It is not the
-    # default review_claude yet only because it outranks the premium reviewer
-    # (Sonnet 5, 38) and is newer than it, which the catalog guard's
-    # premium-not-worse check rejects; moving the default means moving the
-    # premium seat too.
+    # against 17 (AA v4.3.2, read 2026-10-24). Live-probed 2026-10-24: forced
+    # tool call and plain JSON both pass (OpenRouter's endpoint metadata says it
+    # cannot be forced; the provider disagrees). The default Claude reviewer
+    # and the roster adjudicator; see ADJUDICATOR_MODEL. Not the small model:
+    # see the Anthropic note above.
     "anthropic/claude-haiku-5.5": ModelSpec(
         "anthropic/claude-haiku-5.5",
         "Claude Haiku 5.5",
@@ -309,6 +348,8 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         43.0,
         128_000,
     ),
+    # Sonnet 5 and Opus 5 are superseded by their 5.5 releases below, which are
+    # stronger and no dearer. Kept so stored runs and overrides still price.
     "anthropic/claude-sonnet-5": ModelSpec(
         "anthropic/claude-sonnet-5",
         "Claude Sonnet 5",
@@ -319,13 +360,6 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         38.0,
         128_000,
     ),
-    # Opus 5.5 (2026-09-22, 58 index, $4/$20) is stronger *and* cheaper, and is
-    # deliberately absent: every provider rejects a forced or "required"
-    # tool_choice for it (probed 2026-09-26). Sonnet 5.5 (2026-09-28, 56,
-    # $2/$10) is absent for the same reason (probed 2026-10-24: "tool_choice:
-    # type tool and any are not supported for this model"), and the research loop forces its
-    # final tool call on whatever model it has escalated to. As the frontier
-    # escalation target it would turn an escalation into a permanent 400.
     "anthropic/claude-opus-5": ModelSpec(
         "anthropic/claude-opus-5",
         "Claude Opus 5",
@@ -336,18 +370,60 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         51.0,
         128_000,
     ),
+    # Sonnet 5.5 (2026-09-28): 56 against Sonnet 5's 38 at the same $2/$10, with
+    # half the cached-read price. Opus 5.5 (2026-09-22): 58 against Opus 5's 51
+    # and cheaper on every price. Both reject a forced tool_choice from every
+    # provider (re-probed 2026-10-24: HTTP 400, "tool_choice: type tool and any
+    # are not supported for this model"), so they carry
+    # ``forced_tool_choice=False`` and the agent loop asks for its final tool
+    # call by instruction instead; both then called the named function under
+    # ``tool_choice: "auto"`` in the same probe. Plain JSON passes on both.
+    # Every role that uses them today — review, chamber narratives, chamber
+    # synthesis, roster completeness — is a plain-JSON call that sends no
+    # tools; the fallback matters for the escalation edge into FRONTIER_MODEL
+    # and for any override that runs them in a tool loop.
+    "anthropic/claude-sonnet-5.5": ModelSpec(
+        "anthropic/claude-sonnet-5.5",
+        "Claude Sonnet 5.5",
+        2.00,
+        10.00,
+        0.10,
+        1_000_000,
+        56.0,
+        128_000,
+        forced_tool_choice=False,
+    ),
+    "anthropic/claude-opus-5.5": ModelSpec(
+        "anthropic/claude-opus-5.5",
+        "Claude Opus 5.5",
+        4.00,
+        20.00,
+        0.20,
+        1_000_000,
+        58.0,
+        128_000,
+        forced_tool_choice=False,
+    ),
     # --- xAI ---------------------------------------------------------------
     # Grok version strings sort by decimal, not integer: 4.20 (2026-03-31) is
     # *older* than 4.3 (2026-04-30), which is older than 4.5 (2026-07-08).
     # Reading them the other way once put the premium reviewer on an older
     # model than the default one. Release dates decide, never string order.
+    #
+    # Grok 4.3 was the default Grok reviewer and forecast-panel member until
+    # 2026-10-24, and was poor value: 25 on the index at $1.25/$2.50. OpenRouter
+    # serves no cheaper current xAI general model (grok-build-0.1 is a coding
+    # build), so the default seat moved up to 4.7 rather than sideways. Kept so
+    # stored runs still price.
     "x-ai/grok-4.3": ModelSpec("x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 25.0),
     "x-ai/grok-4.5": ModelSpec("x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 39.0),
     "x-ai/grok-4.6": ModelSpec("x-ai/grok-4.6", "Grok 4.6", 2.00, 6.00, 0.50, 500_000, 44.0),
-    # Newer and +2 index over 4.6. It launched 20% cheaper and was repriced to
-    # 4.6's $2/$6 in October 2026, so it now wins on index alone. It answered a
-    # probability tool field as a percentage (64.0) in 2 of 3 probe draws, so it
-    # is a reviewer, not a forecast-panel member, until that is normalized.
+    # The newest xAI model OpenRouter serves (2026-09-21) and +2 index over 4.6
+    # at the same $2/$6, so it is both Grok seats. It once answered a
+    # probability tool field as a percentage (64.0) in 2 of 3 draws; that is
+    # harmless in the forecast panel, which rescales every member's
+    # probabilities to sum to 1 (`shared.forecast_math.normalize_probabilities`).
+    # Live-probed 2026-10-24: forced tool call and plain JSON both pass.
     "x-ai/grok-4.7": ModelSpec("x-ai/grok-4.7", "Grok 4.7", 2.00, 6.00, 0.50, 500_000, 46.0),
 }
 
@@ -393,24 +469,39 @@ PREMIUM_RESEARCH_MODEL = "openai/gpt-6.1-sol"
 #: The second-largest line in the bill (301M prompt tokens across the latest
 #: 500 runs), so GPT-6 Luna — same index as GPT-5.6 Luna at half the price on
 #: every axis — roughly halves it.
+#:
+#: Haiku 5.5 has the same list price and scores 43 against 37.3, but it is not
+#: the cheaper model here. This role runs long tool loops (polling, voter
+#: resources, issue sub-agents) that re-send a growing prefix every turn. Luna
+#: caches that prefix implicitly (warm read 11.7x cheaper, re-measured
+#: 2026-10-24); Haiku 5.5 caches none of it and tokenizes the same text into
+#: ~1.6x the tokens. Moving it would multiply this line several times over.
 SMALL_MODEL = "openai/gpt-6-luna"
 
 #: Ceiling for escalation. Nothing routes here by default.
 #:
 #: Sol became the premium research model, so it can no longer also be the place
 #: research escalates *to* — a self-edge would fail the escalation guard and, more
-#: to the point, would not be an escalation. Opus 5 (51) is above GPT-6 Sol
-#: (47.5), and it remains the target for GPT-6 Sol when an override still names
-#: it, the chamber synthesis model, and the roster completeness reviewer. It is
-#: no longer above the premium research model, which is the top of the ladder.
-FRONTIER_MODEL = "anthropic/claude-opus-5"
+#: to the point, would not be an escalation. Opus 5.5 (58) is the strongest
+#: catalogued model and cheaper than Opus 5 on every price. It is the target
+#: for GPT-6 Sol when an override still names it, and the chamber synthesis
+#: model. It rejects a forced tool_choice (``forced_tool_choice=False``), so a
+#: tool loop that escalates here asks for its final call by instruction.
+FRONTIER_MODEL = "anthropic/claude-opus-5.5"
 
-DEFAULT_REVIEW_CLAUDE = "anthropic/claude-haiku-4.5"
-DEFAULT_REVIEW_GEMINI = "google/gemini-3.5-flash-lite"
-DEFAULT_REVIEW_GROK = "x-ai/grok-4.3"
+#: The review panel keeps three different houses in both profiles: models from
+#: one lab share blind spots, so a second opinion from the same lab is worth
+#: less. The Grok seat stays by owner preference. Moved 2026-10-24 from
+#: Haiku 4.5 / Gemini 3.5 Flash Lite / Grok 4.3 (17 / 22 / 25 on the index) to
+#: 43 / 41 / 46; the Claude move saves about what the other two add.
+DEFAULT_REVIEW_CLAUDE = "anthropic/claude-haiku-5.5"
+DEFAULT_REVIEW_GEMINI = "google/gemini-3.8-flash"
+DEFAULT_REVIEW_GROK = "x-ai/grok-4.7"
 
-PREMIUM_REVIEW_CLAUDE = "anthropic/claude-sonnet-5"
-PREMIUM_REVIEW_GEMINI = "google/gemini-3.8-flash"
+#: Each house's strongest model that answers a plain-JSON review. Grok 4.7 is
+#: already the newest xAI model, so both profiles share it.
+PREMIUM_REVIEW_CLAUDE = "anthropic/claude-sonnet-5.5"
+PREMIUM_REVIEW_GEMINI = "google/gemini-4-argon"
 PREMIUM_REVIEW_GROK = "x-ai/grok-4.7"
 
 #: The fail-closed reading-comprehension gate in front of every roster edit.
@@ -422,19 +513,30 @@ PREMIUM_REVIEW_GROK = "x-ai/grok-4.7"
 #: The gate's whole claim to independence is that the model producing the
 #: evidence is not the model judging it, and roster edits are made from both
 #: roster-phase loops (roster model) and metadata/refinement loops (primary
-#: model). Luna satisfies that against both DeepSeek and Sol and returns
-#: well-formed JSON under the 400-token ceiling, verified against the live API.
-#: ``scripts/check_model_catalog.py`` enforces the separation.
+#: model). ``scripts/check_model_catalog.py`` enforces the separation.
 #:
-#: It does **not** get ``temperature=0``, and neither did GPT-5.6 Luna: no
-#: OpenRouter endpoint for either lists ``temperature`` as a supported
-#: parameter, so it is dropped in transit. Determinism rests on the pinned
-#: model and the verdict cache, not on sampling.
-ADJUDICATOR_MODEL = SMALL_MODEL
+#: Haiku 5.5 since 2026-10-24, replacing GPT-6 Luna: same list price, 43
+#: against 37.3, and a different *house* from both research models (DeepSeek,
+#: OpenAI), where Luna shared a lab with the premium research model. On the
+#: labelled cases in ``tests/test_roster_adjudicator_live.py``, two draws each
+#: under the 400-token ceiling, both scored 18/18 with no empty verdicts. Each
+#: verdict is one short, uncached call, so Anthropic's lack of implicit caching
+#: costs little here, unlike in the small model's tool loops.
+#:
+#: It does **not** get ``temperature=0``, and neither did Luna: no OpenRouter
+#: endpoint for either lists ``temperature`` as a supported parameter, so it
+#: is dropped in transit. Determinism rests on the pinned model and the
+#: verdict cache, not on sampling.
+ADJUDICATOR_MODEL = "anthropic/claude-haiku-5.5"
 
 #: Strong, independent second look used only when every ordinary completeness
-#: judgment rejects a structurally valid roster-evidence bundle.
-ROSTER_COMPLETENESS_REVIEW_MODEL = "anthropic/claude-opus-5"
+#: judgment rejects a structurally valid roster-evidence bundle. A plain-JSON
+#: call. Opus 5.5 answered all three labelled completeness cases correctly at
+#: the 1,200-token ceiling (2026-10-24); Gemini 4 Argon, the strongest
+#: non-Anthropic candidate, got one of three. It shares a lab with the
+#: adjudicator, but it is consulted only after that gate has already said no,
+#: so a shared blind spot can only keep a block in place, never open one.
+ROSTER_COMPLETENESS_REVIEW_MODEL = "anthropic/claude-opus-5.5"
 
 #: Chamber-forecast narratives: a handful of long-context calls over every
 #: published race summary, run by hand from the admin UI rather than per race.
@@ -455,17 +557,22 @@ DEFAULT_CHAMBER_FORECAST_MODEL = PREMIUM_REVIEW_GEMINI
 #: usable forced tool call in 6 of 6 attempts on the same prompt. (3.8 Flash
 #: does return one; it is a candidate if the panel ever wants a Google seat.)
 #:
-#: All three are cheap (~$0.005 a call), so the panel adds ~$0.02 per race.
+#: Members answer through a forced ``submit_forecast_estimate`` call. The Grok
+#: seat follows the default reviewer onto Grok 4.7 (2026-10-24): the panel's
+#: Grok calls ran ~6.6k prompt tokens a race across the latest 40 production
+#: runs, so the move costs about half a cent a race. All three remain cheap,
+#: and the panel adds ~$0.02 per race.
 FORECAST_PANEL_MODELS: tuple[str, ...] = (DEFAULT_RESEARCH_MODEL, SMALL_MODEL, DEFAULT_REVIEW_GROK)
 
 #: Chamber narratives are a few calls per regeneration over the whole map, not
 #: per race, so their panel takes each house's flagship. Each drafts the note
-#: independently from the same computed numbers.
+#: independently from the same computed numbers. Plain JSON, no tools, so
+#: Sonnet 5.5 needs no tool-choice fallback here.
 CHAMBER_FORECAST_PANEL_MODELS: tuple[str, ...] = (PREMIUM_REVIEW_CLAUDE, PREMIUM_RESEARCH_MODEL, PREMIUM_REVIEW_GROK)
 
 #: Merges the chamber panel's drafts into the published note and holds every
 #: claim to the computed numbers. The strongest catalogued model; it runs once
-#: per chamber, three times per regeneration.
+#: per chamber, three times per regeneration. Plain JSON, no tools.
 CHAMBER_FORECAST_SYNTHESIS_MODEL = FRONTIER_MODEL
 
 #: Looks at a candidate photo before it is stored and answers structural
@@ -506,8 +613,8 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
         # catalog, not a merge of the two roles. It stays a separate role so a
         # roster regression is a one-line fix, and so `premium` can differ.
     },
-    # Research and roster move up a real tier and all three reviewers go to
-    # their flagships. Review is where quality is actually decided and it runs a
+    # Research and roster move up a real tier and the reviewers go to their
+    # flagships (Grok already is one). Review is where quality is actually decided and it runs a
     # handful of times per race rather than once per candidate/issue pair.
     "premium": {
         "primary": PREMIUM_RESEARCH_MODEL,
@@ -545,10 +652,15 @@ MODEL_ESCALATION: Dict[str, str] = {
     # and a premium loop that stalls fails rather than climbing to a frontier
     # price tier (owner decision, 2026-10-24).
     # The previous premium model, still reachable through model_overrides.
-    "openai/gpt-6-sol": FRONTIER_MODEL,  # 47.5 -> 51.0
-    DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
-    DEFAULT_REVIEW_GEMINI: PREMIUM_REVIEW_GEMINI,  # 22.0 -> 41.0
-    DEFAULT_REVIEW_GROK: PREMIUM_REVIEW_GROK,  # 25.0 -> 46.0
+    "openai/gpt-6-sol": FRONTIER_MODEL,  # 47.5 -> 58.0
+    DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 43.0 -> 56.0
+    DEFAULT_REVIEW_GEMINI: PREMIUM_REVIEW_GEMINI,  # 41.0 -> 53.0
+    # DEFAULT_REVIEW_GROK is PREMIUM_REVIEW_GROK (Grok 4.7, the newest xAI
+    # model), so it has no edge: a self-edge is not an escalation.
+    # The previous default reviewers, still reachable through model_overrides.
+    "anthropic/claude-haiku-4.5": PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 56.0
+    "google/gemini-3.5-flash-lite": PREMIUM_REVIEW_GEMINI,  # 22.0 -> 53.0
+    "x-ai/grok-4.3": PREMIUM_REVIEW_GROK,  # 25.0 -> 46.0
 }
 
 
@@ -596,7 +708,10 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
     "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
     "claude-sonnet-5": "anthropic/claude-sonnet-5",
+    "claude-sonnet-5.5": "anthropic/claude-sonnet-5.5",
     "claude-opus-5": "anthropic/claude-opus-5",
+    "claude-opus-5.5": "anthropic/claude-opus-5.5",
+    "gemini-4-argon": "google/gemini-4-argon",
     "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite",
     "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
     "gemini-3.6-flash": "google/gemini-3.6-flash",
@@ -735,6 +850,16 @@ def intelligence_of(model: Optional[str]) -> Optional[float]:
     """Return a model's intelligence index, or ``None`` if it is not catalogued."""
     spec = spec_for(model)
     return spec.intelligence if spec else None
+
+
+def accepts_forced_tool_choice(model: Optional[str]) -> bool:
+    """Whether *model* honours a ``tool_choice`` that forces a named function.
+
+    An uncatalogued model is assumed to, which keeps today's request shape for
+    anything we have not probed.
+    """
+    spec = spec_for(model)
+    return spec.forced_tool_choice if spec else True
 
 
 def escalation_for(model: Optional[str]) -> Optional[str]:

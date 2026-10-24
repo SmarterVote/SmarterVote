@@ -148,6 +148,16 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "intelligence": 41.0,
     "maxCompletionTokens": 65536
   },
+  "google/gemini-4-argon": {
+    "id": "google/gemini-4-argon",
+    "label": "Gemini 4 Argon",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1048576,
+    "intelligence": 53.0,
+    "maxCompletionTokens": 943718
+  },
   "anthropic/claude-haiku-4.5": {
     "id": "anthropic/claude-haiku-4.5",
     "label": "Claude Haiku 4.5",
@@ -186,6 +196,26 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "cachedInputPerM": 0.5,
     "contextWindowTokens": 1000000,
     "intelligence": 51.0,
+    "maxCompletionTokens": 128000
+  },
+  "anthropic/claude-sonnet-5.5": {
+    "id": "anthropic/claude-sonnet-5.5",
+    "label": "Claude Sonnet 5.5",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1000000,
+    "intelligence": 56.0,
+    "maxCompletionTokens": 128000
+  },
+  "anthropic/claude-opus-5.5": {
+    "id": "anthropic/claude-opus-5.5",
+    "label": "Claude Opus 5.5",
+    "inputPerM": 4.0,
+    "outputPerM": 20.0,
+    "cachedInputPerM": 0.2,
+    "contextWindowTokens": 1000000,
+    "intelligence": 58.0,
     "maxCompletionTokens": 128000
   },
   "x-ai/grok-4.3": {
@@ -245,10 +275,13 @@ export const MODEL_LABELS: Record<string, string> = {
   "google/gemini-3.6-flash": "Gemini 3.6 Flash",
   "google/gemini-3.7-flash": "Gemini 3.7 Flash",
   "google/gemini-3.8-flash": "Gemini 3.8 Flash",
+  "google/gemini-4-argon": "Gemini 4 Argon",
   "anthropic/claude-haiku-4.5": "Claude Haiku 4.5",
   "anthropic/claude-haiku-5.5": "Claude Haiku 5.5",
   "anthropic/claude-sonnet-5": "Claude Sonnet 5",
   "anthropic/claude-opus-5": "Claude Opus 5",
+  "anthropic/claude-sonnet-5.5": "Claude Sonnet 5.5",
+  "anthropic/claude-opus-5.5": "Claude Opus 5.5",
   "x-ai/grok-4.3": "Grok 4.3",
   "x-ai/grok-4.5": "Grok 4.5",
   "x-ai/grok-4.6": "Grok 4.6",
@@ -283,7 +316,10 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
   "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
   "claude-sonnet-5": "anthropic/claude-sonnet-5",
+  "claude-sonnet-5.5": "anthropic/claude-sonnet-5.5",
   "claude-opus-5": "anthropic/claude-opus-5",
+  "claude-opus-5.5": "anthropic/claude-opus-5.5",
+  "gemini-4-argon": "google/gemini-4-argon",
   "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
   "gemini-3.6-flash": "google/gemini-3.6-flash",
@@ -341,22 +377,22 @@ export const PROFILE_DEFAULTS: Record<string, Record<string, string>> = {
     "small": "openai/gpt-6-luna",
     "roster": "deepseek/deepseek-v4.1-flash",
     "image_vision": "google/gemini-3.1-flash-lite",
-    "review_claude": "anthropic/claude-haiku-4.5",
-    "review_gemini": "google/gemini-3.5-flash-lite",
-    "review_grok": "x-ai/grok-4.3"
+    "review_claude": "anthropic/claude-haiku-5.5",
+    "review_gemini": "google/gemini-3.8-flash",
+    "review_grok": "x-ai/grok-4.7"
   },
   "premium": {
     "primary": "openai/gpt-6.1-sol",
     "small": "openai/gpt-6-luna",
     "roster": "openai/gpt-6.1-sol",
     "image_vision": "google/gemini-3.1-flash-lite",
-    "review_claude": "anthropic/claude-sonnet-5",
-    "review_gemini": "google/gemini-3.8-flash",
+    "review_claude": "anthropic/claude-sonnet-5.5",
+    "review_gemini": "google/gemini-4-argon",
     "review_grok": "x-ai/grok-4.7"
   }
 };
 
-export const DEFAULT_CHAMBER_FORECAST_MODEL = "google/gemini-3.8-flash";
+export const DEFAULT_CHAMBER_FORECAST_MODEL = "google/gemini-4-argon";
 
 export type ReviewerKey = "claude" | "gemini" | "grok";
 
@@ -370,12 +406,12 @@ export const REVIEWER_DEFS: {
     "name": "Claude",
     "options": [
       {
-        "value": "anthropic/claude-haiku-4.5",
-        "label": "Claude Haiku 4.5"
+        "value": "anthropic/claude-haiku-5.5",
+        "label": "Claude Haiku 5.5"
       },
       {
-        "value": "anthropic/claude-sonnet-5",
-        "label": "Claude Sonnet 5"
+        "value": "anthropic/claude-sonnet-5.5",
+        "label": "Claude Sonnet 5.5"
       }
     ]
   },
@@ -384,12 +420,12 @@ export const REVIEWER_DEFS: {
     "name": "Gemini",
     "options": [
       {
-        "value": "google/gemini-3.5-flash-lite",
-        "label": "Gemini 3.5 Flash Lite"
-      },
-      {
         "value": "google/gemini-3.8-flash",
         "label": "Gemini 3.8 Flash"
+      },
+      {
+        "value": "google/gemini-4-argon",
+        "label": "Gemini 4 Argon"
       }
     ]
   },
@@ -397,10 +433,6 @@ export const REVIEWER_DEFS: {
     "key": "grok",
     "name": "Grok",
     "options": [
-      {
-        "value": "x-ai/grok-4.3",
-        "label": "Grok 4.3"
-      },
       {
         "value": "x-ai/grok-4.7",
         "label": "Grok 4.7"
@@ -425,7 +457,7 @@ export const RESEARCH_MODELS: { value: string; label: string }[] = [
 ];
 
 export const DEFAULT_REVIEWER_MODELS: Record<ReviewerKey, string> = {
-  "claude": "anthropic/claude-haiku-4.5",
-  "gemini": "google/gemini-3.5-flash-lite",
-  "grok": "x-ai/grok-4.3"
+  "claude": "anthropic/claude-haiku-5.5",
+  "gemini": "google/gemini-3.8-flash",
+  "grok": "x-ai/grok-4.7"
 };
