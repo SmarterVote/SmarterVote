@@ -147,6 +147,9 @@ def _provider(model_id: str) -> str:
     return model_id.split("/", 1)[0]
 
 
+_SERVICE_TIERS = frozenset({"flex", "priority"})
+
+
 def _routed_record(model_id: str, record: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
     """Return the record to price *model_id* against, plus a label naming where it came from.
 
@@ -164,6 +167,11 @@ def _routed_record(model_id: str, record: Dict[str, Any]) -> tuple[Dict[str, Any
     matching = [e for e in endpoints if str(e.get("tag") or "").split("/")[0] == order[0]]
     if not matching:
         return record, ""
+    # A bare slug bills the provider's standard tier: a forced DeepInfra probe on
+    # 2026-10-24 was charged deepinfra/fp8's price, not the cheaper /flex tier's.
+    # The /flex and /priority service tiers only count when nothing else is left.
+    standard = [e for e in matching if not set(str(e.get("tag") or "").split("/")[1:]) & _SERVICE_TIERS]
+    matching = standard or matching
     endpoint = min(matching, key=lambda e: float((e.get("pricing") or {}).get("prompt") or "inf"))
     routed = {
         "pricing": endpoint.get("pricing") or {},
