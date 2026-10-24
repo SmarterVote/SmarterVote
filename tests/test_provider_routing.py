@@ -40,7 +40,8 @@ async def test_preference_is_sent_as_openrouter_provider_object():
     with patch("pipeline_client.agent.llm._get_openrouter_client", return_value=client):
         await _call_openrouter([{"role": "user", "content": "hi"}], model="deepseek/deepseek-v4.1-flash")
     kwargs = client.chat.completions.create.call_args.kwargs
-    assert kwargs["extra_body"] == {"provider": {"order": ["inference-net"], "allow_fallbacks": True}}
+    expected_order = list(MODEL_PROVIDER_PREFERENCES["deepseek/deepseek-v4.1-flash"])
+    assert kwargs["extra_body"] == {"provider": {"order": expected_order, "allow_fallbacks": True}}
 
 
 @pytest.mark.asyncio

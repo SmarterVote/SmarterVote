@@ -133,7 +133,9 @@ class ModelSpec:
 # stored run record that still has to price correctly.
 #
 # Prices, context windows, and completion limits verified against OpenRouter
-# live 2026-09-26. Intelligence is AA Intelligence Index v4.3.2, same date.
+# live 2026-10-24 (for a model with a provider preference, against the endpoint
+# we route to). Intelligence is AA Intelligence Index v4.3.2, captured
+# 2026-09-26; GPT-6.1 Sol and Haiku 5.5 added from their AA pages 2026-10-24.
 
 MODEL_CATALOG: Dict[str, ModelSpec] = {
     # --- OpenAI: GPT-6 family (2026-09-22) ---------------------------------
@@ -154,9 +156,16 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         37.3,
         128_000,
     ),
+    # Superseded by GPT-6.1 Sol at the same price. Kept so stored runs and
+    # explicit overrides still price correctly.
     "openai/gpt-6-sol": ModelSpec("openai/gpt-6-sol", "GPT-6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.5, 128_000),
+    # --- OpenAI: GPT-6.1 (2026-09-29) --------------------------------------
+    # Same $2/$10 as GPT-6 Sol with cached reads at half the price ($0.10 vs
+    # $0.20), and 52 against 47.5 on the index. Live-probed 2026-10-24: returns
+    # a forced tool call and plain JSON output.
+    "openai/gpt-6.1-sol": ModelSpec("openai/gpt-6.1-sol", "GPT-6.1 Sol", 2.00, 10.00, 0.10, 1_050_000, 52.0, 128_000),
     # --- OpenAI: GPT-5.6 family (2026-07-09) -------------------------------
-    # Superseded by GPT-6 at the same or twice the price. Kept so stored runs
+    # Superseded by GPT-6. Sol was repriced to $4/$20 in October 2026. Kept so stored runs
     # and explicit overrides still price correctly.
     "openai/gpt-5.6-luna": ModelSpec(
         "openai/gpt-5.6-luna",
@@ -178,7 +187,7 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         42.0,
         128_000,
     ),
-    "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 2.00, 10.00, 0.20, 1_050_000, 47.0, 128_000),
+    "openai/gpt-5.6-sol": ModelSpec("openai/gpt-5.6-sol", "GPT-5.6 Sol", 4.00, 20.00, 0.40, 1_050_000, 47.0, 128_000),
     # --- DeepSeek ----------------------------------------------------------
     # The default research model until 2026-09-26, replaced by V4.1 Flash below.
     # It has the lowest list input price in the catalog, but it escalated to Sol
@@ -188,27 +197,29 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     "deepseek/deepseek-v4-flash-0731": ModelSpec(
         "deepseek/deepseek-v4-flash-0731",
         "DeepSeek V4 Flash (07-31)",
-        0.021,
-        0.32,
-        0.016,
-        1_310_720,
+        0.04444,
+        0.13332,
+        0.001414,
+        1_048_576,
         34.0,
-        943_718,
+        131_072,
     ),
     # The default research and roster model. Five index points above 0731.
-    # Only InferenceNet serves it at list price, and OpenRouter will not route
-    # there on its own; see MODEL_PROVIDER_PREFERENCES. Pinned to the 4.1 slug
+    # Provider prices for it span ~15x and OpenRouter will not route to the
+    # cheap ones on its own, so it is pinned to Baidu (fp8) with fallbacks; see
+    # MODEL_PROVIDER_PREFERENCES. The price and completion limit below are
+    # Baidu's endpoint, not OpenRouter's headline figure. Pinned to the 4.1 slug
     # so a provider upgrade cannot move the research model with no commit to
     # point at.
     "deepseek/deepseek-v4.1-flash": ModelSpec(
         "deepseek/deepseek-v4.1-flash",
         "DeepSeek V4.1 Flash",
-        0.035,
-        0.29,
-        0.001,
+        0.0537,
+        0.2148,
+        0.001074,
         1_048_576,
         39.0,
-        384_000,
+        393_216,
     ),
     # --- Google ------------------------------------------------------------
     "google/gemini-3.1-flash-lite": ModelSpec(
@@ -231,9 +242,10 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         22.0,
         65_536,
     ),
-    # 3.6, 3.7 and 3.8 Flash now all cost the same $0.75/$3.75 (3.7 launched at
-    # half that and was repriced), so the newest is a strict win: 34 -> 39 -> 41.
-    # 3.8 also returns forced tool calls, which 3.7 failed 6 of 6 times.
+    # 3.6 and 3.7 Flash cost $0.75/$3.75 (3.7 launched at half that and was
+    # repriced); 3.8 was raised 10% to $0.825/$4.125 in October 2026. The index
+    # still climbs 34 -> 39 -> 41, and 3.8 returns forced tool calls, which 3.7
+    # failed 6 of 6 times.
     "google/gemini-3.6-flash": ModelSpec(
         "google/gemini-3.6-flash",
         "Gemini 3.6 Flash",
@@ -257,18 +269,19 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     "google/gemini-3.8-flash": ModelSpec(
         "google/gemini-3.8-flash",
         "Gemini 3.8 Flash",
-        0.75,
-        3.75,
-        0.075,
+        0.825,
+        4.125,
+        0.0825,
         1_048_576,
         41.0,
         65_536,
     ),
     # --- Anthropic ---------------------------------------------------------
-    # Haiku 4.5 is old (2025-10-15) and weak, and it stays because it is the
-    # only sub-$2 Anthropic model OpenRouter serves. The review panel wants
-    # three *different* houses more than it wants three strong models, and
-    # dropping the Anthropic seat entirely would cost more than Haiku does.
+    # Haiku 4.5 is old (2025-10-15) and weak. It was kept because it was the
+    # only sub-$2 Anthropic model OpenRouter served: the review panel wants
+    # three *different* houses more than it wants three strong models. Haiku
+    # 5.5 (below) now beats it on every axis but is not yet the default
+    # reviewer; see its note.
     "anthropic/claude-haiku-4.5": ModelSpec(
         "anthropic/claude-haiku-4.5",
         "Claude Haiku 4.5",
@@ -278,6 +291,23 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
         200_000,
         17.0,
         64_000,
+    ),
+    # Haiku 5.5 (2026-10-07): $0.10/$0.50 against Haiku 4.5's $1/$5, index 43
+    # against 17 (AA v4.3.2, read 2026-10-24), and it returned a forced tool
+    # call and plain JSON output in a live probe on 2026-10-24. It is not the
+    # default review_claude yet only because it outranks the premium reviewer
+    # (Sonnet 5, 38) and is newer than it, which the catalog guard's
+    # premium-not-worse check rejects; moving the default means moving the
+    # premium seat too.
+    "anthropic/claude-haiku-5.5": ModelSpec(
+        "anthropic/claude-haiku-5.5",
+        "Claude Haiku 5.5",
+        0.10,
+        0.50,
+        0.01,
+        1_000_000,
+        43.0,
+        128_000,
     ),
     "anthropic/claude-sonnet-5": ModelSpec(
         "anthropic/claude-sonnet-5",
@@ -291,7 +321,9 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     ),
     # Opus 5.5 (2026-09-22, 58 index, $4/$20) is stronger *and* cheaper, and is
     # deliberately absent: every provider rejects a forced or "required"
-    # tool_choice for it (probed 2026-09-26), and the research loop forces its
+    # tool_choice for it (probed 2026-09-26). Sonnet 5.5 (2026-09-28, 56,
+    # $2/$10) is absent for the same reason (probed 2026-10-24: "tool_choice:
+    # type tool and any are not supported for this model"), and the research loop forces its
     # final tool call on whatever model it has escalated to. As the frontier
     # escalation target it would turn an escalation into a permanent 400.
     "anthropic/claude-opus-5": ModelSpec(
@@ -312,10 +344,11 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     "x-ai/grok-4.3": ModelSpec("x-ai/grok-4.3", "Grok 4.3", 1.25, 2.50, 0.20, 1_000_000, 25.0),
     "x-ai/grok-4.5": ModelSpec("x-ai/grok-4.5", "Grok 4.5", 2.00, 6.00, 0.30, 500_000, 39.0),
     "x-ai/grok-4.6": ModelSpec("x-ai/grok-4.6", "Grok 4.6", 2.00, 6.00, 0.50, 500_000, 44.0),
-    # Newer, +2 index, and 20% cheaper than 4.6 on every price. It answered a
+    # Newer and +2 index over 4.6. It launched 20% cheaper and was repriced to
+    # 4.6's $2/$6 in October 2026, so it now wins on index alone. It answered a
     # probability tool field as a percentage (64.0) in 2 of 3 probe draws, so it
     # is a reviewer, not a forecast-panel member, until that is normalized.
-    "x-ai/grok-4.7": ModelSpec("x-ai/grok-4.7", "Grok 4.7", 1.60, 4.80, 0.40, 500_000, 46.0),
+    "x-ai/grok-4.7": ModelSpec("x-ai/grok-4.7", "Grok 4.7", 2.00, 6.00, 0.50, 500_000, 46.0),
 }
 
 
@@ -334,6 +367,9 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
 #:   V4.1 Flash, OpenRouter default routing  $0.86   0 escalated
 #:   V4.1 Flash, routed to InferenceNet      $0.20   0 escalated
 #:
+#: (InferenceNet later repriced ~3x; the model is now routed to Baidu. See
+#: MODEL_PROVIDER_PREFERENCES.)
+#:
 #: All three arms produced identical rosters. Per-token list price is the wrong
 #: lens here: 0731 is cheaper per token but spends more tokens and escalates.
 #: What decides the bill is escalation to Sol, and routing (arm 2 paid ~7x list).
@@ -346,8 +382,10 @@ DEFAULT_RESEARCH_MODEL = "deepseek/deepseek-v4.1-flash"
 #: identical 1.05M context, cheaper output ($10 vs $12), and 47 against 42.
 #: There is no axis on which Terra is the better buy, so nothing selects it.
 #: GPT-6 Sol then replaced GPT-5.6 Sol at an identical price: +0.5 index and
-#: roughly half the output tokens per task by AA's measurement.
-PREMIUM_RESEARCH_MODEL = "openai/gpt-6-sol"
+#: roughly half the output tokens per task by AA's measurement. GPT-6.1 Sol
+#: replaced GPT-6 Sol in turn: same $2/$10, half the cached-read price, 52
+#: against 47.5.
+PREMIUM_RESEARCH_MODEL = "openai/gpt-6.1-sol"
 
 #: Bounded sub-agent work and the roster adjudication gate, in *both* profiles.
 #: Deliberately not the research model — see :data:`ADJUDICATOR_MODEL`.
@@ -361,9 +399,10 @@ SMALL_MODEL = "openai/gpt-6-luna"
 #:
 #: Sol became the premium research model, so it can no longer also be the place
 #: research escalates *to* — a self-edge would fail the escalation guard and, more
-#: to the point, would not be an escalation. Opus 5 (51) is above Sol (47.5).
-#: This is the one edge that leaves its provider family: GPT-6 Astra (53) is
-#: $10/$50, and Opus 5.5 cannot take a forced tool call (see its catalog note).
+#: to the point, would not be an escalation. Opus 5 (51) is above GPT-6 Sol
+#: (47.5), and it remains the target for GPT-6 Sol when an override still names
+#: it, the chamber synthesis model, and the roster completeness reviewer. It is
+#: no longer above the premium research model, which is the top of the ladder.
 FRONTIER_MODEL = "anthropic/claude-opus-5"
 
 DEFAULT_REVIEW_CLAUDE = "anthropic/claude-haiku-4.5"
@@ -498,11 +537,15 @@ PROFILE_DEFAULTS: Dict[str, Dict[str, str]] = {
 #: Edges stay inside one provider family wherever possible so prompt behaviour
 #: does not shift mid-loop.
 MODEL_ESCALATION: Dict[str, str] = {
-    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 39.0 -> 47.5
+    DEFAULT_RESEARCH_MODEL: PREMIUM_RESEARCH_MODEL,  # 39.0 -> 52.0
     # The previous research model, still reachable through model_overrides.
-    "deepseek/deepseek-v4-flash-0731": PREMIUM_RESEARCH_MODEL,  # 34.0 -> 47.5
-    SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 47.5
-    PREMIUM_RESEARCH_MODEL: FRONTIER_MODEL,  # 47.5 -> 51.0
+    "deepseek/deepseek-v4-flash-0731": PREMIUM_RESEARCH_MODEL,  # 34.0 -> 52.0
+    SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 52.0
+    # PREMIUM_RESEARCH_MODEL deliberately has no edge: premium is the ceiling,
+    # and a premium loop that stalls fails rather than climbing to a frontier
+    # price tier (owner decision, 2026-10-24).
+    # The previous premium model, still reachable through model_overrides.
+    "openai/gpt-6-sol": FRONTIER_MODEL,  # 47.5 -> 51.0
     DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
     DEFAULT_REVIEW_GEMINI: PREMIUM_REVIEW_GEMINI,  # 22.0 -> 41.0
     DEFAULT_REVIEW_GROK: PREMIUM_REVIEW_GROK,  # 25.0 -> 46.0
@@ -520,11 +563,21 @@ MODEL_ESCALATION: Dict[str, str] = {
 #: ($0.035/M), and a 5-race refresh trial paid ~7x list as a result. Pinning
 #: InferenceNet returned list price with working tool calls, at ~5s latency.
 #:
+#: InferenceNet then repriced to $0.103/$0.715/$0.008, so on 2026-10-24 the pin
+#: moved to Baidu fp8 ($0.0537/$0.2148/$0.001074), the cheapest healthy endpoint
+#: on every price that matters at our 22:1 input:output mix. Sail Research fp4
+#: ($0.09/$0.25/$0.006) is next, and InferenceNet the last pinned fallback. All
+#: three returned a forced tool call and plain JSON with fallbacks disabled.
+#: Decart ($0.09/$0.18/$0.018) is deliberately absent: OpenRouter's tool
+#: compatibility filter drops it from any request with a forced tool_choice.
+#:
 #: Keys are catalog model IDs; values are OpenRouter provider slugs (the
-#: endpoint ``tag`` without its ``/variant`` suffix). The catalog guard checks
-#: that each slug still serves its model.
+#: endpoint ``tag`` without its ``/variant`` suffix; ``provider.order`` takes
+#: the bare slug and matches every endpoint of that provider). The catalog guard
+#: checks that each slug still serves its model, and checks the catalog price
+#: against the first slug's endpoint.
 MODEL_PROVIDER_PREFERENCES: Dict[str, tuple[str, ...]] = {
-    "deepseek/deepseek-v4.1-flash": ("inference-net",),
+    "deepseek/deepseek-v4.1-flash": ("baidu", "sail-research", "inference-net"),
 }
 
 #: Old model strings that still appear in stored run options and race records.
@@ -539,7 +592,9 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
     "gpt-6-luna": "openai/gpt-6-luna",
     "gpt-6-sol": "openai/gpt-6-sol",
+    "gpt-6.1-sol": "openai/gpt-6.1-sol",
     "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
+    "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
     "claude-sonnet-5": "anthropic/claude-sonnet-5",
     "claude-opus-5": "anthropic/claude-opus-5",
     "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite",
@@ -553,10 +608,10 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "grok-4.7": "x-ai/grok-4.7",
     # Retired models, mapped to their nearest current equivalent so historical
     # runs still price and re-run sensibly.
-    "openai/gpt-5.4": "openai/gpt-6-sol",
+    "openai/gpt-5.4": "openai/gpt-6.1-sol",
     "openai/gpt-5.4-mini": "openai/gpt-6-luna",
     "openai/gpt-5-nano": "openai/gpt-6-luna",
-    "gpt-5.4": "openai/gpt-6-sol",
+    "gpt-5.4": "openai/gpt-6.1-sol",
     "gpt-5.4-mini": "openai/gpt-6-luna",
     "gpt-5-nano": "openai/gpt-6-luna",
     "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
