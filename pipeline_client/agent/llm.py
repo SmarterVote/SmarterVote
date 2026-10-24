@@ -24,13 +24,7 @@ from .cost import (
     total_token_budget_reached,
 )
 from .errors import PermanentProviderError, RetryableProviderError
-from .model_registry import (
-    MODEL_CATALOG,
-    accepts_forced_tool_choice,
-    escalation_for,
-    normalize_model_id,
-    provider_routing_for,
-)
+from .model_registry import MODEL_CATALOG, accepts_forced_tool_choice, escalation_for, normalize_model_id, provider_routing_for
 from .roster_adjudicator import collect_roster_adjudications
 from .run_budget import RunBudget
 from .source_types import normalize_source_type
