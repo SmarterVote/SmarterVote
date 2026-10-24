@@ -110,10 +110,14 @@ def test_every_escalation_climbs_the_intelligence_index():
         assert target_iq > source_iq, f"{source} ({source_iq}) -> {target} ({target_iq}) is not an upgrade"
 
 
-def test_escalation_is_defined_for_every_profile_primary():
-    """A stalled research loop with nowhere to climb just fails."""
-    for profile, roles in PROFILE_DEFAULTS.items():
-        assert escalation_for(roles["primary"]), f"{profile}.primary has no escalation target"
+def test_escalation_is_defined_for_default_primary():
+    """A stalled default research loop climbs to the premium research model."""
+    assert escalation_for(PROFILE_DEFAULTS["default"]["primary"]) == PROFILE_DEFAULTS["premium"]["primary"]
+
+
+def test_premium_primary_is_the_ceiling():
+    """Premium is the top tier: a stalled premium loop fails instead of climbing."""
+    assert escalation_for(PROFILE_DEFAULTS["premium"]["primary"]) is None
 
 
 def test_escalation_normalizes_legacy_model_ids():

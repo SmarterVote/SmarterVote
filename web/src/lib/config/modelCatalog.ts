@@ -48,16 +48,6 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "intelligence": 52.0,
     "maxCompletionTokens": 128000
   },
-  "openai/gpt-6-astra": {
-    "id": "openai/gpt-6-astra",
-    "label": "GPT-6 Astra",
-    "inputPerM": 10.0,
-    "outputPerM": 50.0,
-    "cachedInputPerM": 1.0,
-    "contextWindowTokens": 1050000,
-    "intelligence": 53.0,
-    "maxCompletionTokens": 128000
-  },
   "openai/gpt-5.6-luna": {
     "id": "openai/gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
@@ -245,7 +235,6 @@ export const MODEL_LABELS: Record<string, string> = {
   "openai/gpt-6-luna": "GPT-6 Luna",
   "openai/gpt-6-sol": "GPT-6 Sol",
   "openai/gpt-6.1-sol": "GPT-6.1 Sol",
-  "openai/gpt-6-astra": "GPT-6 Astra",
   "openai/gpt-5.6-luna": "GPT-5.6 Luna",
   "openai/gpt-5.6-terra": "GPT-5.6 Terra",
   "openai/gpt-5.6-sol": "GPT-5.6 Sol",
@@ -291,7 +280,6 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "gpt-6-luna": "openai/gpt-6-luna",
   "gpt-6-sol": "openai/gpt-6-sol",
   "gpt-6.1-sol": "openai/gpt-6.1-sol",
-  "gpt-6-astra": "openai/gpt-6-astra",
   "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
   "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
   "claude-sonnet-5": "anthropic/claude-sonnet-5",

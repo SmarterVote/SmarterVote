@@ -164,9 +164,6 @@ MODEL_CATALOG: Dict[str, ModelSpec] = {
     # $0.20), and 52 against 47.5 on the index. Live-probed 2026-10-24: returns
     # a forced tool call and plain JSON output.
     "openai/gpt-6.1-sol": ModelSpec("openai/gpt-6.1-sol", "GPT-6.1 Sol", 2.00, 10.00, 0.10, 1_050_000, 52.0, 128_000),
-    # Escalation target for GPT-6.1 Sol only; see PREMIUM_ESCALATION_MODEL.
-    # Live-probed 2026-10-24: returns a forced tool call and plain JSON output.
-    "openai/gpt-6-astra": ModelSpec("openai/gpt-6-astra", "GPT-6 Astra", 10.00, 50.00, 1.00, 1_050_000, 53.0, 128_000),
     # --- OpenAI: GPT-5.6 family (2026-07-09) -------------------------------
     # Superseded by GPT-6. Sol was repriced to $4/$20 in October 2026. Kept so stored runs
     # and explicit overrides still price correctly.
@@ -405,16 +402,8 @@ SMALL_MODEL = "openai/gpt-6-luna"
 #: to the point, would not be an escalation. Opus 5 (51) is above GPT-6 Sol
 #: (47.5), and it remains the target for GPT-6 Sol when an override still names
 #: it, the chamber synthesis model, and the roster completeness reviewer. It is
-#: no longer above the premium research model; see PREMIUM_ESCALATION_MODEL.
+#: no longer above the premium research model, which is the top of the ladder.
 FRONTIER_MODEL = "anthropic/claude-opus-5"
-
-#: Where GPT-6.1 Sol (52) climbs when it stalls. Opus 5 (51) now sits below it,
-#: and every research loop needs somewhere to climb. Opus 5.5 (58) and Sonnet
-#: 5.5 (56) cannot take a forced tool call (see their catalog note), which
-#: leaves GPT-6 Astra (53): the only stronger model that can, in the same
-#: family, at $10/$50. That is 5x Sol's price, but it is reached only by a
-#: premium run whose research loop has already stalled.
-PREMIUM_ESCALATION_MODEL = "openai/gpt-6-astra"
 
 DEFAULT_REVIEW_CLAUDE = "anthropic/claude-haiku-4.5"
 DEFAULT_REVIEW_GEMINI = "google/gemini-3.5-flash-lite"
@@ -552,7 +541,9 @@ MODEL_ESCALATION: Dict[str, str] = {
     # The previous research model, still reachable through model_overrides.
     "deepseek/deepseek-v4-flash-0731": PREMIUM_RESEARCH_MODEL,  # 34.0 -> 52.0
     SMALL_MODEL: PREMIUM_RESEARCH_MODEL,  # 37.3 -> 52.0
-    PREMIUM_RESEARCH_MODEL: PREMIUM_ESCALATION_MODEL,  # 52.0 -> 53.0
+    # PREMIUM_RESEARCH_MODEL deliberately has no edge: premium is the ceiling,
+    # and a premium loop that stalls fails rather than climbing to a frontier
+    # price tier (owner decision, 2026-10-24).
     # The previous premium model, still reachable through model_overrides.
     "openai/gpt-6-sol": FRONTIER_MODEL,  # 47.5 -> 51.0
     DEFAULT_REVIEW_CLAUDE: PREMIUM_REVIEW_CLAUDE,  # 17.0 -> 38.0
@@ -602,7 +593,6 @@ LEGACY_MODEL_ALIASES: Dict[str, str] = {
     "gpt-6-luna": "openai/gpt-6-luna",
     "gpt-6-sol": "openai/gpt-6-sol",
     "gpt-6.1-sol": "openai/gpt-6.1-sol",
-    "gpt-6-astra": "openai/gpt-6-astra",
     "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
     "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
     "claude-sonnet-5": "anthropic/claude-sonnet-5",
