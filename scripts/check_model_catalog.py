@@ -145,6 +145,32 @@ def _provider(model_id: str) -> str:
     return model_id.split("/", 1)[0]
 
 
+def _routed_record(model_id: str, record: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
+    """Return the record to price *model_id* against, plus a label naming where it came from.
+
+    A model with a provider preference is billed at the preferred provider's
+    endpoint, not at OpenRouter's headline figure (which is just one of the
+    endpoints, and not necessarily the one we route to). So its prices and
+    limits are checked against the first preferred slug's endpoint. A missing
+    preferred provider is reported by :func:`_check_provider_preferences`; here
+    it falls back to the headline record.
+    """
+    order = MODEL_PROVIDER_PREFERENCES.get(model_id)
+    if not order:
+        return record, ""
+    endpoints = _fetch_endpoints(model_id) or []
+    matching = [e for e in endpoints if str(e.get("tag") or "").split("/")[0] == order[0]]
+    if not matching:
+        return record, ""
+    endpoint = min(matching, key=lambda e: float((e.get("pricing") or {}).get("prompt") or "inf"))
+    routed = {
+        "pricing": endpoint.get("pricing") or {},
+        "context_length": endpoint.get("context_length"),
+        "top_provider": {"max_completion_tokens": endpoint.get("max_completion_tokens")},
+    }
+    return routed, f" (via preferred provider {endpoint.get('tag')})"
+
+
 def _check_catalog(live: Dict[str, Dict[str, Any]]) -> List[str]:
     """Catalog entries must still exist and still cost what we say they cost."""
     errors: List[str] = []
@@ -153,6 +179,8 @@ def _check_catalog(live: Dict[str, Dict[str, Any]]) -> List[str]:
         if record is None:
             errors.append(f"{model_id}: in MODEL_CATALOG but no longer served by OpenRouter")
             continue
+        record, via = _routed_record(model_id, record)
+        model_id = f"{model_id}{via}"
         for field, recorded, label in (
             ("prompt", spec.input_per_m, "input"),
             ("completion", spec.output_per_m, "output"),
@@ -393,15 +421,29 @@ def _advise_newer(live: Dict[str, Dict[str, Any]]) -> List[str]:
     return notes
 
 
-def _fetch_endpoint_slugs(model_id: str) -> Optional[set]:
-    """Return the provider slugs currently serving *model_id*, or None if unreachable."""
+_ENDPOINTS_CACHE: Dict[str, Optional[List[Dict[str, Any]]]] = {}
+
+
+def _fetch_endpoints(model_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Return OpenRouter's per-provider endpoint records for *model_id*, or None if unreachable."""
+    if model_id in _ENDPOINTS_CACHE:
+        return _ENDPOINTS_CACHE[model_id]
     req = urllib.request.Request(f"https://openrouter.ai/api/v1/models/{model_id}/endpoints")
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             payload = json.load(resp)
+        endpoints: Optional[List[Dict[str, Any]]] = (payload.get("data") or {}).get("endpoints") or []
     except Exception:  # noqa: BLE001 - reported as a check failure by the caller
+        endpoints = None
+    _ENDPOINTS_CACHE[model_id] = endpoints
+    return endpoints
+
+
+def _fetch_endpoint_slugs(model_id: str) -> Optional[set]:
+    """Return the provider slugs currently serving *model_id*, or None if unreachable."""
+    endpoints = _fetch_endpoints(model_id)
+    if endpoints is None:
         return None
-    endpoints = (payload.get("data") or {}).get("endpoints") or []
     return {str(e.get("tag") or "").split("/")[0] for e in endpoints if e.get("tag")}
 
 

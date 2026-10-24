@@ -38,6 +38,26 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "intelligence": 47.5,
     "maxCompletionTokens": 128000
   },
+  "openai/gpt-6.1-sol": {
+    "id": "openai/gpt-6.1-sol",
+    "label": "GPT-6.1 Sol",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1050000,
+    "intelligence": 52.0,
+    "maxCompletionTokens": 128000
+  },
+  "openai/gpt-6-astra": {
+    "id": "openai/gpt-6-astra",
+    "label": "GPT-6 Astra",
+    "inputPerM": 10.0,
+    "outputPerM": 50.0,
+    "cachedInputPerM": 1.0,
+    "contextWindowTokens": 1050000,
+    "intelligence": 53.0,
+    "maxCompletionTokens": 128000
+  },
   "openai/gpt-5.6-luna": {
     "id": "openai/gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
@@ -61,9 +81,9 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "openai/gpt-5.6-sol": {
     "id": "openai/gpt-5.6-sol",
     "label": "GPT-5.6 Sol",
-    "inputPerM": 2.0,
-    "outputPerM": 10.0,
-    "cachedInputPerM": 0.2,
+    "inputPerM": 4.0,
+    "outputPerM": 20.0,
+    "cachedInputPerM": 0.4,
     "contextWindowTokens": 1050000,
     "intelligence": 47.0,
     "maxCompletionTokens": 128000
@@ -71,22 +91,22 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "deepseek/deepseek-v4-flash-0731": {
     "id": "deepseek/deepseek-v4-flash-0731",
     "label": "DeepSeek V4 Flash (07-31)",
-    "inputPerM": 0.021,
-    "outputPerM": 0.32,
-    "cachedInputPerM": 0.016,
-    "contextWindowTokens": 1310720,
+    "inputPerM": 0.04444,
+    "outputPerM": 0.13332,
+    "cachedInputPerM": 0.001414,
+    "contextWindowTokens": 1048576,
     "intelligence": 34.0,
-    "maxCompletionTokens": 943718
+    "maxCompletionTokens": 131072
   },
   "deepseek/deepseek-v4.1-flash": {
     "id": "deepseek/deepseek-v4.1-flash",
     "label": "DeepSeek V4.1 Flash",
-    "inputPerM": 0.035,
-    "outputPerM": 0.29,
-    "cachedInputPerM": 0.001,
+    "inputPerM": 0.0537,
+    "outputPerM": 0.2148,
+    "cachedInputPerM": 0.001074,
     "contextWindowTokens": 1048576,
     "intelligence": 39.0,
-    "maxCompletionTokens": 384000
+    "maxCompletionTokens": 393216
   },
   "google/gemini-3.1-flash-lite": {
     "id": "google/gemini-3.1-flash-lite",
@@ -131,9 +151,9 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "google/gemini-3.8-flash": {
     "id": "google/gemini-3.8-flash",
     "label": "Gemini 3.8 Flash",
-    "inputPerM": 0.75,
-    "outputPerM": 3.75,
-    "cachedInputPerM": 0.075,
+    "inputPerM": 0.825,
+    "outputPerM": 4.125,
+    "cachedInputPerM": 0.0825,
     "contextWindowTokens": 1048576,
     "intelligence": 41.0,
     "maxCompletionTokens": 65536
@@ -147,6 +167,16 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "contextWindowTokens": 200000,
     "intelligence": 17.0,
     "maxCompletionTokens": 64000
+  },
+  "anthropic/claude-haiku-5.5": {
+    "id": "anthropic/claude-haiku-5.5",
+    "label": "Claude Haiku 5.5",
+    "inputPerM": 0.1,
+    "outputPerM": 0.5,
+    "cachedInputPerM": 0.01,
+    "contextWindowTokens": 1000000,
+    "intelligence": 43.0,
+    "maxCompletionTokens": 128000
   },
   "anthropic/claude-sonnet-5": {
     "id": "anthropic/claude-sonnet-5",
@@ -201,9 +231,9 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "x-ai/grok-4.7": {
     "id": "x-ai/grok-4.7",
     "label": "Grok 4.7",
-    "inputPerM": 1.6,
-    "outputPerM": 4.8,
-    "cachedInputPerM": 0.4,
+    "inputPerM": 2.0,
+    "outputPerM": 6.0,
+    "cachedInputPerM": 0.5,
     "contextWindowTokens": 500000,
     "intelligence": 46.0,
     "maxCompletionTokens": null
@@ -214,6 +244,8 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
 export const MODEL_LABELS: Record<string, string> = {
   "openai/gpt-6-luna": "GPT-6 Luna",
   "openai/gpt-6-sol": "GPT-6 Sol",
+  "openai/gpt-6.1-sol": "GPT-6.1 Sol",
+  "openai/gpt-6-astra": "GPT-6 Astra",
   "openai/gpt-5.6-luna": "GPT-5.6 Luna",
   "openai/gpt-5.6-terra": "GPT-5.6 Terra",
   "openai/gpt-5.6-sol": "GPT-5.6 Sol",
@@ -225,6 +257,7 @@ export const MODEL_LABELS: Record<string, string> = {
   "google/gemini-3.7-flash": "Gemini 3.7 Flash",
   "google/gemini-3.8-flash": "Gemini 3.8 Flash",
   "anthropic/claude-haiku-4.5": "Claude Haiku 4.5",
+  "anthropic/claude-haiku-5.5": "Claude Haiku 5.5",
   "anthropic/claude-sonnet-5": "Claude Sonnet 5",
   "anthropic/claude-opus-5": "Claude Opus 5",
   "x-ai/grok-4.3": "Grok 4.3",
@@ -257,7 +290,10 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
   "gpt-6-luna": "openai/gpt-6-luna",
   "gpt-6-sol": "openai/gpt-6-sol",
+  "gpt-6.1-sol": "openai/gpt-6.1-sol",
+  "gpt-6-astra": "openai/gpt-6-astra",
   "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
+  "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
   "claude-sonnet-5": "anthropic/claude-sonnet-5",
   "claude-opus-5": "anthropic/claude-opus-5",
   "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite",
@@ -269,10 +305,10 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "grok-4.5": "x-ai/grok-4.5",
   "grok-4.6": "x-ai/grok-4.6",
   "grok-4.7": "x-ai/grok-4.7",
-  "openai/gpt-5.4": "openai/gpt-6-sol",
+  "openai/gpt-5.4": "openai/gpt-6.1-sol",
   "openai/gpt-5.4-mini": "openai/gpt-6-luna",
   "openai/gpt-5-nano": "openai/gpt-6-luna",
-  "gpt-5.4": "openai/gpt-6-sol",
+  "gpt-5.4": "openai/gpt-6.1-sol",
   "gpt-5.4-mini": "openai/gpt-6-luna",
   "gpt-5-nano": "openai/gpt-6-luna",
   "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
@@ -322,9 +358,9 @@ export const PROFILE_DEFAULTS: Record<string, Record<string, string>> = {
     "review_grok": "x-ai/grok-4.3"
   },
   "premium": {
-    "primary": "openai/gpt-6-sol",
+    "primary": "openai/gpt-6.1-sol",
     "small": "openai/gpt-6-luna",
-    "roster": "openai/gpt-6-sol",
+    "roster": "openai/gpt-6.1-sol",
     "image_vision": "google/gemini-3.1-flash-lite",
     "review_claude": "anthropic/claude-sonnet-5",
     "review_gemini": "google/gemini-3.8-flash",
@@ -395,8 +431,8 @@ export const RESEARCH_MODELS: { value: string; label: string }[] = [
     "label": "DeepSeek V4.1 Flash (default)"
   },
   {
-    "value": "openai/gpt-6-sol",
-    "label": "GPT-6 Sol (premium)"
+    "value": "openai/gpt-6.1-sol",
+    "label": "GPT-6.1 Sol (premium)"
   }
 ];
 
