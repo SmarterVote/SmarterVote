@@ -1231,6 +1231,7 @@ class _FakeAccessibilityClient:
         self._head = head
         self._get = get
         self.get_calls = 0
+        self.head_headers = None
 
     def __call__(self, *args, **kwargs):
         return self
@@ -1242,6 +1243,7 @@ class _FakeAccessibilityClient:
         return False
 
     async def head(self, url, headers=None, **kwargs):
+        self.head_headers = headers
         return self._head
 
     async def get(self, url, headers=None, **kwargs):
@@ -1329,6 +1331,112 @@ async def test_check_url_accessible_accepts_an_image_from_the_range_get_fallback
 
     assert accessible is True
     assert final_url == url
+
+
+_MCCORMICK_ORIGINAL = (
+    "https://upload.wikimedia.org/wikipedia/commons/e/e3/"
+    "Rep._Rich_McCormick_official_photo%2C_118th_Congress_%281%29.jpg"
+    "?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled"
+)
+
+
+@pytest.mark.parametrize(
+    "url,expect_bot_ua",
+    [
+        (_MCCORMICK_ORIGINAL, True),
+        ("https://en.wikipedia.org/wiki/Special:FilePath/Jane_Doe.jpg", True),
+        ("https://commons.wikimedia.org/wiki/Special:FilePath/Jane_Doe.jpg", True),
+        ("https://example.com/photos/jane-doe.jpg", False),
+        ("https://notwikimedia.org/jane-doe.jpg", False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_check_url_accessible_sends_the_policy_ua_to_wikimedia(monkeypatch, url, expect_bot_ua):
+    """Wikimedia's UA policy blocks spoofed browser agents from automated clients."""
+    from pipeline_client.agent.images import _BROWSER_UA, _WIKIMEDIA_API_UA, _check_url_accessible
+
+    client = _FakeAccessibilityClient(head=_FakeHeadResponse(200, url, "image/jpeg"))
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    await _check_url_accessible(url)
+
+    assert client.head_headers["User-Agent"] == (_WIKIMEDIA_API_UA if expect_bot_ua else _BROWSER_UA)
+
+
+@pytest.mark.asyncio
+async def test_check_url_accessible_treats_a_wikimedia_429_as_accessible(monkeypatch):
+    """Rate limiting is not absence: Wikimedia files are content-addressed and stable."""
+    from pipeline_client.agent.images import _check_url_accessible
+
+    client = _FakeAccessibilityClient(head=_FakeHeadResponse(429, _MCCORMICK_ORIGINAL))
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, final_url = await _check_url_accessible(_MCCORMICK_ORIGINAL)
+
+    assert accessible is True
+    assert final_url == _MCCORMICK_ORIGINAL
+
+
+@pytest.mark.asyncio
+async def test_check_url_accessible_treats_a_wikimedia_429_on_the_range_get_as_accessible(monkeypatch):
+    from pipeline_client.agent.images import _check_url_accessible
+
+    client = _FakeAccessibilityClient(
+        head=_FakeHeadResponse(405, _MCCORMICK_ORIGINAL),
+        get=_FakeHeadResponse(429, _MCCORMICK_ORIGINAL),
+    )
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, _ = await _check_url_accessible(_MCCORMICK_ORIGINAL)
+
+    assert accessible is True
+
+
+@pytest.mark.asyncio
+async def test_check_url_accessible_still_rejects_a_non_wikimedia_429(monkeypatch):
+    from pipeline_client.agent.images import _check_url_accessible
+
+    url = "https://example.com/photos/jane-doe.jpg"
+    client = _FakeAccessibilityClient(head=_FakeHeadResponse(429, url))
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, _ = await _check_url_accessible(url)
+
+    assert accessible is False
+
+
+@pytest.mark.asyncio
+async def test_best_accessible_image_url_prefers_the_wikimedia_thumbnail(monkeypatch):
+    """The Wikipedia API's thumbnail_unscaled original is stored as a sized thumbnail."""
+    from pipeline_client.agent.images import WIKIMEDIA_THUMB_WIDTH, _best_accessible_image_url
+
+    checked = []
+
+    async def fake_check(url):
+        checked.append(url)
+        return True, url
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+
+    best = await _best_accessible_image_url(_MCCORMICK_ORIGINAL)
+
+    filename = "Rep._Rich_McCormick_official_photo%2C_118th_Congress_%281%29.jpg"
+    assert best == (
+        f"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/{filename}/{WIKIMEDIA_THUMB_WIDTH}px-{filename}"
+    )
+    assert checked == [best]
+
+
+@pytest.mark.asyncio
+async def test_best_accessible_image_url_falls_back_to_the_original_when_the_thumbnail_fails(monkeypatch):
+    from pipeline_client.agent.images import _best_accessible_image_url
+
+    async def fake_check(url):
+        return ("/thumb/" not in url), url
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+
+    assert await _best_accessible_image_url(_MCCORMICK_ORIGINAL) == _MCCORMICK_ORIGINAL
 
 
 # ---------------------------------------------------------------------------

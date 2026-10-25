@@ -1,7 +1,7 @@
 import pytest
 
 from pipeline_client.agent.image_denylist import DENIED_IMAGE_URLS, is_denied_image
-from pipeline_client.agent.images import _is_rejected_candidate_image, _resolve_single_image
+from pipeline_client.agent.images import _is_rejected_candidate_image, _resolve_single_image, wikimedia_thumbnail_url
 
 LAWLER_NAMESAKE = "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_Lawler.png"
 TWO_PERSON = "https://upload.wikimedia.org/wikipedia/commons/7/7a/Jonathan_Kreiss-Tomkins_and_Terry_Gardiner.jpg"
@@ -61,7 +61,8 @@ async def test_resolve_discards_denied_existing_image_and_skips_it_from_ballotpe
 
     await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
 
-    assert candidate["image_url"] == replacement
+    # The Wikimedia original is stored in its sized thumbnail form.
+    assert candidate["image_url"] == wikimedia_thumbnail_url(replacement)
 
 
 @pytest.mark.asyncio
