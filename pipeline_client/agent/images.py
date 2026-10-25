@@ -6,7 +6,7 @@ import os
 import re
 import unicodedata
 from html.parser import HTMLParser
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
@@ -175,11 +175,79 @@ def _is_untrusted_wikimedia_match(url: str, candidate_name: str) -> bool:
     """
     if "upload.wikimedia.org" not in url:
         return False
-    candidate_tokens = _name_tokens(candidate_name)
-    if not candidate_tokens:
+    if not _name_tokens(candidate_name):
         return False
     url_tokens = _name_tokens(unquote(url))
-    return not candidate_tokens.issubset(url_tokens) or bool(url_tokens & _WIKIMEDIA_NON_CANDIDATE_QUALIFIERS)
+    return not _filename_names_candidate(url, candidate_name) or bool(url_tokens & _WIKIMEDIA_NON_CANDIDATE_QUALIFIERS)
+
+
+# Common English nicknames, so "Senator_Dan_Sullivan" or "Mike_Lawler" still
+# names Daniel S. Sullivan or Michael Lawler.  Prefix forms (dan/daniel) need
+# no entry here.
+_GIVEN_NAME_NICKNAMES = frozenset(
+    frozenset(pair)
+    for pair in (
+        ("bill", "william"),
+        ("bob", "robert"),
+        ("jim", "james"),
+        ("mike", "michael"),
+        ("tom", "thomas"),
+        ("dick", "richard"),
+        ("chuck", "charles"),
+        ("liz", "elizabeth"),
+        ("peggy", "margaret"),
+        ("ted", "edward"),
+    )
+)
+
+
+def _given_names_match(left: str, right: str) -> bool:
+    """True for the same given name, a prefix form of it (dan/daniel), or a known nickname."""
+    if left == right:
+        return True
+    if min(len(left), len(right)) >= 3 and (left.startswith(right) or right.startswith(left)):
+        return True
+    return frozenset((left, right)) in _GIVEN_NAME_NICKNAMES
+
+
+def _basename_words(url: str) -> List[str]:
+    """Lower-cased words of an image filename, camelCase split, single letters kept."""
+    basename = _fold_accents(unquote(urlparse(url).path).rsplit("/", 1)[-1])
+    words: List[str] = []
+    for chunk in re.split(r"[^A-Za-z]+", basename):
+        if chunk:
+            words.extend(w.lower() for w in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])", chunk))
+    return words
+
+
+def _filename_names_candidate(url: str, candidate_name: str) -> bool:
+    """True if an image filename names this candidate rather than a namesake.
+
+    The surname must appear; a given name must match exactly, as a prefix form
+    or as a nickname; and a lone middle initial beside the surname must not
+    contradict the candidate's own.  va-house-04-2026 stored the actress
+    Kristen Bell for Joan E. Bell (surname only) and the coal executive
+    Robert E. Murray for Robert P. Murray (conflicting initial), while an exact
+    given-name test discarded "Senator_Dan_Sullivan_official" for Daniel S.
+    Sullivan.
+    """
+    surname = _candidate_surname(candidate_name)
+    if not surname:
+        return True
+    basename = _fold_accents(unquote(urlparse(url).path).rsplit("/", 1)[-1]).lower()
+    words = _basename_words(url)
+    file_tokens = set(re.findall(r"[a-z0-9]+", basename)) | set(words)
+    if surname not in file_tokens:
+        return False
+    given = [t for t in _name_tokens(candidate_name) if t != surname and t not in _NAME_SUFFIX_TOKENS]
+    if given and not any(_given_names_match(g, token) for g in given for token in file_tokens if token != surname):
+        return False
+    mine = _middle_initial(candidate_name)
+    if mine:
+        for index, word in enumerate(words):
+            if word == surname and index >= 1 and len(words[index - 1]) == 1 and words[index - 1] != mine:
+                return False
+    return True
 
 
 # Words that appear in a Ballotpedia filename without being part of anybody's
@@ -1722,6 +1790,10 @@ async def _lookup_serper_image(
                 meta = f"{r.get('title', '')} {r.get('source', '')} {r.get('link', '') or r.get('domain', '')}"
                 if not _is_valid_image_url(img_url) or _looks_like_non_photo(img_url, meta):
                     continue
+                if _is_rejected_candidate_image(img_url, candidate_name):
+                    # A namesake's file: va-house-04-2026 took the actress Kristen
+                    # Bell's Wikimedia portrait for Joan E. Bell on surname alone.
+                    continue
                 meta_tokens = set(re.findall(r"[a-z0-9]+", _fold_accents(meta).lower()))
                 url_tokens = set(re.findall(r"[a-z0-9]+", _fold_accents(unquote(img_url)).lower()))
                 if surname and surname not in meta_tokens | url_tokens:
@@ -1850,6 +1922,44 @@ def _is_rejected_candidate_image(url: str, candidate_name: str) -> bool:
     )
 
 
+def _is_congress_portrait(url: str) -> bool:
+    """True for a Bioguide portrait (``bioguide.congress.gov`` or the unitedstates.github.io mirror)."""
+    host = _image_host(url)
+    if host == "unitedstates.github.io":
+        return unquote(urlparse(url).path).lower().startswith("/images/congress/")
+    return _host_matches(host, ("bioguide.congress.gov",))
+
+
+def _is_wrong_candidate_for_race(
+    url: str,
+    candidate: Dict[str, Any],
+    other_images: Sequence[str],
+    other_names: Sequence[str],
+) -> Optional[str]:
+    """Return why a newly found photo belongs to someone else in the race, else None.
+
+    ny-house-05-2026 gave the challenger George Marsh the Bioguide portrait
+    M001137 -- incumbent Gregory Meeks -- from a page covering both of them.
+    Only a member of Congress has a Bioguide portrait, and an opponent's
+    current photo is never this candidate's.
+    """
+    identity = _image_identity(url)
+    for other in other_images:
+        if other and (other == url or (identity and _image_identity(other) == identity)):
+            return "is another candidate's current image"
+    if _is_congress_portrait(url) and not candidate.get("incumbent"):
+        return "is a congressional portrait, but this candidate is not an incumbent"
+    # Two candidates sharing given name and surname ("Daniel S. Sullivan",
+    # "Dan J. Sullivan") cannot be told apart by a Wikimedia filename that names
+    # no middle initial, so neither may take it as a new photo.  An existing
+    # photo is unaffected: it is never checked here.
+    if _image_host(url) == "upload.wikimedia.org" and any(
+        _candidate_surname(other) and _filename_names_candidate(url, other) for other in other_names
+    ):
+        return "names another candidate in this race as well"
+    return None
+
+
 async def _resolve_single_image(
     candidate: Dict[str, Any],
     *,
@@ -1861,12 +1971,31 @@ async def _resolve_single_image(
     office: str = "",
     jurisdiction: str = "",
     run_budget: RunBudget | None = None,
+    other_images: Sequence[str] = (),
+    other_names: Sequence[str] = (),
 ) -> None:
-    """Validate and resolve image_url for a single candidate in-place."""
+    """Validate and resolve image_url for a single candidate in-place.
+
+    *other_images* and *other_names* are the race's other candidates' current
+    photos and names; a newly found photo matching one of them is refused.
+    """
     log = make_logger(on_log)
     name = candidate.get("name", "unknown")
     current_url = candidate.get("image_url") or None  # Treat "" and None identically
     low_resolution_fallback: Optional[str] = None
+
+    def _new_image_rejected(url: Optional[str], source: str) -> bool:
+        """Apply the candidate-aware guards to a newly found photo, logging a refusal."""
+        if not url:
+            return False
+        if _is_rejected_candidate_image(url, name):
+            log("info", f"  [{name}] {source} image is filed under another person's name or is not a portrait - skipping it")
+            return True
+        reason = _is_wrong_candidate_for_race(url, candidate, other_images, other_names)
+        if reason:
+            log("info", f"  [{name}] {source} image {reason} - skipping it")
+            return True
+        return False
 
     # Normalise empty string to None
     if not current_url:
@@ -1986,6 +2115,8 @@ async def _resolve_single_image(
     if is_denied_image(bp_url):
         log("info", f"  [{name}] Ballotpedia returned an audit-rejected image - skipping it")
         bp_url = None
+    if _new_image_rejected(bp_url, "Ballotpedia"):
+        bp_url = None
     if bp_url:
         log("info", f"  [{name}] Ballotpedia API returned: {bp_url[:80]}")
         accessible, final_url = await _check_url_accessible(bp_url)
@@ -2005,6 +2136,8 @@ async def _resolve_single_image(
     wiki_url = await _lookup_wikipedia_image(name, context=search_context)
     if is_denied_image(wiki_url):
         log("info", f"  [{name}] Wikipedia returned an audit-rejected image - skipping it")
+        wiki_url = None
+    if _new_image_rejected(wiki_url, "Wikipedia"):
         wiki_url = None
     if wiki_url:
         log("info", f"  [{name}] Wikipedia API returned: {wiki_url[:80]}")
@@ -2026,7 +2159,7 @@ async def _resolve_single_image(
     # Fast path 3: inspect candidate website/profile pages for image metadata.
     log("info", f"  [{name}] Inspecting known candidate pages for image metadata...")
     page_url = await _lookup_known_page_image(candidate)
-    if is_denied_image(page_url):
+    if is_denied_image(page_url) or _new_image_rejected(page_url, "Candidate page"):
         page_url = None
     if page_url and is_partisan_image_host(page_url):
         low_resolution_fallback = low_resolution_fallback or page_url
@@ -2041,7 +2174,7 @@ async def _resolve_single_image(
     # Fast path 4: query Serper Images API directly
     log("info", f"  [{name}] Trying Serper Images API lookup...")
     serper_img = await _lookup_serper_image(name, context=search_context, run_budget=run_budget)
-    if is_denied_image(serper_img):
+    if is_denied_image(serper_img) or _new_image_rejected(serper_img, "Serper"):
         serper_img = None
     if serper_img and is_partisan_image_host(serper_img):
         low_resolution_fallback = low_resolution_fallback or serper_img
@@ -2081,6 +2214,8 @@ async def _resolve_single_image(
         if not found_url:
             log("info", f"  [{name}] Agent returned null — no image found")
             return
+        if "commons.wikimedia.org/wiki/File:" not in found_url and _new_image_rejected(found_url, "Agent"):
+            return
 
         log("info", f"  [{name}] Agent returned: {found_url[:80]}")
 
@@ -2088,7 +2223,7 @@ async def _resolve_single_image(
         if "commons.wikimedia.org/wiki/File:" in found_url:
             log("info", f"  [{name}] Agent URL is Commons page — resolving via Special:FilePath")
             direct = await _resolve_wikimedia_commons(found_url)
-            if direct and not _is_rejected_candidate_image(direct, name):
+            if direct and not _new_image_rejected(direct, "Agent Commons"):
                 candidate["image_url"] = direct
                 log("info", f"  [{name}] Commons resolved → {direct[:80]}")
                 return
@@ -2262,10 +2397,13 @@ async def resolve_candidate_images(
     jurisdiction = race_json.get("jurisdiction", "")
     total = len(candidates)
     done = 0
+    # Snapshot before resolution runs in parallel and starts rewriting them.
+    starting_images = [c.get("image_url") or "" for c in candidates]
 
     async def _resolve_with_progress(c: Dict[str, Any]) -> None:
         nonlocal done
         previous_url = c.get("image_url") or None
+        others = [i for i, other in enumerate(candidates) if other is not c]
         resolve_call = _resolve_single_image(
             c,
             agent_loop_fn=agent_loop_fn,
@@ -2276,6 +2414,8 @@ async def resolve_candidate_images(
             office=office,
             jurisdiction=jurisdiction,
             run_budget=run_budget,
+            other_images=[starting_images[i] for i in others if starting_images[i]],
+            other_names=[str(candidates[i].get("name") or "") for i in others],
         )
         if run_budget:
             timeout = run_budget.bounded_timeout(60.0, minimum_seconds=5.0, operation="candidate image resolution")
