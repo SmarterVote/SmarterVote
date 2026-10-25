@@ -587,6 +587,9 @@ def apply_stability_guard(
     with no new evidence, re-reasoning alone may not change the rating (NC-05,
     GA-01, IN-09 drifted Likely -> Safe on unchanged inputs).
 
+    When the evidence differs only by added polls, the one-sided
+    ``_apply_directional_guard`` is tried instead; at most one guard applies.
+
     Mutates *consensus* in place and returns a human-readable note, or None
     when the guard does not apply. Same-party (candidate-level) races are left
     alone: their numbers describe candidates, not parties.
@@ -595,8 +598,9 @@ def apply_stability_guard(
         return None
     if consensus.get("candidate_probabilities"):
         return None
-    if forecast_evidence_key(race_json) != baseline_evidence:
-        return None
+    evidence = forecast_evidence_key(race_json)
+    if evidence != baseline_evidence:
+        return _apply_directional_guard(consensus, baseline_forecast, baseline_evidence, evidence, race_json)
     prior_probs = normalize_probabilities(baseline_forecast.get("party_probabilities") or {})
     prior_leader = leading_party(prior_probs)
     if prior_leader is None:
@@ -607,6 +611,111 @@ def apply_stability_guard(
     if capped is None:
         return None
     proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)
+    rating = _hold_consensus(consensus, capped, prior_leader, baseline_forecast, margin_ceiling=True)
+    return (
+        f"Stability guard: poll set, roster and contest stage unchanged since the baseline forecast, so the "
+        f"{prior_leader} probability was held to {capped[prior_leader]:.2f} (baseline {prior_probs[prior_leader]:.2f}, "
+        f"panel {proposed:.2f}, max move {STABILITY_MAX_SHIFT:.2f}); rating {baseline_forecast.get('rating')} -> {rating}."
+    )
+
+
+def _apply_directional_guard(
+    consensus: Dict[str, Any],
+    baseline_forecast: Dict[str, Any],
+    baseline_evidence: Any,
+    evidence: tuple,
+    race_json: Dict[str, Any],
+) -> Optional[str]:
+    """Stop a rerun moving against the baseline leader when every added poll favors that leader.
+
+    NY-Gov: the baseline was Safe D, the only new poll was ActiVote Hochul +18
+    (more favorable than any before it), and the panel's re-reasoning dropped
+    the rating to Likely D by citing an older Pollfinity +3; the exact-evidence
+    guard was off because the poll set had changed. When the roster and contest
+    stage are unchanged, no baseline poll was dropped, and every new poll that
+    maps to the two leading parties shows the baseline leader ahead by at least
+    the baseline's ``margin_estimate`` (or simply ahead without one), the
+    leader's probability may fall at most ``STABILITY_MAX_SHIFT`` and not below
+    the baseline's rating band. A move toward the leader is left alone.
+    """
+    if not (isinstance(baseline_evidence, tuple) and len(baseline_evidence) == 3):
+        return None
+    baseline_polls, *baseline_rest = baseline_evidence
+    current_polls, *current_rest = evidence
+    if current_rest != baseline_rest or not (isinstance(baseline_polls, frozenset) and baseline_polls < current_polls):
+        return None
+    prior_probs = normalize_probabilities(baseline_forecast.get("party_probabilities") or {})
+    prior_leader = leading_party(prior_probs)
+    others = sorted((party for party in prior_probs if party != prior_leader), key=prior_probs.get, reverse=True)
+    if prior_leader is None or not others:
+        return None
+    proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)
+    if proposed >= prior_probs[prior_leader]:
+        return None  # One-sided: a move toward the leader is not capped.
+    prior_margin = baseline_forecast.get("margin_estimate")
+    has_margin = isinstance(prior_margin, (int, float)) and not isinstance(prior_margin, bool)
+    new_polls = [
+        poll
+        for poll in _usable_polls(race_json.get("polling"))
+        if poll_identity([poll]) and not poll_identity([poll]) <= baseline_polls
+    ]
+    margins = [_poll_party_margin(poll, race_json, prior_leader, others[0]) for poll in new_polls]
+    margins = [margin for margin in margins if margin is not None]
+    if not margins or any(margin <= 0 or (has_margin and margin < prior_margin) for margin in margins):
+        return None
+    capped = cap_probability_shift(
+        prior_probs, consensus["party_probabilities"], keep_band=True, prior_rating=baseline_forecast.get("rating")
+    )
+    if capped is None:
+        return None
+    rating = _hold_consensus(consensus, capped, prior_leader, baseline_forecast, margin_ceiling=False)
+    threshold = f">= baseline margin {prior_margin:g}" if has_margin else "a lead"
+    return (
+        f"Directional guard: {len(margins)} new poll(s) all favor {prior_leader} by {threshold}, so the "
+        f"{prior_leader} probability was held to {capped[prior_leader]:.2f} (baseline {prior_probs[prior_leader]:.2f}, "
+        f"panel {proposed:.2f}, max drop {STABILITY_MAX_SHIFT:.2f}); rating {baseline_forecast.get('rating')} -> {rating}."
+    )
+
+
+def _poll_party_margin(poll: Any, race_json: Dict[str, Any], leader: str, runner_up: str) -> Optional[float]:
+    """*leader*'s lead over *runner_up* in points, from the poll's first matchup naming a candidate of each.
+
+    Candidates map to parties through the race's roster; None when no matchup maps.
+    """
+    parties = {
+        _name_key(candidate["name"]): normalize_party_label(candidate.get("party"))
+        for candidate in _active_candidates(race_json)
+    }
+    for matchup in (poll.get("matchups") or []) if isinstance(poll, dict) else []:
+        if not isinstance(matchup, dict):
+            continue
+        names = matchup.get("candidates") or []
+        shares = matchup.get("percentages") or []
+        if len(names) != len(shares):
+            continue
+        best: Dict[str, float] = {}
+        for name, share in zip(names, shares):
+            party = parties.get(_name_key(name))
+            value = _numeric(share)
+            if party in (leader, runner_up) and value is not None:
+                best[party] = max(best.get(party, 0.0), value)
+        if len(best) == 2:
+            return best[leader] - best[runner_up]
+    return None
+
+
+def _hold_consensus(
+    consensus: Dict[str, Any],
+    capped: Dict[str, float],
+    prior_leader: str,
+    baseline_forecast: Dict[str, Any],
+    margin_ceiling: bool,
+) -> str:
+    """Write the *capped* probabilities into *consensus* and return the resulting rating.
+
+    The margin may fall at most ``STABILITY_MAX_MARGIN_SHIFT`` below the
+    baseline's and, with *margin_ceiling*, rise at most that much above it.
+    """
     leader = leading_party(capped)
     rating = rating_for(capped)
     margin = consensus.get("margin_estimate")
@@ -618,9 +727,10 @@ def apply_stability_guard(
         and not isinstance(margin, bool)
         and not isinstance(prior_margin, bool)
     ):
-        margin = round(
-            min(max(float(margin), prior_margin - STABILITY_MAX_MARGIN_SHIFT), prior_margin + STABILITY_MAX_MARGIN_SHIFT), 1
-        )
+        margin = max(float(margin), prior_margin - STABILITY_MAX_MARGIN_SHIFT)
+        if margin_ceiling:
+            margin = min(margin, prior_margin + STABILITY_MAX_MARGIN_SHIFT)
+        margin = round(margin, 1)
     consensus.update(
         {
             "party_probabilities": capped,
@@ -631,11 +741,7 @@ def apply_stability_guard(
             "margin_estimate": margin,
         }
     )
-    return (
-        f"Stability guard: poll set, roster and contest stage unchanged since the baseline forecast, so the "
-        f"{prior_leader} probability was held to {capped[prior_leader]:.2f} (baseline {prior_probs[prior_leader]:.2f}, "
-        f"panel {proposed:.2f}, max move {STABILITY_MAX_SHIFT:.2f}); rating {baseline_forecast.get('rating')} -> {rating}."
-    )
+    return rating
 
 
 def _consensus_for_prompt(consensus: Dict[str, Any]) -> Dict[str, Any]:

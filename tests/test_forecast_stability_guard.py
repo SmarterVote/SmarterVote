@@ -342,3 +342,95 @@ def test_stability_guard_passes_the_baseline_rating():
     consensus = build_consensus([_member(0.40)] * 3, poll_count=1)
     assert apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
     assert consensus["rating"] == "lean_r"
+
+
+# --- directional guard: only polls added, all favoring the baseline leader ---------
+
+
+def _ny_gov():
+    # NY-Gov: Safe D, Democrat ahead in every poll including a narrow Pollfinity +3.
+    race = _race()
+    race["polling"] = [_poll("Quinnipiac", "2026-10-19", 54, 40), _poll("Pollfinity", "2026-10-12", 47, 44)]
+    race["forecast"] = {
+        "rating": "safe_d",
+        "party_probabilities": {"Democratic": 0.96, "Republican": 0.04},
+        "margin_estimate": 12.0,
+    }
+    return race
+
+
+def _rerun(race, added, panel_d):
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["polling"].append(added)
+    consensus = build_consensus([_member(panel_d)] * 3, poll_count=len(race["polling"]))
+    return apply_stability_guard(consensus, baseline, evidence, race), consensus
+
+
+def test_directional_guard_holds_the_band_when_a_new_poll_favors_the_leader_more():
+    # ActiVote Hochul +18 was the only new poll, yet the panel dropped Safe D to Likely D.
+    note, consensus = _rerun(_ny_gov(), _poll("ActiVote", "2026-10-23", 59, 41), 0.85)
+    assert note and note.startswith("Directional guard: 1 new poll(s) all favor Democratic")
+    assert consensus["party_probabilities"]["Democratic"] == pytest.approx(0.95)
+    assert consensus["rating"] == "safe_d"
+    assert consensus["margin_estimate"] == 10.0  # may fall at most 2 points below the baseline's 12.0
+
+
+def test_directional_guard_stands_aside_when_a_new_poll_is_less_favorable():
+    note, consensus = _rerun(_ny_gov(), _poll("ActiVote", "2026-10-23", 50, 44), 0.85)
+    assert note is None
+    assert consensus["rating"] == "likely_d"
+
+
+def test_directional_guard_stands_aside_when_a_new_poll_shows_the_other_side_ahead():
+    race = _ny_gov()
+    del race["forecast"]["margin_estimate"]  # without a margin, a new poll need only show the leader ahead
+    assert _rerun(copy.deepcopy(race), _poll("ActiVote", "2026-10-23", 52, 48), 0.85)[0]
+    note, consensus = _rerun(race, _poll("ActiVote", "2026-10-23", 44, 48), 0.85)
+    assert note is None
+    assert consensus["rating"] == "likely_d"
+
+
+def test_directional_guard_leaves_a_move_toward_the_leader_alone():
+    race = _ny_gov()
+    race["forecast"].update({"rating": "likely_d", "party_probabilities": {"Democratic": 0.88, "Republican": 0.12}})
+    note, consensus = _rerun(race, _poll("ActiVote", "2026-10-23", 59, 41), 0.97)
+    assert note is None
+    assert consensus["party_probabilities"]["Democratic"] == pytest.approx(0.97)
+    assert consensus["rating"] == "safe_d"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda race: race["candidates"].append({"name": "New Republican", "party": "Republican"}),
+        lambda race: race.update({"contest_stage": "runoff"}),
+        lambda race: race["polling"].pop(0),  # a baseline poll dropped: not only polls added
+    ],
+)
+def test_directional_guard_stands_aside_when_more_than_polls_changed(change):
+    race = _ny_gov()
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["polling"].append(_poll("ActiVote", "2026-10-23", 59, 41))
+    change(race)
+    consensus = build_consensus([_member(0.85)] * 3, poll_count=2)
+    assert apply_stability_guard(consensus, baseline, evidence, race) is None
+    assert consensus["rating"] == "likely_d"
+
+
+def test_directional_guard_needs_a_new_poll_it_can_map_to_the_parties():
+    unmapped = _poll("ActiVote", "2026-10-23", 59, 41)
+    unmapped["matchups"][0]["candidates"] = ["Someone Else", "Another Person"]
+    note, consensus = _rerun(_ny_gov(), unmapped, 0.85)
+    assert note is None
+    assert consensus["rating"] == "likely_d"
+
+
+def test_directional_guard_skips_same_party_races():
+    race = _ny_gov()
+    baseline = copy.deepcopy(race["forecast"])
+    evidence = forecast_evidence_key(race)
+    race["polling"].append(_poll("ActiVote", "2026-10-23", 59, 41))
+    consensus = {"candidate_probabilities": {"A": 0.8, "B": 0.2}, "party_probabilities": {"Democratic": 1.0}}
+    assert apply_stability_guard(consensus, baseline, evidence, race) is None
