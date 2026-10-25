@@ -1406,6 +1406,20 @@ async def _sniff_url_is_image(client: Any, url: str, headers: Dict[str, str]) ->
         return None
 
 
+def _is_wikimedia_host(url: str) -> bool:
+    """True for *.wikimedia.org / *.wikipedia.org URLs."""
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    return any(host == root or host.endswith("." + root) for root in ("wikimedia.org", "wikipedia.org"))
+
+
+def _probe_headers(url: str) -> Dict[str, str]:
+    """User-Agent for probing *url*: Wikimedia's UA policy blocks spoofed browser agents."""
+    return {"User-Agent": _WIKIMEDIA_API_UA if _is_wikimedia_host(url) else _BROWSER_UA}
+
+
 async def _check_url_accessible(url: str) -> Tuple[bool, str]:
     """Check whether a URL is accessible *and an image*, returning (accessible, final_url).
 
@@ -1413,13 +1427,16 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
     — useful for resolving Wikimedia Special:FilePath redirects to upload URLs.
 
     Strategy:
-    1. HEAD with browser UA — fast, most servers support it.
+    1. HEAD with browser UA (the policy-compliant bot UA for Wikimedia hosts) —
+       fast, most servers support it.
     2. If HEAD returns 405/501, fall back to byte-range GET.
 
     Either way a response that advertises itself as ``text/*`` is rejected; see
-    ``_serves_a_web_page``.
+    ``_serves_a_web_page``. A 429 from a Wikimedia host counts as accessible but
+    unverified: its files are content-addressed and stable, and 429 is rate
+    limiting, not absence.
     """
-    headers = {"User-Agent": _BROWSER_UA}
+    headers = _probe_headers(url)
     try:
         async with httpx.AsyncClient(timeout=10, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
             resp = await client.head(url, headers=headers)
@@ -1434,8 +1451,13 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
                     logger.debug("Rejecting %s: served %s, not an image", url, resp.headers.get("content-type"))
                     return False, url
                 return True, final_url
+            if resp.status_code == 429 and _is_wikimedia_host(final_url):
+                logger.debug("Wikimedia rate-limited %s (429); keeping it unverified", url)
+                return True, final_url
             if resp.status_code in (405, 501):
                 resp2 = await client.get(url, headers={**headers, "Range": "bytes=0-63"})
+                if resp2.status_code == 429 and _is_wikimedia_host(str(resp2.url)):
+                    return True, str(resp2.url)
                 if resp2.status_code not in (200, 206) or _serves_a_web_page(resp2):
                     return False, url
                 verdict = _content_type_verdict(resp2)
@@ -1525,8 +1547,15 @@ async def _prefer_wikimedia_thumbnail(candidate: Dict[str, Any], log: Callable[[
 
 
 async def _best_accessible_image_url(url: str) -> Optional[str]:
-    """Return the best accessible direct URL for an image candidate."""
+    """Return the best accessible direct URL for an image candidate.
+
+    For a Wikimedia original, the sized thumbnail is tried first: Wikimedia asks
+    hotlinkers to use thumbnails, and serves them where it throttles originals.
+    """
     candidates: List[str] = []
+    thumb = wikimedia_thumbnail_url(url)
+    if thumb:
+        candidates.append(thumb)
     original = _wikimedia_original_image_url(url)
     if original:
         candidates.append(original)
