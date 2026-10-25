@@ -1790,3 +1790,167 @@ def test_search_surname_skips_generational_suffixes():
     assert _surname_for_search_match("Vicente Gonzalez Jr.") == "gonzalez"
     assert _surname_for_search_match("Thomas Kean III") == "kean"
     assert _surname_for_search_match("Ron Ula") == "ula"
+
+
+def test_wikimedia_filename_must_name_the_candidate_not_a_namesake():
+    """va-house-04-2026 and ak-senate-2026 regressions.
+
+    Kristen Bell (actress) was stored for Joan E. Bell on surname alone, and
+    Robert E. Murray (coal executive) for Robert P. Murray, while Daniel S.
+    Sullivan's official "Senator_Dan_Sullivan" portrait was discarded because
+    "dan" is not exactly "daniel".
+    """
+    wm = "https://upload.wikimedia.org/wikipedia/commons/"
+    assert _is_untrusted_wikimedia_match(wm + "a/ab/Kristen_Bell_Empire_State.jpg", "Joan E. Bell")
+    assert _is_untrusted_wikimedia_match(wm + "5/53/Robert_E._Murray_%28crop%29.jpg", "Robert P. Murray")
+    assert not _is_untrusted_wikimedia_match(wm + "1/10/Senator_Dan_Sullivan_official.jpg", "Daniel S. Sullivan")
+    assert not _is_untrusted_wikimedia_match(
+        wm + "thumb/1/10/Senator_Dan_Sullivan_official.jpg/500px-Senator_Dan_Sullivan_official.jpg", "Daniel S. Sullivan"
+    )
+    # Nicknames, prefix forms, and a filename carrying no initial all still match.
+    assert not _is_untrusted_wikimedia_match(wm + "0/0a/Mike_Lawler_119th_Congress.jpg", "Michael Lawler")
+    assert not _is_untrusted_wikimedia_match(wm + "1/1a/Bob_Good_official.jpg", "Robert G. Good")
+    assert not _is_untrusted_wikimedia_match(wm + "1/1a/Robert_Murray_2026.jpg", "Robert P. Murray")
+    assert not _is_untrusted_wikimedia_match(wm + "1/1a/Robert_P._Murray.jpg", "Robert P. Murray")
+    # A different given name never matches.
+    assert _is_untrusted_wikimedia_match(wm + "1/1a/Dave_Sullivan.jpg", "Daniel S. Sullivan")
+    # A namesake's file is rejected on every new-image path, not only Wikimedia's own lookup.
+    assert _is_rejected_candidate_image(wm + "a/ab/Kristen_Bell_Empire_State.jpg", "Joan E. Bell")
+
+
+def _stub_fast_paths(monkeypatch, *, ballotpedia=None, wikipedia=None, page=None, serper=None):
+    async def fake_check(url: str):
+        return True, url
+
+    async def fake_best(url: str):
+        return url
+
+    async def fake_ballotpedia(name: str, state=None):
+        return ballotpedia
+
+    async def fake_wikipedia(name: str, context: str = ""):
+        return wikipedia
+
+    async def fake_page_image(candidate: dict):
+        return page
+
+    async def fake_serper_image(name: str, context: str = "", run_budget=None):
+        return serper
+
+    monkeypatch.setattr("pipeline_client.agent.images._check_url_accessible", fake_check)
+    monkeypatch.setattr("pipeline_client.agent.images._best_accessible_image_url", fake_best)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_ballotpedia_image", fake_ballotpedia)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_wikipedia_image", fake_wikipedia)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_known_page_image", fake_page_image)
+    monkeypatch.setattr("pipeline_client.agent.images._lookup_serper_image", fake_serper_image)
+
+
+async def _null_agent(*args, **kwargs):
+    return {"image_url": None}
+
+
+@pytest.mark.asyncio
+async def test_resolve_keeps_existing_dan_sullivan_portrait_for_daniel_s_sullivan(monkeypatch):
+    existing = "https://upload.wikimedia.org/wikipedia/commons/1/10/Senator_Dan_Sullivan_official.jpg"
+    candidate = {"name": "Daniel S. Sullivan", "image_url": existing, "incumbent": True}
+    _stub_fast_paths(monkeypatch)
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("an accessible, matching existing image needs no search")
+
+    # The race's other Sullivan does not make an *existing* photo ambiguous.
+    await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test", other_names=["Dan J. Sullivan"])
+
+    assert candidate["image_url"] == existing
+
+
+@pytest.mark.asyncio
+async def test_resolve_refuses_new_wikimedia_photo_naming_two_same_name_candidates(monkeypatch):
+    portrait = "https://upload.wikimedia.org/wikipedia/commons/1/10/Senator_Dan_Sullivan_official.jpg"
+    candidate = {"name": "Dan J. Sullivan", "image_url": None}
+    _stub_fast_paths(monkeypatch, wikipedia=portrait)
+
+    await _resolve_single_image(candidate, agent_loop_fn=_null_agent, model="test", other_names=["Daniel S. Sullivan"])
+
+    assert candidate["image_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_rejects_wikipedia_namesake_with_conflicting_middle_initial(monkeypatch):
+    namesake = "https://upload.wikimedia.org/wikipedia/commons/5/53/Robert_E._Murray_%28crop%29.jpg"
+    candidate = {"name": "Robert P. Murray", "image_url": None}
+    _stub_fast_paths(monkeypatch, wikipedia=namesake)
+
+    await _resolve_single_image(candidate, agent_loop_fn=_null_agent, model="test")
+
+    assert candidate["image_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_keeps_partisan_fallback_over_a_namesakes_wikimedia_photo(monkeypatch):
+    """Joan E. Bell's iVoterGuide photo lost to the actress Kristen Bell.
+
+    iVoterGuide is deliberately a partisan host, so its photo is only a last
+    resort -- but a namesake's portrait is no replacement for it.
+    """
+    existing = "https://images.ivoterguide.com/candidates/097248.jpg"
+    actress = "https://upload.wikimedia.org/wikipedia/commons/a/ab/Kristen_Bell_Empire_State.jpg"
+    candidate = {"name": "Joan E. Bell", "image_url": existing}
+    _stub_fast_paths(monkeypatch, wikipedia=actress, serper=actress)
+
+    async def fail_agent(*args, **kwargs):
+        raise AssertionError("the partisan fallback should be kept before the agent runs")
+
+    await _resolve_single_image(candidate, agent_loop_fn=fail_agent, model="test")
+
+    assert candidate["image_url"] == existing
+
+
+@pytest.mark.asyncio
+async def test_resolve_rejects_bioguide_portrait_for_a_non_incumbent(monkeypatch):
+    """ny-house-05-2026 gave challenger George Marsh incumbent Gregory Meeks' Bioguide portrait."""
+    meeks = "https://unitedstates.github.io/images/congress/450x550/M001137.jpg"
+    challenger = {"name": "George Marsh", "image_url": None, "incumbent": False}
+    _stub_fast_paths(monkeypatch, page=meeks)
+
+    await _resolve_single_image(challenger, agent_loop_fn=_null_agent, model="test")
+    assert challenger["image_url"] is None
+
+    incumbent = {"name": "Gregory Meeks", "image_url": None, "incumbent": True}
+    await _resolve_single_image(incumbent, agent_loop_fn=_null_agent, model="test")
+    assert incumbent["image_url"] == meeks
+
+
+@pytest.mark.asyncio
+async def test_resolve_rejects_an_opponents_current_image(monkeypatch):
+    opponent = "https://example.com/campaign/meeks_headshot.jpg"
+    candidate = {"name": "George Marsh", "image_url": None}
+    _stub_fast_paths(monkeypatch, serper=opponent)
+
+    await _resolve_single_image(
+        candidate, agent_loop_fn=_null_agent, model="test", other_images=[opponent], other_names=["Gregory Meeks"]
+    )
+
+    assert candidate["image_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_candidate_images_passes_opponents_bioguide_id(monkeypatch):
+    """The roster snapshot reaches each candidate, matched by Bioguide ID across URL forms."""
+    from pipeline_client.agent.images import resolve_candidate_images
+
+    meeks_current = "https://bioguide.congress.gov/bioguide/photo/M/M001137.jpg"
+    mirror = "https://unitedstates.github.io/images/congress/450x550/M001137.jpg"
+    race = {
+        "candidates": [
+            {"name": "Gregory Meeks", "image_url": meeks_current, "incumbent": True},
+            # Marked incumbent only to prove the opponent check fires on its own.
+            {"name": "George Marsh", "image_url": None, "incumbent": True},
+        ]
+    }
+    _stub_fast_paths(monkeypatch, page=mirror)
+
+    await resolve_candidate_images(race, agent_loop_fn=_null_agent, model="test")
+
+    assert race["candidates"][0]["image_url"] == meeks_current
+    assert race["candidates"][1]["image_url"] is None
