@@ -32,6 +32,12 @@ def _tool_round(index, content):
     ]
 
 
+def _notebook(messages):
+    matches = [m for m in messages if str(m.get("content") or "").startswith("Research notebook")]
+    assert len(matches) == 1
+    return matches[0]
+
+
 def test_model_budget_uses_large_catalog_window():
     budget = AgentContextBudget.for_model(
         "google/gemini-3.5-flash-lite",
@@ -63,7 +69,7 @@ def test_ten_large_tool_rounds_stay_below_hard_maximum():
 
     assert prepared.estimated_input_tokens <= context.budget.maximum_input_tokens
     assert prepared.compacted_results > 0 or prepared.dropped_tool_turns > 0
-    assert "https://example.com/0" in prepared.messages[2]["content"]
+    assert "https://example.com/0" in _notebook(prepared.messages)["content"]
 
 
 def test_duplicate_sources_are_omitted_after_first_fetch():
@@ -104,7 +110,7 @@ def test_relevant_excerpt_and_url_survive_truncation():
     )
 
     assert "Jane Doe healthcare plan" in result
-    assert "https://example.com/health" in prepared.messages[2]["content"]
+    assert "https://example.com/health" in _notebook(prepared.messages)["content"]
     assert context.truncated_results == 1
 
 
@@ -140,3 +146,72 @@ def test_web_results_are_fenced_as_untrusted_and_cannot_close_the_fence():
 def test_editing_tool_results_are_not_fenced():
     context = AgentContext(_budget(), task_text="candidate")
     assert context.prepare_tool_result("set_issue_stance", "Set stance.") == "Set stance."
+
+
+def _base_messages():
+    return [{"role": "system", "content": "system"}, {"role": "user", "content": "user"}]
+
+
+def _common_prefix_length(first, second):
+    length = 0
+    for left, right in zip(first, second):
+        if left != right:
+            break
+        length += 1
+    return length
+
+
+def test_notebook_follows_history_so_the_prompt_prefix_is_stable():
+    """Each request must extend the previous one so implicit prompt caching can match."""
+    context = AgentContext(_budget(max_retained_tool_turns=20), task_text="Jane Doe")
+    messages = _base_messages()
+    previous = None
+    for index in range(4):
+        content = context.prepare_tool_result("fetch_page", f"Jane Doe page {index}", source_url=f"https://e.example/{index}")
+        messages.extend(_tool_round(index, content))
+        prepared = context.prepare_messages(messages).messages
+        # The notebook is never a system message (chat templates hoist those to the front).
+        assert all(m.get("role") != "system" for m in prepared[1:])
+        assert _notebook(prepared) is prepared[-1]
+        if previous is not None:
+            # Everything the previous request sent ahead of its notebook is resent unchanged.
+            assert _common_prefix_length(previous, prepared) == len(previous) - 1
+        previous = prepared
+
+
+def test_notebook_stays_ahead_of_trailing_instructions():
+    context = AgentContext(_budget(), task_text="Jane Doe")
+    messages = _base_messages()
+    content = context.prepare_tool_result("fetch_page", "Jane Doe page", source_url="https://e.example/1")
+    messages.extend(_tool_round(1, content))
+    messages.append({"role": "user", "content": "Finalize now."})
+
+    prepared = context.prepare_messages(messages).messages
+
+    assert prepared[-1] == {"role": "user", "content": "Finalize now."}
+    assert _notebook(prepared) is prepared[-2]
+    assert "<untrusted_web_content>" in prepared[-2]["content"]
+
+
+def test_old_tool_turns_are_dropped_in_steps_not_one_per_request():
+    context = AgentContext(
+        _budget(max_retained_tool_turns=12, target_input_tokens=10**9, maximum_input_tokens=10**9), task_text="x"
+    )
+    messages = _base_messages()
+    retained = []
+    prefixes_reused = 0
+    previous = None
+    for index in range(30):
+        messages.extend(_tool_round(index, context.prepare_tool_result("set_candidate_field", f"ok {index}")))
+        prepared = context.prepare_messages(messages)
+        kept = len(AgentContext._tool_groups(prepared.messages))
+        retained.append(kept)
+        if previous is not None and _common_prefix_length(previous, prepared.messages) > 2:
+            prefixes_reused += 1
+        previous = prepared.messages
+
+    # Never more than the configured window, never fewer than two thirds of it once full.
+    assert max(retained) == 12
+    assert min(retained[12:]) >= 9
+    # Most requests extend the previous one instead of shifting the whole history.
+    assert prefixes_reused >= 20

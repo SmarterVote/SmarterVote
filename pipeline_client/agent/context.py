@@ -280,7 +280,7 @@ class AgentContext:
         dropped = 0
 
         groups = self._tool_groups(prepared)
-        excess_groups = max(0, len(groups) - self.budget.max_retained_tool_turns)
+        excess_groups = self._excess_tool_groups(len(groups))
         for start, end in reversed(groups[:excess_groups]):
             del prepared[start:end]
             dropped += 1
@@ -302,7 +302,7 @@ class AgentContext:
 
         notebook = self._notebook_message()
         if notebook:
-            prepared.insert(2, notebook)
+            prepared.insert(self._notebook_index(prepared), notebook)
             while self._estimate_request(prepared, tool_tokens) > self.budget.maximum_input_tokens:
                 groups = self._tool_groups(prepared)
                 if not groups:
@@ -355,14 +355,51 @@ class AgentContext:
                 changed += 1
         return changed
 
+    def _excess_tool_groups(self, group_count: int) -> int:
+        """Return how many of the oldest tool turns to drop, in whole steps.
+
+        Dropping exactly one turn per iteration once the window is full shifts
+        the start of the history on every request, so the provider's implicit
+        prefix cache can never match past the task prompt. Dropping in steps of
+        a third of the window keeps the retained history byte-identical for
+        several consecutive requests, and never retains more than the window.
+        """
+        retained = self.budget.max_retained_tool_turns
+        excess = group_count - retained
+        if excess <= 0:
+            return 0
+        step = max(1, retained // 3)
+        return min(group_count - 1, math.ceil(excess / step) * step)
+
+    @staticmethod
+    def _notebook_index(messages: Sequence[Dict[str, Any]]) -> int:
+        """Place the notebook after the history, before any trailing instructions.
+
+        The notebook grows with every tool result. Placed at the front of the
+        history it changed the prompt prefix on every request and defeated the
+        implicit prompt caching that OpenAI and DeepSeek apply to an unchanged
+        prefix, so every turn of a long research loop re-paid full input price
+        for the entire accumulated history. Trailing user turns (nudges, forced
+        finalization instructions) stay last so they remain the final word.
+        """
+        index = len(messages)
+        while index > 2 and messages[index - 1].get("role") == "user":
+            index -= 1
+        return max(2, index)
+
     def _estimate_request(self, messages: Sequence[Dict[str, Any]], tool_tokens: int) -> int:
         return estimate_tokens(messages) + tool_tokens
 
     def _notebook_message(self) -> Optional[Dict[str, str]]:
         if not self._notebook:
             return None
+        # A user turn, not a system message: several chat templates (DeepSeek's
+        # among them) hoist every system message to the front of the prompt,
+        # which would move this ever-changing block back into the prefix. Its
+        # summaries quote tool results, so they are fenced like any web content.
         return {
-            "role": "system",
-            "content": "Research notebook (durable source index):\n"
-            + json.dumps(self._notebook, ensure_ascii=True, separators=(",", ":")),
+            "role": "user",
+            "content": "Research notebook (durable source index of this phase's tool results so far; "
+            "older tool turns may have been dropped from the history above):\n"
+            + wrap_untrusted(json.dumps(self._notebook, ensure_ascii=True, separators=(",", ":"))),
         }

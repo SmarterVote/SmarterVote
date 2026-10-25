@@ -46,7 +46,11 @@ def test_premium_profile_upgrades_research_roster_and_every_reviewer():
     assert premium["roster"] == PREMIUM_RESEARCH_MODEL
     assert premium["small"] == SMALL_MODEL
     for role in ("review_claude", "review_gemini", "review_grok"):
-        assert premium[role] != default[role], f"{role} should differ between profiles"
+        assert MODEL_CATALOG[premium[role]].intelligence >= MODEL_CATALOG[default[role]].intelligence, role
+    # Claude and Gemini each have a stronger tier to buy. xAI's newest model
+    # (Grok 4.7) already fills the default seat, so both profiles share it.
+    assert premium["review_claude"] != default["review_claude"]
+    assert premium["review_gemini"] != default["review_gemini"]
 
 
 def test_unset_cheap_mode_resolves_to_the_cheap_profile():
@@ -110,10 +114,14 @@ def test_every_escalation_climbs_the_intelligence_index():
         assert target_iq > source_iq, f"{source} ({source_iq}) -> {target} ({target_iq}) is not an upgrade"
 
 
-def test_escalation_is_defined_for_every_profile_primary():
-    """A stalled research loop with nowhere to climb just fails."""
-    for profile, roles in PROFILE_DEFAULTS.items():
-        assert escalation_for(roles["primary"]), f"{profile}.primary has no escalation target"
+def test_escalation_is_defined_for_default_primary():
+    """A stalled default research loop climbs to the premium research model."""
+    assert escalation_for(PROFILE_DEFAULTS["default"]["primary"]) == PROFILE_DEFAULTS["premium"]["primary"]
+
+
+def test_premium_primary_is_the_ceiling():
+    """Premium is the top tier: a stalled premium loop fails instead of climbing."""
+    assert escalation_for(PROFILE_DEFAULTS["premium"]["primary"]) is None
 
 
 def test_escalation_normalizes_legacy_model_ids():
@@ -134,11 +142,30 @@ def test_adjudicator_never_judges_evidence_it_produced():
 def test_completeness_fallback_is_independent_from_research_models():
     from shared.model_catalog import ROSTER_COMPLETENESS_REVIEW_MODEL
 
-    assert ROSTER_COMPLETENESS_REVIEW_MODEL == "anthropic/claude-opus-5"
+    assert ROSTER_COMPLETENESS_REVIEW_MODEL == "anthropic/claude-opus-5.5"
     assert ROSTER_COMPLETENESS_REVIEW_MODEL in MODEL_CATALOG
     for profile, roles in PROFILE_DEFAULTS.items():
         assert ROSTER_COMPLETENESS_REVIEW_MODEL != roles["primary"], f"{profile}: fallback == primary"
         assert ROSTER_COMPLETENESS_REVIEW_MODEL != roles["roster"], f"{profile}: fallback == roster"
+
+
+def test_forced_tool_choice_flag_marks_only_the_probed_rejecters():
+    from shared.model_catalog import accepts_forced_tool_choice
+
+    unforceable = sorted(model_id for model_id, spec in MODEL_CATALOG.items() if not spec.forced_tool_choice)
+    assert unforceable == ["anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5"]
+    assert accepts_forced_tool_choice("claude-opus-5.5") is False  # legacy bare alias normalizes first
+    assert accepts_forced_tool_choice("anthropic/claude-haiku-5.5") is True
+    # Anything we have not probed keeps today's forced request shape.
+    assert accepts_forced_tool_choice("someone/unknown-model") is True
+    assert accepts_forced_tool_choice(None) is True
+
+
+def test_review_panel_keeps_three_houses_in_every_profile():
+    for profile in ("default", "premium"):
+        roles = PROFILE_DEFAULTS[profile]
+        houses = {roles[role].split("/", 1)[0] for role in ("review_claude", "review_gemini", "review_grok")}
+        assert houses == {"anthropic", "google", "x-ai"}, profile
 
 
 def test_model_overrides_win_over_profile_defaults():

@@ -38,6 +38,16 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "intelligence": 47.5,
     "maxCompletionTokens": 128000
   },
+  "openai/gpt-6.1-sol": {
+    "id": "openai/gpt-6.1-sol",
+    "label": "GPT-6.1 Sol",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1050000,
+    "intelligence": 52.0,
+    "maxCompletionTokens": 128000
+  },
   "openai/gpt-5.6-luna": {
     "id": "openai/gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
@@ -61,9 +71,9 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "openai/gpt-5.6-sol": {
     "id": "openai/gpt-5.6-sol",
     "label": "GPT-5.6 Sol",
-    "inputPerM": 2.0,
-    "outputPerM": 10.0,
-    "cachedInputPerM": 0.2,
+    "inputPerM": 4.0,
+    "outputPerM": 20.0,
+    "cachedInputPerM": 0.4,
     "contextWindowTokens": 1050000,
     "intelligence": 47.0,
     "maxCompletionTokens": 128000
@@ -71,22 +81,32 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "deepseek/deepseek-v4-flash-0731": {
     "id": "deepseek/deepseek-v4-flash-0731",
     "label": "DeepSeek V4 Flash (07-31)",
-    "inputPerM": 0.021,
-    "outputPerM": 0.32,
-    "cachedInputPerM": 0.016,
-    "contextWindowTokens": 1310720,
+    "inputPerM": 0.04444,
+    "outputPerM": 0.13332,
+    "cachedInputPerM": 0.001414,
+    "contextWindowTokens": 1048576,
     "intelligence": 34.0,
-    "maxCompletionTokens": 943718
+    "maxCompletionTokens": 131072
   },
   "deepseek/deepseek-v4.1-flash": {
     "id": "deepseek/deepseek-v4.1-flash",
     "label": "DeepSeek V4.1 Flash",
-    "inputPerM": 0.035,
-    "outputPerM": 0.29,
-    "cachedInputPerM": 0.001,
+    "inputPerM": 0.0537,
+    "outputPerM": 0.2148,
+    "cachedInputPerM": 0.001074,
     "contextWindowTokens": 1048576,
     "intelligence": 39.0,
-    "maxCompletionTokens": 384000
+    "maxCompletionTokens": 393216
+  },
+  "deepseek/deepseek-v4.1-flash-1017": {
+    "id": "deepseek/deepseek-v4.1-flash-1017",
+    "label": "DeepSeek V4.1 Flash (10-17)",
+    "inputPerM": 0.098,
+    "outputPerM": 0.294,
+    "cachedInputPerM": 0.00294,
+    "contextWindowTokens": 1048576,
+    "intelligence": 45.0,
+    "maxCompletionTokens": 131072
   },
   "google/gemini-3.1-flash-lite": {
     "id": "google/gemini-3.1-flash-lite",
@@ -131,12 +151,22 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "google/gemini-3.8-flash": {
     "id": "google/gemini-3.8-flash",
     "label": "Gemini 3.8 Flash",
-    "inputPerM": 0.75,
-    "outputPerM": 3.75,
-    "cachedInputPerM": 0.075,
+    "inputPerM": 0.825,
+    "outputPerM": 4.125,
+    "cachedInputPerM": 0.0825,
     "contextWindowTokens": 1048576,
     "intelligence": 41.0,
     "maxCompletionTokens": 65536
+  },
+  "google/gemini-4-argon": {
+    "id": "google/gemini-4-argon",
+    "label": "Gemini 4 Argon",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1048576,
+    "intelligence": 53.0,
+    "maxCompletionTokens": 943718
   },
   "anthropic/claude-haiku-4.5": {
     "id": "anthropic/claude-haiku-4.5",
@@ -147,6 +177,16 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "contextWindowTokens": 200000,
     "intelligence": 17.0,
     "maxCompletionTokens": 64000
+  },
+  "anthropic/claude-haiku-5.5": {
+    "id": "anthropic/claude-haiku-5.5",
+    "label": "Claude Haiku 5.5",
+    "inputPerM": 0.1,
+    "outputPerM": 0.5,
+    "cachedInputPerM": 0.01,
+    "contextWindowTokens": 1000000,
+    "intelligence": 43.0,
+    "maxCompletionTokens": 128000
   },
   "anthropic/claude-sonnet-5": {
     "id": "anthropic/claude-sonnet-5",
@@ -166,6 +206,26 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
     "cachedInputPerM": 0.5,
     "contextWindowTokens": 1000000,
     "intelligence": 51.0,
+    "maxCompletionTokens": 128000
+  },
+  "anthropic/claude-sonnet-5.5": {
+    "id": "anthropic/claude-sonnet-5.5",
+    "label": "Claude Sonnet 5.5",
+    "inputPerM": 2.0,
+    "outputPerM": 10.0,
+    "cachedInputPerM": 0.1,
+    "contextWindowTokens": 1000000,
+    "intelligence": 56.0,
+    "maxCompletionTokens": 128000
+  },
+  "anthropic/claude-opus-5.5": {
+    "id": "anthropic/claude-opus-5.5",
+    "label": "Claude Opus 5.5",
+    "inputPerM": 4.0,
+    "outputPerM": 20.0,
+    "cachedInputPerM": 0.2,
+    "contextWindowTokens": 1000000,
+    "intelligence": 58.0,
     "maxCompletionTokens": 128000
   },
   "x-ai/grok-4.3": {
@@ -201,9 +261,9 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
   "x-ai/grok-4.7": {
     "id": "x-ai/grok-4.7",
     "label": "Grok 4.7",
-    "inputPerM": 1.6,
-    "outputPerM": 4.8,
-    "cachedInputPerM": 0.4,
+    "inputPerM": 2.0,
+    "outputPerM": 6.0,
+    "cachedInputPerM": 0.5,
     "contextWindowTokens": 500000,
     "intelligence": 46.0,
     "maxCompletionTokens": null
@@ -214,19 +274,25 @@ export const MODEL_CATALOG: Record<string, ModelSpec> = {
 export const MODEL_LABELS: Record<string, string> = {
   "openai/gpt-6-luna": "GPT-6 Luna",
   "openai/gpt-6-sol": "GPT-6 Sol",
+  "openai/gpt-6.1-sol": "GPT-6.1 Sol",
   "openai/gpt-5.6-luna": "GPT-5.6 Luna",
   "openai/gpt-5.6-terra": "GPT-5.6 Terra",
   "openai/gpt-5.6-sol": "GPT-5.6 Sol",
   "deepseek/deepseek-v4-flash-0731": "DeepSeek V4 Flash (07-31)",
   "deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+  "deepseek/deepseek-v4.1-flash-1017": "DeepSeek V4.1 Flash (10-17)",
   "google/gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
   "google/gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
   "google/gemini-3.6-flash": "Gemini 3.6 Flash",
   "google/gemini-3.7-flash": "Gemini 3.7 Flash",
   "google/gemini-3.8-flash": "Gemini 3.8 Flash",
+  "google/gemini-4-argon": "Gemini 4 Argon",
   "anthropic/claude-haiku-4.5": "Claude Haiku 4.5",
+  "anthropic/claude-haiku-5.5": "Claude Haiku 5.5",
   "anthropic/claude-sonnet-5": "Claude Sonnet 5",
   "anthropic/claude-opus-5": "Claude Opus 5",
+  "anthropic/claude-sonnet-5.5": "Claude Sonnet 5.5",
+  "anthropic/claude-opus-5.5": "Claude Opus 5.5",
   "x-ai/grok-4.3": "Grok 4.3",
   "x-ai/grok-4.5": "Grok 4.5",
   "x-ai/grok-4.6": "Grok 4.6",
@@ -255,11 +321,17 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "gpt-5.6-sol": "openai/gpt-5.6-sol",
   "deepseek-v4-flash-0731": "deepseek/deepseek-v4-flash-0731",
   "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
+  "deepseek-v4.1-flash-1017": "deepseek/deepseek-v4.1-flash-1017",
   "gpt-6-luna": "openai/gpt-6-luna",
   "gpt-6-sol": "openai/gpt-6-sol",
+  "gpt-6.1-sol": "openai/gpt-6.1-sol",
   "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
+  "claude-haiku-5.5": "anthropic/claude-haiku-5.5",
   "claude-sonnet-5": "anthropic/claude-sonnet-5",
+  "claude-sonnet-5.5": "anthropic/claude-sonnet-5.5",
   "claude-opus-5": "anthropic/claude-opus-5",
+  "claude-opus-5.5": "anthropic/claude-opus-5.5",
+  "gemini-4-argon": "google/gemini-4-argon",
   "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
   "gemini-3.6-flash": "google/gemini-3.6-flash",
@@ -269,10 +341,10 @@ export const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "grok-4.5": "x-ai/grok-4.5",
   "grok-4.6": "x-ai/grok-4.6",
   "grok-4.7": "x-ai/grok-4.7",
-  "openai/gpt-5.4": "openai/gpt-6-sol",
+  "openai/gpt-5.4": "openai/gpt-6.1-sol",
   "openai/gpt-5.4-mini": "openai/gpt-6-luna",
   "openai/gpt-5-nano": "openai/gpt-6-luna",
-  "gpt-5.4": "openai/gpt-6-sol",
+  "gpt-5.4": "openai/gpt-6.1-sol",
   "gpt-5.4-mini": "openai/gpt-6-luna",
   "gpt-5-nano": "openai/gpt-6-luna",
   "deepseek/deepseek-v4-flash": "deepseek/deepseek-v4.1-flash",
@@ -317,22 +389,22 @@ export const PROFILE_DEFAULTS: Record<string, Record<string, string>> = {
     "small": "openai/gpt-6-luna",
     "roster": "deepseek/deepseek-v4.1-flash",
     "image_vision": "google/gemini-3.1-flash-lite",
-    "review_claude": "anthropic/claude-haiku-4.5",
-    "review_gemini": "google/gemini-3.5-flash-lite",
-    "review_grok": "x-ai/grok-4.3"
+    "review_claude": "anthropic/claude-haiku-5.5",
+    "review_gemini": "google/gemini-3.8-flash",
+    "review_grok": "x-ai/grok-4.7"
   },
   "premium": {
-    "primary": "openai/gpt-6-sol",
+    "primary": "openai/gpt-6.1-sol",
     "small": "openai/gpt-6-luna",
-    "roster": "openai/gpt-6-sol",
+    "roster": "openai/gpt-6.1-sol",
     "image_vision": "google/gemini-3.1-flash-lite",
-    "review_claude": "anthropic/claude-sonnet-5",
-    "review_gemini": "google/gemini-3.8-flash",
+    "review_claude": "anthropic/claude-sonnet-5.5",
+    "review_gemini": "google/gemini-4-argon",
     "review_grok": "x-ai/grok-4.7"
   }
 };
 
-export const DEFAULT_CHAMBER_FORECAST_MODEL = "google/gemini-3.8-flash";
+export const DEFAULT_CHAMBER_FORECAST_MODEL = "google/gemini-4-argon";
 
 export type ReviewerKey = "claude" | "gemini" | "grok";
 
@@ -346,12 +418,12 @@ export const REVIEWER_DEFS: {
     "name": "Claude",
     "options": [
       {
-        "value": "anthropic/claude-haiku-4.5",
-        "label": "Claude Haiku 4.5"
+        "value": "anthropic/claude-haiku-5.5",
+        "label": "Claude Haiku 5.5"
       },
       {
-        "value": "anthropic/claude-sonnet-5",
-        "label": "Claude Sonnet 5"
+        "value": "anthropic/claude-sonnet-5.5",
+        "label": "Claude Sonnet 5.5"
       }
     ]
   },
@@ -360,12 +432,12 @@ export const REVIEWER_DEFS: {
     "name": "Gemini",
     "options": [
       {
-        "value": "google/gemini-3.5-flash-lite",
-        "label": "Gemini 3.5 Flash Lite"
-      },
-      {
         "value": "google/gemini-3.8-flash",
         "label": "Gemini 3.8 Flash"
+      },
+      {
+        "value": "google/gemini-4-argon",
+        "label": "Gemini 4 Argon"
       }
     ]
   },
@@ -373,10 +445,6 @@ export const REVIEWER_DEFS: {
     "key": "grok",
     "name": "Grok",
     "options": [
-      {
-        "value": "x-ai/grok-4.3",
-        "label": "Grok 4.3"
-      },
       {
         "value": "x-ai/grok-4.7",
         "label": "Grok 4.7"
@@ -395,13 +463,13 @@ export const RESEARCH_MODELS: { value: string; label: string }[] = [
     "label": "DeepSeek V4.1 Flash (default)"
   },
   {
-    "value": "openai/gpt-6-sol",
-    "label": "GPT-6 Sol (premium)"
+    "value": "openai/gpt-6.1-sol",
+    "label": "GPT-6.1 Sol (premium)"
   }
 ];
 
 export const DEFAULT_REVIEWER_MODELS: Record<ReviewerKey, string> = {
-  "claude": "anthropic/claude-haiku-4.5",
-  "gemini": "google/gemini-3.5-flash-lite",
-  "grok": "x-ai/grok-4.3"
+  "claude": "anthropic/claude-haiku-5.5",
+  "gemini": "google/gemini-3.8-flash",
+  "grok": "x-ai/grok-4.7"
 };

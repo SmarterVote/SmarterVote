@@ -1,4 +1,9 @@
-from pipeline_client.agent.model_registry import DEFAULT_RESEARCH_MODEL, PREMIUM_RESEARCH_MODEL, SMALL_MODEL
+from pipeline_client.agent.model_registry import (
+    DEFAULT_RESEARCH_MODEL,
+    DEFAULT_REVIEW_CLAUDE,
+    PREMIUM_RESEARCH_MODEL,
+    SMALL_MODEL,
+)
 
 """Tests for run_agent orchestration and _load_existing helper."""
 
@@ -1257,7 +1262,7 @@ async def test_run_agent_custom_profile_preserved():
 async def test_run_agent_respects_review_provider_selection():
     """Reviewer checkboxes should control which OpenRouter review roles run."""
     discovery_result = {"id": "reviewers-2024", "candidates": []}
-    reviews = [{"model": "anthropic/claude-haiku-4.5", "verdict": "approved", "flags": []}]
+    reviews = [{"model": DEFAULT_REVIEW_CLAUDE, "verdict": "approved", "flags": []}]
 
     with (
         patch("pipeline_client.agent.phases._agent_loop", new_callable=AsyncMock) as mock_loop,
@@ -1277,7 +1282,7 @@ async def test_run_agent_respects_review_provider_selection():
     assert result["generator"] == [
         DEFAULT_RESEARCH_MODEL,
         SMALL_MODEL,
-        "anthropic/claude-haiku-4.5",
+        DEFAULT_REVIEW_CLAUDE,
     ]
     assert mock_reviews.call_args.kwargs["review_providers"] == ["claude"]
 

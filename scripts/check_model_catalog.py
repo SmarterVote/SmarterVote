@@ -34,7 +34,9 @@ What is checked (these fail)
 5. Every escalation edge climbs the **intelligence index**. A lateral or
    downward edge means a stalled model "escalates" into something no better.
 6. For each role, `premium` is not worse than `default` — never a lower
-   intelligence score, and never older when both come from the same provider.
+   intelligence score, and never older when both come from the same provider
+   unless premium is strictly more capable on the index (a newer small model
+   below an older large one, e.g. Haiku 5.5 under Sonnet 5.5, is a real tier).
 7. The roster adjudicator differs from the `primary` and `roster` model of every
    profile. That separation is the gate's entire claim to independence, and it
    is load-bearing on a publish path.
@@ -145,6 +147,40 @@ def _provider(model_id: str) -> str:
     return model_id.split("/", 1)[0]
 
 
+_SERVICE_TIERS = frozenset({"flex", "priority"})
+
+
+def _routed_record(model_id: str, record: Dict[str, Any]) -> tuple[Dict[str, Any], str]:
+    """Return the record to price *model_id* against, plus a label naming where it came from.
+
+    A model with a provider preference is billed at the preferred provider's
+    endpoint, not at OpenRouter's headline figure (which is just one of the
+    endpoints, and not necessarily the one we route to). So its prices and
+    limits are checked against the first preferred slug's endpoint. A missing
+    preferred provider is reported by :func:`_check_provider_preferences`; here
+    it falls back to the headline record.
+    """
+    order = MODEL_PROVIDER_PREFERENCES.get(model_id)
+    if not order:
+        return record, ""
+    endpoints = _fetch_endpoints(model_id) or []
+    matching = [e for e in endpoints if str(e.get("tag") or "").split("/")[0] == order[0]]
+    if not matching:
+        return record, ""
+    # A bare slug bills the provider's standard tier: a forced DeepInfra probe on
+    # 2026-10-24 was charged deepinfra/fp8's price, not the cheaper /flex tier's.
+    # The /flex and /priority service tiers only count when nothing else is left.
+    standard = [e for e in matching if not set(str(e.get("tag") or "").split("/")[1:]) & _SERVICE_TIERS]
+    matching = standard or matching
+    endpoint = min(matching, key=lambda e: float((e.get("pricing") or {}).get("prompt") or "inf"))
+    routed = {
+        "pricing": endpoint.get("pricing") or {},
+        "context_length": endpoint.get("context_length"),
+        "top_provider": {"max_completion_tokens": endpoint.get("max_completion_tokens")},
+    }
+    return routed, f" (via preferred provider {endpoint.get('tag')})"
+
+
 def _check_catalog(live: Dict[str, Dict[str, Any]]) -> List[str]:
     """Catalog entries must still exist and still cost what we say they cost."""
     errors: List[str] = []
@@ -153,6 +189,8 @@ def _check_catalog(live: Dict[str, Dict[str, Any]]) -> List[str]:
         if record is None:
             errors.append(f"{model_id}: in MODEL_CATALOG but no longer served by OpenRouter")
             continue
+        record, via = _routed_record(model_id, record)
+        model_id = f"{model_id}{via}"
         for field, recorded, label in (
             ("prompt", spec.input_per_m, "input"),
             ("completion", spec.output_per_m, "output"),
@@ -233,6 +271,10 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
       deepseek-v4-flash-0731 says nothing about which is stronger. Restricting
       to one provider is exactly the shape of the grok bug, where 4.20 and 4.3
       were the same price from the same provider and only the date revealed it.
+      Recency is a tiebreaker for when capability does not decide: a premium
+      model *strictly* above the default on the index passes even when older,
+      because a lab's newer small tier (Haiku 5.5, 43) legitimately sits below
+      its slightly older mid tier (Sonnet 5.5, 56).
     """
     errors: List[str] = []
     default, premium = PROFILE_DEFAULTS.get("default", {}), PROFILE_DEFAULTS.get("premium", {})
@@ -240,6 +282,7 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
         cheap_id, good_id = default.get(role), premium.get(role)
         if not cheap_id or not good_id or cheap_id == good_id:
             continue
+        strictly_stronger = False
         if cheap_id in MODEL_CATALOG and good_id in MODEL_CATALOG:
             cheap_iq, good_iq = MODEL_CATALOG[cheap_id].intelligence, MODEL_CATALOG[good_id].intelligence
             if good_iq < cheap_iq:
@@ -247,7 +290,8 @@ def _check_premium_not_worse(live: Dict[str, Dict[str, Any]]) -> List[str]:
                     f"role {role!r}: premium uses {good_id} ({good_iq}) which is LESS capable "
                     f"than default's {cheap_id} ({cheap_iq})"
                 )
-        if _provider(cheap_id) != _provider(good_id):
+            strictly_stronger = good_iq > cheap_iq
+        if strictly_stronger or _provider(cheap_id) != _provider(good_id):
             continue
         cheap_date, good_date = _released(live.get(cheap_id)), _released(live.get(good_id))
         if cheap_date and good_date and good_date < cheap_date:
@@ -393,15 +437,29 @@ def _advise_newer(live: Dict[str, Dict[str, Any]]) -> List[str]:
     return notes
 
 
-def _fetch_endpoint_slugs(model_id: str) -> Optional[set]:
-    """Return the provider slugs currently serving *model_id*, or None if unreachable."""
+_ENDPOINTS_CACHE: Dict[str, Optional[List[Dict[str, Any]]]] = {}
+
+
+def _fetch_endpoints(model_id: str) -> Optional[List[Dict[str, Any]]]:
+    """Return OpenRouter's per-provider endpoint records for *model_id*, or None if unreachable."""
+    if model_id in _ENDPOINTS_CACHE:
+        return _ENDPOINTS_CACHE[model_id]
     req = urllib.request.Request(f"https://openrouter.ai/api/v1/models/{model_id}/endpoints")
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             payload = json.load(resp)
+        endpoints: Optional[List[Dict[str, Any]]] = (payload.get("data") or {}).get("endpoints") or []
     except Exception:  # noqa: BLE001 - reported as a check failure by the caller
+        endpoints = None
+    _ENDPOINTS_CACHE[model_id] = endpoints
+    return endpoints
+
+
+def _fetch_endpoint_slugs(model_id: str) -> Optional[set]:
+    """Return the provider slugs currently serving *model_id*, or None if unreachable."""
+    endpoints = _fetch_endpoints(model_id)
+    if endpoints is None:
         return None
-    endpoints = (payload.get("data") or {}).get("endpoints") or []
     return {str(e.get("tag") or "").split("/")[0] for e in endpoints if e.get("tag")}
 
 

@@ -10,7 +10,9 @@ RUN apt-get update \
 
 COPY requirements-constraints.txt .
 COPY services/races-api/requirements.txt .
-RUN pip install --no-cache-dir -c requirements-constraints.txt -r requirements.txt
+# The base image's pip vendors its own certifi; 26.2.2 carries the GHSA-6q48-6c7w-9gw2 fix.
+RUN pip install --no-cache-dir --upgrade pip==26.2.2 \
+    && pip install --no-cache-dir -c requirements-constraints.txt -r requirements.txt
 
 COPY services/races-api/main.py .
 COPY services/races-api/config.py .
