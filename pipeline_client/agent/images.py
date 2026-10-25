@@ -1953,7 +1953,7 @@ def _is_wrong_candidate_for_race(
     # "Dan J. Sullivan") cannot be told apart by a Wikimedia filename that names
     # no middle initial, so neither may take it as a new photo.  An existing
     # photo is unaffected: it is never checked here.
-    if "upload.wikimedia.org" in url and any(
+    if _image_host(url) == "upload.wikimedia.org" and any(
         _candidate_surname(other) and _filename_names_candidate(url, other) for other in other_names
     ):
         return "names another candidate in this race as well"
