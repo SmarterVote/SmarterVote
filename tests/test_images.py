@@ -959,6 +959,27 @@ def test_wikimedia_occupational_namesakes_are_rejected(url):
     assert _looks_like_non_photo(url) is True
 
 
+def test_wikimedia_occupational_namesake_is_rejected_on_the_thumb_host_too():
+    # Wikipedia's page-summary API hands out thumb.wikimedia.org URLs; the
+    # namesake rule must treat them like upload.wikimedia.org.
+    url = (
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Ryan_Kelly_%28American_football%29.JPG/"
+        "250px-Ryan_Kelly_%28American_football%29.JPG"
+    )
+    assert _looks_like_non_photo(url) is True
+
+
+def test_is_wikimedia_file_host_matches_exact_file_hosts_only():
+    from pipeline_client.agent.wikimedia_hosts import is_wikimedia_file_host
+
+    assert is_wikimedia_file_host("https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg")
+    assert is_wikimedia_file_host("https://THUMB.wikimedia.org/x/y.jpg")
+    assert not is_wikimedia_file_host("https://commons.wikimedia.org/wiki/File:X.jpg")
+    assert not is_wikimedia_file_host("https://upload.wikimedia.org.evil.example/X.jpg")
+    assert not is_wikimedia_file_host("https://example.com/upload.wikimedia.org/X.jpg")
+    assert not is_wikimedia_file_host(None)
+
+
 @pytest.mark.parametrize(
     "url",
     [

@@ -20,6 +20,7 @@ from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
 from .web_tools import _WIKIMEDIA_API_UA, MAX_PAGE_BYTES, _get_validated, _serper_image_search, ssrf_request_hook
+from .wikimedia_hosts import WIKIMEDIA_FILE_HOSTS, is_wikimedia_file_host
 
 logger = logging.getLogger("pipeline")
 # Validate every request (redirect hops included) against the SSRF guard.
@@ -162,10 +163,10 @@ _WIKIMEDIA_NON_CANDIDATE_QUALIFIERS = frozenset(
 )
 
 
-# Hosts that serve Wikimedia Commons files. Wikipedia's page-summary API also
-# hands out thumb.wikimedia.org thumbnails (va-house-04-2026 took the actress
-# Kristen Bell's portrait for Joan E. Bell that way), so both get the name check.
-_WIKIMEDIA_FILE_HOSTS = frozenset({"upload.wikimedia.org", "thumb.wikimedia.org"})
+# Hosts that serve Wikimedia Commons files (upload. and thumb.wikimedia.org);
+# defined in ``wikimedia_hosts`` so ``image_denylist`` can share it. Use
+# ``is_wikimedia_file_host`` rather than comparing against one host by name.
+_WIKIMEDIA_FILE_HOSTS = WIKIMEDIA_FILE_HOSTS
 
 
 def _is_untrusted_wikimedia_match(url: str, candidate_name: str) -> bool:
@@ -928,7 +929,8 @@ def _is_wikimedia_occupational_namesake(url: str) -> bool:
     ids), a party-state tag ("(R-TN)"), or a political/file word are how
     genuine official portraits are named, so they are left alone.
     """
-    if urlparse(url).netloc.lower() not in {"upload.wikimedia.org", "commons.wikimedia.org"}:
+    # Files on either file host, plus commons.wikimedia.org/wiki/File: pages.
+    if not (is_wikimedia_file_host(url) or _image_host(url) == "commons.wikimedia.org"):
         return False
     basename = unquote(urlparse(url).path).rsplit("/", 1)[-1].lower()
     for qualifier in _wikimedia_qualifiers(basename):
@@ -1373,9 +1375,9 @@ def _is_valid_image_url(url: Any) -> bool:
         if any(path.rstrip("/").endswith(ext) for ext in _IMAGE_EXTENSIONS):
             return True
 
-        # upload.wikimedia.org always serves image files directly.
+        # Wikimedia file hosts always serve image files directly.
         # Do NOT accept commons.wikimedia.org (file pages) or en.wikipedia.org (articles).
-        if netloc == "upload.wikimedia.org":
+        if is_wikimedia_file_host(url):
             return True
 
         # Ballotpedia stores images under /wiki/images/
@@ -1713,7 +1715,7 @@ async def _lookup_wikipedia_image(candidate_name: str, context: str = "") -> Opt
                             continue
                         if (
                             thumb
-                            and urlparse(thumb).netloc.casefold() == "upload.wikimedia.org"
+                            and is_wikimedia_file_host(thumb)
                             and not _is_untrusted_wikimedia_match(thumb, candidate_name)
                         ):
                             return thumb
@@ -1758,7 +1760,7 @@ async def _resolve_wikimedia_commons(url: str) -> Optional[str]:
     filename = url.split("/wiki/File:", 1)[1]
     special_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}"
     accessible, final_url = await _check_url_accessible(special_url)
-    if accessible and "upload.wikimedia.org" in final_url:
+    if accessible and is_wikimedia_file_host(final_url):
         return final_url
     return None
 

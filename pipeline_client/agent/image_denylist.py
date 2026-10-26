@@ -12,6 +12,8 @@ says who is pictured or why it is unusable.
 from typing import Any, Dict
 from urllib.parse import unquote, urlparse
 
+from .wikimedia_hosts import is_wikimedia_file_host
+
 DENIED_IMAGE_URLS: Dict[str, str] = {
     "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/200/300/Michael_Lawler.png": (
         "namesake: an older man, not U.S. Rep. Mike Lawler (NY-17)"
@@ -33,15 +35,16 @@ def _image_key(url: str) -> str:
     """Host and path, case-folded, ignoring scheme, query and fragment.
 
     Wikimedia originals and their ``/thumb/.../250px-`` forms share one key, since
-    the images step stores thumbnails of originals.
+    the images step stores thumbnails of originals, and so does the same file on
+    any Wikimedia file host.
     """
     parsed = urlparse(unquote(url.strip()))
     host = parsed.netloc.lower()
     parts = [p for p in parsed.path.split("/") if p]
-    if host == "upload.wikimedia.org" and len(parts) >= 5:
+    if is_wikimedia_file_host(url) and len(parts) >= 5:
         # /wikipedia/commons/a/ab/File.jpg or /wikipedia/commons/thumb/a/ab/File.jpg/250px-File.jpg
         filename = parts[5] if parts[2] == "thumb" and len(parts) >= 6 else parts[4]
-        return f"{host}/{filename}".lower()
+        return f"wikimedia/{filename}".lower()
     return f"{host}{parsed.path}".lower()
 
 
