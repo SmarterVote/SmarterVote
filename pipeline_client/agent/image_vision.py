@@ -60,6 +60,7 @@ Answer with JSON and nothing else:
   "is_photograph": <bool>,
   "obscured_face": <bool>,
   "subject_is_child": <bool>,
+  "is_booking_photo": <bool>,
   "era": "contemporary" | "archival",
   "uniform_or_costume": <string|null>,
   "overlaid_text": <bool>,
@@ -70,7 +71,9 @@ Answer with JSON and nothing else:
 about 1990. "uniform_or_costume" names sports kit, military dress, religious
 vestments or similar, else null. "obscured_face" covers a helmet, a mask, or a
 subject too distant or turned away to identify. Sunglasses alone do not make a
-face obscured."""
+face obscured. "is_booking_photo" is true for a police booking or mugshot-style
+photo: a height-chart or lineup wall, a booking placard or number board, or jail
+booking framing."""
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,10 @@ def verdict_from_observations(observations: dict[str, Any]) -> PhotoVerdict:
         return no(f"{faces} people in the image")
     if observations.get("obscured_face") and not _only_sunglasses(observations):
         return no("face is obscured")
+    if observations.get("is_booking_photo") is True:
+        # va-house-04-2026 stored Joan E. Bell's photo against a police
+        # height-chart wall. A mugshot is prejudicial even of the right person.
+        return no("booking/mugshot-style photo")
     if observations.get("subject_is_child"):
         # Kept as a rejection on child-safety grounds, but it is the one rule
         # here that can be wrong about a real candidate: Vermont sets no
