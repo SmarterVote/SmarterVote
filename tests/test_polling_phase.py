@@ -187,6 +187,8 @@ def test_wikipedia_poll_table_parser_extracts_recent_head_to_head_rows():
         "sample_size": 1077,
         "population": "LV",
         "source_url": TRAFALGAR_PDF,
+        # The "(R)" suffix is dropped from the name but kept as a partisan note.
+        "note": "Wikipedia marks this poll as partisan: (R)",
     }
     assert (unh["start_date"], unh["date"]) == ("2026-09-28", "2026-10-02")
     assert unh["results"] == {"Graham Jackson": 48.0, "Susan Collins": 44.0}
