@@ -163,8 +163,14 @@ _WIKIMEDIA_NON_CANDIDATE_QUALIFIERS = frozenset(
 )
 
 
+# Hosts that serve Wikimedia Commons files. Wikipedia's page-summary API also
+# hands out thumb.wikimedia.org thumbnails (va-house-04-2026 took the actress
+# Kristen Bell's portrait for Joan E. Bell that way), so both get the name check.
+_WIKIMEDIA_FILE_HOSTS = frozenset({"upload.wikimedia.org", "thumb.wikimedia.org"})
+
+
 def _is_untrusted_wikimedia_match(url: str, candidate_name: str) -> bool:
-    """True if an upload.wikimedia.org filename does not match the full name.
+    """True if a Wikimedia file's filename does not match the full name.
 
     Guards against the same fuzzy-match risk as Wikipedia's opensearch API
     (e.g. "Sam Mead" resolving to "Sam Mendes"), but for a URL that was
@@ -173,7 +179,7 @@ def _is_untrusted_wikimedia_match(url: str, candidate_name: str) -> bool:
     just re-validate it's still *accessible* without checking it's still the
     right person.
     """
-    if "upload.wikimedia.org" not in url:
+    if _image_host(url) not in _WIKIMEDIA_FILE_HOSTS:
         return False
     if not _name_tokens(candidate_name):
         return False
@@ -1953,7 +1959,7 @@ def _is_wrong_candidate_for_race(
     # "Dan J. Sullivan") cannot be told apart by a Wikimedia filename that names
     # no middle initial, so neither may take it as a new photo.  An existing
     # photo is unaffected: it is never checked here.
-    if _image_host(url) == "upload.wikimedia.org" and any(
+    if _image_host(url) in _WIKIMEDIA_FILE_HOSTS and any(
         _candidate_surname(other) and _filename_names_candidate(url, other) for other in other_names
     ):
         return "names another candidate in this race as well"

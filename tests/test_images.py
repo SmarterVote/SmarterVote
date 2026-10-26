@@ -1816,6 +1816,18 @@ def test_wikimedia_filename_must_name_the_candidate_not_a_namesake():
     assert _is_untrusted_wikimedia_match(wm + "1/1a/Dave_Sullivan.jpg", "Daniel S. Sullivan")
     # A namesake's file is rejected on every new-image path, not only Wikimedia's own lookup.
     assert _is_rejected_candidate_image(wm + "a/ab/Kristen_Bell_Empire_State.jpg", "Joan E. Bell")
+    # Wikipedia's page-summary API serves thumb.wikimedia.org thumbnails; the
+    # same actress came back for Joan E. Bell through that host after the fix.
+    thumb = (
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Kristen_Bell_Empire_State.jpg/"
+        "960px-Kristen_Bell_Empire_State.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=thumbnail"
+    )
+    assert _is_rejected_candidate_image(thumb, "Joan E. Bell")
+    assert not _is_untrusted_wikimedia_match(
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Senator_Dan_Sullivan_official.jpg/"
+        "250px-Senator_Dan_Sullivan_official.jpg",
+        "Daniel S. Sullivan",
+    )
 
 
 def _stub_fast_paths(monkeypatch, *, ballotpedia=None, wikipedia=None, page=None, serper=None):
