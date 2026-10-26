@@ -26,6 +26,8 @@ from .cost import (
 from .run_budget import RunBudget
 
 logger = logging.getLogger("pipeline")
+# Wikimedia API policy requires an identifying User-Agent with contact details.
+_WIKIMEDIA_API_UA = "SmarterVoteBot/1.0 (https://smarter.vote; contact: dev@smarter.vote)"
 _SEARCH_MAX_QUERY_CHARS = 500
 
 # ---------------------------------------------------------------------------
