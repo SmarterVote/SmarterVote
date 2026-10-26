@@ -10,6 +10,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from shared.race_titles import STATE_NAMES
+
 from .. import roster
 from ._common import _candidate_name
 
@@ -19,29 +21,103 @@ _TERM_LIMITED_NON_CANDIDATE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# The phrase above only says *someone* is ineligible. Summaries and source titles
+# routinely mention other people ("Her predecessor was term-limited", "Gov. X not
+# running; Rep. Y jumps in"), so a match only counts when this candidate is the
+# grammatical subject of the clause: the clause opens with the candidate's name
+# (optionally after an office title) and the words between the name and the
+# phrase introduce no other person: no other capitalized name (state names are
+# fine, as in "Walz is Minnesota's governor and is not seeking re-election") and
+# no reference to someone else ("predecessor", "opponent", a possessive). The
+# structured ``known_ineligible_or_not_running`` list is the primary removal
+# path, so missing an unusual phrasing here is the safe failure.
+_ROSTER_CLAUSE_SPLIT_RE = re.compile(r"[.;:!?|–—]+|\s-\s")
+_OFFICE_TITLE_PREFIX_RE = re.compile(
+    r"^(?:(?:incumbent|former|outgoing|current|gov|governor|lt|lieutenant|sen|senator|rep|representative|"
+    r"mayor|state|attorney|general|secretary|treasurer|comptroller|auditor|commissioner|del|delegate|"
+    r"assemblymember|councilmember|judge|justice|dr|mr|mrs|ms)\.?\s+)+",
+    re.IGNORECASE,
+)
+_OTHER_PERSON_CUES = frozenset(
+    "predecessor predecessors successor opponent opponents rival rivals challenger challengers whose "
+    "father mother wife husband son daughter brother sister boss".split()
+)
+_STATE_NAME_WORDS = frozenset(word.lower() for state in STATE_NAMES.values() for word in state.split())
+_SUBJECT_GAP_MAX_WORDS = 12
+_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _gap_introduces_other_person(gap: str) -> bool:
+    words = re.findall(r"[A-Za-z][\w'’-]*", gap)
+    if len(words) > _SUBJECT_GAP_MAX_WORDS:
+        return True
+    for word in words:
+        base = re.sub(r"['’]s$", "", word).lower()
+        if base in _OTHER_PERSON_CUES:
+            return True
+        if word[0].isupper() and base not in _STATE_NAME_WORDS:
+            return True
+    return False
+
+
+def _subject_name_variants(name: str) -> List[str]:
+    """Return the full-name and surname forms a clause subject may use."""
+    full = " ".join(name.split())
+    tokens = [token.strip(".,") for token in full.split()]
+    tokens = [token for token in tokens if token and token.lower() not in _NAME_SUFFIXES]
+    variants = [full] if full else []
+    if tokens and tokens[-1] not in variants:
+        variants.append(tokens[-1])
+    return variants
+
+
+def _text_names_candidate_ineligible(name: str, text: str) -> bool:
+    """True when a clause in *text* says this candidate, as its subject, cannot or will not run."""
+    variants = _subject_name_variants(name)
+    if not variants:
+        return False
+    for clause in _ROSTER_CLAUSE_SPLIT_RE.split(text):
+        clause = _OFFICE_TITLE_PREFIX_RE.sub("", clause.strip())
+        lowered = clause.lower()
+        for variant in variants:
+            if not lowered.startswith(variant.lower()):
+                continue
+            rest = clause[len(variant) :]
+            if rest[:1].isalnum() or rest[:1] in {"'", "’"}:
+                continue  # "Young" must not match "Youngkin"; "Doe's predecessor" is not Doe
+            match = _TERM_LIMITED_NON_CANDIDATE_RE.search(rest)
+            if not match:
+                continue
+            if not _gap_introduces_other_person(rest[: match.start()]):
+                return True
+    return False
+
 
 def _normalize_candidate_entries(race_json: Dict[str, Any], log: Any | None = None) -> None:
     """Drop malformed candidate entries before phase fan-out touches them."""
     roster.normalize_candidate_entries(race_json, log)
 
 
-def _candidate_roster_text(candidate: Dict[str, Any]) -> str:
-    """Return searchable text from candidate fields used for roster sanity checks."""
+def _candidate_roster_texts(candidate: Dict[str, Any]) -> List[str]:
+    """Return the candidate's summary and source titles, kept separate so clauses never merge."""
     pieces: List[str] = []
-    for field in ("name", "summary"):
-        value = candidate.get(field)
-        if isinstance(value, str):
-            pieces.append(value)
+    summary = candidate.get("summary")
+    if isinstance(summary, str):
+        pieces.append(summary)
     for source in candidate.get("summary_sources") or []:
         if isinstance(source, dict):
             title = source.get("title")
             if isinstance(title, str):
                 pieces.append(title)
-    return " ".join(pieces)
+    return pieces
 
 
 def _remove_ineligible_officeholders(race_json: Dict[str, Any], log: Any | None = None) -> None:
-    """Drop current officeholders the discovery output says cannot run in this race."""
+    """Drop current officeholders the discovery output says cannot run in this race.
+
+    Only text naming the candidate as the subject counts; see
+    ``_text_names_candidate_ineligible``.
+    """
     candidates = race_json.get("candidates")
     if not isinstance(candidates, list):
         return
@@ -52,8 +128,10 @@ def _remove_ineligible_officeholders(race_json: Dict[str, Any], log: Any | None 
         if not isinstance(candidate, dict):
             kept.append(candidate)
             continue
-        text = _candidate_roster_text(candidate)
-        if candidate.get("incumbent") is True and _TERM_LIMITED_NON_CANDIDATE_RE.search(text):
+        name = _candidate_name(candidate)
+        if candidate.get("incumbent") is True and any(
+            _text_names_candidate_ineligible(name, text) for text in _candidate_roster_texts(candidate)
+        ):
             removed.append(str(candidate.get("name") or "unknown"))
             continue
         kept.append(candidate)
