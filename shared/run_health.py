@@ -163,12 +163,17 @@ def is_placeholder_junk_stance(stance: Any) -> bool:
 # Per-step failure bookkeeping (persisted on race_json.pipeline_state)
 # ---------------------------------------------------------------------------
 
+#: Ceiling on a step-failure detail that has accumulated several merged causes.
+_MERGED_DETAIL_MAX_CHARS = 1000
+
 
 def record_step_failure(
     race_json: Dict[str, Any],
     step: str,
     reason: RunFailureReason,
     detail: str = "",
+    *,
+    merge_detail: bool = False,
 ) -> None:
     """Append a deduplicated failure record to ``race_json.pipeline_state.step_failures``.
 
@@ -176,6 +181,10 @@ def record_step_failure(
     ephemeral run record) means the failure survives checkpointing, drafts,
     and eventual publish — the same durability guarantee the rest of
     ``pipeline_state`` already relies on.
+
+    With *merge_detail*, a second failure for the same step and reason whose
+    detail is not already recorded is appended to the existing entry's detail
+    (bounded), so distinct causes — e.g. two reviewer seats — stay visible.
     """
     if not isinstance(race_json, dict):
         return
@@ -190,6 +199,9 @@ def record_step_failure(
     entry = {"step": step, "reason": reason_value, "detail": detail or None}
     for existing in failures:
         if isinstance(existing, dict) and existing.get("step") == step and existing.get("reason") == reason_value:
+            current = str(existing.get("detail") or "")
+            if merge_detail and detail and detail not in current:
+                existing["detail"] = (f"{current}; {detail}" if current else detail)[:_MERGED_DETAIL_MAX_CHARS]
             return  # already recorded; avoid unbounded growth across retries/normalization passes
     failures.append(entry)
 

@@ -19,7 +19,7 @@ from shared.pipeline_config import REVIEW_PROVIDERS
 
 from .cost import estimate_cost
 from .llm import _call_openrouter, _provider_usage_cost
-from .model_registry import PROFILE_DEFAULTS, normalize_model_id
+from .model_registry import MODEL_CATALOG, PROFILE_DEFAULTS, normalize_model_id
 from .phase_state import race_identity_context
 from .polling_quality import polling_semantic_problem
 from .prompts import REVIEW_SYSTEM, REVIEW_USER
@@ -45,6 +45,34 @@ _REVIEW_ROLES = {
 # profiles both seat three reviewers; a run that explicitly configures fewer
 # reviewers uses that count instead (see ``review_quorum``).
 REVIEW_QUORUM = 2
+
+
+#: Completion ceiling for one reviewer call, clamped to the model's catalogued
+#: maximum. It used to be 8192, and the Claude reviewer filled exactly that on
+#: every multi-candidate race: one flag per sourced-but-unverifiable claim across
+#: 4-7 candidates x 12 issues runs past it, the JSON is cut off mid-array, and the
+#: whole review failed to parse. The prompt now also bounds the flag list
+#: (``REVIEW_MAX_FLAGS``), so this is headroom, not the expected size.
+REVIEW_MAX_TOKENS = 16384
+#: Flags a reviewer may return on its first attempt, and on the single tighter
+#: retry after a truncated or unparseable reply.
+REVIEW_MAX_FLAGS = 25
+REVIEW_RETRY_MAX_FLAGS = 15
+
+
+def _review_max_tokens(model: str) -> int:
+    """Return the reviewer completion cap, never above the model's real limit."""
+    spec = MODEL_CATALOG.get(normalize_model_id(model) or model)
+    limit = getattr(spec, "max_completion_tokens", None)
+    return min(REVIEW_MAX_TOKENS, int(limit)) if limit else REVIEW_MAX_TOKENS
+
+
+def _review_retry_instruction(problem: str) -> str:
+    return (
+        f"\n\nIMPORTANT: your previous reply to this request {problem}, so it could not be used. "
+        f"Reply again with the JSON object only, at most {REVIEW_RETRY_MAX_FLAGS} flags (most severe first), "
+        "each concern and suggestion under 25 words, and a summary under 80 words."
+    )
 
 
 def review_quorum(review_providers: Optional[List[str]]) -> int:
@@ -267,18 +295,20 @@ async def _call_review_model(
             {"role": "user", "content": user},
         ],
         model=model,
-        max_tokens=8192,
+        max_tokens=_review_max_tokens(model),
         run_budget=run_budget,
     )
     usage = getattr(response, "usage", None)
     prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
     provider_cost = _provider_usage_cost(usage)
-    return response.choices[0].message.content or "", {
+    choice = response.choices[0]
+    return choice.message.content or "", {
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "provider_cost_usd": provider_cost,
         "estimated_cost_usd": estimate_cost(model, prompt_tokens, completion_tokens),
+        "finish_reason": getattr(choice, "finish_reason", None),
     }
 
 
@@ -306,41 +336,43 @@ async def _run_single_review(
         race_identity_context=race_identity_context_text,
         research_effort_context=research_effort_context_text,
         correction_goal=correction_goal,
+        max_flags=REVIEW_MAX_FLAGS,
     )
     if provider not in _REVIEW_ROLES:
         return None
     model_name = normalize_model_id(model_override) or _review_model_for(provider, cheap_mode=False)
     try:
         log("info", f"  Reviewing with {model_name}...")
-        call_result = await _call_review_model(REVIEW_SYSTEM, user_prompt, model=model_name, run_budget=run_budget)
-        if isinstance(call_result, tuple):
-            raw, usage = call_result
+        review_data: Any = None
+        problem = ""
+        for attempt in range(2):
+            prompt = user_prompt if attempt == 0 else user_prompt + _review_retry_instruction(problem)
+            call_result = await _call_review_model(REVIEW_SYSTEM, prompt, model=model_name, run_budget=run_budget)
+            if isinstance(call_result, tuple):
+                raw, usage = call_result
+            else:
+                raw, usage = call_result, {}
+            truncated = usage.get("finish_reason") == "length"
+            if metrics_sink is not None:
+                _accumulate_review_metrics(metrics_sink, provider, model_name, usage, truncated=truncated)
+            try:
+                review_data = _extract_json(raw)
+                break
+            except (json.JSONDecodeError, ValueError):
+                completion_tokens = int(usage.get("completion_tokens", 0) or 0)
+                problem = (
+                    f"was cut off at the completion limit (finish_reason=length, {completion_tokens} completion tokens)"
+                    if truncated
+                    else "was not valid JSON"
+                )
+                if metrics_sink is not None:
+                    metrics_sink["providers"][provider]["parse_failures"] += 1
+                if attempt == 0:
+                    log("warning", f"  {provider} review {problem} - retrying once with a tighter output bound")
         else:
-            raw, usage = call_result, {}
-        if metrics_sink is not None:
-            metrics_sink["calls"] = int(metrics_sink.get("calls", 0)) + 1
-            provider_metrics = metrics_sink.setdefault("providers", {}).setdefault(
-                provider,
-                {
-                    "model": model_name,
-                    "calls": 0,
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "provider_cost_usd": 0.0,
-                    "estimated_cost_usd": 0.0,
-                },
-            )
-            provider_metrics["calls"] += 1
-            provider_metrics["prompt_tokens"] += int(usage.get("prompt_tokens", 0) or 0)
-            provider_metrics["completion_tokens"] += int(usage.get("completion_tokens", 0) or 0)
-            provider_metrics["provider_cost_usd"] += float(usage.get("provider_cost_usd") or 0.0)
-            provider_metrics["estimated_cost_usd"] += float(usage.get("estimated_cost_usd") or 0.0)
-
-        try:
-            review_data = _extract_json(raw)
-        except (json.JSONDecodeError, ValueError):
-            log("warning", f"  {provider} review returned malformed JSON - skipping")
-            _note_review_failure(failure_sink, provider, None, "malformed JSON")
+            log("error", f"  {provider} review {problem} after one tighter retry - reviewer seat lost")
+            detail = "truncated JSON" if truncated else "malformed JSON"
+            _note_review_failure(failure_sink, provider, None, f"{detail}: reply {problem} (after one tighter retry)")
             return None
 
         if not isinstance(review_data, dict):
@@ -369,6 +401,24 @@ async def _run_single_review(
         log("warning", f"  {provider} review failed: {exc}")
         _note_review_failure(failure_sink, provider, exc, str(exc))
         return None
+
+
+def _accumulate_review_metrics(
+    metrics_sink: Dict[str, Any], provider: str, model_name: str, usage: Dict[str, Any], *, truncated: bool
+) -> None:
+    metrics_sink["calls"] = int(metrics_sink.get("calls", 0)) + 1
+    provider_metrics = metrics_sink.setdefault("providers", {}).setdefault(provider, {"model": model_name})
+    for key in ("calls", "prompt_tokens", "completion_tokens", "truncated_calls", "parse_failures"):
+        provider_metrics.setdefault(key, 0)
+    for key in ("provider_cost_usd", "estimated_cost_usd"):
+        provider_metrics.setdefault(key, 0.0)
+    provider_metrics["calls"] += 1
+    provider_metrics["prompt_tokens"] += int(usage.get("prompt_tokens", 0) or 0)
+    provider_metrics["completion_tokens"] += int(usage.get("completion_tokens", 0) or 0)
+    provider_metrics["provider_cost_usd"] += float(usage.get("provider_cost_usd") or 0.0)
+    provider_metrics["estimated_cost_usd"] += float(usage.get("estimated_cost_usd") or 0.0)
+    if truncated:
+        provider_metrics["truncated_calls"] += 1
 
 
 def _is_review_control_flow(exc: BaseException) -> bool:
@@ -401,7 +451,9 @@ def _record_reviewer_failures(race_json: Dict[str, Any], failures: List[Dict[str
             # whether the remaining reviews may still pass the race.
             reason = RunFailureReason.STEP_NO_DATA
         detail = f"{failure.get('provider')} reviewer failed: {failure.get('detail') or 'no detail'}"
-        record_step_failure(race_json, "review", reason, detail)
+        # merge_detail: two seats failing for the same reason must both stay
+        # named, not collapse into whichever was recorded first.
+        record_step_failure(race_json, "review", reason, detail, merge_detail=True)
 
 
 # Failures that will not resolve themselves on a retry, so the citation can be
