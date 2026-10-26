@@ -1919,8 +1919,34 @@ _STATE_NAMES_BY_CODE = {
 _STATE_NAMES_LONGEST_FIRST = sorted(set(_STATE_NAMES_BY_CODE.values()), key=len, reverse=True)
 
 
-def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
-    """True if the image host is named for a state other than the race's."""
+# National outlets whose domain starts with a state or city word. They cover
+# every state, so the host says nothing about whose politicians they picture.
+_NATIONAL_OUTLETS_NAMED_FOR_A_PLACE = frozenset(
+    {
+        "kansascity",
+        "newyorker",
+        "newyorkpost",
+        "newyorktimes",
+        "nypost",
+        "nytimes",
+        "washingtonexaminer",
+        "washingtonian",
+        "washingtonmonthly",
+        "washingtonpost",
+        "washingtontimes",
+    }
+)
+
+
+def _host_names_another_state(url: str, race_id: Optional[str], candidate_name: str = "") -> bool:
+    """True if the image host is named for a state other than the race's.
+
+    A state outlet's name *starts* with the state ("newjerseyglobe",
+    "texastribune"); a state name inside a word does not make one. National
+    outlets that start with a state or city word are allowed, and so is a host
+    containing the candidate's surname, which is the candidate's own site
+    ("virginiafoxx.com" for Rep. Virginia Foxx of North Carolina).
+    """
     if not race_id:
         return False
     own = _STATE_NAMES_BY_CODE.get(race_id.split("-", 1)[0].lower())
@@ -1929,10 +1955,14 @@ def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
     # Only the registrable domain: a CDN encodes its data-centre region in a
     # subdomain, and "bloximages.newyork1.vip.townnews.com" is TownNews'
     # infrastructure serving a Florida paper, not a New York outlet.
-    labels = (urlparse(url).hostname or "").lower().split(".")
-    host = re.sub(r"[^a-z]", "", "".join(labels[-2:]))
+    label = re.sub(r"[^a-z]", "", _registrable_host(url).split(".", 1)[0])
+    if not label or label in _NATIONAL_OUTLETS_NAMED_FOR_A_PLACE:
+        return False
+    surname = re.sub(r"[^a-z]", "", _candidate_surname(candidate_name) or "")
+    if len(surname) >= 3 and surname in label:
+        return False
     for state in _STATE_NAMES_LONGEST_FIRST:
-        if state in host:
+        if label.startswith(state):
             return state != own
     return False
 
@@ -2050,7 +2080,7 @@ async def _resolve_single_image(
         current_url = None
         log("info", f"  [{name}] Existing image is hosted by a partisan guide or party site - searching for a neutral source")
 
-    if current_url and _host_names_another_state(current_url, race_id):
+    if current_url and _host_names_another_state(current_url, race_id, name):
         log(
             "info",
             f"  [{name}] Existing image is hosted by another state's outlet - discarding and re-searching",
@@ -2408,7 +2438,7 @@ def _restore_previous_image_if_cleared(
     if candidate.get("image_url") or not previous_url or replaced_by == previous_url:
         return
     name = str(candidate.get("name") or "")
-    if _is_rejected_candidate_image(previous_url, name) or _host_names_another_state(previous_url, race_id):
+    if _is_rejected_candidate_image(previous_url, name) or _host_names_another_state(previous_url, race_id, name):
         return
     if not replacement_rejected_on_inspection and (
         _looks_like_govtrack_reference_headshot(previous_url)

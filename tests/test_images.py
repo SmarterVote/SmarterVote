@@ -850,6 +850,28 @@ def test_state_host_check_ignores_hosts_that_name_no_state():
     assert not _host_names_another_state("https://media.newjerseyglobe.com/x/a.jpg", None)
 
 
+def test_state_host_check_allows_national_outlets_named_for_a_state_or_city():
+    """A host that merely starts with a state or city word is not that state's outlet."""
+    assert not _host_names_another_state("https://www.washingtonpost.com/x/a.jpg", "va-house-07-2026")
+    assert not _host_names_another_state("https://www.kansascity.com/x/a.jpg", "mo-house-05-2026")
+    assert not _host_names_another_state("https://media.newyorker.com/x/a.jpg", "nj-house-07-2026")
+    assert not _host_names_another_state("https://nypost.com/x/a.jpg", "nj-house-07-2026")
+
+
+def test_state_host_check_exempts_the_candidates_own_site():
+    """virginiafoxx.com is Rep. Virginia Foxx's own site, not a Virginia outlet."""
+    assert not _host_names_another_state("https://virginiafoxx.com/x/a.jpg", "nc-house-05-2026", "Virginia Foxx")
+    # Without the candidate's name, the host still reads as another state's.
+    assert _host_names_another_state("https://virginiafoxx.com/x/a.jpg", "nc-house-05-2026")
+
+
+def test_state_host_check_matches_only_a_host_that_starts_with_the_state():
+    assert _host_names_another_state("https://www.texastribune.org/x/a.jpg", "oh-senate-2026")
+    # A state name buried inside a word is not a state outlet.
+    assert not _host_names_another_state("https://dailyohiovalley.example.com/x/a.jpg", "wv-house-02-2026")
+    assert not _host_names_another_state("https://www.mykansasnews.com/x/a.jpg", "mo-house-05-2026")
+
+
 def test_state_host_check_ignores_a_cdn_region_subdomain():
     """A CDN encodes its data centre in a subdomain, not its coverage area.
 
