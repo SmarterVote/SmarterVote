@@ -1318,9 +1318,43 @@ _PARTISAN_IMAGE_HOSTS = (
     "rga.org",
     "lp.org",
     "gp.org",
+    # State parties whose domain carries no party word.
+    "ncdp.org",
+    "dfl.org",
+    "nddemnpl.org",
+    "rpof.org",
+    "rpv.org",
 )
-#: State and county party committees: "texasgop.org", "nhdems.org", "ohiodems.org".
-_PARTY_COMMITTEE_HOST = re.compile(r"(?:^|\.)[a-z]*(?:gop|dems|democrats|republicans)\.(?:org|com|net)$")
+#: State and county party committees are recognised by how their registrable
+#: domain label *ends*, the same way for both parties: "texasgop", "ncgop",
+#: "nhdems", "texasdemocrats", "georgiademocrat", "nmrepublicans",
+#: "oregonrepublicanparty", "floridademocraticparty". Matching the label's end,
+#: not an arbitrary substring, keeps "demographics" and "goprotect" out.
+_PARTY_COMMITTEE_LABEL = re.compile(r"(?:gop|dems|democrats|democraticparty|republicans|republicanparty)$")
+#: Singular endings are shared with ordinary words and newspapers ("tandem",
+#: pressdemocrat.com, lebanondemocrat.com), so they count only directly after
+#: a state name or postal code: "azdem", "kydemocrat", "georgiarepublican".
+_STATE_PARTY_SINGULAR_LABEL = re.compile(r"^([a-z]+?)(?:dem|democrat|republican)$")
+_PARTY_COMMITTEE_TLDS = frozenset({"org", "com", "net", "us"})
+
+
+def _is_party_committee_host(host: str) -> bool:
+    labels = [label for label in host.split(".") if label]
+    if not labels:
+        return False
+    # The .gop TLD is reserved for Republican party organisations ("michigan.gop").
+    if labels[-1] == "gop":
+        return True
+    if len(labels) < 2 or labels[-1] not in _PARTY_COMMITTEE_TLDS:
+        return False
+    label = labels[-2]
+    if _PARTY_COMMITTEE_LABEL.search(label):
+        return True
+    singular = _STATE_PARTY_SINGULAR_LABEL.match(label)
+    if singular:
+        prefix = singular.group(1)
+        return prefix in _STATE_NAMES_BY_CODE or prefix in _STATE_NAMES_BY_CODE.values()
+    return False
 
 
 def _image_host(url: str) -> str:
@@ -1357,7 +1391,7 @@ def is_partisan_image_host(url: Any) -> bool:
     if not isinstance(url, str):
         return False
     host = _image_host(url)
-    return bool(host) and (_host_matches(host, _PARTISAN_IMAGE_HOSTS) or bool(_PARTY_COMMITTEE_HOST.search(host)))
+    return bool(host) and (_host_matches(host, _PARTISAN_IMAGE_HOSTS) or _is_party_committee_host(host))
 
 
 def is_ephemeral_image_host(url: Any) -> bool:

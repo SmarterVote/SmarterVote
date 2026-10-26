@@ -1566,6 +1566,59 @@ def test_partisan_image_hosts(url, expected):
     assert is_partisan_image_host(url) is expected
 
 
+DEMOCRATIC_STATE_PARTY_HOSTS = [
+    "azdem.org",
+    "ncdp.org",
+    "georgiademocrat.org",
+    "kydemocrat.org",
+    "dfl.org",
+    "nddemnpl.org",
+    "nhdems.org",
+    "texasdemocrats.org",
+    "floridademocraticparty.com",
+]
+REPUBLICAN_STATE_PARTY_HOSTS = [
+    "rpof.org",
+    "rpv.org",
+    "oregonrepublicanparty.org",
+    "texasgop.org",
+    "michigan.gop",
+    "georgiarepublican.org",
+    "nmrepublicans.org",
+    "ncgop.org",
+    "azgop.com",
+]
+
+
+@pytest.mark.parametrize("host", DEMOCRATIC_STATE_PARTY_HOSTS + REPUBLICAN_STATE_PARTY_HOSTS)
+def test_state_party_hosts_of_both_parties_are_partisan(host):
+    from pipeline_client.agent.images import is_partisan_image_host
+
+    assert is_partisan_image_host(f"https://www.{host}/wp-content/uploads/jane.jpg") is True
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "demographics.example.com",
+        "goprotect.example.com",
+        "demographics.com",
+        "goprotect.com",
+        "tandem.org",
+        "academy.org",
+        "democracydocket.com",
+        "gopher.edu",
+        # Newspapers named "... Democrat" are news, not party committees.
+        "pressdemocrat.com",
+        "lebanondemocrat.com",
+    ],
+)
+def test_hosts_merely_containing_party_letters_are_not_partisan(host):
+    from pipeline_client.agent.images import is_partisan_image_host
+
+    assert is_partisan_image_host(f"https://{host}/jane.jpg") is False
+
+
 def test_wikimedia_thumbnail_url_forms():
     from pipeline_client.agent.images import wikimedia_thumbnail_url
 
