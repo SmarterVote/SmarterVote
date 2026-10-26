@@ -59,6 +59,8 @@ def _seen(**overrides):
         # Mike_Nichols.jpg was a mid-century publicity still.
         (_seen(era="archival"), "archival"),
         (_seen(uniform_or_costume="sports jersey"), "sports jersey"),
+        # va-house-04-2026: Joan E. Bell in front of a police height-chart wall.
+        (_seen(is_booking_photo=True), "booking/mugshot-style photo"),
     ],
 )
 def test_unusable_images_are_discarded(observations, expected_reason):
@@ -79,6 +81,7 @@ def test_unusable_images_are_discarded(observations, expected_reason):
         _seen(uniform_or_costume="religious robes"),
         # A model that omits a field must not cause a rejection.
         {"faces": 1, "is_photograph": True, "reason": "fine"},
+        _seen(is_booking_photo=False),
     ],
 )
 def test_usable_images_are_kept(observations):
@@ -324,3 +327,68 @@ def test_image_fetch_identifies_itself_to_wikimedia():
     )
 
     assert "SmarterVote" in seen.get("User-Agent", "")
+
+
+def test_missing_booking_field_does_not_reject():
+    """A model that never answers the booking question has no opinion on it."""
+    observations = _seen()
+    observations.pop("is_booking_photo", None)
+
+    assert verdict_from_observations(observations).usable is True
+    assert verdict_from_observations({**observations, "is_booking_photo": None}).usable is True
+
+
+def test_prompt_asks_about_booking_photos():
+    from pipeline_client.agent.image_vision import _PROMPT
+
+    assert '"is_booking_photo": <bool>' in _PROMPT
+    assert "height-chart" in _PROMPT
+
+
+@pytest.mark.asyncio
+async def test_rejected_booking_photo_falls_back_to_the_stored_partisan_portrait(monkeypatch):
+    """va-house-04-2026, 2026-10-26.
+
+    Joan E. Bell's stored iVoterGuide portrait was displaced by a Virginia
+    Mercury booking-style photo. Rejecting the mugshot must leave her with the
+    fallback portrait, not with no image at all.
+    """
+    fallback = "https://images.ivoterguide.com/candidates/joan-bell.jpg"
+    mugshot = "https://virginiamercury.com/wp-content/uploads/2026/09/Joan-Bell-819x1024.jpg"
+    candidate = {"name": "Joan E. Bell", "image_url": fallback}
+    inspected = []
+
+    async def resolved(c, **_kwargs):
+        c["image_url"] = mugshot
+
+    async def keep_thumbnail(c, log):
+        return None
+
+    async def inspected_photo(url, *, model, api_key, client=None):
+        inspected.append(url)
+        return verdict_from_observations(_seen(is_booking_photo=True, reason="height chart behind subject"))
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(images, "_resolve_single_image", resolved)
+    monkeypatch.setattr(images, "_prefer_wikimedia_thumbnail", keep_thumbnail)
+    monkeypatch.setattr(images, "inspect_candidate_photo", inspected_photo)
+
+    await images.resolve_candidate_images(
+        {"candidates": [candidate]}, agent_loop_fn=None, model="test", race_id="va-house-04-2026"
+    )
+
+    assert inspected == [mugshot]
+    assert candidate["image_url"] == fallback
+
+
+def test_partisan_previous_photo_stays_cleared_when_nothing_was_rejected_on_inspection():
+    """Without an inspection rejection, a last-resort photo is not resurrected."""
+    candidate = {"name": "Joan E. Bell", "image_url": None}
+    images._restore_previous_image_if_cleared(
+        candidate,
+        "https://images.ivoterguide.com/candidates/joan-bell.jpg",
+        replaced_by="https://example.com/joan-bell-denied.jpg",
+        race_id="va-house-04-2026",
+        log=lambda *_: None,
+    )
+    assert candidate["image_url"] is None

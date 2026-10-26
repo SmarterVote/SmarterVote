@@ -2352,6 +2352,7 @@ def _restore_previous_image_if_cleared(
     replaced_by: Optional[str],
     race_id: Optional[str],
     log: Callable[[str, str], None],
+    replacement_rejected_on_inspection: bool = False,
 ) -> None:
     """Put back a stored photo that a replacement search discarded and failed to replace.
 
@@ -2361,16 +2362,22 @@ def _restore_previous_image_if_cleared(
     published races lost a good headshot. When the run ends with no photo, a
     stored URL that passes every content guard is better than none. A photo the
     inspection rejected itself (resolution kept it unchanged) stays cleared.
+
+    A last-resort photo (partisan-hosted, low-resolution reference, social
+    avatar) is normally left cleared, but when the replacement that displaced it
+    was then rejected on inspection it is restored: resolution had already
+    chosen it as the fallback, and va-house-04-2026 otherwise swapped Joan E.
+    Bell's iVoterGuide portrait for a mugshot and then for nothing.
     """
     if candidate.get("image_url") or not previous_url or replaced_by == previous_url:
         return
     name = str(candidate.get("name") or "")
-    if (
-        _is_rejected_candidate_image(previous_url, name)
-        or _looks_like_govtrack_reference_headshot(previous_url)
+    if _is_rejected_candidate_image(previous_url, name) or _host_names_another_state(previous_url, race_id):
+        return
+    if not replacement_rejected_on_inspection and (
+        _looks_like_govtrack_reference_headshot(previous_url)
         or _looks_like_social_profile_avatar(previous_url)
         or is_partisan_image_host(previous_url)
-        or _host_names_another_state(previous_url, race_id)
     ):
         return
     candidate["image_url"] = previous_url
@@ -2433,6 +2440,7 @@ async def resolve_candidate_images(
         if is_denied_image(c.get("image_url")):
             log("info", f"  [{c.get('name', 'unknown')}] Resolved image was rejected by a human audit - clearing")
             c["image_url"] = None
+        inspected_url = c.get("image_url") or None
         if run_budget:
             timeout = run_budget.bounded_timeout(125.0, minimum_seconds=5.0, operation="candidate image inspection")
             try:
@@ -2441,7 +2449,14 @@ async def resolve_candidate_images(
                 logger.info("Candidate image inspection timed out; keeping the resolved image")
         else:
             await _discard_if_not_a_headshot(c, model=image_vision_model, on_log=on_log)
-        _restore_previous_image_if_cleared(c, previous_url, replaced_by=resolved_url, race_id=race_id, log=log)
+        _restore_previous_image_if_cleared(
+            c,
+            previous_url,
+            replaced_by=resolved_url,
+            race_id=race_id,
+            log=log,
+            replacement_rejected_on_inspection=bool(inspected_url) and not c.get("image_url"),
+        )
         done += 1
         if on_progress:
             try:
