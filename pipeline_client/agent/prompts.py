@@ -992,6 +992,19 @@ Severity guide for flags:
 - "info"    — claims you cannot independently verify from training data but that have a
                source URL; minor style or completeness issues; training-data uncertainty.
 
+Output limits (your reply has a hard length cap; a reply that runs past it is
+cut off, cannot be parsed, and your whole review is discarded):
+- Reply with the JSON object only: no prose, analysis, or markdown before or
+  after it. Put your roster-audit and correction-goal conclusions in "summary".
+- Return at most {max_flags} flags, most severe first (every "error", then
+  "warning", then "info"). If you find more, keep the most severe and mention
+  the rest briefly in "summary".
+- Combine repeated concerns of the same kind (for example, several sourced
+  claims you cannot independently verify) into one flag that names the
+  affected fields, instead of one flag per field.
+- Keep each "concern" and "suggestion" under 40 words, and "summary" under
+  120 words.
+
 Return JSON:
 {{
   "verdict": "approved|needs_revision|flagged",
