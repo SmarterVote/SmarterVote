@@ -571,6 +571,36 @@ def _evidence_party(label: Any) -> str:
     return "Independent" if party.casefold() in _UNAFFILIATED_LABELS else party
 
 
+#: The exact-evidence guard holds a rating only against a recent baseline. Its
+#: evidence key leaves out prediction markets and the passage of time, so for a
+#: race that is never polled the key never changes and, without this limit, the
+#: guard would freeze the rating band forever while markets and the calendar
+#: move. Past this age a rerun on unchanged evidence may re-rate freely.
+STABILITY_GUARD_MAX_BASELINE_AGE_DAYS = 14
+
+
+def _baseline_older_than_guard_limit(baseline_forecast: Dict[str, Any]) -> bool:
+    """True only when the baseline's ``generated_at`` is known and past the age limit.
+
+    A missing or unparseable timestamp keeps the guard on: the age is unknown,
+    and the guard's purpose is to stop churn.
+    """
+    raw = baseline_forecast.get("generated_at")
+    if isinstance(raw, datetime):
+        generated = raw
+    elif isinstance(raw, str) and raw.strip():
+        try:
+            generated = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return False
+    else:
+        return False
+    if generated.tzinfo is None:
+        generated = generated.replace(tzinfo=timezone.utc)
+    age_days = (datetime.now(timezone.utc) - generated).total_seconds() / 86400
+    return age_days > STABILITY_GUARD_MAX_BASELINE_AGE_DAYS
+
+
 def apply_stability_guard(
     consensus: Dict[str, Any],
     baseline_forecast: Optional[Dict[str, Any]],
@@ -587,6 +617,9 @@ def apply_stability_guard(
     with no new evidence, re-reasoning alone may not change the rating (NC-05,
     GA-01, IN-09 drifted Likely -> Safe on unchanged inputs).
 
+    The exact-evidence hold is skipped when the baseline is older than
+    ``STABILITY_GUARD_MAX_BASELINE_AGE_DAYS``.
+
     When the evidence differs only by added polls, the one-sided
     ``_apply_directional_guard`` is tried instead; at most one guard applies.
 
@@ -601,6 +634,8 @@ def apply_stability_guard(
     evidence = forecast_evidence_key(race_json)
     if evidence != baseline_evidence:
         return _apply_directional_guard(consensus, baseline_forecast, baseline_evidence, evidence, race_json)
+    if _baseline_older_than_guard_limit(baseline_forecast):
+        return None
     prior_probs = normalize_probabilities(baseline_forecast.get("party_probabilities") or {})
     prior_leader = leading_party(prior_probs)
     if prior_leader is None:

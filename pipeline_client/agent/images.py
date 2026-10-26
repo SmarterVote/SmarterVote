@@ -20,6 +20,7 @@ from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
 from .web_tools import _WIKIMEDIA_API_UA, MAX_PAGE_BYTES, _get_validated, _serper_image_search, ssrf_request_hook
+from .wikimedia_hosts import WIKIMEDIA_FILE_HOSTS, is_wikimedia_file_host
 
 logger = logging.getLogger("pipeline")
 # Validate every request (redirect hops included) against the SSRF guard.
@@ -162,10 +163,10 @@ _WIKIMEDIA_NON_CANDIDATE_QUALIFIERS = frozenset(
 )
 
 
-# Hosts that serve Wikimedia Commons files. Wikipedia's page-summary API also
-# hands out thumb.wikimedia.org thumbnails (va-house-04-2026 took the actress
-# Kristen Bell's portrait for Joan E. Bell that way), so both get the name check.
-_WIKIMEDIA_FILE_HOSTS = frozenset({"upload.wikimedia.org", "thumb.wikimedia.org"})
+# Hosts that serve Wikimedia Commons files (upload. and thumb.wikimedia.org);
+# defined in ``wikimedia_hosts`` so ``image_denylist`` can share it. Use
+# ``is_wikimedia_file_host`` rather than comparing against one host by name.
+_WIKIMEDIA_FILE_HOSTS = WIKIMEDIA_FILE_HOSTS
 
 
 def _is_untrusted_wikimedia_match(url: str, candidate_name: str) -> bool:
@@ -928,7 +929,8 @@ def _is_wikimedia_occupational_namesake(url: str) -> bool:
     ids), a party-state tag ("(R-TN)"), or a political/file word are how
     genuine official portraits are named, so they are left alone.
     """
-    if urlparse(url).netloc.lower() not in {"upload.wikimedia.org", "commons.wikimedia.org"}:
+    # Files on either file host, plus commons.wikimedia.org/wiki/File: pages.
+    if not (is_wikimedia_file_host(url) or _image_host(url) == "commons.wikimedia.org"):
         return False
     basename = unquote(urlparse(url).path).rsplit("/", 1)[-1].lower()
     for qualifier in _wikimedia_qualifiers(basename):
@@ -1316,9 +1318,43 @@ _PARTISAN_IMAGE_HOSTS = (
     "rga.org",
     "lp.org",
     "gp.org",
+    # State parties whose domain carries no party word.
+    "ncdp.org",
+    "dfl.org",
+    "nddemnpl.org",
+    "rpof.org",
+    "rpv.org",
 )
-#: State and county party committees: "texasgop.org", "nhdems.org", "ohiodems.org".
-_PARTY_COMMITTEE_HOST = re.compile(r"(?:^|\.)[a-z]*(?:gop|dems|democrats|republicans)\.(?:org|com|net)$")
+#: State and county party committees are recognised by how their registrable
+#: domain label *ends*, the same way for both parties: "texasgop", "ncgop",
+#: "nhdems", "texasdemocrats", "georgiademocrat", "nmrepublicans",
+#: "oregonrepublicanparty", "floridademocraticparty". Matching the label's end,
+#: not an arbitrary substring, keeps "demographics" and "goprotect" out.
+_PARTY_COMMITTEE_LABEL = re.compile(r"(?:gop|dems|democrats|democraticparty|republicans|republicanparty)$")
+#: Singular endings are shared with ordinary words and newspapers ("tandem",
+#: pressdemocrat.com, lebanondemocrat.com), so they count only directly after
+#: a state name or postal code: "azdem", "kydemocrat", "georgiarepublican".
+_STATE_PARTY_SINGULAR_LABEL = re.compile(r"^([a-z]+?)(?:dem|democrat|republican)$")
+_PARTY_COMMITTEE_TLDS = frozenset({"org", "com", "net", "us"})
+
+
+def _is_party_committee_host(host: str) -> bool:
+    labels = [label for label in host.split(".") if label]
+    if not labels:
+        return False
+    # The .gop TLD is reserved for Republican party organisations ("michigan.gop").
+    if labels[-1] == "gop":
+        return True
+    if len(labels) < 2 or labels[-1] not in _PARTY_COMMITTEE_TLDS:
+        return False
+    label = labels[-2]
+    if _PARTY_COMMITTEE_LABEL.search(label):
+        return True
+    singular = _STATE_PARTY_SINGULAR_LABEL.match(label)
+    if singular:
+        prefix = singular.group(1)
+        return prefix in _STATE_NAMES_BY_CODE or prefix in _STATE_NAMES_BY_CODE.values()
+    return False
 
 
 def _image_host(url: str) -> str:
@@ -1332,12 +1368,30 @@ def _host_matches(host: str, domains: Tuple[str, ...]) -> bool:
     return any(host == domain or host.endswith("." + domain) for domain in domains)
 
 
+# Second-level labels under a two-letter country TLD that are a public suffix
+# ("bbc.co.uk", "abc.net.au"), so the registrable domain is one label longer.
+_COUNTRY_SECOND_LEVEL_LABELS = frozenset({"ac", "co", "com", "edu", "gov", "net", "org"})
+
+
+def _registrable_host(url: str) -> str:
+    """Approximate registrable domain of *url*'s host ("cdn.a.com" -> "a.com").
+
+    A deliberately small approximation of the public-suffix rule: the last two
+    labels, or three under a ``co.uk``-style country suffix. Subdomains are a
+    site's own CDN or region shards, so they identify the same site.
+    """
+    labels = [label for label in _image_host(url).split(".") if label]
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _COUNTRY_SECOND_LEVEL_LABELS:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
 def is_partisan_image_host(url: Any) -> bool:
     """True when *url* is served by a partisan guide, fundraising platform or party committee."""
     if not isinstance(url, str):
         return False
     host = _image_host(url)
-    return bool(host) and (_host_matches(host, _PARTISAN_IMAGE_HOSTS) or bool(_PARTY_COMMITTEE_HOST.search(host)))
+    return bool(host) and (_host_matches(host, _PARTISAN_IMAGE_HOSTS) or _is_party_committee_host(host))
 
 
 def is_ephemeral_image_host(url: Any) -> bool:
@@ -1373,9 +1427,9 @@ def _is_valid_image_url(url: Any) -> bool:
         if any(path.rstrip("/").endswith(ext) for ext in _IMAGE_EXTENSIONS):
             return True
 
-        # upload.wikimedia.org always serves image files directly.
+        # Wikimedia file hosts always serve image files directly.
         # Do NOT accept commons.wikimedia.org (file pages) or en.wikipedia.org (articles).
-        if netloc == "upload.wikimedia.org":
+        if is_wikimedia_file_host(url):
             return True
 
         # Ballotpedia stores images under /wiki/images/
@@ -1713,7 +1767,7 @@ async def _lookup_wikipedia_image(candidate_name: str, context: str = "") -> Opt
                             continue
                         if (
                             thumb
-                            and urlparse(thumb).netloc.casefold() == "upload.wikimedia.org"
+                            and is_wikimedia_file_host(thumb)
                             and not _is_untrusted_wikimedia_match(thumb, candidate_name)
                         ):
                             return thumb
@@ -1758,7 +1812,7 @@ async def _resolve_wikimedia_commons(url: str) -> Optional[str]:
     filename = url.split("/wiki/File:", 1)[1]
     special_url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}"
     accessible, final_url = await _check_url_accessible(special_url)
-    if accessible and "upload.wikimedia.org" in final_url:
+    if accessible and is_wikimedia_file_host(final_url):
         return final_url
     return None
 
@@ -1899,8 +1953,34 @@ _STATE_NAMES_BY_CODE = {
 _STATE_NAMES_LONGEST_FIRST = sorted(set(_STATE_NAMES_BY_CODE.values()), key=len, reverse=True)
 
 
-def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
-    """True if the image host is named for a state other than the race's."""
+# National outlets whose domain starts with a state or city word. They cover
+# every state, so the host says nothing about whose politicians they picture.
+_NATIONAL_OUTLETS_NAMED_FOR_A_PLACE = frozenset(
+    {
+        "kansascity",
+        "newyorker",
+        "newyorkpost",
+        "newyorktimes",
+        "nypost",
+        "nytimes",
+        "washingtonexaminer",
+        "washingtonian",
+        "washingtonmonthly",
+        "washingtonpost",
+        "washingtontimes",
+    }
+)
+
+
+def _host_names_another_state(url: str, race_id: Optional[str], candidate_name: str = "") -> bool:
+    """True if the image host is named for a state other than the race's.
+
+    A state outlet's name *starts* with the state ("newjerseyglobe",
+    "texastribune"); a state name inside a word does not make one. National
+    outlets that start with a state or city word are allowed, and so is a host
+    containing the candidate's surname, which is the candidate's own site
+    ("virginiafoxx.com" for Rep. Virginia Foxx of North Carolina).
+    """
     if not race_id:
         return False
     own = _STATE_NAMES_BY_CODE.get(race_id.split("-", 1)[0].lower())
@@ -1909,10 +1989,14 @@ def _host_names_another_state(url: str, race_id: Optional[str]) -> bool:
     # Only the registrable domain: a CDN encodes its data-centre region in a
     # subdomain, and "bloximages.newyork1.vip.townnews.com" is TownNews'
     # infrastructure serving a Florida paper, not a New York outlet.
-    labels = (urlparse(url).hostname or "").lower().split(".")
-    host = re.sub(r"[^a-z]", "", "".join(labels[-2:]))
+    label = re.sub(r"[^a-z]", "", _registrable_host(url).split(".", 1)[0])
+    if not label or label in _NATIONAL_OUTLETS_NAMED_FOR_A_PLACE:
+        return False
+    surname = re.sub(r"[^a-z]", "", _candidate_surname(candidate_name) or "")
+    if len(surname) >= 3 and surname in label:
+        return False
     for state in _STATE_NAMES_LONGEST_FIRST:
-        if state in host:
+        if label.startswith(state):
             return state != own
     return False
 
@@ -2030,7 +2114,7 @@ async def _resolve_single_image(
         current_url = None
         log("info", f"  [{name}] Existing image is hosted by a partisan guide or party site - searching for a neutral source")
 
-    if current_url and _host_names_another_state(current_url, race_id):
+    if current_url and _host_names_another_state(current_url, race_id, name):
         log(
             "info",
             f"  [{name}] Existing image is hosted by another state's outlet - discarding and re-searching",
@@ -2283,6 +2367,9 @@ async def _discard_if_not_a_headshot(
     name = candidate.get("name", "unknown")
     verdict = await inspect_candidate_photo(url, model=model or DEFAULT_IMAGE_VISION_MODEL, api_key=api_key)
     if verdict is None:
+        # Fail open: a provider error or unreadable reply must not strip a
+        # photo, but say so, since the photo was kept without being looked at.
+        log("info", f"  [{name}] Image was not inspected (no usable verdict from the vision check) - keeping it")
         return
     if not verdict.usable:
         log("info", f"  [{name}] Image rejected on inspection ({verdict.reason}) - clearing")
@@ -2298,9 +2385,26 @@ def _image_identity(url: str) -> str:
     stored ".../thumbs/100/100/Rashida-Tlaib.PNG" for her Republican challenger
     James Hooper -- the incumbent's own portrait at a different size. Comparing
     basenames catches that; comparing full URLs does not.
+
+    A bare basename is only an identity when it names someone, though: two
+    campaign sites that each serve their own "headshot.jpg" are two different
+    photos. So:
+
+    - Bioguide portraits are keyed by Bioguide ID, which is the same on
+      bioguide.congress.gov and the unitedstates.github.io mirror.
+    - A filename naming a person (a first/last name pair) is that person's
+      photo wherever it is hosted, so it stays host-independent.
+    - Any other filename is scoped to its registrable host.
     """
     basename = unquote(urlparse(url).path).rsplit("/", 1)[-1].lower()
-    return re.sub(r"\.[a-z0-9]{2,5}$", "", basename).strip()
+    stem = re.sub(r"\.[a-z0-9]{2,5}$", "", basename).strip()
+    if not stem:
+        return ""
+    if _is_congress_portrait(url):
+        return f"bioguide:{stem}"
+    if len(_filename_person_tokens(url)) >= 2:
+        return stem
+    return f"{_registrable_host(url)}/{stem}"
 
 
 def _drop_shared_candidate_images(candidates: List[Dict[str, Any]], log: Callable[[str, str], None]) -> int:
@@ -2371,7 +2475,7 @@ def _restore_previous_image_if_cleared(
     if candidate.get("image_url") or not previous_url or replaced_by == previous_url:
         return
     name = str(candidate.get("name") or "")
-    if _is_rejected_candidate_image(previous_url, name) or _host_names_another_state(previous_url, race_id):
+    if _is_rejected_candidate_image(previous_url, name) or _host_names_another_state(previous_url, race_id, name):
         return
     if not replacement_rejected_on_inspection and (
         _looks_like_govtrack_reference_headshot(previous_url)

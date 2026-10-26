@@ -850,6 +850,28 @@ def test_state_host_check_ignores_hosts_that_name_no_state():
     assert not _host_names_another_state("https://media.newjerseyglobe.com/x/a.jpg", None)
 
 
+def test_state_host_check_allows_national_outlets_named_for_a_state_or_city():
+    """A host that merely starts with a state or city word is not that state's outlet."""
+    assert not _host_names_another_state("https://www.washingtonpost.com/x/a.jpg", "va-house-07-2026")
+    assert not _host_names_another_state("https://www.kansascity.com/x/a.jpg", "mo-house-05-2026")
+    assert not _host_names_another_state("https://media.newyorker.com/x/a.jpg", "nj-house-07-2026")
+    assert not _host_names_another_state("https://nypost.com/x/a.jpg", "nj-house-07-2026")
+
+
+def test_state_host_check_exempts_the_candidates_own_site():
+    """virginiafoxx.com is Rep. Virginia Foxx's own site, not a Virginia outlet."""
+    assert not _host_names_another_state("https://virginiafoxx.com/x/a.jpg", "nc-house-05-2026", "Virginia Foxx")
+    # Without the candidate's name, the host still reads as another state's.
+    assert _host_names_another_state("https://virginiafoxx.com/x/a.jpg", "nc-house-05-2026")
+
+
+def test_state_host_check_matches_only_a_host_that_starts_with_the_state():
+    assert _host_names_another_state("https://www.texastribune.org/x/a.jpg", "oh-senate-2026")
+    # A state name buried inside a word is not a state outlet.
+    assert not _host_names_another_state("https://dailyohiovalley.example.com/x/a.jpg", "wv-house-02-2026")
+    assert not _host_names_another_state("https://www.mykansasnews.com/x/a.jpg", "mo-house-05-2026")
+
+
 def test_state_host_check_ignores_a_cdn_region_subdomain():
     """A CDN encodes its data centre in a subdomain, not its coverage area.
 
@@ -957,6 +979,27 @@ def test_banner_aspect_ratio_rejected_portraits_kept(url, rejected):
 )
 def test_wikimedia_occupational_namesakes_are_rejected(url):
     assert _looks_like_non_photo(url) is True
+
+
+def test_wikimedia_occupational_namesake_is_rejected_on_the_thumb_host_too():
+    # Wikipedia's page-summary API hands out thumb.wikimedia.org URLs; the
+    # namesake rule must treat them like upload.wikimedia.org.
+    url = (
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Ryan_Kelly_%28American_football%29.JPG/"
+        "250px-Ryan_Kelly_%28American_football%29.JPG"
+    )
+    assert _looks_like_non_photo(url) is True
+
+
+def test_is_wikimedia_file_host_matches_exact_file_hosts_only():
+    from pipeline_client.agent.wikimedia_hosts import is_wikimedia_file_host
+
+    assert is_wikimedia_file_host("https://upload.wikimedia.org/wikipedia/commons/a/ab/X.jpg")
+    assert is_wikimedia_file_host("https://THUMB.wikimedia.org/x/y.jpg")
+    assert not is_wikimedia_file_host("https://commons.wikimedia.org/wiki/File:X.jpg")
+    assert not is_wikimedia_file_host("https://upload.wikimedia.org.evil.example/X.jpg")
+    assert not is_wikimedia_file_host("https://example.com/upload.wikimedia.org/X.jpg")
+    assert not is_wikimedia_file_host(None)
 
 
 @pytest.mark.parametrize(
@@ -1521,6 +1564,59 @@ def test_partisan_image_hosts(url, expected):
     from pipeline_client.agent.images import is_partisan_image_host
 
     assert is_partisan_image_host(url) is expected
+
+
+DEMOCRATIC_STATE_PARTY_HOSTS = [
+    "azdem.org",
+    "ncdp.org",
+    "georgiademocrat.org",
+    "kydemocrat.org",
+    "dfl.org",
+    "nddemnpl.org",
+    "nhdems.org",
+    "texasdemocrats.org",
+    "floridademocraticparty.com",
+]
+REPUBLICAN_STATE_PARTY_HOSTS = [
+    "rpof.org",
+    "rpv.org",
+    "oregonrepublicanparty.org",
+    "texasgop.org",
+    "michigan.gop",
+    "georgiarepublican.org",
+    "nmrepublicans.org",
+    "ncgop.org",
+    "azgop.com",
+]
+
+
+@pytest.mark.parametrize("host", DEMOCRATIC_STATE_PARTY_HOSTS + REPUBLICAN_STATE_PARTY_HOSTS)
+def test_state_party_hosts_of_both_parties_are_partisan(host):
+    from pipeline_client.agent.images import is_partisan_image_host
+
+    assert is_partisan_image_host(f"https://www.{host}/wp-content/uploads/jane.jpg") is True
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "demographics.example.com",
+        "goprotect.example.com",
+        "demographics.com",
+        "goprotect.com",
+        "tandem.org",
+        "academy.org",
+        "democracydocket.com",
+        "gopher.edu",
+        # Newspapers named "... Democrat" are news, not party committees.
+        "pressdemocrat.com",
+        "lebanondemocrat.com",
+    ],
+)
+def test_hosts_merely_containing_party_letters_are_not_partisan(host):
+    from pipeline_client.agent.images import is_partisan_image_host
+
+    assert is_partisan_image_host(f"https://{host}/jane.jpg") is False
 
 
 def test_wikimedia_thumbnail_url_forms():

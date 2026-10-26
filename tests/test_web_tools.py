@@ -384,6 +384,49 @@ def test_is_unusable_page_text_detects_block_pages():
     assert _is_unusable_page_text(blocked) is True
 
 
+def _long_campaign_page(sentence: str) -> str:
+    filler = (
+        "Jane Doe is running for Congress to lower costs for working families, fund local schools, "
+        "and repair roads and bridges across the district. "
+    )
+    return "Jane Doe for Congress - Issues\n\n" + filler * 20 + sentence + " " + filler * 5
+
+
+def test_is_unusable_page_text_keeps_long_page_mentioning_social_security_check():
+    page = _long_campaign_page("My opponent would cut your Social Security check.")
+    assert len(page) > 1500
+    assert _is_unusable_page_text(page) is False
+    assert _page_fetch_log_hint("https://janedoe.com/issues", page) is None
+
+
+def test_is_unusable_page_text_keeps_long_page_saying_forbidden():
+    page = _long_campaign_page("Abortion should be forbidden after 15 weeks, with exceptions.")
+    assert _is_unusable_page_text(page) is False
+
+
+def test_is_unusable_page_text_still_rejects_short_cloudflare_interstitial():
+    page = (
+        "Attention Required! | Cloudflare\n"
+        "Please complete the security check to access janedoe.com. "
+        "Why do I have to complete a CAPTCHA? Completing the CAPTCHA proves you are a human and "
+        "gives you temporary access to the web property. Verify you are human by completing the action below. "
+        "Ray ID: 7d1f0e2b3c4a5d6e  Performance & security by Cloudflare"
+    )
+    assert len(page) < 1500
+    assert _is_unusable_page_text(page) is True
+
+
+def test_is_unusable_page_text_rejects_long_page_with_block_marker_in_title():
+    page = "Access Denied\n" + "You don't have permission to access this server. Reference #18. " * 40
+    assert len(page) > 1500
+    assert _is_unusable_page_text(page) is True
+
+
+def test_is_unusable_page_text_rejects_empty_page():
+    assert _is_unusable_page_text("") is True
+    assert _is_unusable_page_text("   \n ") is True
+
+
 def test_page_fetch_log_hint_reports_failed_fetch_strings():
     url = "https://www.jeffwadlin.com/issues"
     page_text = "[Failed to fetch https://www.jeffwadlin.com/issues: 403 forbidden]"

@@ -31,6 +31,7 @@ def test_denied_wikimedia_original_also_matches_its_thumbnail():
     )
     assert is_denied_image(TWO_PERSON)
     assert is_denied_image(thumb)
+    assert is_denied_image(thumb.replace("upload.wikimedia.org", "thumb.wikimedia.org"))
 
 
 def test_denied_image_counts_as_rejected_candidate_image():

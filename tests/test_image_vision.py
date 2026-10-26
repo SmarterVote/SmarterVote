@@ -5,6 +5,7 @@ observations the model actually returned for it.
 """
 
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -249,6 +250,67 @@ def test_inspection_records_provider_usage_and_app_headers(monkeypatch):
     assert calls[0]["headers"]["HTTP-Referer"] == "https://smarter.vote"
     assert calls[0]["headers"]["X-Title"] == "SmarterVote"
     assert recorded == [((12, 4, "test/model"), {"cost_usd": 0.00003})]
+
+
+def test_observations_are_parsed_from_a_reply_with_prose_around_the_json():
+    from pipeline_client.agent.image_vision import parse_observations
+
+    reply = 'Here is my analysis: {"faces": 2, "is_photograph": true, "reason": "two people {posed}"} Hope that helps.'
+    assert parse_observations(reply) == {"faces": 2, "is_photograph": True, "reason": "two people {posed}"}
+    assert parse_observations('```json\n{"faces": 1}\n```') == {"faces": 1}
+    assert parse_observations('{"faces": 1}') == {"faces": 1}
+
+
+@pytest.mark.parametrize("reply", ["", "I cannot inspect this image.", "{not json}", "[1, 2]", "{'faces': 1}"])
+def test_unparseable_replies_return_no_observations(reply):
+    from pipeline_client.agent.image_vision import parse_observations
+
+    assert parse_observations(reply) is None
+
+
+def test_inspection_reads_a_verdict_from_a_prose_wrapped_reply():
+    class _Resp:
+        content = b"\x89PNG\r\n"
+        headers = {"content-type": "image/png"}
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            content = "Here is my analysis: " + json.dumps(_seen(faces=2, reason="two people"))
+            return {"choices": [{"message": {"content": content}}]}
+
+    class _Client:
+        async def get(self, *args, **kwargs):
+            return _Resp()
+
+        async def post(self, *args, **kwargs):
+            return _Resp()
+
+        async def aclose(self):
+            return None
+
+    verdict = asyncio.run(inspect_candidate_photo("https://example.com/a.jpg", model="m", api_key="k", client=_Client()))
+
+    assert verdict is not None
+    assert verdict.usable is False
+
+
+def test_uninspected_photo_is_kept_and_logged(monkeypatch):
+    async def no_verdict(*args, **kwargs):
+        return None
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "k")
+    monkeypatch.setattr(images, "inspect_candidate_photo", no_verdict)
+    messages = []
+    candidate = {"name": "Jane Doe", "image_url": "https://example.com/jane-doe.jpg"}
+
+    asyncio.run(
+        images._discard_if_not_a_headshot(candidate, model="m", on_log=lambda level, msg: messages.append((level, msg)))
+    )
+
+    assert candidate["image_url"] == "https://example.com/jane-doe.jpg"
+    assert any(level == "info" and "not inspected" in msg for level, msg in messages)
 
 
 def test_casual_athletic_clothing_is_not_a_sports_photograph():

@@ -95,6 +95,55 @@ def test_guard_caps_churn_on_an_unchanged_poll_set_and_keeps_the_rating():
     assert consensus["margin_estimate"] == 6.0  # held within 2 points of the baseline's 4.0
 
 
+def _iso_days_ago(days):
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def test_guard_does_not_hold_an_old_baseline_on_unchanged_evidence():
+    # An unpolled race's evidence key never changes, so without an age limit the
+    # exact-evidence guard would hold its rating band forever.
+    from pipeline_client.agent.phases.forecast import STABILITY_GUARD_MAX_BASELINE_AGE_DAYS
+
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    baseline["generated_at"] = _iso_days_ago(STABILITY_GUARD_MAX_BASELINE_AGE_DAYS + 1)
+    consensus = build_consensus([_member(0.34), _member(0.34), _member(0.30)], poll_count=1)
+
+    note = apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
+
+    assert note is None
+    assert consensus["rating"] == "lean_r"
+    assert consensus["party_probabilities"]["Republican"] == pytest.approx(0.66)
+
+
+def test_guard_still_holds_a_fresh_baseline_on_unchanged_evidence():
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    baseline["generated_at"] = _iso_days_ago(2)
+    consensus = build_consensus([_member(0.34), _member(0.34), _member(0.30)], poll_count=1)
+
+    note = apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
+
+    assert note and "Stability guard" in note
+    assert consensus["rating"] == "tilt_r"
+
+
+@pytest.mark.parametrize("generated_at", [None, "", "not-a-date"])
+def test_guard_still_holds_when_baseline_age_is_unknown(generated_at):
+    race = _ar02()
+    baseline = copy.deepcopy(race["forecast"])
+    if generated_at is not None:
+        baseline["generated_at"] = generated_at
+    consensus = build_consensus([_member(0.34), _member(0.34), _member(0.30)], poll_count=1)
+
+    note = apply_stability_guard(consensus, baseline, forecast_evidence_key(race), race)
+
+    assert note and "Stability guard" in note
+    assert consensus["rating"] == "tilt_r"
+
+
 def test_guard_keeps_the_baseline_band_on_unchanged_evidence():
     # A capped move may not carry the rating across a band by itself.
     race = _ar02()
@@ -279,6 +328,8 @@ async def _run_with_baseline(race_json, fake, *, resume_partial=False):
 @pytest.mark.asyncio
 async def test_phase_publishes_the_capped_numbers_and_records_the_guard():
     race = _race()  # baseline tilt_d at 58% D, no polls; the panel median is 68% D (lean_d)
+    # The guard only holds a recent baseline (the shared fixture's date ages).
+    race["forecast"]["generated_at"] = _iso_days_ago(1)
     baseline = copy.deepcopy(race)
     fake, _state = _fake_loop(writer_rating="tilt_d")
     await _run_with_baseline(race, fake)

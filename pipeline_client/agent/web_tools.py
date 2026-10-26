@@ -324,6 +324,14 @@ _UNUSABLE_PAGE_MARKERS = [
     "our systems have detected unusual traffic",
 ]
 
+# Block/interstitial pages (Cloudflare challenges, 403 bodies, "enable JavaScript"
+# shells) are small, and their marker sits in the title or opening lines. Real
+# content pages routinely use the same words in prose ("cut your Social Security
+# check", "should be forbidden", "access denied to voters"), so the markers only
+# count when the whole page is short or the marker appears near the top.
+_UNUSABLE_MARKER_MAX_PAGE_CHARS = 1500
+_UNUSABLE_MARKER_HEAD_CHARS = 300
+
 _POLICY_PATH_TOKENS = [
     "issue",
     "issues",
@@ -910,13 +918,30 @@ async def _try_sitemap_policy_fallback(url: str, client: httpx.AsyncClient, fail
 # ---------------------------------------------------------------------------
 
 
+def _matched_block_marker(text: str) -> Optional[str]:
+    """Return the first block-page marker that signals a blocked page, else None.
+
+    The whole text is searched only when it is short enough to be an
+    interstitial; for longer pages only the title/opening region is searched.
+    """
+    stripped = (text or "").strip()
+    if len(stripped) < _UNUSABLE_MARKER_MAX_PAGE_CHARS:
+        region = stripped.lower()
+    else:
+        region = stripped[:_UNUSABLE_MARKER_HEAD_CHARS].lower()
+    for marker in _UNUSABLE_PAGE_MARKERS:
+        if marker in region:
+            return marker
+    return None
+
+
 def _is_unusable_page_text(text: str) -> bool:
     """Return True for empty/blocked/placeholder pages that lack usable substance."""
     if not text or not text.strip():
         return True
 
     lowered = text.lower()
-    if any(marker in lowered for marker in _UNUSABLE_PAGE_MARKERS):
+    if _matched_block_marker(text):
         return True
 
     if len(text.strip()) < _PAGE_MIN_USEFUL_CHARS and "[failed to fetch" not in lowered:
@@ -938,9 +963,8 @@ def _page_fetch_log_hint(url: str, page_text: str) -> Optional[str]:
     if lowered.startswith("[failed to fetch"):
         return f"fetch failed for {url[:80]} — {text[:220]}"
 
-    matched_markers = [marker for marker in _UNUSABLE_PAGE_MARKERS if marker in lowered]
-    if matched_markers:
-        marker = matched_markers[0]
+    marker = _matched_block_marker(text)
+    if marker:
         return f"content appears blocked/unusable for {url[:80]} (marker='{marker}', chars={len(text)})"
 
     if _is_likely_policy_url(url) and 0 < len(text) < _PAGE_PROXY_RETRY_CHARS:
