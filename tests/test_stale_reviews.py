@@ -127,4 +127,37 @@ def test_stale_error_flags_no_longer_pin_the_grade_below_passing():
     invalidate_stale_reviews(race)
 
     cleared = compute_validation_grade(race["reviews"], race, min_reviews=1)
-    assert cleared["passed"] is True
+    # The stale error no longer caps the score below the pass mark...
+    assert cleared["score"] == 95
+    # ...but no review has judged this roster, so it cannot read as passed until
+    # review re-runs.
+    assert cleared["passed"] is False
+    assert cleared["current_review_count"] == 0
+
+    fresh = _review(score=95, fingerprint=roster_fingerprint(race))
+    regraded = compute_validation_grade(race["reviews"] + [fresh], race, min_reviews=1)
+    assert regraded["passed"] is True
+
+
+def test_grade_with_every_review_stale_is_not_passed():
+    race = _race(["Pete Ricketts", "Dan Osborn"])
+    reviews = [dict(_review(score=96), stale=True) for _ in range(3)]
+
+    grade = compute_validation_grade(reviews, race)
+
+    assert grade["passed"] is False
+    assert grade["stale_review_count"] == 3
+    assert grade["summary"].startswith("Reviews are out of date")
+
+
+def test_grade_with_one_fresh_review_is_unchanged_by_stale_ones():
+    race = _race(["Pete Ricketts", "Dan Osborn"])
+    stale = [dict(_review(score=60), stale=True), dict(_review(score=60), stale=True)]
+    fresh = [_review(score=94)]
+
+    with_stale = compute_validation_grade(stale + fresh, race, min_reviews=1)
+    without_stale = compute_validation_grade(fresh, race, min_reviews=1)
+
+    assert with_stale["passed"] is True
+    assert with_stale["score"] == without_stale["score"] == 94
+    assert with_stale["grade"] == without_stale["grade"]

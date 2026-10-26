@@ -1080,7 +1080,7 @@ async def run_agent(
         log(
             "warning",
             f"{stale_review_count} carried review(s) judged a roster this run replaced; "
-            "their positional flags are marked stale and no longer block publication",
+            "their positional flags are marked stale, and the grade cannot pass on stale reviews alone",
         )
         # The stored grade counted those flags, so it is stale for the same reason.
         race_json["validation_grade"] = (

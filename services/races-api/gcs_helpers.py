@@ -341,6 +341,16 @@ def _assert_publishable_race(data: Dict[str, Any], race_id: Optional[str] = None
     validation_grade = data.get("validation_grade")
     if not isinstance(validation_grade, dict):
         return
+    # A grade computed only from reviews of a superseded roster is not a check
+    # of the roster being published, whatever its `passed` value says (grades
+    # stored before the pipeline enforced this can read passed=True).
+    current_reviews = validation_grade.get("current_review_count")
+    stale_reviews = validation_grade.get("stale_review_count")
+    if current_reviews == 0 and isinstance(stale_reviews, int) and stale_reviews > 0:
+        raise ValueError(
+            f"Race reviews are out of date: all {stale_reviews} review(s) judged an earlier candidate roster. "
+            "Re-run review before publishing"
+        )
     if validation_grade.get("passed") is False:
         grade = validation_grade.get("grade") or "unknown"
         score = validation_grade.get("score")

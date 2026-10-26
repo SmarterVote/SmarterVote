@@ -1417,13 +1417,17 @@ def compute_validation_grade(
 
     quorum_met = len(scores) >= max(1, min_reviews)
     score_passed = avg >= PASSING_SCORE
-    passed = score_passed and quorum_met
     # Stale reviews judged a roster the race has since replaced. They still
     # carry their score (nothing better exists until review re-runs), but the
     # summary and counts must not present them as a check of today's roster:
     # 36 races showed "Validated by 3/3 reviewers" with every review stale.
     current_reviews = [r for r in eligible_reviews if not r.get("stale")]
     stale_count = len(eligible_reviews) - len(current_reviews)
+    # A pass is a statement about the roster on the page. When no review has
+    # judged that roster, the stale reviews' score is reported but cannot pass:
+    # their error flags were skipped as stale, so a passing grade here would be
+    # a check nobody performed. Re-running review restores a pass.
+    passed = score_passed and quorum_met and bool(current_reviews)
     counted_reviews = current_reviews or eligible_reviews
     verdicts = [r.get("verdict", "") for r in counted_reviews]
     approved_count = sum(1 for v in verdicts if v == "approved")
