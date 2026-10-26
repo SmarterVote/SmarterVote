@@ -2367,6 +2367,9 @@ async def _discard_if_not_a_headshot(
     name = candidate.get("name", "unknown")
     verdict = await inspect_candidate_photo(url, model=model or DEFAULT_IMAGE_VISION_MODEL, api_key=api_key)
     if verdict is None:
+        # Fail open: a provider error or unreadable reply must not strip a
+        # photo, but say so, since the photo was kept without being looked at.
+        log("info", f"  [{name}] Image was not inspected (no usable verdict from the vision check) - keeping it")
         return
     if not verdict.usable:
         log("info", f"  [{name}] Image rejected on inspection ({verdict.reason}) - clearing")

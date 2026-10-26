@@ -216,6 +216,30 @@ async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[tuple[st
     return mime, payload
 
 
+def parse_observations(content: str) -> Optional[dict[str, Any]]:
+    """Return the first JSON object in a model reply, or None if it holds none.
+
+    Models do not always answer with bare JSON: some wrap it in a code fence,
+    others lead with prose ("Here is my analysis: {...}"). Treating those as no
+    verdict silently kept every photo the model was never really asked about,
+    so the reply is scanned for the first complete JSON object instead. Each
+    "{" is tried as the start of one with a real JSON decoder, so braces inside
+    string values cannot unbalance it.
+    """
+    decoder = json.JSONDecoder()
+    text = content or ""
+    start = text.find("{")
+    while start != -1:
+        try:
+            value, _end = decoder.raw_decode(text, start)
+        except json.JSONDecodeError:
+            value = None
+        if isinstance(value, dict):
+            return value
+        start = text.find("{", start + 1)
+    return None
+
+
 async def inspect_candidate_photo(
     url: str,
     *,
@@ -264,13 +288,9 @@ async def inspect_candidate_photo(
         if body.get("error") or not body.get("choices"):
             return None
         _record_usage(body, model)
-        content = str(body["choices"][0]["message"]["content"]).strip()
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        observations = json.loads(content)
-        if not isinstance(observations, dict):
+        observations = parse_observations(str(body["choices"][0]["message"]["content"]))
+        if observations is None:
+            logger.info("Image inspection reply for %s held no JSON object; treating as no verdict", url[:120])
             return None
         return verdict_from_observations(observations)
     except (httpx.HTTPError, ValueError, KeyError, IndexError, json.JSONDecodeError, asyncio.TimeoutError):
