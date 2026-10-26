@@ -1334,6 +1334,24 @@ def _host_matches(host: str, domains: Tuple[str, ...]) -> bool:
     return any(host == domain or host.endswith("." + domain) for domain in domains)
 
 
+# Second-level labels under a two-letter country TLD that are a public suffix
+# ("bbc.co.uk", "abc.net.au"), so the registrable domain is one label longer.
+_COUNTRY_SECOND_LEVEL_LABELS = frozenset({"ac", "co", "com", "edu", "gov", "net", "org"})
+
+
+def _registrable_host(url: str) -> str:
+    """Approximate registrable domain of *url*'s host ("cdn.a.com" -> "a.com").
+
+    A deliberately small approximation of the public-suffix rule: the last two
+    labels, or three under a ``co.uk``-style country suffix. Subdomains are a
+    site's own CDN or region shards, so they identify the same site.
+    """
+    labels = [label for label in _image_host(url).split(".") if label]
+    if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _COUNTRY_SECOND_LEVEL_LABELS:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
 def is_partisan_image_host(url: Any) -> bool:
     """True when *url* is served by a partisan guide, fundraising platform or party committee."""
     if not isinstance(url, str):
@@ -2300,9 +2318,26 @@ def _image_identity(url: str) -> str:
     stored ".../thumbs/100/100/Rashida-Tlaib.PNG" for her Republican challenger
     James Hooper -- the incumbent's own portrait at a different size. Comparing
     basenames catches that; comparing full URLs does not.
+
+    A bare basename is only an identity when it names someone, though: two
+    campaign sites that each serve their own "headshot.jpg" are two different
+    photos. So:
+
+    - Bioguide portraits are keyed by Bioguide ID, which is the same on
+      bioguide.congress.gov and the unitedstates.github.io mirror.
+    - A filename naming a person (a first/last name pair) is that person's
+      photo wherever it is hosted, so it stays host-independent.
+    - Any other filename is scoped to its registrable host.
     """
     basename = unquote(urlparse(url).path).rsplit("/", 1)[-1].lower()
-    return re.sub(r"\.[a-z0-9]{2,5}$", "", basename).strip()
+    stem = re.sub(r"\.[a-z0-9]{2,5}$", "", basename).strip()
+    if not stem:
+        return ""
+    if _is_congress_portrait(url):
+        return f"bioguide:{stem}"
+    if len(_filename_person_tokens(url)) >= 2:
+        return stem
+    return f"{_registrable_host(url)}/{stem}"
 
 
 def _drop_shared_candidate_images(candidates: List[Dict[str, Any]], log: Callable[[str, str], None]) -> int:

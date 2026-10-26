@@ -31,6 +31,40 @@ def test_shared_photo_naming_nobody_is_cleared_from_everyone():
     assert b["image_url"] is None
 
 
+def test_generic_filenames_on_different_sites_are_different_photos():
+    a = {"name": "Angie Boone", "image_url": "https://a.com/images/headshot.jpg"}
+    b = {"name": "Keith Varian", "image_url": "https://b.com/headshot.jpg"}
+
+    assert _drop_shared_candidate_images([a, b], _log) == 0
+    assert a["image_url"] and b["image_url"]
+
+
+def test_image_identity_scopes_generic_filenames_to_their_site():
+    from pipeline_client.agent.images import _image_identity
+
+    assert _image_identity("https://a.com/headshot.jpg") != _image_identity("https://b.com/headshot.jpg")
+    assert _image_identity("https://a.com/headshot.jpg") == _image_identity("https://a.com/headshot.jpg")
+    # A CDN subdomain of the same site is still the same site.
+    assert _image_identity("https://www.a.com/x/headshot.jpg") == _image_identity("https://cdn.a.com/y/headshot.png")
+
+
+def test_image_identity_matches_a_bioguide_portrait_across_its_hosts():
+    from pipeline_client.agent.images import _image_identity
+
+    assert _image_identity("https://bioguide.congress.gov/bioguide/photo/M/M001137.jpg") == _image_identity(
+        "https://unitedstates.github.io/images/congress/450x550/M001137.jpg"
+    )
+
+
+def test_image_identity_matches_a_person_named_file_across_hosts():
+    from pipeline_client.agent.images import _image_identity
+
+    # A filename naming a person is that person's photo wherever it is hosted.
+    assert _image_identity("https://cdn.ballotpedia.org/images/Rashida-Tlaib.PNG") == _image_identity(
+        "https://s3.amazonaws.com/ballotpedia-api4/files/thumbs/100/100/Rashida-Tlaib.PNG"
+    )
+
+
 def test_distinct_photos_are_left_alone():
     a = {"name": "Pete Ricketts", "image_url": "https://cdn.example.com/Pete-Ricketts.jpg"}
     b = {"name": "Dan Osborn", "image_url": "https://cdn.example.com/Dan-Osborn.jpg"}
