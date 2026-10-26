@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from ..handlers import _make_editing_handlers
 from ..prompts import POLLING_SYSTEM, POLLING_USER
 from ..tools import POLLING_TOOLS, READ_PROFILE_TOOL
+from ..wikipedia_polls import wikipedia_poll_context
 from ._common import _classify_exception, _is_control_flow_exception, _race_identity_context, _record_step_failure
 from .context import PhaseContext
 
@@ -44,6 +45,11 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
     polling_t0 = time.perf_counter()
     handlers = _make_editing_handlers(race_json, log)
     log("info", f"{prefix} 4: Refreshing public polling...")
+    # Wikipedia's poll table lists polls web search keeps missing (PDF-only releases,
+    # sponsored polls). It is reference context only; add_poll still validates and dedupes.
+    wikipedia_polls = await wikipedia_poll_context(race_json, candidate_names, race_id=race_id)
+    if wikipedia_polls:
+        log("info", "  Wikipedia poll table supplied as reference context")
     try:
         await _agent_loop(
             POLLING_SYSTEM,
@@ -52,6 +58,7 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
                 current_date=datetime.now(timezone.utc).date().isoformat(),
                 candidate_names=", ".join(candidate_names),
                 polling_json=json.dumps(race_json.get("polling", []), indent=2, default=str),
+                wikipedia_polls=wikipedia_polls,
                 race_identity_context=_race_identity_context(race_json),
             ),
             model=small_model,

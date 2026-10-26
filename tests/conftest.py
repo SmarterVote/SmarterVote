@@ -50,6 +50,13 @@ def mock_ballotpedia_election_lookup():
 
 
 @pytest.fixture(autouse=True)
+def mock_wikipedia_poll_table_fetch():
+    """Prevent the polling phase's Wikipedia poll-table lookup from making real HTTP calls."""
+    with patch("pipeline_client.agent.wikipedia_polls.fetch_wikipedia_wikitext", new_callable=AsyncMock, return_value=None):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def stub_roster_adjudication(request):
     """Supply a permissive verdict when a test calls an editing handler directly.
 

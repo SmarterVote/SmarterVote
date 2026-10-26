@@ -500,7 +500,7 @@ Current roster (use these names exactly): {candidate_names}
 Existing polling:
 {polling_json}
 
-Find recent public polls from primary poll releases, reputable aggregators, or
+{wikipedia_polls}Find recent public polls from primary poll releases, reputable aggregators, or
 news coverage linking to the underlying poll. Add at most five useful recent
 polls. Every matchup candidate name must exactly match the roster above and the
 percentages array must align with the candidate array. If a source confirms a

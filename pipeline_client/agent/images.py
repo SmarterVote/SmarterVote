@@ -19,7 +19,7 @@ from .image_denylist import is_denied_image
 from .image_vision import inspect_candidate_photo
 from .run_budget import RunBudget, RunBudgetExceeded
 from .utils import make_logger
-from .web_tools import MAX_PAGE_BYTES, _get_validated, _serper_image_search, ssrf_request_hook
+from .web_tools import _WIKIMEDIA_API_UA, MAX_PAGE_BYTES, _get_validated, _serper_image_search, ssrf_request_hook
 
 logger = logging.getLogger("pipeline")
 # Validate every request (redirect hops included) against the SSRF guard.
@@ -28,7 +28,6 @@ _SSRF_HOOKS = {"request": [ssrf_request_hook]}
 _IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"})
 
 _BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-_WIKIMEDIA_API_UA = "SmarterVoteBot/1.0 (https://smarter.vote; contact: dev@smarter.vote)"
 
 _NON_PHOTO_TOKENS = frozenset(
     {
