@@ -5,6 +5,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from ..handlers import _make_editing_handlers
+from ..polling_quality import restore_dropped_baseline_polls
 from ..prompts import CANONICAL_ISSUES, ITERATE_META_USER, ITERATE_SYSTEM, ITERATE_USER, cycle_kwargs
 from ..review_flags import format_review_flags as _format_review_flags
 from ..run_budget import RunBudget
@@ -56,6 +57,8 @@ async def _run_iteration_pass(
     log("info", f"  Iteration: addressing review flags for {n} candidates (tools mode)")
 
     working = copy.deepcopy(race_json)
+    baseline_polls = copy.deepcopy(working.get("polling") or [])
+    poll_removals: List[Dict[str, Any]] = []
     identity_context = _race_identity_context(working)
     completed_units = _pipeline_completed_units(working)
     if not resume_partial:
@@ -88,7 +91,7 @@ async def _run_iteration_pass(
         cname = _candidate_name(candidate)
         # Scoped to this candidate only: a mistaken candidate_name in a tool call during
         # this turn is rejected instead of silently corrupting a different candidate's data.
-        handlers = _make_editing_handlers(working, log, restrict_to_candidate=cname)
+        handlers = _make_editing_handlers(working, log, restrict_to_candidate=cname, poll_removals=poll_removals)
         source_hints = await _await_advisory_with_run_budget(
             _candidate_source_hints(working, cname),
             run_budget=run_budget,
@@ -147,7 +150,7 @@ async def _run_iteration_pass(
     try:
         # Race-wide pass (not scoped to any single candidate) — RACE_TOOLS has no
         # candidate_name-taking tools, so an unrestricted handler set is correct here.
-        meta_handlers = _make_editing_handlers(working, log)
+        meta_handlers = _make_editing_handlers(working, log, poll_removals=poll_removals)
         await _agent_loop(
             ITERATE_SYSTEM,
             ITERATE_META_USER.format(
@@ -180,5 +183,6 @@ async def _run_iteration_pass(
         log("warning", "  All iteration calls failed — keeping original")
         return None
 
+    restore_dropped_baseline_polls(working, baseline_polls, removals=poll_removals, log=log)
     working.setdefault("id", race_id)
     return working

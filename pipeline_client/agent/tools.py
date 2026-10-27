@@ -1032,9 +1032,10 @@ REMOVE_POLL_TOOL: Dict = {
     "function": {
         "name": "remove_poll",
         "description": (
-            "Remove a poll from the race's polling data. Use this to delete duplicate polls, "
-            "polls with null/missing result data, or polls that are redundant. "
-            "Identify the poll by pollster name (required) and optionally by date."
+            "Remove an invalid poll entry: a duplicate copy of the same survey, a malformed record with "
+            "null/missing result data, a non-poll result, or a poll proven to concern a different contest. "
+            "Never remove a distinct survey because a newer poll exists (an older release from the same "
+            "pollster is still a valid poll). Identify the poll by pollster name and date."
         ),
         "parameters": {
             "type": "object",
@@ -1045,11 +1046,11 @@ REMOVE_POLL_TOOL: Dict = {
                 },
                 "date": {
                     "type": "string",
-                    "description": "Optional poll date (YYYY-MM-DD). If provided, only the poll with this exact pollster+date is removed. If omitted, all polls by this pollster are removed.",
+                    "description": "Poll end date (YYYY-MM-DD). Required when the pollster has more than one stored survey; only that survey is removed.",
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Brief reason for removal (e.g. 'duplicate', 'null result data', 'superseded by newer poll').",
+                    "description": "Why the entry is invalid (e.g. 'duplicate of the same survey', 'null result data', 'election results, not a poll').",
                 },
             },
             "required": ["pollster", "reason"],

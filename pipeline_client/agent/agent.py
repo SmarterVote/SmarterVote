@@ -330,7 +330,12 @@ def _sanitize_polling(race_json: Dict[str, Any], log: Any | None = None) -> None
     for poll in kept_polls:
         duplicate_index = None
         for index, existing in enumerate(deduplicated_polls):
-            if existing.get("matchups") != poll.get("matchups") or existing.get("sample_size") != poll.get("sample_size"):
+            # Two numberless entries (matchups: []) share no topline; only equal numbers mark a duplicate.
+            if (
+                not poll.get("matchups")
+                or existing.get("matchups") != poll.get("matchups")
+                or existing.get("sample_size") != poll.get("sample_size")
+            ):
                 continue
             try:
                 date_gap = abs(

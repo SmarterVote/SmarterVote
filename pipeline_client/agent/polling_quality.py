@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import re
+from datetime import date as _date
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 _PLACEHOLDER_POLLSTERS = {
@@ -160,3 +163,145 @@ def dedupe_same_survey_polls(polls: List[Dict[str, Any]]) -> Tuple[List[Dict[str
                 poll["pollster"] = normalized
         kept.append(poll)
     return kept, removed
+
+
+# --- Baseline poll guard -------------------------------------------------------
+#
+# A polling refresh dropped distinct surveys that were already stored: ks-senate-2026 lost
+# InsiderAdvantage 2026-10-10 beside its 2026-10-14 release (and earlier NYT/Siena
+# 2026-09-30), and ne-governor-2026 lost NPA Polling 2026-10-05 beside its 2026-10-18
+# release. remove_poll offered "superseded by newer poll" as an example reason, and a
+# pollster-only call removed every survey by that pollster. A newer poll does not void an
+# older one (the forecast weights recency itself), so every distinct valid survey stays.
+
+_RECENCY_REMOVAL_RE = re.compile(
+    r"\b(?:supersed\w*|outdated|out[\s-]of[\s-]date|older|stale|newer|more\s+recent|most\s+recent|latest|"
+    r"replaced\s+by|old\s+poll|earlier\s+(?:poll|survey|release|wave))\b",
+    re.IGNORECASE,
+)
+_DUPLICATE_REMOVAL_RE = re.compile(r"\b(?:duplicat\w*|redundant|repeat(?:ed)?|same\s+(?:poll|survey))\b", re.IGNORECASE)
+NEAR_DATE_DUPLICATE_DAYS = 3
+
+
+def is_recency_removal_reason(reason: Any) -> bool:
+    """True when a removal reason only says the poll is older than another one."""
+    return bool(_RECENCY_REMOVAL_RE.search(str(reason or "")))
+
+
+def is_duplicate_removal_reason(reason: Any) -> bool:
+    """True when a removal reason claims the entry duplicates another stored entry."""
+    return bool(_DUPLICATE_REMOVAL_RE.search(str(reason or "")))
+
+
+def _poll_date(poll: Dict[str, Any]) -> Optional[_date]:
+    try:
+        return datetime.fromisoformat(str(poll.get("date") or "").strip()[:10]).date()
+    except ValueError:
+        return None
+
+
+def _canonical_matchups(poll: Dict[str, Any]) -> Tuple[Tuple[Tuple[str, Any], ...], ...]:
+    canonical = []
+    for matchup in poll.get("matchups") or []:
+        if not isinstance(matchup, dict):
+            continue
+        names = matchup.get("candidates") or []
+        percentages = matchup.get("percentages") or []
+        if isinstance(names, list) and isinstance(percentages, list):
+            canonical.append(tuple(sorted(zip((str(name).strip() for name in names), percentages), key=str)))
+    return tuple(sorted(canonical, key=str))
+
+
+def is_same_poll(left: Any, right: Any) -> bool:
+    """Whether two entries record one survey, allowing a relabeled pollster.
+
+    Same survey: normalized pollster + end date (``same_survey_key``); or, within
+    ``NEAR_DATE_DUPLICATE_DAYS``, one source URL or the identical topline and sample size
+    that ``_sanitize_polling`` already collapses (a sponsor relabel, or release date vs
+    field end date).
+    """
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    left_key = same_survey_key(left)
+    if left_key is not None and left_key == same_survey_key(right):
+        return True
+    left_date, right_date = _poll_date(left), _poll_date(right)
+    if left_date is None or right_date is None or abs((left_date - right_date).days) > NEAR_DATE_DUPLICATE_DAYS:
+        return False
+    left_url = str(left.get("source_url") or "").strip()
+    if left_url and left_url == str(right.get("source_url") or "").strip():
+        return True
+    left_matchups = _canonical_matchups(left)
+    return (
+        bool(left_matchups)
+        and left_matchups == _canonical_matchups(right)
+        and left.get("sample_size") == right.get("sample_size")
+    )
+
+
+def baseline_poll_invalidity(poll: Any, roster_names: set, polling_note: Any = None) -> Optional[str]:
+    """Deterministic reason a stored poll may be dropped, or None when it must be kept."""
+    problem = polling_semantic_problem(poll, polling_note)
+    if problem:
+        return problem
+    matchups = [matchup for matchup in poll.get("matchups") or [] if isinstance(matchup, dict)]
+    if matchups and roster_names:
+        on_roster = [
+            matchup
+            for matchup in matchups
+            if isinstance(matchup.get("candidates"), list)
+            and matchup["candidates"]
+            and all(str(name).strip() in roster_names for name in matchup["candidates"])
+        ]
+        if not on_roster:
+            return "Every matchup names a candidate who is not on the current roster."
+    return None
+
+
+def restore_dropped_baseline_polls(
+    race_json: Dict[str, Any],
+    baseline_polls: Any,
+    *,
+    removals: Optional[List[Dict[str, Any]]] = None,
+    log: Any = None,
+) -> List[str]:
+    """Put back any baseline poll an agent phase lost without a validity reason.
+
+    A baseline poll is satisfied when an entry recording the same survey (``is_same_poll``)
+    is still stored, so a relabel ("Trafalgar Group" -> "Trafalgar Group (R)") is not
+    duplicated. Otherwise it is restored unless it is now invalid (non-poll entry, or no
+    matchup left on the current roster) or remove_poll recorded a validity reason for it
+    (``removals`` entries with ``validity: True``). Returns the "pollster (date)" labels restored.
+    """
+    if not isinstance(baseline_polls, list) or not baseline_polls:
+        return []
+    polling = race_json.get("polling")
+    if not isinstance(polling, list):
+        polling = []
+        race_json["polling"] = polling
+    roster_names = {
+        str(candidate.get("name") or "").strip()
+        for candidate in race_json.get("candidates") or []
+        if isinstance(candidate, dict) and str(candidate.get("name") or "").strip()
+    }
+    validity_removed = [
+        item["poll"]
+        for item in removals or []
+        if isinstance(item, dict) and item.get("validity") and isinstance(item.get("poll"), dict)
+    ]
+    restored: List[str] = []
+    for poll in baseline_polls:
+        if not isinstance(poll, dict):
+            continue
+        if any(is_same_poll(poll, current) for current in polling):
+            continue
+        if baseline_poll_invalidity(poll, roster_names, race_json.get("polling_note")):
+            continue
+        key = same_survey_key(poll)
+        if any(removed == poll or (key is not None and same_survey_key(removed) == key) for removed in validity_removed):
+            continue
+        polling.append(copy.deepcopy(poll))
+        restored.append(f"{poll.get('pollster')} ({poll.get('date')})")
+    if restored and log:
+        log("warning", "Restored baseline poll(s) dropped without a validity reason: " + ", ".join(restored))
+    return restored
