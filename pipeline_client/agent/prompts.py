@@ -515,7 +515,9 @@ If a genuine poll does not publish numeric candidate percentages, add it with
 matchups: [] so users can follow the source, and explain the missing numbers in
 polling_note.
 
-Remove duplicate or malformed existing polls. If no public polling exists, set
+Remove duplicate or malformed existing polls. Keep every distinct existing survey:
+a newer release from the same pollster is an additional poll, not a replacement
+for an older one. If no public polling exists, set
 polling_note to "No public polling found for this race as of {current_date}."
 Use only add_poll, remove_poll, and update_race_field for polling_note."""
 

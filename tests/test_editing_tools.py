@@ -2246,7 +2246,7 @@ def test_update_race_field_normalizes_house_ballotpedia_to_district_page():
 
 
 def test_remove_poll_handler():
-    """remove_poll handler deletes polls by pollster+date or pollster alone."""
+    """remove_poll handler deletes polls by pollster+date or by a pollster with one stored survey."""
     from pipeline_client.agent.agent import _make_editing_handlers
 
     race_json = {
@@ -2259,10 +2259,11 @@ def test_remove_poll_handler():
     }
     handlers = _make_editing_handlers(race_json, lambda l, m: None)
 
-    # Remove by pollster+date removes both duplicates
+    # Removing a duplicate by pollster+date keeps one copy of the survey
     result = handlers["remove_poll"]({"pollster": "SurveyUSA", "date": "2026-03-01", "reason": "duplicate"})
-    assert "2" in result or "Removed" in result
-    assert all(p["pollster"] != "SurveyUSA" for p in race_json["polling"])
+    assert result.startswith("Removed 1")
+    assert [p["pollster"] for p in race_json["polling"]] == ["SurveyUSA", "Emerson"]
+    handlers["remove_poll"]({"pollster": "SurveyUSA", "date": "2026-03-01", "reason": "null data"})
     assert len(race_json["polling"]) == 1
 
     # Remove by pollster only

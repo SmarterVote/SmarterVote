@@ -21,6 +21,9 @@ from pipeline_client.agent.ballotpedia import default_ballotpedia_race_url
 from pipeline_client.agent.evidence import merge_source_lists
 from pipeline_client.agent.images import _is_valid_image_url
 from pipeline_client.agent.polling_quality import (
+    is_duplicate_removal_reason,
+    is_recency_removal_reason,
+    is_same_poll,
     normalize_pollster_name,
     poll_population_rank,
     polling_semantic_problem,
@@ -864,7 +867,11 @@ def _get_other_state_candidates(race_id: str, state: str | None) -> set[str]:
 
 
 def _make_editing_handlers(
-    race_json: Dict[str, Any], log: Callable, *, restrict_to_candidate: str | None = None
+    race_json: Dict[str, Any],
+    log: Callable,
+    *,
+    restrict_to_candidate: str | None = None,
+    poll_removals: Optional[list] = None,
 ) -> Dict[str, Any]:
     """Build editing-tool handlers closed over *race_json*.
 
@@ -879,6 +886,10 @@ def _make_editing_handlers(
     one candidate's turn (e.g. passing the wrong ``candidate_name``) can
     silently corrupt a *different* candidate's data, since these handlers
     otherwise look up any candidate by name across the whole roster.
+
+    When *poll_removals* is a list, remove_poll appends ``{"poll", "reason",
+    "validity"}`` for each entry it removes, so the phase can tell a removal for
+    invalidity from a lost poll (``restore_dropped_baseline_polls``).
     """
     _ALLOWED_CANDIDATE_FIELDS = {"party", "incumbent", "website", "image_url"}
     _ALLOWED_RACE_FIELDS = {
@@ -2014,8 +2025,10 @@ def _make_editing_handlers(
                     "skipping duplicate. Store one entry per survey, preferring likely voters."
                 )
         for existing in race_json.get("polling", []):
-            same_topline = existing.get("matchups") == poll.get("matchups") and existing.get("sample_size") == poll.get(
-                "sample_size"
+            same_topline = (
+                bool(poll.get("matchups"))
+                and existing.get("matchups") == poll.get("matchups")
+                and existing.get("sample_size") == poll.get("sample_size")
             )
             try:
                 date_gap = abs(
@@ -2056,22 +2069,73 @@ def _make_editing_handlers(
                 "belongs to the roster; it must not include every candidate or the other party. Remove only a "
                 "duplicate, malformed record, non-poll result, or poll proven to concern a different contest."
             )
-        polling = race_json.get("polling", [])
-        orig_len = len(polling)
+        if not str(reason).strip():
+            return "ERROR: remove_poll requires a reason naming why the entry is invalid or a duplicate."
+        if is_recency_removal_reason(reason):
+            # ks-senate-2026 lost InsiderAdvantage 2026-10-10 to its 2026-10-14 release this way.
+            return (
+                "ERROR: Poll removal blocked. A newer poll does not replace an older one: every distinct survey "
+                "(different end date or release) stays, and the forecast weights recency itself. Remove only a "
+                "duplicate of the same survey, a malformed record, a non-poll result, or a poll proven to concern "
+                "a different contest."
+            )
+        polling = [p for p in race_json.get("polling") or [] if isinstance(p, dict)]
+
+        def _name_key(name: Any) -> Any:
+            key = same_survey_key({"pollster": name, "date": "-"})
+            return key[0] if key else None
+
         if date:
-            race_json["polling"] = [p for p in polling if not (p.get("pollster") == pollster and p.get("date") == date)]
-            removed = orig_len - len(race_json["polling"])
-            if removed:
-                log("info", f"    🗑️ Removed poll: {pollster} ({date}) — {reason}")
-                return f"Removed {removed} poll(s) from {pollster} ({date})."
-            return f"No poll found matching {pollster} / {date} — no action taken."
+            survey_key = same_survey_key({"pollster": pollster, "date": date})
+            targets = [
+                p
+                for p in polling
+                if (p.get("pollster") == pollster and p.get("date") == date)
+                or (survey_key is not None and same_survey_key(p) == survey_key)
+            ]
+            label = f"{pollster} ({date})"
+            if not targets:
+                return f"No poll found matching {pollster} / {date} — no action taken."
         else:
-            race_json["polling"] = [p for p in polling if p.get("pollster") != pollster]
-            removed = orig_len - len(race_json["polling"])
-            if removed:
-                log("info", f"    🗑️ Removed {removed} poll(s) by '{pollster}' — {reason}")
-                return f"Removed {removed} poll(s) from {pollster}."
-            return f"No polls found for pollster '{pollster}' — no action taken."
+            name_key = _name_key(pollster)
+            targets = [
+                p for p in polling if p.get("pollster") == pollster or (name_key and _name_key(p.get("pollster")) == name_key)
+            ]
+            label = pollster
+            if not targets:
+                return f"No polls found for pollster '{pollster}' — no action taken."
+            dates = sorted({str(p.get("date") or "") for p in targets})
+            if len(dates) > 1:
+                return (
+                    f"ERROR: {pollster} has {len(dates)} stored surveys ({', '.join(dates)}). Each distinct survey "
+                    "stays; call remove_poll with the date of the one entry that is invalid."
+                )
+
+        to_remove = list(targets)
+        if is_duplicate_removal_reason(reason):
+            others = [p for p in polling if not any(p is t for t in targets)]
+            if not all(any(is_same_poll(t, other) for other in others) for t in targets):
+                if len(targets) > 1 and all(is_same_poll(targets[0], t) for t in targets[1:]):
+                    # Copies of one survey: keep the most complete copy, drop the rest.
+                    def _completeness(p: Dict[str, Any]) -> tuple:
+                        numeric = sum(1 for m in p.get("matchups") or [] if isinstance(m, dict) and m.get("percentages"))
+                        return (numeric, bool(p.get("sample_size")), bool(p.get("source_url")))
+
+                    keep = max(targets, key=_completeness)
+                    to_remove = [t for t in targets if t is not keep]
+                else:
+                    return (
+                        f"ERROR: Poll removal blocked. {label} is not a duplicate: no other stored entry records the "
+                        "same survey (same pollster and end date, or the identical topline within a few days). "
+                        "Polls with different end dates are distinct surveys and all stay."
+                    )
+
+        race_json["polling"] = [p for p in race_json.get("polling") or [] if not any(p is t for t in to_remove)]
+        if poll_removals is not None:
+            validity = not is_duplicate_removal_reason(reason)
+            poll_removals.extend({"poll": dict(p), "reason": reason, "validity": validity} for p in to_remove)
+        log("info", f"    🗑️ Removed {len(to_remove)} poll(s): {label} — {reason}")
+        return f"Removed {len(to_remove)} poll(s) from {label}."
 
     def update_race_field(args: Dict[str, Any]) -> str:
         field, value = args["field"], args["value"]

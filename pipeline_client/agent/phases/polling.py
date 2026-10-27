@@ -1,10 +1,12 @@
 """Phase 4: refresh public polling data."""
 
+import copy
 import json
 import time
 from datetime import datetime, timezone
 
 from ..handlers import _make_editing_handlers
+from ..polling_quality import restore_dropped_baseline_polls
 from ..prompts import POLLING_SYSTEM, POLLING_USER
 from ..tools import POLLING_TOOLS, READ_PROFILE_TOOL
 from ..wikipedia_polls import wikipedia_poll_context
@@ -43,7 +45,11 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
 
     track("start", "polling")
     polling_t0 = time.perf_counter()
-    handlers = _make_editing_handlers(race_json, log)
+    # Snapshot the stored polls: a valid baseline survey must not be lost silently
+    # (ks-senate-2026 dropped InsiderAdvantage 2026-10-10 beside its 2026-10-14 release).
+    baseline_polls = copy.deepcopy(race_json.get("polling") or [])
+    poll_removals: list = []
+    handlers = _make_editing_handlers(race_json, log, poll_removals=poll_removals)
     log("info", f"{prefix} 4: Refreshing public polling...")
     # Wikipedia's poll table lists polls web search keeps missing (PDF-only releases,
     # sponsored polls). It is reference context only; add_poll still validates and dedupes.
@@ -77,4 +83,7 @@ async def run_polling_phase(ctx: PhaseContext) -> None:
             raise
         log("warning", f"  Polling phase failed: {exc}")
         _record_step_failure(race_json, "polling", _classify_exception(exc), str(exc))
+    finally:
+        # Also on a budget stop: race_json may be checkpointed mid-phase.
+        restore_dropped_baseline_polls(race_json, baseline_polls, removals=poll_removals, log=log)
     track("complete", "polling", duration_ms=int((time.perf_counter() - polling_t0) * 1000), race_json=race_json)
