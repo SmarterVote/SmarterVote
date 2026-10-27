@@ -20,7 +20,12 @@ _METADATA_KEY_RE = re.compile(r"^[a-z][a-z0-9_]+$")
 from pipeline_client.agent.ballotpedia import default_ballotpedia_race_url
 from pipeline_client.agent.evidence import merge_source_lists
 from pipeline_client.agent.images import _is_valid_image_url
-from pipeline_client.agent.polling_quality import polling_semantic_problem
+from pipeline_client.agent.polling_quality import (
+    normalize_pollster_name,
+    poll_population_rank,
+    polling_semantic_problem,
+    same_survey_key,
+)
 from pipeline_client.agent.prompts import CANONICAL_ISSUES
 from pipeline_client.agent.roster import ROSTER_CAP
 from pipeline_client.agent.roster_adjudicator import Claim as _Claim
@@ -1978,7 +1983,7 @@ def _make_editing_handlers(
                 f"Unknown names: {', '.join(unknown_names)}. Valid names: {', '.join(sorted(roster_names))}."
             )
         poll = {
-            "pollster": args["pollster"],
+            "pollster": normalize_pollster_name(args["pollster"]) or args["pollster"],
             "date": args["date"],
             "matchups": matchups,
             "source_url": args["source_url"],
@@ -1988,10 +1993,26 @@ def _make_editing_handlers(
         semantic_problem = polling_semantic_problem(poll, race_json.get("polling_note"))
         if semantic_problem:
             return f"ERROR: {semantic_problem}"
-        # Dedup: same pollster + date
+        # Dedup: same survey (pollster without population label + end date). A likely-voter
+        # release replaces a stored registered-voter or unlabeled variant; anything else is skipped.
+        survey_key = same_survey_key({"pollster": args["pollster"], "date": args["date"]})
         for existing in race_json.get("polling", []):
             if existing.get("pollster") == args["pollster"] and existing.get("date") == args["date"]:
                 return f"Poll from {args['pollster']} ({args['date']}) already exists — skipping duplicate."
+            if survey_key is not None and same_survey_key(existing) == survey_key:
+                if poll_population_rank(args["pollster"]) < poll_population_rank(existing.get("pollster")):
+                    existing.clear()
+                    existing.update(poll)
+                    log(
+                        "info", f"    Replaced same-survey variant with likely-voter poll: {poll['pollster']} ({args['date']})"
+                    )
+                    return (
+                        f"Replaced the same survey's other voter-population variant with {args['pollster']} ({args['date']})."
+                    )
+                return (
+                    f"Poll from {poll['pollster']} ({args['date']}) already exists for another voter population — "
+                    "skipping duplicate. Store one entry per survey, preferring likely voters."
+                )
         for existing in race_json.get("polling", []):
             same_topline = existing.get("matchups") == poll.get("matchups") and existing.get("sample_size") == poll.get(
                 "sample_size"

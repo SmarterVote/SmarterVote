@@ -1002,7 +1002,10 @@ ADD_POLL_TOOL: Dict = {
         "parameters": {
             "type": "object",
             "properties": {
-                "pollster": {"type": "string", "description": "Polling organization name."},
+                "pollster": {
+                    "type": "string",
+                    "description": "Polling organization name only; never append the voter population (LV/RV).",
+                },
                 "date": {"type": "string", "description": "Date of poll (YYYY-MM-DD)."},
                 "sample_size": {"type": "integer", "description": "Number of respondents."},
                 "matchups": {
