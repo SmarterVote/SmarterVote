@@ -1,5 +1,7 @@
 """Tests for the free-text ineligible-incumbent roster filter in discovery."""
 
+import pytest
+
 from pipeline_client.agent.phases.discovery import _remove_ineligible_officeholders
 
 
@@ -97,3 +99,39 @@ def test_candidate_named_as_subject_of_term_limit_is_removed():
     _remove_ineligible_officeholders(race_json)
 
     assert _names(race_json) == ["Chris Carr"]
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "Doe is not term-limited and is seeking a third term.",
+        "Doe isn't term-limited.",
+        "Doe is not ineligible despite the residency challenge.",
+        "Doe denied that she is not running.",
+        "Doe not seeking re-election is false; she filed in March.",
+        "Doe was never term-limited under the 2018 amendment.",
+    ],
+)
+def test_negated_exclusion_text_keeps_the_running_incumbent(summary):
+    race_json = {"candidates": [{"name": "Jane Doe", "incumbent": True, "summary": summary}]}
+
+    _remove_ineligible_officeholders(race_json)
+
+    assert _names(race_json) == ["Jane Doe"]
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "Doe is term-limited.",
+        "Doe is not seeking re-election.",
+        "Doe is not eligible to run again.",
+        "Doe cannot run again.",
+    ],
+)
+def test_plain_exclusion_text_still_removes_the_incumbent(summary):
+    race_json = {"candidates": [{"name": "Jane Doe", "incumbent": True, "summary": summary}]}
+
+    _remove_ineligible_officeholders(race_json)
+
+    assert _names(race_json) == []
