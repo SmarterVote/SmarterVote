@@ -1293,12 +1293,13 @@ def _roster_names(race_json: Optional[Dict[str, Any]]) -> List[Any]:
 def roster_fingerprint(race_json: Optional[Dict[str, Any]]) -> str:
     """Stable digest of the candidate roster a set of reviews was written against.
 
-    The digest covers *who* is on the roster, not their order or the cosmetic
-    spelling of their names: discovery re-sorts candidates and normalizes
-    names between runs, and treating either as a new roster made every
-    carried-forward review stale for no reason.
+    The digest ignores cosmetic spelling (case, punctuation, diacritics, middle
+    initials, suffixes) so a name tidy-up doesn't make every carried-forward
+    review stale. Order still counts: review flags are positional
+    (``candidates[2].image_url``), so after a reorder they would point at the
+    wrong person.
     """
-    names = sorted(_roster_name_key(name) for name in _roster_names(race_json))
+    names = [_roster_name_key(name) for name in _roster_names(race_json)]
     if not names:
         return ""
     return hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest()

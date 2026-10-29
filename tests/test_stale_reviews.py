@@ -31,14 +31,14 @@ def _review(*, score=95, flags=None, fingerprint=None):
     return review
 
 
-def test_fingerprint_tracks_membership_not_order_or_cosmetic_spelling():
+def test_fingerprint_tracks_membership_and_order_not_cosmetic_spelling():
     a = roster_fingerprint(_race(["Pete Ricketts", "Dan Osborn"]))
     assert a == roster_fingerprint(_race(["pete  ricketts", "DAN OSBORN"]))
-    # Discovery re-sorts candidates; a reorder is the same roster.
-    assert a == roster_fingerprint(_race(["Dan Osborn", "Pete Ricketts"]))
+    # Flags are positional, so a reorder invalidates them just as a swap does.
+    assert a != roster_fingerprint(_race(["Dan Osborn", "Pete Ricketts"]))
     # Middle initials, suffixes, punctuation, and diacritics are cosmetic.
     assert a == roster_fingerprint(_race(["Pete J. Ricketts", "Dan Osborn Jr."]))
-    assert roster_fingerprint(_race(["José Peña", "Ann O'Neil"])) == roster_fingerprint(_race(["Ann ONeil", "Jose  Pena III"]))
+    assert roster_fingerprint(_race(["José Peña", "Ann O'Neil"])) == roster_fingerprint(_race(["Jose  Pena III", "Ann ONeil"]))
     assert a != roster_fingerprint(_race(["Pete Ricketts", "Cindy Burbank"]))
     assert a != roster_fingerprint(_race(["Pete Ricketts"]))
 
@@ -47,8 +47,8 @@ def test_review_stamped_with_a_legacy_fingerprint_is_not_stale_on_deploy():
     """Reviews stored before normalization carry the old ordered raw-name digest."""
     import hashlib
 
-    race = _race(["Pete Ricketts", "Dan Osborn"])
-    legacy = hashlib.sha256("pete ricketts\ndan osborn".encode("utf-8")).hexdigest()
+    race = _race(["Pete J. Ricketts", "Dan Osborn"])
+    legacy = hashlib.sha256("pete j. ricketts\ndan osborn".encode("utf-8")).hexdigest()
     assert legacy != roster_fingerprint(race)
     race["reviews"] = [_review(fingerprint=legacy)]
 
@@ -60,13 +60,14 @@ def test_review_stamped_with_a_legacy_fingerprint_is_not_stale_on_deploy():
     assert invalidate_stale_reviews(race) == 1
 
 
-def test_reordered_roster_keeps_a_fresh_review():
+def test_renamed_roster_keeps_a_fresh_review_but_reorder_does_not():
     race = _race(["Pete Ricketts", "Dan Osborn"])
     race["reviews"] = [_review(fingerprint=roster_fingerprint(race))]
-    race["candidates"].reverse()
-    race["candidates"][0]["name"] = "DAN  OSBORN"
-
+    race["candidates"][1]["name"] = "DAN  OSBORN Jr."
     assert invalidate_stale_reviews(race) == 0
+
+    race["candidates"].reverse()
+    assert invalidate_stale_reviews(race) == 1
 
 
 def test_review_judging_a_replaced_roster_is_marked_stale():
