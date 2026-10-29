@@ -177,3 +177,48 @@ def test_record_step_failure_merge_detail(merge):
     failures = race["pipeline_state"]["step_failures"]
     assert len(failures) == 1
     assert failures[0]["detail"] == ("a failed; b failed" if merge else "a failed")
+
+
+# A truncated object whose first inner array is complete: the bracket walker
+# used to return that inner list, hiding the truncation from the retry path.
+TRUNCATED_WITH_INNER_LIST = '{"verdict": "needs_revision", "flags": [{"field": "a", "severity": "low"}], "summary": "cut'
+
+
+def test_extract_json_does_not_return_inner_list_of_truncated_object():
+    with pytest.raises(json.JSONDecodeError):
+        review_module._extract_json(TRUNCATED_WITH_INNER_LIST)
+    with pytest.raises(json.JSONDecodeError):
+        review_module._extract_json("```json\n" + TRUNCATED_WITH_INNER_LIST)
+
+
+def test_truncated_object_with_inner_list_triggers_retry():
+    calls = []
+
+    async def fake_call(system, user, *, model, run_budget=None):
+        calls.append(user)
+        if len(calls) == 1:
+            return TRUNCATED_WITH_INNER_LIST, _usage("length", 16384)
+        return VALID, _usage()
+
+    with patch.object(review_module, "_call_review_model", fake_call):
+        result = asyncio.run(review_module._run_single_review("x-2026", "{}", provider="claude"))
+
+    assert result is not None and result["score"] == 92
+    assert len(calls) == 2
+
+
+def test_list_reply_is_treated_as_parse_failure_and_retried():
+    calls = []
+
+    async def fake_call(system, user, *, model, run_budget=None):
+        calls.append(user)
+        if len(calls) == 1:
+            return '[{"field": "a"}]', _usage()
+        return VALID, _usage()
+
+    with patch.object(review_module, "_call_review_model", fake_call):
+        result = asyncio.run(review_module._run_single_review("x-2026", "{}", provider="claude"))
+
+    assert result is not None and result["score"] == 92
+    assert len(calls) == 2
+    assert "was not a JSON object" in calls[1]

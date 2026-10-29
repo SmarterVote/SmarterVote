@@ -31,12 +31,42 @@ def _review(*, score=95, flags=None, fingerprint=None):
     return review
 
 
-def test_fingerprint_tracks_membership_and_order():
+def test_fingerprint_tracks_membership_not_order_or_cosmetic_spelling():
     a = roster_fingerprint(_race(["Pete Ricketts", "Dan Osborn"]))
     assert a == roster_fingerprint(_race(["pete  ricketts", "DAN OSBORN"]))
-    # Flags are positional, so a reorder invalidates them just as a swap does.
-    assert a != roster_fingerprint(_race(["Dan Osborn", "Pete Ricketts"]))
+    # Discovery re-sorts candidates; a reorder is the same roster.
+    assert a == roster_fingerprint(_race(["Dan Osborn", "Pete Ricketts"]))
+    # Middle initials, suffixes, punctuation, and diacritics are cosmetic.
+    assert a == roster_fingerprint(_race(["Pete J. Ricketts", "Dan Osborn Jr."]))
+    assert roster_fingerprint(_race(["José Peña", "Ann O'Neil"])) == roster_fingerprint(_race(["Ann ONeil", "Jose  Pena III"]))
     assert a != roster_fingerprint(_race(["Pete Ricketts", "Cindy Burbank"]))
+    assert a != roster_fingerprint(_race(["Pete Ricketts"]))
+
+
+def test_review_stamped_with_a_legacy_fingerprint_is_not_stale_on_deploy():
+    """Reviews stored before normalization carry the old ordered raw-name digest."""
+    import hashlib
+
+    race = _race(["Pete Ricketts", "Dan Osborn"])
+    legacy = hashlib.sha256("pete ricketts\ndan osborn".encode("utf-8")).hexdigest()
+    assert legacy != roster_fingerprint(race)
+    race["reviews"] = [_review(fingerprint=legacy)]
+
+    assert invalidate_stale_reviews(race) == 0
+    assert not race["reviews"][0].get("stale")
+
+    # A legacy stamp for a different roster is still stale.
+    race["reviews"] = [_review(fingerprint=hashlib.sha256(b"pete ricketts\ncindy burbank").hexdigest())]
+    assert invalidate_stale_reviews(race) == 1
+
+
+def test_reordered_roster_keeps_a_fresh_review():
+    race = _race(["Pete Ricketts", "Dan Osborn"])
+    race["reviews"] = [_review(fingerprint=roster_fingerprint(race))]
+    race["candidates"].reverse()
+    race["candidates"][0]["name"] = "DAN  OSBORN"
+
+    assert invalidate_stale_reviews(race) == 0
 
 
 def test_review_judging_a_replaced_roster_is_marked_stale():
