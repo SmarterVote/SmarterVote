@@ -39,6 +39,14 @@ def mock_wikipedia_image_lookup():
 
 
 @pytest.fixture(autouse=True)
+def mock_bioguide_member_roster(monkeypatch):
+    """Keep the Bioguide member-roster fetch offline; tests that need members patch it."""
+    monkeypatch.setattr("pipeline_client.agent.images._bioguide_members", None)
+    with patch("pipeline_client.agent.images._fetch_bioguide_members", new_callable=AsyncMock, return_value={}):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def mock_ballotpedia_election_lookup():
     """Prevent real HTTP calls to Ballotpedia during unit tests."""
     with patch(

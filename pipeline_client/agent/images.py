@@ -203,6 +203,16 @@ _GIVEN_NAME_NICKNAMES = frozenset(
         ("liz", "elizabeth"),
         ("peggy", "margaret"),
         ("ted", "edward"),
+        ("ted", "theodore"),
+        ("joe", "joseph"),
+        ("steve", "stephen"),
+        ("steven", "stephen"),
+        ("andy", "andrew"),
+        ("tony", "anthony"),
+        ("katie", "katherine"),
+        ("katie", "kathryn"),
+        ("kate", "katherine"),
+        ("kate", "kathryn"),
     )
 )
 
@@ -1542,6 +1552,38 @@ def _is_wikimedia_host(url: str) -> bool:
     return any(host == root or host.endswith("." + root) for root in ("wikimedia.org", "wikipedia.org"))
 
 
+_RATE_LIMITED_WIKIMEDIA_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg")
+_WIKIMEDIA_HASH_PATH_RE = re.compile(r"/([0-9a-f])/(\1[0-9a-f])/([^/]+)")
+
+
+def _is_rate_limited_wikimedia_file(url: str) -> bool:
+    """True if a URL Wikimedia rate-limited (429) is still safe to keep unverified.
+
+    Only an upload.wikimedia.org file path with an image extension qualifies --
+    not an arbitrary *.wikipedia.org article page.  When the path carries
+    Commons' md5 hash folders (``/a/ab/File.jpg``), they must match the md5 of
+    the filename, so a fabricated path is not kept on the strength of a 429.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if (parsed.hostname or "").lower() != "upload.wikimedia.org":
+        return False
+    path = parsed.path
+    if not path.lower().endswith(_RATE_LIMITED_WIKIMEDIA_EXTENSIONS):
+        return False
+    match = _WIKIMEDIA_HASH_PATH_RE.search(path)
+    if match:
+        import hashlib
+
+        filename = unquote(match.group(3)).replace(" ", "_")
+        digest = hashlib.md5(filename.encode("utf-8")).hexdigest()
+        if not digest.startswith(match.group(2)):
+            return False
+    return True
+
+
 def _probe_headers(url: str) -> Dict[str, str]:
     """User-Agent for probing *url*: Wikimedia's UA policy blocks spoofed browser agents."""
     return {"User-Agent": _WIKIMEDIA_API_UA if _is_wikimedia_host(url) else _BROWSER_UA}
@@ -1559,9 +1601,10 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
     2. If HEAD returns 405/501, fall back to byte-range GET.
 
     Either way a response that advertises itself as ``text/*`` is rejected; see
-    ``_serves_a_web_page``. A 429 from a Wikimedia host counts as accessible but
-    unverified: its files are content-addressed and stable, and 429 is rate
-    limiting, not absence.
+    ``_serves_a_web_page``. A 429 on an upload.wikimedia.org image file counts as
+    accessible but unverified (see ``_is_rate_limited_wikimedia_file``): its
+    files are content-addressed and stable, and 429 is rate limiting, not
+    absence.
     """
     headers = _probe_headers(url)
     try:
@@ -1578,12 +1621,12 @@ async def _check_url_accessible(url: str) -> Tuple[bool, str]:
                     logger.debug("Rejecting %s: served %s, not an image", url, resp.headers.get("content-type"))
                     return False, url
                 return True, final_url
-            if resp.status_code == 429 and _is_wikimedia_host(final_url):
+            if resp.status_code == 429 and _is_rate_limited_wikimedia_file(final_url):
                 logger.debug("Wikimedia rate-limited %s (429); keeping it unverified", url)
                 return True, final_url
             if resp.status_code in (405, 501):
                 resp2 = await client.get(url, headers={**headers, "Range": "bytes=0-63"})
-                if resp2.status_code == 429 and _is_wikimedia_host(str(resp2.url)):
+                if resp2.status_code == 429 and _is_rate_limited_wikimedia_file(str(resp2.url)):
                     return True, str(resp2.url)
                 if resp2.status_code not in (200, 206) or _serves_a_web_page(resp2):
                     return False, url
@@ -2019,11 +2062,92 @@ def _is_congress_portrait(url: str) -> bool:
     return _host_matches(host, ("bioguide.congress.gov",))
 
 
+# The unitedstates/congress-legislators roster, which names every member of
+# Congress by Bioguide ID.  Current members are a small file; the historical
+# one (~1.5 MB) covers former members running again.
+_LEGISLATOR_ROSTER_URLS = (
+    "https://unitedstates.github.io/congress-legislators/legislators-current.csv",
+    "https://unitedstates.github.io/congress-legislators/legislators-historical.csv",
+)
+_BIOGUIDE_ID_RE = re.compile(r"^[A-Z]\d{6}$")
+_bioguide_members: Optional[Dict[str, Dict[str, str]]] = None
+
+
+async def _fetch_bioguide_members() -> Dict[str, Dict[str, str]]:
+    """Fetch {bioguide_id: name fields} for every current and former member; {} on failure."""
+    import csv
+    import io
+
+    members: Dict[str, Dict[str, str]] = {}
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, event_hooks=_SSRF_HOOKS) as client:
+            for roster_url in _LEGISLATOR_ROSTER_URLS:
+                response = await client.get(roster_url, headers={"User-Agent": _WIKIMEDIA_API_UA})
+                response.raise_for_status()
+                for row in csv.DictReader(io.StringIO(response.text)):
+                    bioguide_id = str(row.get("bioguide_id") or "").strip().upper()
+                    if bioguide_id and bioguide_id not in members:
+                        members[bioguide_id] = {
+                            key: str(row.get(key) or "").strip()
+                            for key in ("first_name", "middle_name", "last_name", "nickname")
+                        }
+    except Exception as exc:  # network failure is logged and tolerated
+        logger.info("Bioguide member roster unavailable (%s); congressional portraits stay incumbent-only", exc)
+        return {}
+    return members
+
+
+async def _bioguide_member_names() -> Dict[str, Dict[str, str]]:
+    """Return the Bioguide member roster, fetched once per process."""
+    global _bioguide_members
+    if _bioguide_members is None:
+        members = await _fetch_bioguide_members()
+        if not members:
+            return {}  # Do not cache a failed fetch; the incumbent-only rule still applies.
+        _bioguide_members = members
+    return _bioguide_members
+
+
+def _bioguide_id(url: str) -> Optional[str]:
+    """The Bioguide ID a congressional portrait URL is keyed by, else None."""
+    if not _is_congress_portrait(url):
+        return None
+    stem = re.sub(r"\.[A-Za-z0-9]{2,5}$", "", unquote(urlparse(url).path).rsplit("/", 1)[-1]).strip().upper()
+    return stem if _BIOGUIDE_ID_RE.match(stem) else None
+
+
+def _candidate_is_bioguide_member(candidate_name: str, member: Dict[str, str]) -> bool:
+    """True if *candidate_name* names this Bioguide member (surname, given name/nickname, middle initial)."""
+    surname = _candidate_surname(candidate_name)
+    member_surname = _candidate_surname(member.get("last_name", ""))
+    if not surname or surname != member_surname:
+        return False
+    parts = [t.lower() for t in re.findall(r"[A-Za-z]+", _fold_accents(candidate_name))]
+    parts = [t for t in parts if t not in _NAME_SUFFIX_TOKENS]
+    if len(parts) < 2:
+        return False
+    given = parts[0]
+    member_given = [
+        t.lower()
+        for key in ("first_name", "nickname", "middle_name")
+        for t in re.findall(r"[A-Za-z]+", _fold_accents(member.get(key, "")))
+        if len(t) >= 2
+    ]
+    if not any(_given_names_match(given, other) for other in member_given):
+        return False
+    mine = _middle_initial(candidate_name)
+    member_middle = _fold_accents(member.get("middle_name", "")).strip().lower()
+    if mine and member_middle and member_middle[0] != mine:
+        return False
+    return True
+
+
 def _is_wrong_candidate_for_race(
     url: str,
     candidate: Dict[str, Any],
     other_images: Sequence[str],
     other_names: Sequence[str],
+    bioguide_members: Optional[Dict[str, Dict[str, str]]] = None,
 ) -> Optional[str]:
     """Return why a newly found photo belongs to someone else in the race, else None.
 
@@ -2031,13 +2155,24 @@ def _is_wrong_candidate_for_race(
     M001137 -- incumbent Gregory Meeks -- from a page covering both of them.
     Only a member of Congress has a Bioguide portrait, and an opponent's
     current photo is never this candidate's.
+
+    A non-incumbent may still be a member of Congress -- a House member
+    running statewide (Haley Stevens, Andy Barr) or a former member -- so a
+    Bioguide portrait is accepted when *bioguide_members* names this
+    candidate as the member behind that ID.
     """
     identity = _image_identity(url)
     for other in other_images:
         if other and (other == url or (identity and _image_identity(other) == identity)):
             return "is another candidate's current image"
     if _is_congress_portrait(url) and not candidate.get("incumbent"):
-        return "is a congressional portrait, but this candidate is not an incumbent"
+        bioguide_id = _bioguide_id(url)
+        member = (bioguide_members or {}).get(bioguide_id or "")
+        if not member or not _candidate_is_bioguide_member(str(candidate.get("name") or ""), member):
+            return "is a congressional portrait, but this candidate is not an incumbent"
+        # An opponent with the member's name keeps the portrait ambiguous.
+        if any(other and _candidate_is_bioguide_member(other, member) for other in other_names):
+            return "is a congressional portrait that also names another candidate in this race"
     # Two candidates sharing given name and surname ("Daniel S. Sullivan",
     # "Dan J. Sullivan") cannot be told apart by a Wikimedia filename that names
     # no middle initial, so neither may take it as a new photo.  An existing
@@ -2073,14 +2208,17 @@ async def _resolve_single_image(
     current_url = candidate.get("image_url") or None  # Treat "" and None identically
     low_resolution_fallback: Optional[str] = None
 
-    def _new_image_rejected(url: Optional[str], source: str) -> bool:
+    async def _new_image_rejected(url: Optional[str], source: str) -> bool:
         """Apply the candidate-aware guards to a newly found photo, logging a refusal."""
         if not url:
             return False
         if _is_rejected_candidate_image(url, name):
             log("info", f"  [{name}] {source} image is filed under another person's name or is not a portrait - skipping it")
             return True
-        reason = _is_wrong_candidate_for_race(url, candidate, other_images, other_names)
+        bioguide_members = None
+        if _is_congress_portrait(url) and not candidate.get("incumbent"):
+            bioguide_members = await _bioguide_member_names()
+        reason = _is_wrong_candidate_for_race(url, candidate, other_images, other_names, bioguide_members)
         if reason:
             log("info", f"  [{name}] {source} image {reason} - skipping it")
             return True
@@ -2204,7 +2342,7 @@ async def _resolve_single_image(
     if is_denied_image(bp_url):
         log("info", f"  [{name}] Ballotpedia returned an audit-rejected image - skipping it")
         bp_url = None
-    if _new_image_rejected(bp_url, "Ballotpedia"):
+    if await _new_image_rejected(bp_url, "Ballotpedia"):
         bp_url = None
     if bp_url:
         log("info", f"  [{name}] Ballotpedia API returned: {bp_url[:80]}")
@@ -2226,7 +2364,7 @@ async def _resolve_single_image(
     if is_denied_image(wiki_url):
         log("info", f"  [{name}] Wikipedia returned an audit-rejected image - skipping it")
         wiki_url = None
-    if _new_image_rejected(wiki_url, "Wikipedia"):
+    if await _new_image_rejected(wiki_url, "Wikipedia"):
         wiki_url = None
     if wiki_url:
         log("info", f"  [{name}] Wikipedia API returned: {wiki_url[:80]}")
@@ -2248,7 +2386,7 @@ async def _resolve_single_image(
     # Fast path 3: inspect candidate website/profile pages for image metadata.
     log("info", f"  [{name}] Inspecting known candidate pages for image metadata...")
     page_url = await _lookup_known_page_image(candidate)
-    if is_denied_image(page_url) or _new_image_rejected(page_url, "Candidate page"):
+    if is_denied_image(page_url) or await _new_image_rejected(page_url, "Candidate page"):
         page_url = None
     if page_url and is_partisan_image_host(page_url):
         low_resolution_fallback = low_resolution_fallback or page_url
@@ -2263,7 +2401,7 @@ async def _resolve_single_image(
     # Fast path 4: query Serper Images API directly
     log("info", f"  [{name}] Trying Serper Images API lookup...")
     serper_img = await _lookup_serper_image(name, context=search_context, run_budget=run_budget)
-    if is_denied_image(serper_img) or _new_image_rejected(serper_img, "Serper"):
+    if is_denied_image(serper_img) or await _new_image_rejected(serper_img, "Serper"):
         serper_img = None
     if serper_img and is_partisan_image_host(serper_img):
         low_resolution_fallback = low_resolution_fallback or serper_img
@@ -2303,7 +2441,7 @@ async def _resolve_single_image(
         if not found_url:
             log("info", f"  [{name}] Agent returned null — no image found")
             return
-        if "commons.wikimedia.org/wiki/File:" not in found_url and _new_image_rejected(found_url, "Agent"):
+        if "commons.wikimedia.org/wiki/File:" not in found_url and await _new_image_rejected(found_url, "Agent"):
             return
 
         log("info", f"  [{name}] Agent returned: {found_url[:80]}")
@@ -2312,7 +2450,7 @@ async def _resolve_single_image(
         if "commons.wikimedia.org/wiki/File:" in found_url:
             log("info", f"  [{name}] Agent URL is Commons page — resolving via Special:FilePath")
             direct = await _resolve_wikimedia_commons(found_url)
-            if direct and not _new_image_rejected(direct, "Agent Commons"):
+            if direct and not await _new_image_rejected(direct, "Agent Commons"):
                 candidate["image_url"] = direct
                 log("info", f"  [{name}] Commons resolved → {direct[:80]}")
                 return
