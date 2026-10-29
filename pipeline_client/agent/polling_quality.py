@@ -7,6 +7,7 @@ import re
 from datetime import date as _date
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 _PLACEHOLDER_POLLSTERS = {
     "example",
@@ -109,7 +110,10 @@ def strip_bipartisan_marks(pollster: Any) -> str:
         return name
     name = _PARTY_MARK_RE.sub("", name)
     name = re.sub(r"\s*/\s*", "/", name)
-    return re.sub(r"(?:\s*,)+\s*$", "", re.sub(r"\s*,(?:\s*,)+", ",", name)).strip()
+    name = re.sub(r"/{2,}", "/", name)
+    name = re.sub(r"(?:\s*,)+\s*$", "", re.sub(r"\s*,(?:\s*,)+", ",", name)).strip()
+    # A mark that stood alone after a separator ("Firm A (R) / (D)") leaves it dangling.
+    return re.sub(r"^[\s,/]+|[\s,/]+$", "", name)
 
 
 def normalize_pollster_name(pollster: Any) -> str:
@@ -174,9 +178,12 @@ def dedupe_same_survey_polls(polls: List[Dict[str, Any]]) -> Tuple[List[Dict[str
 # pollster-only call removed every survey by that pollster. A newer poll does not void an
 # older one (the forecast weights recency itself), so every distinct valid survey stays.
 
+# Comparatives ("newer", "latest", "older") only count when they describe another
+# poll, so "the latest topline in this entry is malformed" is not a recency claim.
 _RECENCY_REMOVAL_RE = re.compile(
-    r"\b(?:supersed\w*|outdated|out[\s-]of[\s-]date|older|stale|newer|more\s+recent|most\s+recent|latest|"
-    r"replaced\s+by|old\s+poll|earlier\s+(?:poll|survey|release|wave))\b",
+    r"\b(?:supersed\w*|outdated|out[\s-]of[\s-]date|stale|replaced\s+by|"
+    r"(?:old|older|newer|more\s+recent|most\s+recent|latest|earlier)\s+(?:[\w/&.()-]+\s+){0,2}?"
+    r"(?:polls?|surveys?|releases?|waves?|data))\b",
     re.IGNORECASE,
 )
 _DUPLICATE_REMOVAL_RE = re.compile(r"\b(?:duplicat\w*|redundant|repeat(?:ed)?|same\s+(?:poll|survey))\b", re.IGNORECASE)
@@ -184,8 +191,15 @@ NEAR_DATE_DUPLICATE_DAYS = 3
 
 
 def is_recency_removal_reason(reason: Any) -> bool:
-    """True when a removal reason only says the poll is older than another one."""
-    return bool(_RECENCY_REMOVAL_RE.search(str(reason or "")))
+    """True when a removal reason only says the poll is older than another one.
+
+    A duplicate claim ("duplicate of the newer release") is not a recency claim:
+    remove_poll verifies it against the stored polls instead of refusing it.
+    """
+    text = str(reason or "")
+    if is_duplicate_removal_reason(text):
+        return False
+    return bool(_RECENCY_REMOVAL_RE.search(text))
 
 
 def is_duplicate_removal_reason(reason: Any) -> bool:
@@ -212,6 +226,52 @@ def _canonical_matchups(poll: Dict[str, Any]) -> Tuple[Tuple[Tuple[str, Any], ..
     return tuple(sorted(canonical, key=str))
 
 
+# Pages that list many polls: a shared URL on one of these says nothing about
+# whether two entries are the same survey.
+_POLL_AGGREGATOR_HOSTS = (
+    "wikipedia.org",
+    "ballotpedia.org",
+    "realclearpolitics.com",
+    "realclearpolling.com",
+    "270towin.com",
+    "fivethirtyeight.com",
+    "abcnews.go.com",
+    "racetothewh.com",
+    "decisiondeskhq.com",
+    "natesilver.net",
+    "silverbulletin.com",
+    "pollingreport.com",
+    "electionpolls.com",
+    "votehub.com",
+    "split-ticket.org",
+)
+_POLL_LISTING_PATH_RE = re.compile(
+    r"(?:^|/)(?:polls?|polling|latest[-_]polls?|poll[-_]tracker|polling[-_]averages?|poll[-_]averages?)$",
+    re.IGNORECASE,
+)
+
+
+def _is_poll_listing_url(url: str) -> bool:
+    """True for an aggregator, Wikipedia, or poll-listing page that hosts many surveys."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return True
+    host = (parsed.hostname or "").lower()
+    if any(host == root or host.endswith("." + root) for root in _POLL_AGGREGATOR_HOSTS):
+        return True
+    return bool(_POLL_LISTING_PATH_RE.search(parsed.path.rstrip("/") or "/x"))
+
+
+def _pollsters_compatible(left: Dict[str, Any], right: Dict[str, Any]) -> bool:
+    """Same firm, allowing a sponsor or party-mark relabel ("Emerson" vs "Emerson College/The Hill")."""
+    left_key, right_key = same_survey_key(left), same_survey_key(right)
+    if left_key is None or right_key is None:
+        return False
+    a, b = left_key[0], right_key[0]
+    return a == b or a in b or b in a
+
+
 def is_same_poll(left: Any, right: Any) -> bool:
     """Whether two entries record one survey, allowing a relabeled pollster.
 
@@ -219,6 +279,10 @@ def is_same_poll(left: Any, right: Any) -> bool:
     ``NEAR_DATE_DUPLICATE_DAYS``, one source URL or the identical topline and sample size
     that ``_sanitize_polling`` already collapses (a sponsor relabel, or release date vs
     field end date).
+
+    A shared source URL only identifies a survey when it is a single-poll page from
+    compatible pollsters: Wikipedia and aggregator tables list many distinct polls under
+    one URL, and counting those as one survey let a refresh drop baseline polls.
     """
     if not isinstance(left, dict) or not isinstance(right, dict):
         return False
@@ -229,7 +293,12 @@ def is_same_poll(left: Any, right: Any) -> bool:
     if left_date is None or right_date is None or abs((left_date - right_date).days) > NEAR_DATE_DUPLICATE_DAYS:
         return False
     left_url = str(left.get("source_url") or "").strip()
-    if left_url and left_url == str(right.get("source_url") or "").strip():
+    if (
+        left_url
+        and left_url == str(right.get("source_url") or "").strip()
+        and not _is_poll_listing_url(left_url)
+        and _pollsters_compatible(left, right)
+    ):
         return True
     left_matchups = _canonical_matchups(left)
     return (

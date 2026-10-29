@@ -266,3 +266,75 @@ def test_numberless_polls_from_different_pollsters_are_not_collapsed():
     }
     _sanitize_polling(race)
     assert len(race["polling"]) == 2
+
+
+WIKI_POLLS = "https://en.wikipedia.org/wiki/2026_United_States_Senate_election_in_Kansas"
+
+
+def test_shared_wikipedia_url_does_not_make_distinct_polls_the_same_survey():
+    a = _poll("Emerson College", "2026-10-10", KS, [45, 49], WIKI_POLLS, 800)
+    b = _poll("Cygnal", "2026-10-12", KS, [44, 50], WIKI_POLLS, 600)
+    assert not is_same_poll(a, b)
+    # Same pollster, nearby dates, distinct toplines on an aggregator: still distinct.
+    c = _poll("Emerson College", "2026-10-12", KS, [46, 48], "https://www.realclearpolling.com/polls/senate/ks", 900)
+    d = dict(c, date="2026-10-10", matchups=[{"candidates": KS, "percentages": [40, 52]}], sample_size=700)
+    assert not is_same_poll(c, d)
+
+
+def test_shared_single_poll_url_still_matches_a_relabel_but_not_another_firm():
+    release = "https://emersoncollegepolling.com/kansas-2026-poll/"
+    a = _poll("Emerson College", "2026-10-10", KS, [45, 49], release, 800)
+    relabel = _poll("Emerson College/The Hill", "2026-10-12", KS, [45, 49], release)
+    assert is_same_poll(a, relabel)
+    other_firm = _poll("Cygnal", "2026-10-11", KS, [44, 50], release, 600)
+    assert not is_same_poll(a, other_firm)
+
+
+def test_restore_keeps_baseline_polls_sharing_a_wikipedia_url():
+    race = {
+        "candidates": [{"name": n} for n in KS],
+        "polling": [_poll("Cygnal", "2026-10-12", KS, [44, 50], WIKI_POLLS, 600)],
+    }
+    baseline = [_poll("Emerson College", "2026-10-10", KS, [45, 49], WIKI_POLLS, 800)]
+    assert restore_dropped_baseline_polls(race, baseline) == ["Emerson College (2026-10-10)"]
+
+
+def test_recency_reason_detection_is_narrow_and_yields_to_duplicates():
+    from pipeline_client.agent.polling_quality import is_recency_removal_reason
+
+    assert is_recency_removal_reason("superseded by newer InsiderAdvantage poll")
+    assert is_recency_removal_reason("older poll")
+    assert is_recency_removal_reason("a more recent survey replaced it")
+    # Duplicate claims are verified by remove_poll, not refused as recency.
+    assert not is_recency_removal_reason("duplicate of the newer release")
+    assert not is_recency_removal_reason("same survey as the latest entry")
+    # A comparative that does not describe another poll is not a recency claim.
+    assert not is_recency_removal_reason("malformed: latest topline percentages sum to 140")
+
+
+def test_remove_poll_allows_a_true_duplicate_described_with_recency_words():
+    race = _ks_race()
+    copy_of_oct14 = copy.deepcopy(race["polling"][-1])
+    race["polling"].append(copy_of_oct14)
+    before = len(race["polling"])
+    handlers = _make_editing_handlers(race, lambda *_: None)
+
+    result = handlers["remove_poll"](
+        {
+            "pollster": copy_of_oct14["pollster"],
+            "date": copy_of_oct14["date"],
+            "reason": "duplicate of the newer release",
+        }
+    )
+
+    assert result.startswith("Removed 1 poll(s)"), result
+    assert len(race["polling"]) == before - 1
+
+
+def test_remove_poll_still_verifies_a_duplicate_reason_with_recency_words():
+    race = _ks_race()
+    handlers = _make_editing_handlers(race, lambda *_: None)
+    result = handlers["remove_poll"](
+        {"pollster": "InsiderAdvantage", "date": "2026-10-10", "reason": "duplicate of the newer release"}
+    )
+    assert result.startswith("ERROR: Poll removal blocked"), result

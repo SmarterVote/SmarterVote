@@ -487,3 +487,23 @@ def test_directional_guard_skips_same_party_races():
     race["polling"].append(_poll("ActiVote", "2026-10-23", 59, 41))
     consensus = {"candidate_probabilities": {"A": 0.8, "B": 0.2}, "party_probabilities": {"Democratic": 1.0}}
     assert apply_stability_guard(consensus, baseline, evidence, race) is None
+
+
+def test_evidence_key_ignores_a_pollster_relabel():
+    """A population or bipartisan-mark relabel is the same survey; it must not disable the guard."""
+    race = _ar02()
+    race["polling"] = [_poll("Emerson College", "2026-09-20")]
+    before = forecast_evidence_key(race)
+    race["polling"] = [_poll("Emerson College (LV)", "2026-09-20")]
+    assert forecast_evidence_key(race) == before
+    race["polling"] = [_poll("Emerson College", "2026-09-20"), _poll("Siena", "2026-09-25")]
+    assert forecast_evidence_key(race) != before
+
+
+def test_strip_bipartisan_marks_leaves_no_dangling_separator():
+    from pipeline_client.agent.polling_quality import strip_bipartisan_marks
+
+    assert strip_bipartisan_marks("Firm A (R) / (D)") == "Firm A"
+    assert strip_bipartisan_marks("Firm A (D)/ (R) ") == "Firm A"
+    assert strip_bipartisan_marks("Firm A (R) / Firm B (D) ") == "Firm A/Firm B"
+    assert strip_bipartisan_marks("Firm A (D), Firm B (R),") == "Firm A, Firm B"

@@ -43,6 +43,7 @@ from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
 from shared.run_health import RunFailureReason
 
 from ..handlers import _make_editing_handlers
+from ..polling_quality import normalize_pollster_name, same_survey_key
 from ..prompts import (
     FORECAST_CHECK_SYSTEM,
     FORECAST_CHECK_USER,
@@ -469,6 +470,22 @@ def build_consensus(
     }
 
 
+def _poll_set_identity(polls: Any) -> frozenset:
+    """``poll_identity`` over normalized pollster names.
+
+    A relabel between runs ("Emerson College" -> "Emerson College (LV)", or a
+    bipartisan "(D)/(R)" pair dropped) is the same survey, so it must not read
+    as a new poll and disable the stability guards.
+    """
+    normalized = []
+    for poll in polls if isinstance(polls, list) else []:
+        if isinstance(poll, dict):
+            key = same_survey_key(poll)
+            poll = dict(poll, pollster=key[0] if key else normalize_pollster_name(poll.get("pollster")))
+        normalized.append(poll)
+    return poll_identity(normalized)
+
+
 def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
     """What a forecast reads that can legitimately move it: the poll set, the roster, and the contest stage.
 
@@ -488,7 +505,7 @@ def forecast_evidence_key(race_json: Dict[str, Any]) -> tuple:
             if party in _MAJOR_PARTIES or surname in polled
         )
     )
-    return (poll_identity(polls), roster, str(race_json.get("contest_stage") or ""))
+    return (_poll_set_identity(polls), roster, str(race_json.get("contest_stage") or ""))
 
 
 _MAJOR_PARTIES = frozenset({"Democratic", "Republican"})
@@ -702,7 +719,7 @@ def _apply_directional_guard(
     new_polls = [
         poll
         for poll in _usable_polls(race_json.get("polling"))
-        if poll_identity([poll]) and not poll_identity([poll]) <= baseline_polls
+        if _poll_set_identity([poll]) and not _poll_set_identity([poll]) <= baseline_polls
     ]
     margins = [_poll_party_margin(poll, race_json, prior_leader, others[0]) for poll in new_polls]
     margins = [margin for margin in margins if margin is not None]
