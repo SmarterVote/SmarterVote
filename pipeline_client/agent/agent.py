@@ -724,7 +724,7 @@ def _build_run_audit(existing_data: Dict[str, Any] | None, race_json: Dict[str, 
     if isinstance(after_forecast, dict) and after_forecast.get("method") == STABILIZED_PANEL_METHOD:
         forecast_changes.append(
             "Stability guard applied: polls, roster and contest stage were unchanged since the baseline forecast "
-            "(or every added poll favored the baseline leader), so the move in win probability was capped."
+            "(or every added poll ran against the panel's move), so the move in win probability was capped."
         )
     pipeline_state_for_audit = race_json.get("pipeline_state")
     step_failures = pipeline_state_for_audit.get("step_failures") if isinstance(pipeline_state_for_audit, dict) else None

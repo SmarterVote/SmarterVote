@@ -24,6 +24,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from shared.forecast_math import (
     RATING_BANDS,
+    RATING_HYSTERESIS,
     STABILITY_MAX_SHIFT,
     aggregate_panel,
     cap_probability_shift,
@@ -35,6 +36,7 @@ from shared.forecast_math import (
     panel_spread,
     poll_identity,
     rating_for,
+    rating_with_hysteresis,
 )
 from shared.forecast_summary import _seat_holder, seat_control_note
 from shared.model_catalog import FORECAST_PANEL_MODELS, SMALL_MODEL
@@ -671,7 +673,14 @@ def _apply_directional_guard(
     maps to the two leading parties shows the baseline leader ahead by at least
     the baseline's ``margin_estimate`` (or simply ahead without one), the
     leader's probability may fall at most ``STABILITY_MAX_SHIFT`` and not below
-    the baseline's rating band. A move toward the leader is left alone.
+    the baseline's rating band.
+
+    The mirror case is held the same way: when every mapped new poll shows the
+    baseline leader *less* far ahead than the baseline's ``margin_estimate`` (or
+    not ahead, without one), the leader's probability may rise at most
+    ``STABILITY_MAX_SHIFT`` and not above the baseline's band (FL-Gov: Lean R
+    0.794 -> Likely R 0.800 after a Donalds +2 poll, tighter than the average).
+    A move the new polls point toward is left alone.
     """
     if not (isinstance(baseline_evidence, tuple) and len(baseline_evidence) == 3):
         return None
@@ -685,8 +694,9 @@ def _apply_directional_guard(
     if prior_leader is None or not others:
         return None
     proposed = normalize_probabilities(consensus["party_probabilities"]).get(prior_leader, 0.0)
-    if proposed >= prior_probs[prior_leader]:
-        return None  # One-sided: a move toward the leader is not capped.
+    if abs(proposed - prior_probs[prior_leader]) < 1e-9:
+        return None
+    rising = proposed > prior_probs[prior_leader]
     prior_margin = baseline_forecast.get("margin_estimate")
     has_margin = isinstance(prior_margin, (int, float)) and not isinstance(prior_margin, bool)
     new_polls = [
@@ -696,7 +706,13 @@ def _apply_directional_guard(
     ]
     margins = [_poll_party_margin(poll, race_json, prior_leader, others[0]) for poll in new_polls]
     margins = [margin for margin in margins if margin is not None]
-    if not margins or any(margin <= 0 or (has_margin and margin < prior_margin) for margin in margins):
+    if not margins:
+        return None
+    if rising:
+        # Mirror: the leader's probability may not climb out of its band on polls tighter than before.
+        if not all((margin < prior_margin) if has_margin else (margin <= 0) for margin in margins):
+            return None
+    elif any(margin <= 0 or (has_margin and margin < prior_margin) for margin in margins):
         return None
     capped = cap_probability_shift(
         prior_probs, consensus["party_probabilities"], keep_band=True, prior_rating=baseline_forecast.get("rating")
@@ -704,11 +720,41 @@ def _apply_directional_guard(
     if capped is None:
         return None
     rating = _hold_consensus(consensus, capped, prior_leader, baseline_forecast, margin_ceiling=False)
-    threshold = f">= baseline margin {prior_margin:g}" if has_margin else "a lead"
+    if rising:
+        finding = f"show {prior_leader} " + (f"below baseline margin {prior_margin:g}" if has_margin else "not ahead")
+    else:
+        finding = f"favor {prior_leader} by " + (f">= baseline margin {prior_margin:g}" if has_margin else "a lead")
     return (
-        f"Directional guard: {len(margins)} new poll(s) all favor {prior_leader} by {threshold}, so the "
+        f"Directional guard: {len(margins)} new poll(s) all {finding}, so the "
         f"{prior_leader} probability was held to {capped[prior_leader]:.2f} (baseline {prior_probs[prior_leader]:.2f}, "
-        f"panel {proposed:.2f}, max drop {STABILITY_MAX_SHIFT:.2f}); rating {baseline_forecast.get('rating')} -> {rating}."
+        f"panel {proposed:.2f}, max {'rise' if rising else 'drop'} {STABILITY_MAX_SHIFT:.2f}); "
+        f"rating {baseline_forecast.get('rating')} -> {rating}."
+    )
+
+
+def apply_rating_hysteresis(consensus: Dict[str, Any], baseline_forecast: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Keep the baseline's rating unless the consensus probability clears that band by ``RATING_HYSTERESIS``.
+
+    Runs after the stability guards. Only the label is held: the probabilities
+    stay as the panel (or a guard) set them. Mutates *consensus* in place and
+    returns a note, or None when the rating was left alone. Same-party
+    (candidate-level) races are skipped, like the guards.
+    """
+    if not isinstance(baseline_forecast, dict) or consensus.get("candidate_probabilities"):
+        return None
+    prior_rating = baseline_forecast.get("rating")
+    proposed = consensus["rating"]
+    held = rating_with_hysteresis(consensus["party_probabilities"], prior_rating)
+    if held == proposed:
+        return None
+    leader = consensus.get("leading_party")
+    consensus["rating"] = held
+    consensus["predicted_winner_party"] = "Toss-up" if held == "tossup" else leader
+    probability = consensus.get("win_probability")
+    shown = f"{probability:.3f}" if isinstance(probability, (int, float)) else "unknown"
+    return (
+        f"Rating hysteresis: {leader} probability {shown} does not clear the {prior_rating} band by "
+        f"{RATING_HYSTERESIS:.3f}, so the rating stays {held} (plain bands: {proposed})."
     )
 
 
@@ -1153,8 +1199,11 @@ async def run_forecast_phase(ctx: PhaseContext) -> None:
                 stability_note = apply_stability_guard(
                     consensus, ctx.baseline_forecast, ctx.baseline_forecast_evidence, race_json
                 )
-            if stability_note:
-                log("info", f"  Forecast {stability_note}")
+                if stability_note:
+                    log("info", f"  Forecast {stability_note}")
+                hysteresis_note = apply_rating_hysteresis(consensus, ctx.baseline_forecast)
+                if hysteresis_note:
+                    log("info", f"  Forecast {hysteresis_note}")
         else:
             log("warning", "  Forecast panel produced no estimates; the writer will set the numbers itself")
 

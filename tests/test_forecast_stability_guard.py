@@ -175,7 +175,9 @@ def test_rating_band_bounds():
 @pytest.mark.parametrize(
     "change",
     [
-        lambda race: race["polling"].append(_poll("Siena", "2026-10-01")),
+        # A new poll at least as favorable to the rising leader as the baseline margin
+        # (a tighter one now trips the directional guard's mirror case).
+        lambda race: race["polling"].append(_poll("Siena", "2026-10-01", d=42, r=50)),
         lambda race: race["candidates"].append({"name": "New Republican", "party": "Republican"}),
         lambda race: race.update({"contest_stage": "runoff"}),
     ],

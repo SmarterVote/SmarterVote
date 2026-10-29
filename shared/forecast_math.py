@@ -146,6 +146,54 @@ def rating_for(probs: Mapping[str, float]) -> str:
     return "tossup"
 
 
+#: How far past a band edge a rerun's probability must land before the rating
+#: leaves the baseline's band. Panel jitter near an edge used to flip ratings
+#: against the new evidence: FL-Gov went Lean R 0.794 -> Likely R 0.800 after a
+#: tighter-than-average poll, WI-Gov Lean D 0.79 -> Likely D 0.82, SD-AL Safe R
+#: -> Likely R despite a +28 poll. The probability still updates; only the label
+#: is sticky, and never more than this far from its own band.
+RATING_HYSTERESIS = 0.025
+
+
+def _rating_band(rating: object) -> Optional[tuple[Optional[str], float, float]]:
+    """``(party, low, high)`` for a party rating such as ``"lean_r"``: *party*'s probability spans ``[low, high)``.
+
+    A toss-up has no party, and its range is the leader's. None for "other" or an unknown label.
+    """
+    if rating == "tossup":
+        return None, 0.0, RATING_BANDS[-1][0]
+    if not isinstance(rating, str):
+        return None
+    band, _, suffix = rating.partition("_")
+    party = {"d": "Democratic", "r": "Republican"}.get(suffix)
+    upper = 1.0
+    for threshold, name in RATING_BANDS:
+        if name == band and party:
+            return party, threshold, upper
+        upper = threshold
+    return None
+
+
+def rating_with_hysteresis(probs: Mapping[str, float], prior_rating: object, margin: float = RATING_HYSTERESIS) -> str:
+    """The rating for *probs*, kept at *prior_rating* unless the probability clears its band by *margin*.
+
+    Symmetric for both parties and in both directions. A rating that would
+    cross from one party to the other, or that "other" describes, is never held.
+    """
+    rating = rating_for(probs)
+    band = _rating_band(prior_rating)
+    if rating == prior_rating or rating == "other" or band is None:
+        return rating
+    party, low, high = band
+    normalized = normalize_probabilities(probs)
+    if party is None:
+        leader = leading_party(normalized)
+        held = leader in MAJOR_PARTIES and normalized[leader] < round(high + margin, 4)
+    else:
+        held = round(low - margin, 4) <= normalized.get(party, 0.0) < round(high + margin, 4)
+    return str(prior_rating) if held else rating
+
+
 def panel_spread(estimates: Sequence[Mapping[object, object]], party: Optional[str]) -> float:
     """How far apart the members were on the consensus leader's probability."""
     if not party:
