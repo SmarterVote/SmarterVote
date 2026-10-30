@@ -1,8 +1,10 @@
+from unittest.mock import AsyncMock
+
 import pytest
 
+from pipeline_client.agent.images import _candidate_page_urls, _extract_page_image_urls
+from pipeline_client.agent.images import _fetch_bioguide_members as _real_fetch_bioguide_members
 from pipeline_client.agent.images import (
-    _candidate_page_urls,
-    _extract_page_image_urls,
     _filename_person_tokens,
     _host_names_another_state,
     _is_mismatched_person_filename,
@@ -1448,6 +1450,41 @@ async def test_check_url_accessible_still_rejects_a_non_wikimedia_429(monkeypatc
     assert accessible is False
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://en.wikipedia.org/wiki/Rich_McCormick",
+        "https://en.wikipedia.org/wiki/Special:FilePath/Jane_Doe.jpg",
+        "https://upload.wikimedia.org/wikipedia/commons/e/e3/Not_an_image.pdf",
+        # md5 folder does not match the filename.
+        "https://upload.wikimedia.org/wikipedia/commons/0/0a/Rep._Rich_McCormick_official_photo%2C_118th_Congress_%281%29.jpg",
+    ],
+)
+@pytest.mark.asyncio
+async def test_check_url_accessible_rejects_a_429_that_is_not_a_wikimedia_image_file(monkeypatch, url):
+    """A 429 on any *.wikipedia.org page used to be accepted as an image."""
+    from pipeline_client.agent.images import _check_url_accessible
+
+    client = _FakeAccessibilityClient(head=_FakeHeadResponse(429, url))
+    monkeypatch.setattr("pipeline_client.agent.images.httpx.AsyncClient", client)
+
+    accessible, _ = await _check_url_accessible(url)
+
+    assert accessible is False
+
+
+def test_rate_limited_wikimedia_file_accepts_thumbs_and_hashless_paths():
+    from pipeline_client.agent.images import _is_rate_limited_wikimedia_file
+
+    thumb = (
+        "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/"
+        "Rep._Rich_McCormick_official_photo%2C_118th_Congress_%281%29.jpg/330px-x.jpg"
+    )
+    assert _is_rate_limited_wikimedia_file(thumb)
+    assert _is_rate_limited_wikimedia_file("https://upload.wikimedia.org/some/file.webp")
+    assert not _is_rate_limited_wikimedia_file("https://thumb.wikimedia.org.evil.com/a/ab/x.jpg")
+
+
 @pytest.mark.asyncio
 async def test_best_accessible_image_url_prefers_the_wikimedia_thumbnail(monkeypatch):
     """The Wikipedia API's thumbnail_unscaled original is stored as a sized thumbnail."""
@@ -2062,3 +2099,105 @@ async def test_resolve_candidate_images_passes_opponents_bioguide_id(monkeypatch
 
     assert race["candidates"][0]["image_url"] == meeks_current
     assert race["candidates"][1]["image_url"] is None
+
+
+_STEVENS_ROSTER = {
+    "S001215": {"first_name": "Haley", "middle_name": "Maria", "last_name": "Stevens", "nickname": ""},
+    "B001282": {"first_name": "Garland", "middle_name": "Hale", "last_name": "Barr", "nickname": "Andy"},
+}
+
+
+@pytest.mark.asyncio
+async def test_resolve_accepts_bioguide_portrait_for_a_member_running_statewide(monkeypatch):
+    """A House member running for Senate is no incumbent of that seat, but the portrait is hers."""
+    stevens = "https://unitedstates.github.io/images/congress/450x550/S001215.jpg"
+    _stub_fast_paths(monkeypatch, page=stevens)
+    monkeypatch.setattr("pipeline_client.agent.images._fetch_bioguide_members", AsyncMock(return_value=_STEVENS_ROSTER))
+
+    candidate = {"name": "Haley Stevens", "image_url": None, "incumbent": False}
+    await _resolve_single_image(candidate, agent_loop_fn=_null_agent, model="test")
+    assert candidate["image_url"] == stevens
+
+    # Nickname: Bioguide files Andy Barr under his given name Garland.
+    barr = "https://bioguide.congress.gov/bioguide/photo/B/B001282.jpg"
+    _stub_fast_paths(monkeypatch, page=barr)
+    candidate = {"name": "Andy Barr", "image_url": None, "incumbent": False}
+    await _resolve_single_image(candidate, agent_loop_fn=_null_agent, model="test")
+    assert candidate["image_url"] == barr
+
+
+@pytest.mark.asyncio
+async def test_resolve_still_rejects_bioguide_portrait_of_a_different_member(monkeypatch):
+    stevens = "https://unitedstates.github.io/images/congress/450x550/S001215.jpg"
+    _stub_fast_paths(monkeypatch, page=stevens)
+    monkeypatch.setattr("pipeline_client.agent.images._fetch_bioguide_members", AsyncMock(return_value=_STEVENS_ROSTER))
+
+    # Same surname, different given name: a namesake, not the member.
+    namesake = {"name": "Mallory Stevens", "image_url": None, "incumbent": False}
+    await _resolve_single_image(namesake, agent_loop_fn=_null_agent, model="test")
+    assert namesake["image_url"] is None
+
+    # Conflicting middle initial.
+    initial = {"name": "Haley K. Stevens", "image_url": None, "incumbent": False}
+    await _resolve_single_image(initial, agent_loop_fn=_null_agent, model="test")
+    assert initial["image_url"] is None
+
+    # The member's name also matches an opponent: ambiguous, refused.
+    twin = {"name": "Haley Stevens", "image_url": None, "incumbent": False}
+    await _resolve_single_image(twin, agent_loop_fn=_null_agent, model="test", other_names=["Haley M. Stevens"])
+    assert twin["image_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_bioguide_members_parses_the_legislator_rosters(monkeypatch):
+    import httpx
+
+    from pipeline_client.agent import images
+
+    header = "last_name,first_name,middle_name,suffix,nickname,bioguide_id\n"
+    current = header + "Barr,Garland,Hale,,Andy,B001282\n"
+    historical = header + "Mace,Nancy,Ruth,,,M000194\nBarr,Old,,,,B001282\n"
+
+    def handler(request):
+        return httpx.Response(200, text=current if "current" in request.url.path else historical)
+
+    real_client = httpx.AsyncClient
+
+    def client_factory(**kwargs):
+        kwargs.pop("event_hooks", None)
+        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+
+    monkeypatch.setattr(images.httpx, "AsyncClient", client_factory)
+    members = await _real_fetch_bioguide_members()
+
+    assert members["B001282"]["nickname"] == "Andy"  # current wins over historical
+    assert members["M000194"]["last_name"] == "Mace"
+
+    def failing(request):
+        return httpx.Response(503)
+
+    monkeypatch.setattr(
+        images.httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(failing), timeout=1.0)
+    )
+    assert await _real_fetch_bioguide_members() == {}
+
+
+@pytest.mark.parametrize(
+    "nickname,given",
+    [
+        ("joe", "joseph"),
+        ("steve", "stephen"),
+        ("steven", "stephen"),
+        ("andy", "andrew"),
+        ("tony", "anthony"),
+        ("katie", "katherine"),
+        ("katie", "kathryn"),
+        ("ted", "theodore"),
+        ("ted", "edward"),
+    ],
+)
+def test_given_name_nicknames_match(nickname, given):
+    from pipeline_client.agent.images import _given_names_match
+
+    assert _given_names_match(nickname, given)
+    assert _given_names_match(given, nickname)

@@ -33,7 +33,9 @@ _MAX_ROWS = 25
 _MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"
 # "October 21–23, 2026", "September 28 – October 2, 2026", "October 23, 2026"
 _DATE_RE = re.compile(rf"({_MONTHS})\s+(\d{{1,2}})(?:\s*[–—-]\s*(?:({_MONTHS})\s+)?(\d{{1,2}}))?,?\s*(\d{{4}})")
-_RACE_ID_RE = re.compile(r"^([a-z]{2})-(senate|governor)(-special)?-(\d{4})$")
+# Race IDs put "-special" after the year (fl-senate-2026-special); the older
+# "oh-senate-special-2026" form is still accepted.
+_RACE_ID_RE = re.compile(r"^([a-z]{2})-(senate|governor)(-special)?-(\d{4})(-special)?$")
 _REF_RE = re.compile(r"<ref(\s[^>]*?)?(?:/>|>(.*?)</ref\s*>)", re.IGNORECASE | re.DOTALL)
 _REF_NAME_RE = re.compile(r"""name\s*=\s*["']?([^"'/>]+?)["']?\s*(?:/|$)""", re.IGNORECASE)
 _URL_RE = re.compile(r"https?://[^\s|\]}<>\"]+")
@@ -54,7 +56,10 @@ def wikipedia_poll_page_title(race_json: Dict[str, Any], race_id: Optional[str] 
     match = _RACE_ID_RE.match(str(race_id or race_json.get("id") or "").strip().lower())
     if not match:
         return None
-    code, office, special, year = match.groups()
+    code, office, special_before, year, special_after = match.groups()
+    if special_before and special_after:
+        return None
+    special = special_before or special_after
     state = str(race_json.get("state") or STATE_NAMES.get(code, "")).strip()
     if not state:
         return None

@@ -209,6 +209,9 @@ def test_wikipedia_poll_table_parser_caps_rows_and_needs_a_polling_section():
     [
         ({"id": "me-senate-2026", "state": "Maine"}, "2026 United States Senate election in Maine"),
         ({"id": "oh-senate-special-2026"}, "2026 United States Senate special election in Ohio"),
+        ({"id": "oh-senate-2026-special"}, "2026 United States Senate special election in Ohio"),
+        ({"id": "fl-senate-2026-special"}, "2026 United States Senate special election in Florida"),
+        ({"id": "fl-senate-special-2026-special"}, None),
         ({"id": "ny-governor-2026"}, "2026 New York gubernatorial election"),
         ({"id": "oh-house-10-2026", "state": "Ohio"}, None),
         ({"id": "zz-senate-2026"}, None),

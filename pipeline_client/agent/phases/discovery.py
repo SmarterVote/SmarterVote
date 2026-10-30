@@ -31,6 +31,26 @@ _TERM_LIMITED_NON_CANDIDATE_RE = re.compile(
 # no reference to someone else ("predecessor", "opponent", a possessive). The
 # structured ``known_ineligible_or_not_running`` list is the primary removal
 # path, so missing an unusual phrasing here is the safe failure.
+# Negated exclusion text keeps the candidate: "Smith is not term-limited",
+# "Smith isn't ineligible", "Smith denied that she is not running", or
+# "reports that Smith is not seeking re-election are false".
+_NEGATION_BEFORE_PHRASE_RE = re.compile(r"(?:\bnot|n['’]t|\bnever)\s+(?:\w+\s+)?$", re.IGNORECASE)
+_DENIAL_IN_GAP_RE = re.compile(
+    r"\b(?:denied|denies|deny|dismissed|dismisses|rejected|rejects|refuted|refutes)\b", re.IGNORECASE
+)
+_FALSE_AFTER_PHRASE_RE = re.compile(
+    r"\b(?:is|are|was|were|proved|proven)\s+(?:\w+\s+)?(?:false|untrue|incorrect|inaccurate|wrong|unfounded)\b",
+    re.IGNORECASE,
+)
+
+
+def _exclusion_is_negated(gap: str, after: str) -> bool:
+    """True when the matched exclusion phrase is negated, denied, or called false."""
+    return bool(
+        _NEGATION_BEFORE_PHRASE_RE.search(gap) or _DENIAL_IN_GAP_RE.search(gap) or _FALSE_AFTER_PHRASE_RE.search(after)
+    )
+
+
 _ROSTER_CLAUSE_SPLIT_RE = re.compile(r"[.;:!?|–—]+|\s-\s")
 _OFFICE_TITLE_PREFIX_RE = re.compile(
     r"^(?:(?:incumbent|former|outgoing|current|gov|governor|lt|lieutenant|sen|senator|rep|representative|"
@@ -88,7 +108,10 @@ def _text_names_candidate_ineligible(name: str, text: str) -> bool:
             match = _TERM_LIMITED_NON_CANDIDATE_RE.search(rest)
             if not match:
                 continue
-            if not _gap_introduces_other_person(rest[: match.start()]):
+            gap = rest[: match.start()]
+            if _exclusion_is_negated(gap, rest[match.end() :]):
+                continue
+            if not _gap_introduces_other_person(gap):
                 return True
     return False
 

@@ -56,8 +56,14 @@ def _extract_json(text: str) -> Dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    # Find the outermost balanced JSON object or array.
-    for open_ch, close_ch in [("{", "}"), ("[", "]")]:
+    # Find the outermost balanced JSON object or array.  When the reply
+    # visibly opens as an object, never fall back to an array nested inside
+    # it: a truncated object would otherwise "parse" as its first inner list
+    # and hide the truncation from callers that retry on parse failure.
+    delimiters = [("{", "}"), ("[", "]")]
+    if cleaned.startswith("{"):
+        delimiters = [("{", "}")]
+    for open_ch, close_ch in delimiters:
         start = cleaned.find(open_ch)
         if start == -1:
             continue

@@ -357,14 +357,23 @@ async def _run_single_review(
                 _accumulate_review_metrics(metrics_sink, provider, model_name, usage, truncated=truncated)
             try:
                 review_data = _extract_json(raw)
+                if not isinstance(review_data, dict):
+                    # The reviewer contract is a JSON object; a list (or a
+                    # scalar) is a parse failure, so the tighter retry runs.
+                    raise ValueError(f"expected a JSON object, got {type(review_data).__name__}")
                 break
             except (json.JSONDecodeError, ValueError):
                 completion_tokens = int(usage.get("completion_tokens", 0) or 0)
                 problem = (
                     f"was cut off at the completion limit (finish_reason=length, {completion_tokens} completion tokens)"
                     if truncated
-                    else "was not valid JSON"
+                    else (
+                        "was not a JSON object"
+                        if review_data is not None and not isinstance(review_data, dict)
+                        else "was not valid JSON"
+                    )
                 )
+                review_data = None
                 if metrics_sink is not None:
                     metrics_sink["providers"][provider]["parse_failures"] += 1
                 if attempt == 0:
@@ -1258,20 +1267,47 @@ _POSITIONAL_FIELD_PATTERN = re.compile(r"^candidates\[(\d+)\]")
 _STALE_REVIEW_REASON = "Roster changed after this review was written; positional flags no longer describe these candidates."
 
 
+_ROSTER_NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+
+
+def _roster_name_key(name: Any) -> str:
+    """Normalize a candidate name so cosmetic edits keep the same roster identity.
+
+    Casefolds, strips diacritics and punctuation, collapses whitespace, and
+    drops single-letter middle initials and generational suffixes, so
+    "José A. Peña Jr." and "jose pena" are the same person.
+    """
+    folded = "".join(ch for ch in unicodedata.normalize("NFKD", str(name or "")) if not unicodedata.combining(ch))
+    joined = re.sub(r"['\u2019.]", "", folded.casefold())  # O'Neil == ONeil, J.D. == JD
+    tokens = re.sub(r"[^\w\s]|_", " ", joined).split()
+    tokens = [t for t in tokens if t not in _ROSTER_NAME_SUFFIXES]
+    return " ".join(t for index, t in enumerate(tokens) if index == 0 or index == len(tokens) - 1 or len(t) > 1)
+
+
+def _roster_names(race_json: Optional[Dict[str, Any]]) -> List[Any]:
+    if not isinstance(race_json, dict):
+        return []
+    return [candidate.get("name") for candidate in race_json.get("candidates") or [] if isinstance(candidate, dict)]
+
+
 def roster_fingerprint(race_json: Optional[Dict[str, Any]]) -> str:
     """Stable digest of the candidate roster a set of reviews was written against.
 
-    Order is part of the fingerprint on purpose. Reviewer flags address
-    candidates positionally (``candidates[2].image_url``), so a reordered roster
-    invalidates them exactly as thoroughly as a replaced one.
+    The digest ignores cosmetic spelling (case, punctuation, diacritics, middle
+    initials, suffixes) so a name tidy-up doesn't make every carried-forward
+    review stale. Order still counts: review flags are positional
+    (``candidates[2].image_url``), so after a reorder they would point at the
+    wrong person.
     """
-    if not isinstance(race_json, dict):
+    names = [_roster_name_key(name) for name in _roster_names(race_json)]
+    if not names:
         return ""
-    names: List[str] = []
-    for candidate in race_json.get("candidates") or []:
-        if not isinstance(candidate, dict):
-            continue
-        names.append(re.sub(r"\s+", " ", str(candidate.get("name") or "")).strip().casefold())
+    return hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest()
+
+
+def _legacy_roster_fingerprint(race_json: Optional[Dict[str, Any]]) -> str:
+    """The pre-normalization ordered digest, so reviews stamped with it are not all stale on deploy."""
+    names = [re.sub(r"\s+", " ", str(name or "")).strip().casefold() for name in _roster_names(race_json)]
     if not names:
         return ""
     return hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest()
@@ -1313,6 +1349,9 @@ def invalidate_stale_reviews(race_json: Dict[str, Any], *, baseline_race_json: O
         return 0
 
     current = roster_fingerprint(race_json)
+    # A review stamped before fingerprints were normalized still matches the
+    # roster it judged if the legacy (ordered, raw-name) digest matches.
+    current_forms = {current, _legacy_roster_fingerprint(race_json)}
     baseline = roster_fingerprint(baseline_race_json) if isinstance(baseline_race_json, dict) else None
 
     stale_reviews = 0
@@ -1321,7 +1360,7 @@ def invalidate_stale_reviews(race_json: Dict[str, Any], *, baseline_race_json: O
             continue
         stored = review.get("roster_fingerprint")
         if isinstance(stored, str) and stored:
-            is_stale = stored != current
+            is_stale = stored not in current_forms
         elif baseline is not None:
             is_stale = baseline != current
         else:
