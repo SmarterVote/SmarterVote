@@ -283,11 +283,16 @@ def is_same_poll(left: Any, right: Any) -> bool:
     A shared source URL only identifies a survey when it is a single-poll page from
     compatible pollsters: Wikipedia and aggregator tables list many distinct polls under
     one URL, and counting those as one survey let a refresh drop baseline polls.
+
+    Also the same survey: a differently spelled label for the same firm with the exact
+    topline within ``RELABELED_SURVEY_DAYS`` (``is_relabeled_same_survey``).
     """
     if not isinstance(left, dict) or not isinstance(right, dict):
         return False
     left_key = same_survey_key(left)
     if left_key is not None and left_key == same_survey_key(right):
+        return True
+    if is_relabeled_same_survey(left, right):
         return True
     left_date, right_date = _poll_date(left), _poll_date(right)
     if left_date is None or right_date is None or abs((left_date - right_date).days) > NEAR_DATE_DUPLICATE_DAYS:
@@ -306,6 +311,195 @@ def is_same_poll(left: Any, right: Any) -> bool:
         and left_matchups == _canonical_matchups(right)
         and left.get("sample_size") == right.get("sample_size")
     )
+
+
+# --- Relabeled same-survey duplicates -------------------------------------------
+#
+# ia-senate-2026 stored each survey twice after one polling phase: one copy dated at the
+# field end, one at the release (4-8 days later), under a differently spelled pollster:
+# "Marist University" 10-11 vs "Marist Poll" 10-15, "NPA Polling" 10-12 vs "National
+# Public Affairs" 10-20, "GS Strategy Group/New River Strategies (for The Cook Political
+# Report)" 10-13 vs "New River / GSG" 10-21. Each pair carried the identical topline.
+#
+# The rule is deliberately narrow. An identical topline alone never merges unrelated firms
+# beyond the near-date window above, and one identically labeled pollster on two dates
+# stays two waves (ks-senate-2026 InsiderAdvantage 10-10 and 10-14 repeated a topline).
+RELABELED_SURVEY_DAYS = 14
+
+# Words that say what kind of organization a pollster is, not which one.
+_GENERIC_POLLSTER_TOKENS = frozenset(
+    """
+    the for and of by with at in on inc llc ltd co corp company
+    poll polls polling pollster pollsters survey surveys research researchers
+    university univ college school institute center centre
+    group strategies strategy strategic consulting consultants partners associates
+    analytics insights data opinion public national affairs political politics report
+    news media new times post daily journal tribune star herald
+    """.split()
+)
+_PARENTHETICAL_RE = re.compile(r"\([^()]*\)")
+_POLLSTER_SEGMENT_RE = re.compile(r"\s*(?:/|&|\+|,|;|\band\b|\bwith\b|\bfor\b)\s*", re.IGNORECASE)
+
+
+def _pollster_label(poll: Dict[str, Any]) -> str:
+    """Pollster name without population label, party marks, or "(for Sponsor)" notes."""
+    name = _PARTY_MARK_RE.sub("", split_poll_population(poll.get("pollster"))[0])
+    return _PARENTHETICAL_RE.sub(" ", name)
+
+
+def _pollster_segments(label: str) -> List[List[str]]:
+    """Word lists of each firm a label names ("A/B" or "A & B" names two firms)."""
+    segments = []
+    for part in _POLLSTER_SEGMENT_RE.split(label):
+        words = re.findall(r"[a-z0-9]+", part.casefold())
+        if words:
+            segments.append(words)
+    return segments
+
+
+def _significant_tokens(segments: List[List[str]]) -> set:
+    return {word for words in segments for word in words if len(word) >= 3 and word not in _GENERIC_POLLSTER_TOKENS}
+
+
+def _is_acronym_of(token: str, words: List[str]) -> bool:
+    """True when ``token`` spells a run of 2+ consecutive words by their leading letters.
+
+    "npa" is National Public Affairs; "gsg" is GS Strategy Group (a word may give more
+    than its first letter, as "GS" does).
+    """
+    if not 2 <= len(token) <= 6 or len(words) < 2:
+        return False
+
+    def spell(rest: str, index: int, used: int) -> bool:
+        if not rest:
+            return used >= 2
+        if index >= len(words):
+            return False
+        word = words[index]
+        for length in range(1, min(len(word), len(rest)) + 1):
+            if word[:length] != rest[:length]:
+                break
+            if spell(rest[length:], index + 1, used + 1):
+                return True
+        return False
+
+    return any(spell(token, start, 0) for start in range(len(words)))
+
+
+def pollster_identities_compatible(left: Any, right: Any) -> bool:
+    """Whether two poll entries' pollster labels plausibly name the same firm.
+
+    Compatible when the compacted names are equal or one contains the other, when they
+    share a distinctive word ("Marist University" / "Marist Poll"), or when a word of one
+    is an acronym of a firm named in the other ("NPA Polling" / "National Public Affairs").
+    """
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    left_label, right_label = _pollster_label(left), _pollster_label(right)
+    a = re.sub(r"[^a-z0-9]+", "", left_label.casefold())
+    b = re.sub(r"[^a-z0-9]+", "", right_label.casefold())
+    if not a or not b:
+        return False
+    if a == b or (min(len(a), len(b)) >= 3 and (a in b or b in a)):
+        return True
+    left_segments, right_segments = _pollster_segments(left_label), _pollster_segments(right_label)
+    if _significant_tokens(left_segments) & _significant_tokens(right_segments):
+        return True
+    for word_segments, firm_segments in ((left_segments, right_segments), (right_segments, left_segments)):
+        for word in {word for words in word_segments for word in words}:
+            if any(_is_acronym_of(word, words) for words in firm_segments):
+                return True
+    return False
+
+
+def is_relabeled_same_survey(left: Any, right: Any) -> bool:
+    """One survey stored twice: field end date vs release date, pollster spelled differently.
+
+    Requires all of: the identical candidate -> percentage map in every matchup (order
+    independent, exact numbers); dates within ``RELABELED_SURVEY_DAYS``; equal sample
+    sizes, or one missing; and compatible pollster identities
+    (``pollster_identities_compatible``) that are not one identical label, because one
+    label on two dates is two waves of a tracking poll.
+    """
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    left_matchups = _canonical_matchups(left)
+    if not left_matchups or not all(left_matchups) or left_matchups != _canonical_matchups(right):
+        return False
+    left_date, right_date = _poll_date(left), _poll_date(right)
+    if left_date is None or right_date is None or abs((left_date - right_date).days) > RELABELED_SURVEY_DAYS:
+        return False
+    left_sample, right_sample = left.get("sample_size"), right.get("sample_size")
+    if left_sample and right_sample and left_sample != right_sample:
+        return False
+    left_key, right_key = same_survey_key(left), same_survey_key(right)
+    if left_key is not None and right_key is not None and left_key[0] == right_key[0]:
+        return left_key == right_key
+    return pollster_identities_compatible(left, right)
+
+
+def _record_richness(poll: Dict[str, Any]) -> tuple:
+    url = str(poll.get("source_url") or "").strip()
+    return (
+        bool(poll.get("sample_size")),
+        bool(url) and not _is_poll_listing_url(url),
+        bool(url),
+        len(poll.get("matchups") or []),
+        len(normalize_pollster_name(poll.get("pollster"))),
+    )
+
+
+def _richer_first(left: Dict[str, Any], right: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    return (left, right) if _record_richness(left) >= _record_richness(right) else (right, left)
+
+
+def merge_relabeled_survey(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+    """One record from two copies of a survey, keeping every known detail.
+
+    The richer copy (sample size, then a primary-source URL over an aggregator or
+    Wikipedia, then any URL) is the base, and fields it lacks come from the other copy.
+    The date is the earlier one, the field end date preceding the release, and the
+    pollster label is that copy's.
+    """
+    base, other = _richer_first(left, right)
+    merged = copy.deepcopy(base)
+    for key, value in other.items():
+        if merged.get(key) in (None, "", [], {}) and value not in (None, "", [], {}):
+            merged[key] = copy.deepcopy(value)
+    left_date, right_date = _poll_date(left), _poll_date(right)
+    if left_date is not None and right_date is not None and left_date != right_date:
+        # The label travels with its date: "Marist Poll" on the field end date would read as
+        # a second wave of the "Marist Poll" release copy, and a refresh would re-add it.
+        earlier = left if left_date < right_date else right
+        merged["date"] = str(earlier.get("date")).strip()
+        merged["pollster"] = earlier.get("pollster")
+    return merged
+
+
+def merge_relabeled_survey_polls(polls: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Collapse relabeled copies of one survey (``is_relabeled_same_survey``) into one entry.
+
+    Returns the kept polls, in their original order, and "pollster (date)" labels of the
+    copies merged away.
+    """
+    kept: List[Any] = []
+    removed: List[str] = []
+    for poll in polls:
+        if isinstance(poll, dict):
+            match = next(
+                (index for index, existing in enumerate(kept) if is_relabeled_same_survey(existing, poll)),
+                None,
+            )
+            if match is not None:
+                existing = kept[match]
+                merged = merge_relabeled_survey(existing, poll)
+                identity = (merged.get("pollster"), merged.get("date"))
+                dropped = poll if (existing.get("pollster"), existing.get("date")) == identity else existing
+                removed.append(f"{dropped.get('pollster')} ({dropped.get('date')})")
+                kept[match] = merged
+                continue
+        kept.append(poll)
+    return kept, removed
 
 
 def baseline_poll_invalidity(poll: Any, roster_names: set, polling_note: Any = None) -> Optional[str]:

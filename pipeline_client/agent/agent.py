@@ -52,7 +52,7 @@ from .phases import (  # noqa: F401 - re-exported for backward compat
     _select_target_candidates,
 )
 from .phases.forecast import STABILIZED_PANEL_METHOD
-from .polling_quality import dedupe_same_survey_polls, polling_semantic_problem
+from .polling_quality import dedupe_same_survey_polls, merge_relabeled_survey_polls, polling_semantic_problem
 from .review import (
     build_review_change_manifest,
     build_semantic_review_packet,
@@ -323,6 +323,12 @@ def _sanitize_polling(race_json: Dict[str, Any], log: Any | None = None) -> None
     dropped_polls += len(same_survey_removed)
     if same_survey_removed and log:
         log("warning", "Removed same-survey population variant(s): " + ", ".join(same_survey_removed))
+
+    # One survey stored at its field end date and its release date under two spellings of the pollster.
+    kept_polls, relabeled_removed = merge_relabeled_survey_polls(kept_polls)
+    dropped_polls += len(relabeled_removed)
+    if relabeled_removed and log:
+        log("warning", "Merged relabeled copies of the same survey: " + ", ".join(relabeled_removed))
 
     sponsor_pattern = re.compile(r"\b(?:DCCC|DSCC|NRCC|NRSC|committee|campaign)\b", re.IGNORECASE)
     deduplicated_polls: List[Dict[str, Any]] = []

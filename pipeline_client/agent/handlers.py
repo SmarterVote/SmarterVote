@@ -23,7 +23,9 @@ from pipeline_client.agent.images import _is_valid_image_url
 from pipeline_client.agent.polling_quality import (
     is_duplicate_removal_reason,
     is_recency_removal_reason,
+    is_relabeled_same_survey,
     is_same_poll,
+    merge_relabeled_survey,
     normalize_pollster_name,
     poll_population_rank,
     polling_semantic_problem,
@@ -2023,6 +2025,16 @@ def _make_editing_handlers(
                 return (
                     f"Poll from {poll['pollster']} ({args['date']}) already exists for another voter population — "
                     "skipping duplicate. Store one entry per survey, preferring likely voters."
+                )
+        for existing in race_json.get("polling", []):
+            if isinstance(existing, dict) and is_relabeled_same_survey(existing, poll):
+                # Field end date vs release date under another spelling of the pollster: one survey.
+                merged = merge_relabeled_survey(existing, poll)
+                existing.clear()
+                existing.update(merged)
+                return (
+                    f"Poll from {args['pollster']} ({args['date']}) is the same survey as the stored "
+                    f"{merged.get('pollster')} ({merged.get('date')}) entry (identical topline) - merged, not duplicated."
                 )
         for existing in race_json.get("polling", []):
             same_topline = (
