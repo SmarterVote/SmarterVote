@@ -33,6 +33,9 @@ async def test_smartervote_mcp_exposes_lean_tool_surface():
 
     assert tool_names == {
         "health",
+        "refresh_race_results",
+        "publish_race_results",
+        "get_public_results",
         "list_published_races",
         "list_race_summaries",
         "get_published_race",

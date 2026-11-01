@@ -28,8 +28,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from shared.election_results import post_election_frozen_steps
 from shared.neutrality import find_loaded_language, iter_site_voice_text
-from shared.pipeline_config import DEFAULT_UPDATE_PIPELINE_STEPS, PIPELINE_STEP_IDS, REVIEW_PROVIDERS, PipelineRuntimeConfig
+from shared.pipeline_config import (
+    DEFAULT_UPDATE_PIPELINE_STEPS,
+    EXPLICIT_ONLY_PIPELINE_STEPS,
+    PIPELINE_STEP_IDS,
+    REVIEW_PROVIDERS,
+    PipelineRuntimeConfig,
+)
 from shared.race_cleanup import cleanup_race_data, validate_forecast_evidence
 from shared.run_health import clear_step_failures
 from shared.text_quality import is_placeholder_text as _is_placeholder_text
@@ -911,7 +918,7 @@ async def run_agent(
     t0 = time.perf_counter()
 
     # Step enablement check - None means all enabled
-    _all_steps = set(PIPELINE_STEP_IDS)
+    _all_steps = set(PIPELINE_STEP_IDS) - EXPLICIT_ONLY_PIPELINE_STEPS
     _enabled = set(enabled_steps) if enabled_steps else set(_all_steps)
 
     def _step_enabled(step: str) -> bool:
@@ -967,6 +974,12 @@ async def run_agent(
         log("info", "Using low-cost update steps; issue research and review are opt-in")
 
     if isinstance(existing_data, dict):
+        # After polls close, the roster, polling and forecast are the record the
+        # results are read against. Discovery would also remove losers outright.
+        _frozen = _enabled & post_election_frozen_steps(existing_data)
+        if _frozen:
+            _enabled -= _frozen
+            log("warning", f"Polls have closed; skipping frozen steps: {sorted(_frozen)}")
         # Health is an assessment of the latest attempt. Retain unrelated failures,
         # but let every enabled phase prove itself again from a clean slate.
         clear_step_failures(existing_data, _enabled)
@@ -1108,7 +1121,7 @@ async def run_agent(
 
     reviews_ran_this_run = False
     review_required_steps_ran = bool(_enabled & {"issues", "refinement", "iteration"})
-    maintenance_steps_ran = bool(_enabled & {"polling", "forecast", "voter_resources"})
+    maintenance_steps_ran = bool(_enabled & {"polling", "forecast", "voter_resources", "results"})
     validation_grade = race_json.get("validation_grade")
     if not isinstance(validation_grade, dict) and race_json.get("reviews"):
         validation_grade = compute_validation_grade(race_json.get("reviews", []), race_json, min_reviews=1)

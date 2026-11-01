@@ -307,7 +307,7 @@ async def test_v2_handler_continuation_progress_includes_prior_completed_steps()
 
     progress_updates = mock_fs_logger_cls.return_value.update_progress.call_args_list
     refinement_update = next(call for call in progress_updates if call.kwargs.get("current_step_progress") == 25)
-    assert refinement_update.args[0] == 58
+    assert refinement_update.args[0] == 57
 
 
 @pytest.mark.asyncio

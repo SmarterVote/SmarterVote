@@ -11,7 +11,9 @@ import random
 import re
 import socket
 import weakref
-from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -33,6 +35,20 @@ _SEARCH_MAX_QUERY_CHARS = 500
 # ---------------------------------------------------------------------------
 # Search cache
 # ---------------------------------------------------------------------------
+
+
+#: Set by the results phase: a count cached an hour ago is a wrong count.
+_fresh_reads_only: ContextVar[bool] = ContextVar("fresh_reads_only", default=False)
+
+
+@contextmanager
+def fresh_web_reads() -> Iterator[None]:
+    """Skip cached searches and pages inside this block."""
+    token = _fresh_reads_only.set(True)
+    try:
+        yield
+    finally:
+        _fresh_reads_only.reset(token)
 
 
 def _get_search_cache():
@@ -595,7 +611,7 @@ async def _fetch_page(url: str) -> str:
         logger.warning("Blocked fetch of disallowed URL %s: %s", url, exc)
         return f"[Blocked: {exc}]"
 
-    cache = _get_search_cache()
+    cache = None if _fresh_reads_only.get() else _get_search_cache()
     if cache:
         cached = cache.get_page(url)
         if cached:
@@ -1184,7 +1200,7 @@ async def _cached_searlo_search(
             normalized_query[:_SEARCH_MAX_QUERY_CHARS].rsplit(" ", 1)[0] or normalized_query[:_SEARCH_MAX_QUERY_CHARS]
         )
 
-    cache = _get_search_cache()
+    cache = None if _fresh_reads_only.get() else _get_search_cache()
     if cache:
         cached = cache.get(normalized_query, race_id)
         if cached:

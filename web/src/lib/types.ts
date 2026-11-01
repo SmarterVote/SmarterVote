@@ -175,6 +175,63 @@ export interface ForecastPanelEstimate {
   confidence: ConfidenceLevel;
 }
 
+export type RaceResultStatus =
+  | "not_yet_reported"
+  | "counting"
+  | "too_close"
+  | "called"
+  | "runoff_required"
+  | "rcv_pending"
+  | "certified"
+  | "unopposed";
+
+export interface ResultCandidate {
+  name: string;
+  party?: string | null;
+  votes?: number | null;
+  pct?: number | null;
+}
+
+export interface RaceResult {
+  status: RaceResultStatus;
+  winner_name?: string | null;
+  winner_party?: string | null;
+  called_by?: string | null;
+  called_at?: string | null;
+  pct_reporting?: number | null;
+  candidates: ResultCandidate[];
+  runoff_date?: string | null;
+  correction_note?: string | null;
+  sources: Source[];
+  as_of: string;
+}
+
+/** A count row in the public results file, which also carries the headshot. */
+export interface PublicResultCandidate extends ResultCandidate {
+  image_url?: string | null;
+}
+
+/** One row of the public results file (shared/election_results.py). */
+export interface PublicRaceResult {
+  id: string;
+  title?: string | null;
+  status: RaceResultStatus;
+  winner_name?: string | null;
+  winner_party?: string | null;
+  called_by?: string | null;
+  called_at?: string | null;
+  pct_reporting?: number | null;
+  runoff_date?: string | null;
+  as_of?: string | null;
+  candidates: PublicResultCandidate[];
+  sources: { url: string; title?: string | null }[];
+}
+
+export interface PublicResultsFile {
+  generated_at: string | null;
+  races: PublicRaceResult[];
+}
+
 export interface RaceForecast {
   predicted_winner_name?: string | null;
   predicted_winner_party?: string | null;
@@ -378,6 +435,7 @@ export interface Race {
   polling: PollEntry[];
   polling_note?: string | null;
   forecast?: RaceForecast | null;
+  result?: RaceResult | null;
   reviews: AgentReview[];
   validation_grade?: ValidationGrade | null;
   pipeline_state?: PipelineState | null;
@@ -484,7 +542,8 @@ export type PipelineStepId =
   | "forecast"
   | "voter_resources"
   | "review"
-  | "iteration";
+  | "iteration"
+  | "results";
 
 export const PIPELINE_STEPS: {
   id: PipelineStepId;
@@ -493,7 +552,7 @@ export const PIPELINE_STEPS: {
 }[] = [
   { id: "discovery", label: "Discovery", weight: 12 },
   { id: "images", label: "Image Resolution", weight: 4 },
-  { id: "issues", label: "Issue Research", weight: 28 },
+  { id: "issues", label: "Issue Research", weight: 26 },
   { id: "finance", label: "Finance & Voting", weight: 9 },
   { id: "refinement", label: "Refinement", weight: 11 },
   { id: "polling", label: "Polling", weight: 7 },
@@ -501,12 +560,14 @@ export const PIPELINE_STEPS: {
   { id: "voter_resources", label: "Voter Resources", weight: 5 },
   { id: "review", label: "AI Review", weight: 12 },
   { id: "iteration", label: "Review Iteration", weight: 8 },
+  { id: "results", label: "Election Results", weight: 2 },
 ];
 
 const UPDATE_OPT_IN_STEPS = new Set<PipelineStepId>([
   "issues",
   "review",
   "iteration",
+  "results",
 ]);
 export const DEFAULT_UPDATE_PIPELINE_STEP_IDS: PipelineStepId[] =
   PIPELINE_STEPS.filter((step) => !UPDATE_OPT_IN_STEPS.has(step.id)).map(

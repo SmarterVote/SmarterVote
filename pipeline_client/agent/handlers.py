@@ -49,6 +49,7 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
+from shared.election_results import validate_race_result
 from shared.name_variants import canonical_given_name, text_names_given_name
 
 logger = logging.getLogger("pipeline")
@@ -2415,3 +2416,33 @@ def _make_editing_handlers(
             handlers[tool_name] = _scope_guard(tool_name, handlers[tool_name])
 
     return handlers
+
+
+def _make_results_handlers(race_json: Dict[str, Any], log: Callable) -> Dict[str, Any]:
+    """The results phase's only write. Anything the checks reject is never stored."""
+
+    def record_race_result(args: Dict[str, Any]) -> str:
+        now = datetime.now(timezone.utc)
+        party_by_name = {
+            str(c.get("name") or "").casefold(): c.get("party") for c in race_json.get("candidates", []) if isinstance(c, dict)
+        }
+        result: Dict[str, Any] = {
+            key: args.get(key)
+            for key in ("status", "winner_name", "called_by", "called_at", "pct_reporting", "runoff_date", "correction_note")
+        }
+        result["candidates"] = [
+            {**row, "party": party_by_name.get(str(row.get("name") or "").casefold())}
+            for row in args.get("candidates") or []
+            if isinstance(row, dict)
+        ]
+        result["sources"] = [{**source, "last_accessed": now.isoformat()} for source in args.get("sources") or []]
+        result["winner_party"] = party_by_name.get(str(args.get("winner_name") or "").casefold())
+        result["as_of"] = now.isoformat()
+        errors = validate_race_result(result, race_json, previous=race_json.get("result"), now=now)
+        if errors:
+            log("warning", f"  Result rejected: {'; '.join(errors)}")
+            return "Rejected, nothing stored: " + "; ".join(errors)
+        race_json["result"] = result
+        return f"Recorded status {result['status']}."
+
+    return {"record_race_result": record_race_result}

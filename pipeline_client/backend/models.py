@@ -37,6 +37,7 @@ class PipelineStep(str, Enum):
     VOTER_RESOURCES = "voter_resources"
     REVIEW = "review"
     ITERATION = "iteration"
+    RESULTS = "results"
 
 
 # Ordered lists for run creation

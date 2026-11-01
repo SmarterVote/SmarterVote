@@ -4,6 +4,8 @@
   import { page } from "$app/stores";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
+  import ResultBanner from "$lib/components/ResultBanner.svelte";
+  import { liveResults, newestResult } from "$lib/utils/results";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import { getDraftRace, getRace } from "$lib/api";
   import type { CanonicalIssue, Race } from "$lib/types";
@@ -22,6 +24,10 @@
   } from "$lib/utils/racePage";
 
   export let data: { prerenderedRace?: Race | null };
+
+  $: currentResult = race
+    ? newestResult(race.result, $liveResults.get(race.id))
+    : null;
 
   let race: Race | null = data.prerenderedRace ?? null;
   let loading = !race;
@@ -312,6 +318,16 @@
           {raceDisplayTitle(race)}
         </p>{/if}
       <p class="sr-only" role="status" aria-live="polite">{copyStatus}</p>
+      {#if race && currentResult}
+        <div class="mt-4">
+          <ResultBanner
+            raceId={race.id}
+            result={currentResult}
+            candidates={race.candidates}
+            showCompareLink={false}
+          />
+        </div>
+      {/if}
     </header>
 
     {#if loading}
@@ -348,6 +364,7 @@
         {race}
         {candidates}
         {isDraftPreview}
+        preElectionForecast={!!currentResult}
         bind:selectedIssue
         onToggle={toggleSelection}
       />

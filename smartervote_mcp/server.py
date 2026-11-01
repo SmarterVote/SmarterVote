@@ -1255,6 +1255,30 @@ async def queue_races(
 
 
 @mcp.tool(structured_output=False)
+async def refresh_race_results(race_ids: List[str], note: str | None = None) -> Dict[str, Any]:
+    """Queue the bounded results check on the published baseline. Never publishes."""
+    return await queue_races(
+        race_ids,
+        cheap_mode=True,
+        baseline_source="published",
+        enabled_steps=["results"],
+        note=note or "Election results check.",
+    )
+
+
+@mcp.tool(structured_output=False)
+async def publish_race_results(race_ids: List[str]) -> Dict[str, Any]:
+    """Publish only the checked result block from each draft; failed races are listed, not published."""
+    return await _client().post("/api/results/publish", json={"race_ids": race_ids})
+
+
+@mcp.tool(structured_output=False)
+async def get_public_results() -> Dict[str, Any]:
+    """Read the published results file that the site shows."""
+    return await _client().get("/public/results")
+
+
+@mcp.tool(structured_output=False)
 async def refresh_race_core(
     race_ids: List[str],
     baseline_source: Literal["latest", "published"] = "latest",

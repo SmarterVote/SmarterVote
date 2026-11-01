@@ -20,6 +20,7 @@ from .image_resolution import run_image_resolution_phase
 from .issues import run_issues_phase
 from .polling import run_polling_phase
 from .refinement import run_refinement_phase
+from .results import run_results_phase
 from .voter_resources import run_voter_resources_phase
 
 #: Run order is load-bearing: issues and finance populate the fields refinement
@@ -32,6 +33,7 @@ _PHASES = (
     run_polling_phase,
     run_forecast_phase,
     run_voter_resources_phase,
+    run_results_phase,
 )
 
 
