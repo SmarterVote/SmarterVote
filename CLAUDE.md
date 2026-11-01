@@ -159,3 +159,7 @@ silently aborting an escalation.
 - **Local development**: `docs/local-development.md`
 - **Documentation map and status**: `docs/README.md`
 - **AI conventions (Copilot-style)**: `.github/copilot-instructions.md`
+
+## Cloud sessions
+
+In cloud sessions `gh` reaches GitHub through REST only: use `gh api`, because GraphQL commands such as `gh repo view` return 403.
