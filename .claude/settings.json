@@ -1,3 +1,8 @@
 {
-  "enabledMcpjsonServers": ["smartervote-races"]
+  "enabledMcpjsonServers": ["smartervote-races"],
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"" }] }
+    ]
+  }
 }
