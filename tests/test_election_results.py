@@ -51,7 +51,10 @@ def test_nothing_is_accepted_before_polls_close():
 
 
 def test_poll_close_is_the_states_last_close_and_unknown_states_wait_longest():
-    assert poll_close_utc("Ohio") == datetime(2026, 11, 4, 1, tzinfo=timezone.utc)
+    # 7:30 and 8 p.m. Eastern, which is UTC-5 on Election Day.
+    assert poll_close_utc("Ohio") == datetime(2026, 11, 4, 0, 30, tzinfo=timezone.utc)
+    assert poll_close_utc("Florida") == datetime(2026, 11, 4, 1, tzinfo=timezone.utc)
+    assert poll_close_utc("Alaska") == datetime(2026, 11, 4, 6, tzinfo=timezone.utc)
     assert poll_close_utc("Alaska") == poll_close_utc("Atlantis")
 
 

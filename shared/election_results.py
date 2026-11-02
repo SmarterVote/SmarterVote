@@ -24,16 +24,15 @@ FROZEN_POST_ELECTION_STEPS = frozenset({"discovery", "polling", "forecast"})
 
 _ALLOW_POST_ELECTION_ENV = "PIPELINE_ALLOW_POST_ELECTION_STEPS"
 
-# Latest statewide poll close on 2026-11-03, as UTC hours after midnight Nov 3.
-# Deliberately conservative: where a state spans time zones this is the last
-# zone, because a result accepted early is worse than one accepted late.
-_LATEST_POLL_CLOSE_UTC_HOUR: Dict[str, int] = {
+# Latest statewide poll close on 2026-11-03, in UTC hours after midnight Nov 3
+# (Eastern is UTC-5 on Election Day, so 25 is 8 p.m. ET). Source:
+# https://www.270towin.com/poll-closing-times/ using each state's last zone.
+_LATEST_POLL_CLOSE_UTC_HOUR: Dict[str, float] = {
     **dict.fromkeys(["Georgia", "Indiana", "Kentucky", "South Carolina", "Vermont", "Virginia"], 24),
-    **dict.fromkeys(["North Carolina", "Ohio", "West Virginia"], 25),
+    **dict.fromkeys(["North Carolina", "Ohio", "West Virginia"], 24.5),
     **dict.fromkeys(
         [
             "Alabama",
-            "Arkansas",
             "Connecticut",
             "Delaware",
             "District of Columbia",
@@ -51,8 +50,9 @@ _LATEST_POLL_CLOSE_UTC_HOUR: Dict[str, int] = {
             "Rhode Island",
             "Tennessee",
         ],
-        26,
+        25,
     ),
+    "Arkansas": 25.5,
     **dict.fromkeys(
         [
             "Arizona",
@@ -65,19 +65,20 @@ _LATEST_POLL_CLOSE_UTC_HOUR: Dict[str, int] = {
             "Nebraska",
             "New Mexico",
             "New York",
+            "North Dakota",
             "South Dakota",
             "Texas",
             "Wisconsin",
             "Wyoming",
         ],
-        27,
+        26,
     ),
-    **dict.fromkeys(["Montana", "Nevada", "North Dakota", "Utah"], 28),
-    **dict.fromkeys(["California", "Idaho", "Oregon", "Washington"], 29),
-    "Hawaii": 30,
-    "Alaska": 31,
+    **dict.fromkeys(["Montana", "Nevada", "Utah"], 27),
+    **dict.fromkeys(["California", "Idaho", "Oregon", "Washington"], 28),
+    "Hawaii": 29,
+    "Alaska": 30,
 }
-_UNKNOWN_STATE_POLL_CLOSE_UTC_HOUR = 31
+_UNKNOWN_STATE_POLL_CLOSE_UTC_HOUR = 30
 
 
 def poll_close_utc(state: Optional[str], election_date: str = GENERAL_ELECTION_DATE) -> datetime:
