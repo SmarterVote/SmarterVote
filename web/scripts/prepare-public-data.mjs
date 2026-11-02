@@ -47,7 +47,11 @@ export const FORECAST_DETAIL_FIELDS = [
 /** Directory, relative to the static root, holding the per-race payloads. */
 export const FORECAST_DIR = "forecast";
 
-const NON_RACE_FILES = new Set(["summaries.json", "chamber_forecasts.json"]);
+const NON_RACE_FILES = new Set([
+  "summaries.json",
+  "chamber_forecasts.json",
+  "results.json",
+]);
 /** Child routes of /races/<race>/ that are not candidate pages. */
 const RESERVED_CANDIDATE_SLUGS = new Set(["compare"]);
 const RACE_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,99}$/;
@@ -209,7 +213,12 @@ export function preparePublicData(staticDir, { log = console.log } = {}) {
   let stubs = 0;
 
   for (const file of fs.readdirSync(staticDir).sort()) {
-    if (!file.endsWith(".json") || file === "chamber_forecasts.json") continue;
+    if (
+      !file.endsWith(".json") ||
+      file === "chamber_forecasts.json" ||
+      file === "results.json"
+    )
+      continue;
     const filePath = path.join(staticDir, file);
     const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
 

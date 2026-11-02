@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from google.api_core.exceptions import NotFound, PreconditionFailed
 
 from shared.config import NON_RACE_CATALOG_IDS
+from shared.election_results import validate_race_result
 from shared.race_catalog import (
     build_agent_metrics_summary,
     build_candidate_summaries,
@@ -409,6 +410,7 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> bool:
     import firestore_helpers  # avoid circular at module load
 
     _assert_publishable_race(data, race_id)
+    _carry_forward_published_result(race_id, data)
     # Strict archive: a provider failure aborts the publish rather than
     # overwriting races/{id}.json with no retired copy of the previous version.
     _gcs_archive_active_if_present(race_id, "races", "published")
@@ -431,6 +433,72 @@ def publish_race_to_gcs(race_id: str, data: Dict[str, Any]) -> bool:
 
 # Alias used by races_admin router
 _publish_race_gcs = publish_race_to_gcs
+
+
+def _carry_forward_published_result(race_id: str, data: Dict[str, Any]) -> None:
+    """A draft that predates the live result must not erase it when published."""
+    published = _gcs_get_race_json(race_id, "races") or {}
+    live = published.get("result")
+    if not isinstance(live, dict):
+        return
+    incoming = data.get("result")
+    if not isinstance(incoming, dict) or str(incoming.get("as_of") or "") < str(live.get("as_of") or ""):
+        data["result"] = live
+
+
+def publish_race_result(race_id: str) -> Dict[str, Any]:
+    """Copy only the checked ``result`` block from the draft onto the published race.
+
+    Everything else on the draft stays unpublished, and ``updated_utc`` stays put
+    because the forecast drawer uses it to match its deploy-time payload.
+    """
+    draft = _gcs_get_race_json(race_id, "drafts")
+    if not draft or not isinstance(draft.get("result"), dict):
+        raise ValueError("The draft has no result to publish")
+    published = _gcs_get_race_json(race_id, "races")
+    if not published:
+        raise ValueError("Results can only be added to a published race")
+    errors = validate_race_result(draft["result"], published, previous=published.get("result"))
+    if errors:
+        raise ValueError("; ".join(errors))
+    published["result"] = draft["result"]
+    if not _gcs_put_race_json(race_id, "races", published):
+        raise RuntimeError(f"Failed to write published race blob for {race_id}")
+    return published
+
+
+def update_results_index(entries: Dict[str, Dict[str, Any]], max_attempts: int = 5) -> None:
+    """Merge rows into races/results.json, retrying if another publish wrote first."""
+    client = _get_gcs_admin()
+    if client is None or not _GCS_BUCKET:
+        raise RuntimeError("GCS client is unavailable while updating races/results.json")
+    blob = client.bucket(_GCS_BUCKET).blob("races/results.json")
+    for _attempt in range(max_attempts):
+        generation = 0
+        rows: Dict[str, Dict[str, Any]] = {}
+        if blob.exists():
+            blob.reload()
+            generation = int(blob.generation or 0)
+            rows = {row["id"]: row for row in json.loads(blob.download_as_text()).get("races", []) if row.get("id")}
+        rows.update(entries)
+        payload = {"generated_at": datetime.now(timezone.utc).isoformat(), "races": [rows[key] for key in sorted(rows)]}
+        try:
+            blob.upload_from_string(json.dumps(payload), content_type="application/json", if_generation_match=generation)
+            return
+        except PreconditionFailed:
+            logging.info("races/results.json changed concurrently; retrying")
+    raise RuntimeError("races/results.json kept changing during update")
+
+
+def load_results_index() -> Dict[str, Any]:
+    """The public results file, or an empty one before anything is published."""
+    client = _get_gcs_admin()
+    if client is None or not _GCS_BUCKET:
+        return {"generated_at": None, "races": []}
+    blob = client.bucket(_GCS_BUCKET).blob("races/results.json")
+    if not blob.exists():
+        return {"generated_at": None, "races": []}
+    return json.loads(blob.download_as_text())
 
 
 def save_chamber_forecasts(data: Dict[str, Any], draft: bool = False) -> None:

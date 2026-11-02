@@ -31,7 +31,7 @@ FIRESTORE_RESEARCH_CHECKPOINTS_COLLECTION = "research_checkpoints"
 # backfilled as contests, and no API may accept them as a race_id: a request
 # for race "summaries" addresses races/summaries.json, the public index, so an
 # unpublish or delete of it would wipe every published race from the site.
-NON_RACE_CATALOG_IDS = frozenset({"chamber_forecasts", "summaries"})
+NON_RACE_CATALOG_IDS = frozenset({"chamber_forecasts", "results", "summaries"})
 
 # Subcollections, nested under a document rather than at the root. Named apart
 # because `runs` is a child of a race document and is a different thing from the

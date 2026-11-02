@@ -52,6 +52,10 @@ const race = {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
 
+// The first import of a race page compiles the whole page. Under a full parallel
+// run that alone can pass 5s, and a timed-out test's render leaks into the next.
+vi.setConfig({ testTimeout: 30_000 });
+
 describe("draft preview fallback", () => {
   beforeEach(() => {
     h.getRace.mockReset();

@@ -26,6 +26,7 @@ const STATIC_PAGES = [
   { path: "/", source: "src/routes/+page.svelte", data: true },
   { path: "/elections/", source: "src/routes/elections", data: true },
   { path: "/forecast/", source: "src/routes/forecast", data: true },
+  { path: "/results/", source: "src/routes/results" },
   { path: "/my-ballot/", source: "src/routes/my-ballot", data: true },
   { path: "/about/", source: "src/routes/about" },
   { path: "/support/", source: "src/routes/support" },

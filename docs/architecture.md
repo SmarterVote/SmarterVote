@@ -96,6 +96,8 @@ The admin dashboard should target `services/races-api`.
 | GET    | `/api/research/status`                                      | Provenance-safe research status and spend        |
 | GET    | `/api/research/checkpoints/{race_id}`                       | Read official result checkpoint                 |
 | PUT    | `/api/research/checkpoints/{race_id}`                       | Record official result evidence                 |
+| POST   | `/api/results/publish`                                      | Publish only the checked result block from drafts |
+| GET    | `/public/results`                                           | Public results file, cached at the Cloudflare edge |
 | GET    | `/api/races/{race_id}/data?draft=true`                      | Get draft or published JSON                      |
 | GET    | `/api/races/{race_id}/versions`                             | List retired versions                            |
 | GET    | `/api/races/{race_id}/versions/{filename}`                  | Read a retired version JSON file                 |

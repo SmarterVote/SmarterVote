@@ -1246,6 +1246,63 @@ VOTER_RESOURCE_TOOLS: List[Dict] = [
     )
 ]
 
+RECORD_RACE_RESULT_TOOL: Dict = {
+    "type": "function",
+    "function": {
+        "name": "record_race_result",
+        "description": "Record what sources report about this general election. Rejected calls explain what to fix.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "not_yet_reported",
+                        "counting",
+                        "too_close",
+                        "called",
+                        "runoff_required",
+                        "rcv_pending",
+                        "certified",
+                    ],
+                },
+                "winner_name": {"type": "string", "description": "Exact roster name. Only for called or certified."},
+                "called_by": {"type": "string", "description": "The organization that projected the winner, such as AP."},
+                "called_at": {"type": "string", "description": "ISO 8601 time of the call."},
+                "pct_reporting": {"type": "number", "description": "Estimated share of votes counted, 0-100."},
+                "runoff_date": {"type": "string", "description": "YYYY-MM-DD, only for runoff_required."},
+                "correction_note": {"type": "string", "description": "Why an earlier call or count was wrong, if one was."},
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "votes": {"type": "integer"},
+                            "pct": {"type": "number"},
+                        },
+                        "required": ["name"],
+                    },
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "url": {"type": "string"},
+                            "type": {"type": "string", "enum": ["news", "government"]},
+                            "title": {"type": "string"},
+                            "published_at": {"type": "string"},
+                        },
+                        "required": ["url", "type"],
+                    },
+                },
+            },
+            "required": ["status", "sources"],
+        },
+    },
+}
+
 # ---------------------------------------------------------------------------
 # Read-only verification tool
 # ---------------------------------------------------------------------------

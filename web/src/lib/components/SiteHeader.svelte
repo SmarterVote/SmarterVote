@@ -247,6 +247,7 @@
     { href: "/my-ballot/", label: "My Ballot" },
     { href: "/elections/", label: "Elections" },
     { href: "/forecast/", label: "Forecast" },
+    { href: "/results/", label: "Results" },
     { href: "/about/", label: "About" },
     { href: "/support/", label: "Support" },
   ];
