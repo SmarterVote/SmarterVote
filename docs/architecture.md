@@ -98,6 +98,7 @@ The admin dashboard should target `services/races-api`.
 | PUT    | `/api/research/checkpoints/{race_id}`                       | Record official result evidence                 |
 | POST   | `/api/results/publish`                                      | Publish only the checked result block from drafts |
 | GET    | `/public/results`                                           | Public results file, cached at the Cloudflare edge |
+| GET    | `/public/forecast-live`                                     | Chamber projection with called races counted as certain; edge-cached like results |
 | GET    | `/api/races/{race_id}/data?draft=true`                      | Get draft or published JSON                      |
 | GET    | `/api/races/{race_id}/versions`                             | List retired versions                            |
 | GET    | `/api/races/{race_id}/versions/{filename}`                  | Read a retired version JSON file                 |

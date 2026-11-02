@@ -232,6 +232,34 @@ export interface PublicResultsFile {
   races: PublicRaceResult[];
 }
 
+/** One chamber of shared/forecast_summary.py:build_live_chamber_projection. */
+export interface LiveChamberProjection {
+  control_party: "Democratic" | "Republican" | "Other";
+  control_probability: number;
+  outcome_probabilities: Record<string, number>;
+  projected_seats: Record<string, number>;
+  seat_distribution: Record<string, number>;
+  threshold: number;
+  total_seats: number;
+  vp_tiebreak_party?: string;
+  /** Chamber-control races whose published result names a winner. */
+  called_count: number;
+  /** Chamber-control races on this cycle's ballot (holdover seats excluded). */
+  total_count: number;
+  /** Latest result as_of among the called races, or null with none called. */
+  as_of: string | null;
+}
+
+/** Mirrors services/races-api/routers/results.py:public_forecast_live. */
+export interface LiveForecastFile {
+  schema_version: string;
+  results_updated_at: string | null;
+  generated_at: string;
+  chambers: Partial<
+    Record<"house" | "senate" | "governors", LiveChamberProjection>
+  >;
+}
+
 export interface RaceForecast {
   predicted_winner_name?: string | null;
   predicted_winner_party?: string | null;

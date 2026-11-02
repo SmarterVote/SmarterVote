@@ -154,6 +154,8 @@ FRONTEND_ONLY_OR_OTHER_BACKEND_TYPES: Dict[str, str] = {
     "PublicResultCandidate": "A shared/models.py:ResultCandidate row plus the headshot result_index_entry adds for the public file.",
     "PublicRaceResult": "Mirrors shared/election_results.py:result_index_entry (the compact row in races/results.json), not a Pydantic model.",
     "PublicResultsFile": "Mirrors services/races-api/routers/results.py:public_results.",
+    "LiveChamberProjection": "One chamber of shared/forecast_summary.py:build_live_chamber_projection, not a Pydantic model.",
+    "LiveForecastFile": "Mirrors services/races-api/routers/results.py:public_forecast_live.",
     "CandidateSummary": "Mirrors services/races-api/schemas.py:CandidateSummary (search/listing projection), not shared/models.py:Candidate.",
     "RaceSummary": "Mirrors services/races-api/schemas.py:RaceSummary, not shared/models.py:RaceJSON.",
     "RaceForecastSummary": "Mirrors services/races-api/schemas.py:RaceForecastSummary (the compact forecast on a summary), not shared/models.py:RaceForecast.",
