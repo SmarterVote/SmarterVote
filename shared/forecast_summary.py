@@ -434,6 +434,10 @@ def _race_party_probabilities(forecast: Dict[str, Any]) -> Dict[Party, float]:
     rep = totals.get("Republican", 0.0)
     if dem or rep:
         return {"Democratic": dem, "Republican": rep, "Other": max(0.0, 1.0 - dem - rep)}
+    if totals.get("Other", 0.0) >= SAME_PARTY_PROBABILITY:
+        # A seat certain for a non-major party (e.g. a called Independent win) is
+        # not a major-party toss-up; without this it fell through to the 50/50 default.
+        return {"Democratic": 0.0, "Republican": 0.0, "Other": 1.0}
 
     party = normalize_party(forecast.get("predicted_winner_party"))
     win_probability = forecast.get("win_probability")
@@ -582,9 +586,33 @@ def _race_note(race: Dict[str, Any]) -> str:
     return f"{title} ({rating})"
 
 
+def _bounded_control_probability(value: float, report_decided_exactly: bool) -> float:
+    """Keep a modeled control probability off 0/1; optionally let a decided outcome read exactly."""
+    if report_decided_exactly and value <= _DECIDED_TOLERANCE:
+        return 0.0
+    if report_decided_exactly and value >= 1.0 - _DECIDED_TOLERANCE:
+        return 1.0
+    return max(0.01, min(0.99, value))
+
+
+_DECIDED_TOLERANCE = 1e-9
+
+
 def summarize_chamber(
-    summaries: list[Dict[str, Any]], chamber: Chamber, narrative: str | None = None, analysis: Dict[str, Any] | None = None
+    summaries: list[Dict[str, Any]],
+    chamber: Chamber,
+    narrative: str | None = None,
+    analysis: Dict[str, Any] | None = None,
+    *,
+    report_decided_exactly: bool = False,
 ) -> Dict[str, Any]:
+    """Seat math for one chamber. Pure: the narrative is passed in, never generated here.
+
+    ``report_decided_exactly`` lets a control probability that the seat
+    distribution makes exactly 0 or 1 (every path to the threshold is closed by
+    certain seats, e.g. called races) read as 0/1 instead of the 1%/99% bounds
+    a modeled forecast is kept within.
+    """
     races = _chamber_races(summaries, chamber)
     active_states = {state for race in races if (state := race_state(race))}
     projected: Dict[Party, int] = {"Democratic": 0, "Republican": 0, "Other": 0}
@@ -714,8 +742,8 @@ def summarize_chamber(
             "Other": 0,
         }
 
-    dem_control_probability = max(0.01, min(0.99, dem_control_probability))
-    republican_probability = max(0.01, min(0.99, republican_probability))
+    dem_control_probability = _bounded_control_probability(dem_control_probability, report_decided_exactly)
+    republican_probability = _bounded_control_probability(republican_probability, report_decided_exactly)
 
     if dem_control_probability > republican_probability:
         control_party: Party = "Democratic"
@@ -824,6 +852,140 @@ def build_chamber_forecasts(
         "governors": chambers["governors"]["narrative"],
         "chambers": chambers,
         "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Live projection on election night
+# ---------------------------------------------------------------------------
+#
+# Deliberately simple: a race whose published result names a winner counts as
+# certain for that winner's party, and every other race keeps its frozen
+# pre-election probabilities. Nothing is inferred from early results (no swing
+# or conditional updating), so with no calls the projection is exactly the
+# pre-election chamber math.
+
+#: Result statuses that name a winner; tests pin this to shared.election_results.WINNER_STATUSES.
+LIVE_WINNER_STATUSES = frozenset({"called", "certified", "unopposed"})
+
+_LIVE_CHAMBER_FIELDS = (
+    "control_party",
+    "control_probability",
+    "outcome_probabilities",
+    "projected_seats",
+    "seat_distribution",
+    "threshold",
+    "total_seats",
+    "vp_tiebreak_party",
+)
+
+
+def _result_rows(results_index: Any) -> Dict[str, Dict[str, Any]]:
+    """Result rows keyed by race id, from races/results.json (or a bare list of rows)."""
+    rows = results_index.get("races") if isinstance(results_index, dict) else results_index
+    if not isinstance(rows, list):
+        return {}
+    return {str(row["id"]): row for row in rows if isinstance(row, dict) and row.get("id")}
+
+
+def called_result_party(race: Dict[str, Any], result: Optional[Dict[str, Any]]) -> Optional[Party]:
+    """The party of a published winner, or None when the race is uncalled or the party is unclear.
+
+    The winner must match exactly one candidate on the race's roster. The
+    roster's party and the result's own ``winner_party`` must agree when both
+    are readable; a disagreement, or no readable party at all, returns None so
+    the race keeps its pre-election probabilities instead of being guessed.
+    """
+    if not isinstance(result, dict) or result.get("status") not in LIVE_WINNER_STATUSES:
+        return None
+    winner = str(result.get("winner_name") or "").strip().casefold()
+    if not winner:
+        return None
+    candidates = race.get("candidates") if isinstance(race.get("candidates"), list) else []
+    matches = [
+        candidate
+        for candidate in candidates
+        if isinstance(candidate, dict) and str(candidate.get("name") or "").strip().casefold() == winner
+    ]
+    if len(matches) != 1:
+        return None
+    roster_party = classify_party(matches[0].get("party"))
+    result_party = classify_party(result.get("winner_party"))
+    if roster_party and result_party and roster_party != result_party:
+        return None
+    return roster_party or result_party
+
+
+def _called_parties(summaries: Iterable[Dict[str, Any]], results_index: Any) -> Dict[str, Party]:
+    rows = _result_rows(results_index)
+    called: Dict[str, Party] = {}
+    for race in summaries:
+        race_id = str(race.get("id") or "")
+        party = called_result_party(race, rows.get(race_id)) if race_id else None
+        if party:
+            called[race_id] = party
+    return called
+
+
+def _certain_forecast(party: Party) -> Dict[str, Any]:
+    probabilities: Dict[str, float] = {"Democratic": 0.0, "Republican": 0.0, "Other": 0.0}
+    probabilities[party] = 1.0
+    rating = {"Democratic": "safe_d", "Republican": "safe_r"}.get(party, "")
+    return {"predicted_winner_party": party, "win_probability": 1.0, "party_probabilities": probabilities, "rating": rating}
+
+
+def _apply_called(summaries: list[Dict[str, Any]], called: Dict[str, Party]) -> list[Dict[str, Any]]:
+    updated: list[Dict[str, Any]] = []
+    for race in summaries:
+        party = called.get(str(race.get("id") or ""))
+        forecast = race.get("forecast") if isinstance(race.get("forecast"), dict) else None
+        # A same-party contest's seat control is already certain; leave it as published.
+        if party is None or (forecast and same_party_contest_party(forecast)):
+            updated.append(dict(race))
+        else:
+            updated.append({**race, "forecast": _certain_forecast(party)})
+    return updated
+
+
+def apply_called_results(summaries: list[Dict[str, Any]], results_index: Any) -> list[Dict[str, Any]]:
+    """Copies of *summaries* where each called race is certain for its winner's party.
+
+    Uncalled races (runoff_required, rcv_pending, too_close, counting,
+    not_yet_reported, or no result) and races whose winner's party cannot be
+    read come back unchanged. The inputs are not modified.
+    """
+    return _apply_called(summaries, _called_parties(summaries, results_index))
+
+
+def build_live_chamber_projection(
+    summaries: list[Dict[str, Any]], results_index: Any, now: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """Chamber control with called races locked in and every other race as forecast before the election.
+
+    Reuses :func:`summarize_chamber` with no narrative, so no model is called.
+    ``called_count`` / ``total_count`` count this cycle's chamber-control races
+    (holdover seats are in the seat math but are not races to call).
+    """
+    called = _called_parties(summaries, results_index)
+    live_summaries = _apply_called(summaries, called)
+    rows = _result_rows(results_index)
+    chambers: Dict[str, Dict[str, Any]] = {}
+    for chamber in ("house", "senate", "governors"):
+        races = _chamber_races(summaries, chamber)
+        called_ids = [race_id for race in races if (race_id := str(race.get("id") or "")) in called]
+        summary = summarize_chamber(live_summaries, chamber, narrative=None, report_decided_exactly=True)
+        stamps = [str(rows[race_id]["as_of"]) for race_id in called_ids if rows[race_id].get("as_of")]
+        chambers[chamber] = {
+            **{key: summary[key] for key in _LIVE_CHAMBER_FIELDS if key in summary},
+            "called_count": len(called_ids),
+            "total_count": len(races),
+            "as_of": max(stamps) if stamps else None,
+        }
+    return {
+        "schema_version": "forecast_live.v1",
+        "results_updated_at": results_index.get("generated_at") if isinstance(results_index, dict) else None,
+        "generated_at": (now or datetime.now(timezone.utc)).isoformat(),
+        "chambers": chambers,
     }
 
 

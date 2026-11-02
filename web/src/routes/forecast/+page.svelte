@@ -6,6 +6,7 @@
   import ForecastElectoralMap from "$lib/components/forecast/ForecastElectoralMap.svelte";
   import ForecastHoldovers from "$lib/components/forecast/ForecastHoldovers.svelte";
   import ForecastKeyRaces from "$lib/components/forecast/ForecastKeyRaces.svelte";
+  import ForecastLiveProjection from "$lib/components/forecast/ForecastLiveProjection.svelte";
   import ForecastMissingRaces from "$lib/components/forecast/ForecastMissingRaces.svelte";
   import ForecastOutlookAnalysis from "$lib/components/forecast/ForecastOutlookAnalysis.svelte";
   import ForecastProjectionSummary from "$lib/components/forecast/ForecastProjectionSummary.svelte";
@@ -33,6 +34,7 @@
     buildSeatOutcomeChart,
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
+  import { liveChamberProjection, liveForecast } from "$lib/utils/liveForecast";
   import { canonicalStateName } from "$lib/utils/states";
   import { scrollBehavior } from "$lib/utils/motion";
 
@@ -184,6 +186,12 @@
   $: mostLikelyOutcome = getMostLikelySeatOutcome(
     chamberSummary?.seat_distribution ?? {},
   );
+
+  // Election night: shown only once a race in this chamber is called. Until
+  // then, or if the live file fails to load, the page is the forecast alone.
+  $: liveProjection = hydrated
+    ? liveChamberProjection($liveForecast, activeTab)
+    : null;
 </script>
 
 <svelte:head>
@@ -274,6 +282,14 @@
         aria-labelledby="forecast-tab-{activeTab}"
         class="space-y-8"
       >
+        {#if liveProjection}
+          <ForecastLiveProjection
+            projection={liveProjection}
+            resultsUpdatedAt={$liveForecast?.results_updated_at ?? null}
+          />
+          <h2 class="h-section -mb-4">Pre-election forecast</h2>
+        {/if}
+
         <ForecastSummaryCard
           {activeTab}
           {controlParty}

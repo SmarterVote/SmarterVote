@@ -86,3 +86,57 @@ def test_a_newer_draft_result_survives_a_normal_publish():
     with patch.object(gcs_helpers, "_gcs_get_race_json", return_value=_race(result=RESULT)):
         gcs_helpers._carry_forward_published_result("oh-governor-2026", data)
     assert data["result"] == newer
+
+
+def _live_client(summaries):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from routers import results
+
+    class _Summaries:
+        calls = 0
+
+        def get_race_summaries(self):
+            self.calls += 1
+            return summaries
+
+    app = FastAPI()
+    app.include_router(results.router)
+    app.state.publish_service = _Summaries()
+    results._clear_results_cache()
+    return TestClient(app), results, app.state.publish_service
+
+
+def test_public_forecast_live_locks_in_called_races_and_is_cacheable():
+    race = {
+        "id": "oh-governor-2026",
+        "office": "Governor",
+        "state": "Ohio",
+        "candidates": [{"name": "Ann Lee", "party": "Democratic"}, {"name": "Bob Ray", "party": "Republican"}],
+        "forecast": {"party_probabilities": {"Democratic": 0.4, "Republican": 0.6}, "rating": "lean_r"},
+    }
+    index = {
+        "generated_at": "2026-11-04T03:06:00Z",
+        "races": [{**RESULT, "id": "oh-governor-2026", "winner_party": "Democratic"}],
+    }
+    client, results, service = _live_client([race])
+    try:
+        with patch.object(gcs_helpers, "load_results_index", return_value=index) as load:
+            response = client.get("/public/forecast-live")
+            assert client.get("/public/forecast-live").json() == response.json()
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == results._RESULTS_CACHE_CONTROL
+        governors = response.json()["chambers"]["governors"]
+        assert (governors["called_count"], governors["total_count"]) == (1, 1)
+        assert governors["as_of"] == RESULT["as_of"]
+        assert response.json()["results_updated_at"] == "2026-11-04T03:06:00Z"
+        # The second request was served from the 30s local cache.
+        assert load.call_count == 1 and service.calls == 1
+
+        # Publishing results clears the projection along with the results file.
+        results._clear_results_cache()
+        with patch.object(gcs_helpers, "load_results_index", return_value={"generated_at": None, "races": []}):
+            governors = client.get("/public/forecast-live").json()["chambers"]["governors"]
+        assert governors["called_count"] == 0
+    finally:
+        results._clear_results_cache()
