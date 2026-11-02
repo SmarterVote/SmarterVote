@@ -799,6 +799,9 @@ Status:
 - certified: the official election authority certified the result.
 
 Use roster names exactly. Mark each source's type as "news" or "government".
+Whenever a source reports them, give votes and pct for every candidate, including
+on a called race. Set correction_note only when the previously recorded result
+above was wrong; if none is recorded, there is nothing to correct.
 If the tool rejects your call, fix only what it names, or lower the status."""
 
 # ------------------------------------------------------------------
