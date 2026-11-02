@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from pipeline_client.agent.handlers import _make_results_handlers
+from pipeline_client.agent.prompts import RESULTS_USER
 from pipeline_client.agent.web_tools import _fresh_reads_only, fresh_web_reads
 from shared.election_results import poll_close_utc, post_election_frozen_steps, result_index_entry, validate_race_result
 from shared.models import RaceResult
@@ -130,6 +131,27 @@ def test_handler_output_matches_the_public_schema():
     model = RaceResult.model_validate({**race["result"], "sources": [{**s, "last_accessed": AFTER_CLOSE} for s in SOURCES]})
     assert model.winner_party == "Democratic"
     assert race["result"]["candidates"][1]["party"] == "Republican"
+
+
+def test_handler_drops_a_correction_note_when_nothing_was_recorded():
+    race = {**RACE}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(called(correction_note="Corrects an earlier entry"))
+    assert race["result"]["correction_note"] is None
+
+
+def test_handler_keeps_a_correction_note_on_a_recorded_result():
+    race = {**RACE, "result": called()}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(called(correction_note="AP retracted its call"))
+    assert race["result"]["correction_note"] == "AP retracted its call"
+
+
+def test_results_prompt_asks_for_vote_counts_and_limits_correction_notes():
+    assert "give votes and pct for every candidate" in " ".join(RESULTS_USER.split())
+    assert "if none is recorded, there is nothing to correct" in " ".join(RESULTS_USER.split())
 
 
 def test_results_step_is_never_part_of_a_default_run():

@@ -1271,7 +1271,10 @@ RECORD_RACE_RESULT_TOOL: Dict = {
                 "called_at": {"type": "string", "description": "ISO 8601 time of the call."},
                 "pct_reporting": {"type": "number", "description": "Estimated share of votes counted, 0-100."},
                 "runoff_date": {"type": "string", "description": "YYYY-MM-DD, only for runoff_required."},
-                "correction_note": {"type": "string", "description": "Why an earlier call or count was wrong, if one was."},
+                "correction_note": {
+                    "type": "string",
+                    "description": "Why the previously recorded call or count was wrong. Omit if nothing was recorded or nothing was wrong.",
+                },
                 "candidates": {
                     "type": "array",
                     "items": {

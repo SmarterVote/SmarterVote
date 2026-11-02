@@ -2438,7 +2438,11 @@ def _make_results_handlers(race_json: Dict[str, Any], log: Callable) -> Dict[str
         result["sources"] = [{**source, "last_accessed": now.isoformat()} for source in args.get("sources") or []]
         result["winner_party"] = party_by_name.get(str(args.get("winner_name") or "").casefold())
         result["as_of"] = now.isoformat()
-        errors = validate_race_result(result, race_json, previous=race_json.get("result"), now=now)
+        previous = race_json.get("result")
+        if not isinstance(previous, dict):
+            # The note is what lets a retraction past the regression check, so it needs something to correct.
+            result["correction_note"] = None
+        errors = validate_race_result(result, race_json, previous=previous, now=now)
         if errors:
             log("warning", f"  Result rejected: {'; '.join(errors)}")
             return "Rejected, nothing stored: " + "; ".join(errors)
