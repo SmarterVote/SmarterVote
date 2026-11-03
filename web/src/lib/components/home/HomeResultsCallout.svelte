@@ -30,7 +30,7 @@
     <div class="min-w-0">
       <h2 id="home-results-heading" class="h-card">Election results</h2>
       <p class="mt-1 text-sm leading-6 text-content-muted">
-        Live results for tonight's races as they're counted and called.
+        Live results as races are counted and called.
       </p>
       {#if called > 0}
         <p class="mt-1 text-xs font-semibold text-content-subtle">
