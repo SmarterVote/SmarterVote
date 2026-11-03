@@ -287,25 +287,31 @@
             projection={liveProjection}
             resultsUpdatedAt={$liveForecast?.results_updated_at ?? null}
           />
-          <h2 class="h-section -mb-4">Pre-election forecast</h2>
         {/if}
 
-        <ForecastSummaryCard
-          {activeTab}
-          {controlParty}
-          controlProbability={chamberSummary?.control_probability}
-          vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
-          {mostLikelyOutcome}
-          tossupCount={chamberSummary?.tossup_count ?? 0}
-          competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
-          {cycleYear}
-          {outcomeProbabilities}
-          {projectedSeats}
-          {totalSeats}
-          {threshold}
-          narrative={chamberNarrative}
-          updatedAt={chamberForecasts?.updated_at}
-        />
+        <!-- The heading and card share a wrapper so the tab panel's space-y
+             gap sits above the heading, not between it and the card. -->
+        <div>
+          {#if liveProjection}
+            <h2 class="h-section mb-3">Pre-election forecast</h2>
+          {/if}
+          <ForecastSummaryCard
+            {activeTab}
+            {controlParty}
+            controlProbability={chamberSummary?.control_probability}
+            vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
+            {mostLikelyOutcome}
+            tossupCount={chamberSummary?.tossup_count ?? 0}
+            competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
+            {cycleYear}
+            {outcomeProbabilities}
+            {projectedSeats}
+            {totalSeats}
+            {threshold}
+            narrative={chamberNarrative}
+            updatedAt={chamberForecasts?.updated_at}
+          />
+        </div>
 
         <!-- Interactive Map & Statistics Dashboard Grid -->
         <section
