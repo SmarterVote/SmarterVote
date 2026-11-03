@@ -1,4 +1,5 @@
 <script lang="ts">
+  import HomeResultsCallout from "$lib/components/home/HomeResultsCallout.svelte";
   import HowItWorks from "$lib/components/home/HowItWorks.svelte";
   import InteractiveRaceCompare from "$lib/components/home/InteractiveRaceCompare.svelte";
   import TrustPrinciples from "$lib/components/home/TrustPrinciples.svelte";
@@ -56,6 +57,9 @@
       class="absolute inset-0 opacity-60 bg-[linear-gradient(to_right,var(--color-blue-100)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-blue-100)_1px,transparent_1px)] bg-size-[56px_56px] mask-[linear-gradient(to_right,black,transparent_75%)] dark:opacity-10"
       aria-hidden="true"
     ></div>
+    <div class="page-container relative">
+      <HomeResultsCallout />
+    </div>
     <div
       class="page-container relative grid items-start gap-9 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:gap-10 xl:gap-14"
     >

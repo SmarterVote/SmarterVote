@@ -113,8 +113,9 @@ describe("ForecastLiveProjection", () => {
     expect(screen.getByText("62.0%")).toBeTruthy();
     expect(screen.getByText("Republican")).toBeTruthy();
     expect(screen.getByText("51R-49D")).toBeTruthy();
-    expect(screen.getByText(/Called races count as decided/)).toBeTruthy();
-    expect(screen.getByText(/As of /)).toBeTruthy();
+    const footnote = screen.getByText(/Called races count as decided/);
+    expect(footnote.textContent).toMatch(/pre-election\s+forecast\. As of \S/);
+    expect(footnote.textContent).not.toMatch(/forecast\.As of/);
   });
 
   it("falls back to the results file time and omits a missing time", () => {

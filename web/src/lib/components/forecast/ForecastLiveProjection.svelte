@@ -70,7 +70,6 @@
 
   <p class="mt-3 text-xs text-content-muted">
     Called races count as decided; all other races use the pre-election
-    forecast.{#if asOf}
-      As of {asOf}.{/if}
+    forecast.{asOf ? ` As of ${asOf}.` : ""}
   </p>
 </section>
