@@ -1,5 +1,6 @@
 import { browser } from "$app/environment";
 import { readable, writable } from "svelte/store";
+import { daysUntilElection } from "$lib/utils/electionDate";
 import type {
   PublicRaceResult,
   PublicResultCandidate,
@@ -7,6 +8,30 @@ import type {
   RaceResult,
   RaceResultStatus,
 } from "$lib/types";
+
+/** The 2026 U.S. general election, as a calendar date. */
+export const GENERAL_ELECTION_DATE = "2026-11-03";
+
+/**
+ * Whether results are worth pointing to: Election Day (local calendar date)
+ * or any day after it. It never switches back off.
+ */
+export function isResultsSeason(now: Date = new Date()): boolean {
+  const days = daysUntilElection(GENERAL_ELECTION_DATE, now);
+  return days !== null && days <= 0;
+}
+
+/** How many races the live file names a winner for (called/certified/unopposed). */
+export function calledRaceCount(
+  results: Map<string, PublicRaceResult> | null | undefined,
+): number {
+  if (!results) return 0;
+  let count = 0;
+  for (const row of results.values()) {
+    if (resultGroup(row?.status) === "called") count += 1;
+  }
+  return count;
+}
 
 const RESULTS_URL = "/results-live.json";
 const REFRESH_MS = 60_000;
