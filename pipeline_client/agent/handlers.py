@@ -49,7 +49,8 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
-from shared.election_results import validate_race_result
+from pipeline_client.agent.web_tools import fresh_read_texts
+from shared.election_results import unread_counts, validate_race_result
 from shared.name_variants import canonical_given_name, text_names_given_name
 
 logger = logging.getLogger("pipeline")
@@ -2438,7 +2439,19 @@ def _make_results_handlers(race_json: Dict[str, Any], log: Callable) -> Dict[str
         result["sources"] = [{**source, "last_accessed": now.isoformat()} for source in args.get("sources") or []]
         result["winner_party"] = party_by_name.get(str(args.get("winner_name") or "").casefold())
         result["as_of"] = now.isoformat()
-        errors = validate_race_result(result, race_json, previous=race_json.get("result"), now=now)
+        previous = race_json.get("result")
+        if not isinstance(previous, dict):
+            # The note is what lets a retraction past the regression check, so it needs something to correct.
+            result["correction_note"] = None
+        errors = list(validate_race_result(result, race_json, previous=previous, now=now))
+        texts = fresh_read_texts()
+        if texts is not None:
+            unread = unread_counts(result, texts)
+            if unread:
+                errors.append(
+                    "These counts appear in no page or search result read this run; copy counts exactly "
+                    "as a source prints them, or leave them out: " + "; ".join(unread)
+                )
         if errors:
             log("warning", f"  Result rejected: {'; '.join(errors)}")
             return "Rejected, nothing stored: " + "; ".join(errors)

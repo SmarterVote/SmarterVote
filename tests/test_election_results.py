@@ -6,8 +6,15 @@ from unittest.mock import patch
 import pytest
 
 from pipeline_client.agent.handlers import _make_results_handlers
+from pipeline_client.agent.prompts import RESULTS_USER
 from pipeline_client.agent.web_tools import _fresh_reads_only, fresh_web_reads
-from shared.election_results import poll_close_utc, post_election_frozen_steps, result_index_entry, validate_race_result
+from shared.election_results import (
+    poll_close_utc,
+    post_election_frozen_steps,
+    result_index_entry,
+    unread_counts,
+    validate_race_result,
+)
 from shared.models import RaceResult
 from shared.pipeline_config import EXPLICIT_ONLY_PIPELINE_STEPS
 
@@ -95,6 +102,25 @@ def test_impossible_counts_are_rejected():
     assert any("total" in error for error in errors_for(called(candidates=rows)))
 
 
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [],
+        [{"name": "Ann Lee"}, {"name": "Bob Ray"}],
+        [{"name": "Bob Ray", "pct": 48.0}],
+    ],
+)
+def test_a_reported_result_needs_counts_including_the_winners(rows):
+    assert any("votes or pct" in error for error in errors_for(called(candidates=rows)))
+
+
+def test_unopposed_and_unreported_races_need_no_counts():
+    unopposed = {**RACE, "candidates": RACE["candidates"][:1]}
+    result = called(status="unopposed", candidates=[], called_by=None, called_at=None)
+    assert validate_race_result(result, unopposed, now=AFTER_CLOSE) == []
+    assert errors_for({"status": "not_yet_reported", "sources": []}) == []
+
+
 def test_a_runoff_needs_a_later_date():
     assert errors_for(called(status="runoff_required", winner_name=None))
     ok = called(status="runoff_required", winner_name=None, runoff_date="2026-12-01")
@@ -132,6 +158,28 @@ def test_handler_output_matches_the_public_schema():
     assert race["result"]["candidates"][1]["party"] == "Republican"
 
 
+def test_handler_drops_a_correction_note_when_nothing_was_recorded():
+    race = {**RACE}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(called(correction_note="Corrects an earlier entry"))
+    assert race["result"]["correction_note"] is None
+
+
+def test_handler_keeps_a_correction_note_on_a_recorded_result():
+    race = {**RACE, "result": called()}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(called(correction_note="AP retracted its call"))
+    assert race["result"]["correction_note"] == "AP retracted its call"
+
+
+def test_results_prompt_asks_for_vote_counts_and_limits_correction_notes():
+    assert "give votes and pct for every candidate a source reports" in " ".join(RESULTS_USER.split()).lower()
+    assert "never round, estimate or compute a count" in " ".join(RESULTS_USER.split()).lower()
+    assert "if none is recorded, there is nothing to correct" in " ".join(RESULTS_USER.split())
+
+
 def test_results_step_is_never_part_of_a_default_run():
     assert EXPLICIT_ONLY_PIPELINE_STEPS == {"results"}
 
@@ -156,3 +204,29 @@ def test_public_index_entry_limits_sources():
     assert entry["winner_name"] == "Ann Lee"
     assert len(entry["sources"]) == 2
     assert result_index_entry("x", RACE) is None
+
+
+def test_counts_must_appear_in_what_was_read():
+    result = called()
+    page = "Ann Lee won with 52.0% and 100 votes; Bob Ray had 48% (90 votes)."
+    assert unread_counts(result, [page]) == []
+    assert unread_counts(result, ["Ann Lee 55% Bob Ray 45%"]) == [
+        "Ann Lee: 100 votes",
+        "Ann Lee: 52%",
+        "Bob Ray: 90 votes",
+        "Bob Ray: 48%",
+    ]
+    big = called(candidates=[{"name": "Ann Lee", "votes": 180002, "pct": 56.9}])
+    assert unread_counts(big, ["Letlow 180,002 (56.9 percent)"]) == []
+    assert unread_counts(big, ["1180,002 votes and 156.9%"]) == ["Ann Lee: 180,002 votes", "Ann Lee: 56.9%"]
+
+
+def test_handler_rejects_counts_it_never_read():
+    race = {**RACE}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    with fresh_web_reads() as texts, patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        texts.append("Ann Lee 55% Bob Ray 45%")
+        assert "appear in no page" in handler(called())
+        assert "result" not in race
+        texts.append("Ann Lee 52.0% (100 votes), Bob Ray 48% (90 votes)")
+        assert handler(called()).startswith("Recorded")

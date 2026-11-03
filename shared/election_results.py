@@ -8,6 +8,7 @@ results-only publish endpoint both call :func:`validate_race_result`.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -19,6 +20,9 @@ RESULT_STATUSES = frozenset(
 )
 #: Statuses that name a winner.
 WINNER_STATUSES = frozenset({"called", "certified", "unopposed"})
+#: Statuses that report a count. A prompt asking for counts was not enough: the
+#: replay returned called races with no counts at all, so the check is here.
+COUNTED_STATUSES = frozenset({"counting", "too_close", "called", "runoff_required", "rcv_pending", "certified"})
 #: Steps that would rewrite the pre-election record once voting has ended.
 FROZEN_POST_ELECTION_STEPS = frozenset({"discovery", "polling", "forecast"})
 
@@ -183,6 +187,16 @@ def validate_race_result(
         if not runoff or runoff <= election_date:
             errors.append("A runoff needs a runoff_date after the election")
 
+    counted = {
+        str(row.get("name") or "").strip().casefold()
+        for row in result.get("candidates") or []
+        if isinstance(row, dict) and (row.get("votes") is not None or row.get("pct") is not None)
+    }
+    if status in COUNTED_STATUSES and not counted:
+        errors.append(f"Status {status} needs votes or pct for the candidates the sources report")
+    elif status in WINNER_STATUSES & COUNTED_STATUSES and winner and winner.casefold() not in counted:
+        errors.append(f"The winner {winner!r} needs votes or pct")
+
     if result.get("as_of") and _parse_datetime(result.get("as_of")) is None:
         errors.append("as_of is not a valid timestamp")
     reporting = result.get("pct_reporting")
@@ -230,6 +244,35 @@ def _regression_errors(result: Dict[str, Any], previous: Optional[Dict[str, Any]
         if isinstance(before, int) and isinstance(after, int) and after < before:
             errors.append(f"Votes for {row.get('name')!r} fell from {before} to {after} without a correction_note")
     return errors
+
+
+def _number_patterns(row: Dict[str, Any]) -> List[tuple[str, "re.Pattern[str]"]]:
+    patterns: List[tuple[str, "re.Pattern[str]"]] = []
+    votes = row.get("votes")
+    if isinstance(votes, int):
+        forms = "|".join(re.escape(form) for form in {f"{votes:,}", str(votes)})
+        patterns.append((f"{votes:,} votes", re.compile(rf"(?<![\d,.])(?:{forms})(?![\d,]*\d)")))
+    pct = row.get("pct")
+    if isinstance(pct, (int, float)):
+        forms = {f"{pct:.1f}", f"{pct:g}"}
+        if float(pct).is_integer():
+            forms.add(str(int(pct)))
+        alternatives = "|".join(re.escape(form) for form in forms)
+        patterns.append((f"{pct:g}%", re.compile(rf"(?<![\d.])(?:{alternatives})\s*(?:%|percent|pct)", re.I)))
+    return patterns
+
+
+def unread_counts(result: Dict[str, Any], texts: List[str]) -> List[str]:
+    """Counts in *result* that appear in none of *texts*. The model must copy a count, never estimate one."""
+    corpus = "\n".join(texts)
+    missing: List[str] = []
+    for row in result.get("candidates") or []:
+        if not isinstance(row, dict):
+            continue
+        for label, pattern in _number_patterns(row):
+            if not pattern.search(corpus):
+                missing.append(f"{row.get('name')}: {label}")
+    return missing
 
 
 def result_index_entry(race_id: str, race: Dict[str, Any]) -> Optional[Dict[str, Any]]:
