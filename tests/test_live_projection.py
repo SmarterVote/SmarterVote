@@ -231,6 +231,15 @@ def test_calls_matching_the_favorites_sharpen_control():
     assert live["chambers"]["senate"]["control_probability"] > baseline["control_probability"]
 
 
+def test_an_undecided_chamber_never_reads_certain_under_the_swing_update():
+    # Every favorite wins: the posterior can push control to within rounding of 1,
+    # but with races still uncalled the chamber is not decided and must stay capped.
+    rows = [_call(race, "Democratic") for race in D_FAVORED[:4]] + [_call(race, "Republican") for race in R_FAVORED[:4]]
+    live = build_live_chamber_projection(SENATE_RACES, _index(*rows))
+    assert "swing_posterior" in live
+    assert 0.01 <= live["chambers"]["senate"]["control_probability"] <= 0.99
+
+
 def test_upsets_shift_the_swing_toward_the_winner():
     rows = [_call(race, "Republican") for race in D_FAVORED[:6]]
     live = build_live_chamber_projection(SENATE_RACES, _index(*rows))
