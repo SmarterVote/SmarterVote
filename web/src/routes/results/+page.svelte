@@ -66,21 +66,20 @@
     ].map((race) => [race.id, race]),
   );
   $: rows = [
-    ...[...directory.values()].map(
-      (race): Row => ({ ...race, result: $liveResults.get(race.id) ?? null }),
-    ),
+    ...[...directory.values()].map((race): Row => ({
+      ...race,
+      result: $liveResults.get(race.id) ?? null,
+    })),
     ...[...$liveResults.values()]
       .filter((row) => !directory.has(row.id))
-      .map(
-        (row): Row => ({
-          id: row.id,
-          title: row.title ?? row.id,
-          state: "Other",
-          office: resultOffice(row.title, row.id),
-          competitive: false,
-          result: row,
-        }),
-      ),
+      .map((row): Row => ({
+        id: row.id,
+        title: row.title ?? row.id,
+        state: "Other",
+        office: resultOffice(row.title, row.id),
+        competitive: false,
+        result: row,
+      })),
   ];
   $: states = [...new Set(rows.map((row) => row.state))].sort();
   $: counts = rows.reduce<Record<ResultGroup, number>>(
@@ -207,7 +206,11 @@
   </dl>
 
   <div class="space-y-3">
-    <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+    <div
+      class="flex flex-wrap gap-2"
+      role="group"
+      aria-label="Filter by status"
+    >
       {#each FILTERS as option (option.id)}
         <button
           type="button"
@@ -219,7 +222,11 @@
         </button>
       {/each}
     </div>
-    <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by office">
+    <div
+      class="flex flex-wrap gap-2"
+      role="group"
+      aria-label="Filter by office"
+    >
       {#each OFFICES as option (option.id)}
         <button
           type="button"
