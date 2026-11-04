@@ -3,7 +3,9 @@ import type { PublicRaceResult } from "$lib/types";
 import {
   GENERAL_ELECTION_DATE,
   calledRaceCount,
+  formatPctReporting,
   isResultsSeason,
+  resultDirectory,
 } from "./results";
 
 describe("isResultsSeason", () => {
@@ -49,5 +51,44 @@ describe("calledRaceCount", () => {
     expect(calledRaceCount(null)).toBe(0);
     expect(calledRaceCount(undefined)).toBe(0);
     expect(calledRaceCount(new Map())).toBe(0);
+  });
+});
+
+describe("formatPctReporting", () => {
+  it("formats a partial count without rounding it up to 100%", () => {
+    expect(formatPctReporting(10.3)).toBe("10%");
+    expect(formatPctReporting(99.6)).toBe("99%");
+    expect(formatPctReporting(100)).toBe("100%");
+    expect(formatPctReporting(0.4)).toBe("<1%");
+    expect(formatPctReporting(0)).toBe("0%");
+  });
+
+  it("is empty when the feed has no usable figure", () => {
+    expect(formatPctReporting(null)).toBe("");
+    expect(formatPctReporting(undefined)).toBe("");
+    expect(formatPctReporting(Number.NaN)).toBe("");
+    expect(formatPctReporting(-1)).toBe("");
+  });
+});
+
+describe("resultDirectory", () => {
+  it("normalizes postal-code states so a state is listed once", () => {
+    const rows = resultDirectory([
+      {
+        id: "ca-governor-2026",
+        title: "California Governor",
+        office: "Governor",
+        state: "CA",
+        election_date: GENERAL_ELECTION_DATE,
+      },
+      {
+        id: "ca-senate-2026",
+        title: "California Senate",
+        office: "U.S. Senate",
+        state: "California",
+        election_date: GENERAL_ELECTION_DATE,
+      },
+    ]);
+    expect(rows.map((row) => row.state)).toEqual(["California", "California"]);
   });
 });

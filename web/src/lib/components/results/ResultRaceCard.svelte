@@ -1,7 +1,11 @@
 <script lang="ts">
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PublicRaceResult } from "$lib/types";
-  import { compareHref, namesWinner } from "$lib/utils/results";
+  import {
+    compareHref,
+    formatPctReporting,
+    namesWinner,
+  } from "$lib/utils/results";
   import ResultBars from "./ResultBars.svelte";
   import ResultStatusPill from "./ResultStatusPill.svelte";
 
@@ -12,6 +16,10 @@
   $: hasRows = !!result?.candidates?.length;
   $: winner =
     result && namesWinner(result.status) ? result.winner_name : undefined;
+  $: reporting =
+    result && result.status !== "not_yet_reported"
+      ? formatPctReporting(result.pct_reporting)
+      : "";
   $: asOf = result?.as_of
     ? new Date(result.as_of).toLocaleTimeString(undefined, {
         hour: "numeric",
@@ -41,6 +49,27 @@
         limit={3}
         compact
       />
+      {#if winner && result.status === "called" && result.called_by}
+        <p class="mt-2 text-xs text-content-muted">
+          Called by {result.called_by}
+        </p>
+      {/if}
+      {#if reporting}
+        <div class="mt-3" data-testid="result-reporting">
+          <p class="text-xs font-semibold text-content-subtle">
+            Est. {reporting} of votes counted
+          </p>
+          <div
+            class="mt-1 h-1 overflow-hidden rounded-full bg-surface-alt"
+            aria-hidden="true"
+          >
+            <div
+              class="h-full rounded-full bg-content-subtle/60"
+              style="width: {Math.min(100, result.pct_reporting ?? 0)}%"
+            ></div>
+          </div>
+        </div>
+      {/if}
     {:else}
       <p
         class="rounded-xl border border-dashed border-stroke bg-surface-alt/40 px-4 py-5 text-center text-sm text-content-subtle"
