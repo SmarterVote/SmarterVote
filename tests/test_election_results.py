@@ -221,6 +221,52 @@ def test_counts_must_appear_in_what_was_read():
     assert unread_counts(big, ["1180,002 votes and 156.9%"]) == ["Ann Lee: 180,002 votes", "Ann Lee: 56.9%"]
 
 
+def test_handler_drops_placeholder_zero_votes():
+    race = {**RACE}
+    handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]
+    shares = called(
+        status="counting",
+        winner_name=None,
+        pct_reporting=92.8,
+        candidates=[{"name": "Ann Lee", "votes": 0, "pct": 49.5}, {"name": "Bob Ray", "votes": 0, "pct": 49.3}],
+    )
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        assert handler(shares).startswith("Recorded")
+    assert [row["votes"] for row in race["result"]["candidates"]] == [None, None]
+    assert [row["pct"] for row in race["result"]["candidates"]] == [49.5, 49.3]
+
+    blank = called(
+        status="counting",
+        winner_name=None,
+        pct_reporting=33.2,
+        candidates=[{"name": "Ann Lee", "votes": 0}, {"name": "Bob Ray", "votes": 0}],
+    )
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(blank)
+    assert [row["votes"] for row in race["result"]["candidates"]] == [None, None]
+
+    # A real zero stays: a candidate on 0% while others have votes.
+    real = called(
+        status="counting",
+        winner_name=None,
+        pct_reporting=10.0,
+        candidates=[{"name": "Ann Lee", "votes": 120, "pct": 100.0}, {"name": "Bob Ray", "votes": 0, "pct": 0.0}],
+    )
+    with patch("pipeline_client.agent.handlers.validate_race_result", return_value=[]):
+        handler(real)
+    assert [row["votes"] for row in race["result"]["candidates"]] == [120, 0]
+
+
+def test_blank_counts_fail_the_counted_status_check():
+    blank = called(
+        status="counting",
+        winner_name=None,
+        pct_reporting=33.2,
+        candidates=[{"name": "Ann Lee", "votes": None}, {"name": "Bob Ray", "votes": None}],
+    )
+    assert any("needs votes or pct" in error for error in errors_for(blank))
+
+
 def test_handler_rejects_counts_it_never_read():
     race = {**RACE}
     handler = _make_results_handlers(race, lambda *_: None)["record_race_result"]

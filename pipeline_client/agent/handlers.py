@@ -2436,6 +2436,18 @@ def _make_results_handlers(race_json: Dict[str, Any], log: Callable) -> Dict[str
             for row in args.get("candidates") or []
             if isinstance(row, dict)
         ]
+        # Most network results pages print only shares, and the model then wrote votes 0 as a placeholder
+        # ("0" matches almost any page). A zero beside a nonzero share, or zero for everyone once precincts
+        # report, is a missing count: drop it and keep the share.
+        reporting = result.get("pct_reporting")
+        all_zero = bool(result["candidates"]) and all(row.get("votes") == 0 for row in result["candidates"])
+        for row in result["candidates"]:
+            pct = row.get("pct")
+            if row.get("votes") == 0 and (
+                (isinstance(pct, (int, float)) and pct > 0)
+                or (all_zero and isinstance(reporting, (int, float)) and reporting > 0)
+            ):
+                row["votes"] = None
         result["sources"] = [{**source, "last_accessed": now.isoformat()} for source in args.get("sources") or []]
         result["winner_party"] = party_by_name.get(str(args.get("winner_name") or "").casefold())
         result["as_of"] = now.isoformat()

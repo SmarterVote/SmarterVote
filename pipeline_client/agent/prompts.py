@@ -801,7 +801,9 @@ Status:
 Use roster names exactly. Mark each source's type as "news" or "government".
 Give votes and pct for every candidate a source reports, including on a called
 race, copied exactly as the source prints them. Never round, estimate or compute
-a count: one that does not appear in what you read is rejected. Set correction_note only when the previously recorded result
+a count: one that does not appear in what you read is rejected. When a source
+prints only percentages, give pct and leave votes out; never write 0 for a count
+you do not have. Set correction_note only when the previously recorded result
 above was wrong; if none is recorded, there is nothing to correct.
 If the tool rejects your call, fix only what it names, or lower the status."""
 
