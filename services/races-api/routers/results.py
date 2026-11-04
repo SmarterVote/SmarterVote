@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, List
 
 import gcs_helpers
+import live_feeds
 from auth import verify_token
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, Field
@@ -65,6 +66,22 @@ def _load_live_forecast(publish_service: Any) -> Dict[str, Any]:
     return data
 
 
+def refresh_live_feeds(publish_service: Any) -> None:
+    """Rewrite the static live feeds from fresh data. Never raises: the caller's publish already succeeded."""
+    if not live_feeds.live_feeds_bucket():
+        return
+    try:
+        _clear_results_cache()
+        results = _load_public_results()
+        summaries = publish_service.get_race_summaries_fresh()
+        if not isinstance(summaries, list):
+            raise TypeError(f"Invalid summaries from publish service: {type(summaries)}")
+        forecast = build_live_chamber_projection(summaries, results)
+        live_feeds.write_live_feeds(results, forecast)
+    except Exception:
+        logger.exception("Live feeds not refreshed; the previous static copies stay in place")
+
+
 def _publish_results(race_ids: List[str]) -> Dict[str, Any]:
     published: List[str] = []
     rejected: Dict[str, str] = {}
@@ -91,7 +108,8 @@ async def publish_results(request: Request, payload: PublishResultsRequest) -> D
     """Publish each race's checked draft result, and nothing else from its draft."""
     outcome = await run_in_threadpool(_publish_results, payload.race_ids)
     _clear_results_cache()
-    _clear_public_race_cache(request)
+    # Also rewrites the static live feeds (see _clear_public_race_cache).
+    await run_in_threadpool(_clear_public_race_cache, request)
     return outcome
 
 

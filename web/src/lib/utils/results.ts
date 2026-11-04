@@ -7,6 +7,7 @@ import {
   GOVERNOR_HOLDOVERS,
   SENATE_HOLDOVERS,
 } from "$lib/utils/holdovers";
+import { fetchLiveFeed } from "$lib/utils/liveFeedUrl";
 import { partyKey } from "$lib/utils/party";
 import type {
   LiveChamberProjection,
@@ -41,7 +42,7 @@ export function calledRaceCount(
   return count;
 }
 
-const RESULTS_URL = "/results-live.json";
+const RESULTS_FILE = "results-live.json";
 const REFRESH_MS = 60_000;
 
 export type ResultOffice = "governor" | "senate" | "house" | "other";
@@ -354,7 +355,7 @@ export async function fetchLiveResultsFile(
   generatedAt: Date | null;
 } | null> {
   try {
-    const response = await fetchFn(RESULTS_URL);
+    const response = await fetchLiveFeed(RESULTS_FILE, fetchFn);
     if (!response.ok) return null;
     const file = (await response.json()) as PublicResultsFile;
     if (!Array.isArray(file?.races)) return null;

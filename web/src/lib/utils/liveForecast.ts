@@ -6,8 +6,9 @@ import type {
   LiveSwingPosterior,
 } from "$lib/types";
 import type { ForecastTab } from "$lib/utils/forecast";
+import { fetchLiveFeed } from "$lib/utils/liveFeedUrl";
 
-const LIVE_FORECAST_URL = "/forecast-live.json";
+const LIVE_FORECAST_FILE = "forecast-live.json";
 const REFRESH_MS = 60_000;
 
 const isCount = (value: unknown): value is number =>
@@ -88,7 +89,7 @@ export async function fetchLiveForecast(
   fetchFn: typeof fetch = fetch,
 ): Promise<LiveForecastFile | null> {
   try {
-    const response = await fetchFn(LIVE_FORECAST_URL);
+    const response = await fetchLiveFeed(LIVE_FORECAST_FILE, fetchFn);
     if (!response.ok) return null;
     const file = (await response.json()) as LiveForecastFile;
     if (!file || typeof file !== "object" || !file.chambers) return null;
