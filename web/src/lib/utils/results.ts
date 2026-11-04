@@ -440,6 +440,32 @@ export function resultLeader(
   };
 }
 
+/** A candidate with a vote share, as the results cards draw them. */
+export interface ResultContender {
+  name: string;
+  party: string | null;
+  pct: number;
+  imageUrl: string | null;
+}
+
+/** The top two candidates by vote share, for a two-way margin bar. */
+export function resultContenders(
+  result: PublicRaceResult | null | undefined,
+): ResultContender[] {
+  return sortResultRows(result?.candidates ?? [])
+    .filter(
+      (row) =>
+        !!row.name && typeof row.pct === "number" && Number.isFinite(row.pct),
+    )
+    .slice(0, 2)
+    .map((row) => ({
+      name: row.name,
+      party: row.party ?? null,
+      pct: row.pct as number,
+      imageUrl: row.image_url ?? null,
+    }));
+}
+
 export type StatsChamber = "senate" | "house" | "governor";
 
 export interface ChamberSeats {
@@ -585,6 +611,8 @@ export interface RaceMargin {
   /** Lead over second place, in percentage points. */
   margin: number;
   pctReporting: number | null;
+  /** The top two by vote share, for the card's margin bar and headshot. */
+  contenders: ResultContender[];
 }
 
 function countingMargins(rows: ResultStatsRow[]): RaceMargin[] {
@@ -604,6 +632,7 @@ function countingMargins(rows: ResultStatsRow[]): RaceMargin[] {
       party: leader.party,
       margin: leader.margin,
       pctReporting: row.result?.pct_reporting ?? null,
+      contenders: resultContenders(row.result),
     });
   }
   return out;
@@ -642,6 +671,12 @@ export interface UpsetWatch {
   predicted: string;
   predictedParty: string | null;
   called: boolean;
+  /** Headshots from the count, when the feed carries them. */
+  leaderImage?: string | null;
+  predictedImage?: string | null;
+  /** The leader's lead in points, and the share counted. */
+  margin?: number;
+  pctReporting?: number | null;
 }
 
 /**
@@ -653,6 +688,17 @@ export interface UpsetWatch {
  */
 export function upsetWatch(rows: ResultStatsRow[], limit = 5): UpsetWatch[] {
   const out: (UpsetWatch & { margin: number })[] = [];
+  const imageOf = (
+    row: ResultStatsRow,
+    name: string | null | undefined,
+  ): string | null => {
+    const want = name ? surname(name) : "";
+    if (!want) return null;
+    return (
+      row.result?.candidates.find((c) => surname(c.name) === want)?.image_url ??
+      null
+    );
+  };
   for (const row of rows) {
     const predictedName = forecastPick(row.predicted_winner_name) ?? "";
     const predictedParty = forecastPick(row.predicted_winner_party);
@@ -679,6 +725,9 @@ export function upsetWatch(rows: ResultStatsRow[], limit = 5): UpsetWatch[] {
       predictedParty,
       called,
       margin: leader?.margin ?? 0,
+      pctReporting: row.result?.pct_reporting ?? null,
+      leaderImage: imageOf(row, name),
+      predictedImage: imageOf(row, predictedName),
     });
   }
   return out
@@ -688,8 +737,7 @@ export function upsetWatch(rows: ResultStatsRow[], limit = 5): UpsetWatch[] {
         a.margin - b.margin ||
         a.id.localeCompare(b.id),
     )
-    .slice(0, limit)
-    .map(({ margin: _margin, ...rest }) => rest);
+    .slice(0, limit);
 }
 
 /** "2026 Alabama's 2nd Congressional District Election" becomes "Alabama's 2nd Congressional District". */

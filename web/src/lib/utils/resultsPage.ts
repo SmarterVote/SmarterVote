@@ -8,9 +8,11 @@ import { partyKey } from "$lib/utils/party";
 import { canonicalStateName } from "$lib/utils/states";
 import {
   namesWinner,
+  resultContenders,
   resultGroup,
   resultLeader,
   shortRaceTitle,
+  type ResultContender,
   type ResultGroup,
   type ResultOffice,
 } from "$lib/utils/results";
@@ -229,6 +231,12 @@ export interface LatestCall {
   calledAt: string;
   /** The winner's party differs from the seat's current holder. */
   flip: boolean;
+  /** The winner's headshot, from the count, when the feed carries one. */
+  winnerImage?: string | null;
+  /** Lead in points over second place, and the share counted. */
+  margin?: number | null;
+  pctReporting?: number | null;
+  contenders?: ResultContender[];
 }
 
 /**
@@ -246,14 +254,18 @@ export function isFlip(
   return winner !== "other" && holder !== "other" && winner !== holder;
 }
 
+/** The named winner's row in the count, if it is there. */
+function winnerRow(result: PublicRaceResult) {
+  const name = result.winner_name?.trim().toLocaleLowerCase();
+  return name
+    ? result.candidates.find((c) => c.name.trim().toLocaleLowerCase() === name)
+    : undefined;
+}
+
 /** The winner's party: the feed's, else the named winner's candidate row. */
 function winnerParty(result: PublicRaceResult): string | null {
   if (result.winner_party) return result.winner_party;
-  const name = result.winner_name?.trim().toLocaleLowerCase();
-  const match = name
-    ? result.candidates.find((c) => c.name.trim().toLocaleLowerCase() === name)
-    : undefined;
-  return match?.party ?? null;
+  return winnerRow(result)?.party ?? null;
 }
 
 /** The newest calls, by `called_at`, newest first. */
@@ -273,6 +285,10 @@ export function latestCalls(rows: ResultsPageRow[], limit = 8): LatestCall[] {
       calledBy: result.called_by ?? null,
       calledAt: result.called_at as string,
       flip: isFlip(party, row.holder_party),
+      winnerImage: winnerRow(result)?.image_url ?? null,
+      margin: rowMargin(row),
+      pctReporting: finite(result.pct_reporting) ? result.pct_reporting : null,
+      contenders: resultContenders(result),
       time,
     });
   }
@@ -294,6 +310,8 @@ export interface KeyRace {
   party: string | null;
   margin: number | null;
   pctReporting: number | null;
+  /** The top two by vote share, for the card's margin bar and headshots. */
+  contenders?: ResultContender[];
 }
 
 const GROUP_RANK: Record<ResultGroup, number> = {
@@ -340,6 +358,7 @@ export function keyRaces(
           group !== "awaiting" && finite(row.result?.pct_reporting)
             ? (row.result?.pct_reporting as number)
             : null,
+        contenders: group === "awaiting" ? [] : resultContenders(row.result),
       };
     })
     .sort(
