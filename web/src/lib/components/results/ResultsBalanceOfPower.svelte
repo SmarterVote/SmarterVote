@@ -4,6 +4,7 @@
   import {
     formatLiveControlProbability,
     liveChamberProjection,
+    swingPosteriorNote,
   } from "$lib/utils/liveForecast";
 
   export let file: LiveForecastFile | null = null;
@@ -13,6 +14,7 @@
     { id: "house", label: "House" },
   ];
 
+  $: swingNote = swingPosteriorNote(file?.swing_posterior);
   $: rows = CHAMBERS.map((chamber) => ({
     ...chamber,
     projection: liveChamberProjection(file, chamber.id, 0),
@@ -70,9 +72,19 @@
         </div>
       {/each}
     </div>
+    {#if swingNote}
+      <p
+        class="mt-2 text-xs font-medium text-content-subtle"
+        data-testid="results-swing-note"
+      >
+        {swingNote}
+      </p>
+    {/if}
     <p class="mt-2 text-xs text-content-muted">
       A projection, not a result: called races count as decided, and every other
-      race uses the pre-election forecast.
+      race uses the pre-election forecast{swingNote
+        ? ", shifted by the national swing the calls point to"
+        : ""}.
     </p>
   </section>
 {/if}

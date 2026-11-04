@@ -1,6 +1,10 @@
 import { browser } from "$app/environment";
 import { readable } from "svelte/store";
-import type { LiveChamberProjection, LiveForecastFile } from "$lib/types";
+import type {
+  LiveChamberProjection,
+  LiveForecastFile,
+  LiveSwingPosterior,
+} from "$lib/types";
 import type { ForecastTab } from "$lib/utils/forecast";
 
 const LIVE_FORECAST_URL = "/forecast-live.json";
@@ -37,6 +41,38 @@ export function liveChamberProjection(
     return null;
   }
   return row;
+}
+
+/**
+ * One line on what the calls so far say about the polls, or null when the
+ * feed has no swing update (too few informative calls, or an older feed).
+ */
+export function swingPosteriorNote(
+  posterior: LiveSwingPosterior | null | undefined,
+): string | null {
+  if (!posterior || typeof posterior !== "object") return null;
+  const calls = posterior.calls ?? posterior.informative_calls;
+  const mean = posterior.mean_logit;
+  if (
+    !isCount(calls) ||
+    calls === 0 ||
+    typeof mean !== "number" ||
+    !Number.isFinite(mean)
+  ) {
+    return null;
+  }
+  const direction =
+    posterior.direction ??
+    (Math.abs(mean) < 0.1
+      ? "accurate"
+      : mean > 0
+        ? "Republican"
+        : "Democratic");
+  const finding =
+    direction === "accurate"
+      ? "polls being about right"
+      : `polls underestimating ${direction === "Republican" ? "Republicans" : "Democrats"}`;
+  return `Updated with ${calls} called ${calls === 1 ? "race" : "races"}: results so far point to ${finding}.`;
 }
 
 /** Like the pre-election card's format, except an outcome the calls settle reads 0% / 100%. */

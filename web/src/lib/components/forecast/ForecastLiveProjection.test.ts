@@ -6,6 +6,7 @@ import {
   fetchLiveForecast,
   formatLiveControlProbability,
   liveChamberProjection,
+  swingPosteriorNote,
 } from "$lib/utils/liveForecast";
 
 const senate: LiveChamberProjection = {
@@ -149,5 +150,71 @@ describe("ForecastLiveProjection", () => {
     expect(
       screen.getByTestId("forecast-live-pre-election").textContent,
     ).toMatch(/Pre-election: 55\.0%\s+Democratic/);
+  });
+});
+
+describe("swingPosteriorNote", () => {
+  it("names the direction and the number of calls", () => {
+    expect(
+      swingPosteriorNote({
+        mean_logit: -0.49,
+        sd_logit: 0.41,
+        informative_calls: 52,
+        calls: 102,
+        direction: "Democratic",
+      }),
+    ).toBe(
+      "Updated with 102 called races: results so far point to polls underestimating Democrats.",
+    );
+    expect(
+      swingPosteriorNote({
+        mean_logit: 0.03,
+        sd_logit: 0.3,
+        informative_calls: 6,
+      }),
+    ).toBe(
+      "Updated with 6 called races: results so far point to polls being about right.",
+    );
+    expect(
+      swingPosteriorNote({
+        mean_logit: 0.4,
+        sd_logit: 0.3,
+        informative_calls: 6,
+      }),
+    ).toMatch(/underestimating Republicans\.$/);
+  });
+
+  it("shows nothing without a usable update", () => {
+    expect(swingPosteriorNote(undefined)).toBeNull();
+    expect(swingPosteriorNote(null)).toBeNull();
+    expect(
+      swingPosteriorNote({
+        mean_logit: Number.NaN,
+        sd_logit: 0.3,
+        informative_calls: 6,
+      }),
+    ).toBeNull();
+  });
+
+  it("renders the note on the live card only when the feed has one", () => {
+    const { unmount } = render(ForecastLiveProjection, {
+      props: { projection: senate },
+    });
+    expect(screen.queryByTestId("forecast-live-swing")).toBeNull();
+    unmount();
+    render(ForecastLiveProjection, {
+      props: {
+        projection: senate,
+        swingPosterior: {
+          mean_logit: 0.02,
+          sd_logit: 0.2,
+          informative_calls: 9,
+          direction: "accurate",
+        },
+      },
+    });
+    expect(screen.getByTestId("forecast-live-swing").textContent).toMatch(
+      /Updated with 9 called races: results so far point to polls being about right\./,
+    );
   });
 });

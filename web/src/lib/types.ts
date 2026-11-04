@@ -250,6 +250,24 @@ export interface LiveChamberProjection {
   as_of: string | null;
 }
 
+/**
+ * The national swing learned from called races, from
+ * shared/forecast_summary.py:_swing_posterior_payload. Positive mean_logit is a
+ * Republican-ward shift relative to the pre-election forecast.
+ */
+export interface LiveSwingPosterior {
+  mean_logit: number;
+  sd_logit: number;
+  /** Called races whose winner was below 97% before the election. */
+  informative_calls: number;
+  prior_sd_logit?: number;
+  /** Every called race used as evidence, informative or not. */
+  calls?: number;
+  likelihood_power?: number;
+  direction?: "accurate" | "Democratic" | "Republican";
+  summary?: string;
+}
+
 /** Mirrors services/races-api/routers/results.py:public_forecast_live. */
 export interface LiveForecastFile {
   schema_version: string;
@@ -258,6 +276,8 @@ export interface LiveForecastFile {
   chambers: Partial<
     Record<"house" | "senate" | "governors", LiveChamberProjection>
   >;
+  /** Present only once enough informative calls have updated the national swing. */
+  swing_posterior?: LiveSwingPosterior;
 }
 
 export interface RaceForecast {
