@@ -38,7 +38,10 @@
     >
       {title}
     </a>
-    <ResultStatusPill status={result?.status ?? null} />
+    <ResultStatusPill
+      status={result?.status ?? null}
+      candidates={result?.candidates ?? null}
+    />
   </div>
 
   <div class="flex-1">
