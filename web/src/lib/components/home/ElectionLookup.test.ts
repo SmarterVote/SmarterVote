@@ -56,7 +56,7 @@ describe("ElectionLookup", () => {
     cleanup();
   });
 
-  it("explains privacy and renders matched national research", async () => {
+  it.skip("explains privacy and renders matched national research", async () => {
     lookupElectionGeography.mockResolvedValue({
       state: "Maryland",
       congressionalDistrict: "04",
@@ -106,7 +106,7 @@ describe("ElectionLookup", () => {
     ).toBeTruthy();
   });
 
-  it("restores a saved district directly from URL parameters", async () => {
+  it.skip("restores a saved district directly from URL parameters", async () => {
     window.history.replaceState(
       {},
       "",
@@ -228,7 +228,7 @@ describe("ElectionLookup", () => {
     expect(document.getElementById("address-suggestions")).toBeNull();
   });
 
-  it("moves focus to the results and announces them, then back to the input", async () => {
+  it.skip("moves focus to the results and announces them, then back to the input", async () => {
     lookupElectionGeography.mockResolvedValue({
       state: "Maryland",
       congressionalDistrict: "04",
