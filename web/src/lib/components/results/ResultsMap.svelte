@@ -8,7 +8,7 @@
     type ResultDirectoryRace,
   } from "$lib/utils/results";
 
-  export type MapOffice = "senate" | "governor";
+  export type MapOffice = "senate" | "governor" | "house";
   export type MapRace = ResultDirectoryRace & {
     result: PublicRaceResult | null;
   };
@@ -159,6 +159,151 @@
     raceCounts: Record<string, number>;
     rows: { race: MapRace; call: MapCall }[];
     counts: MapCounts;
+    /** House only: one row per state with its delegation tally. */
+    stateRows: { state: string; tally: string; href: string }[];
+  }
+
+  /** Hatched in the leader's color: counts still coming in (USMap patterns). */
+  export const HOUSE_LEAD_FILLS: Record<MapSide, string> = {
+    D: "url(#map-result-lead-d)",
+    R: "url(#map-result-lead-r)",
+    O: "url(#map-result-lead-other)",
+  };
+  /** Two parties level in called-plus-leading seats. */
+  export const HOUSE_SPLIT_FILL = "url(#map-split-holdover)";
+
+  export interface HouseTally {
+    called: Record<MapSide, number>;
+    leading: Record<MapSide, number>;
+    awaiting: number;
+    total: number;
+  }
+
+  const SIDES: MapSide[] = ["D", "R", "O"];
+
+  /**
+   * One state's House delegation shade: solid when every seat is called for
+   * one party; the lighter Lean shade when every seat is called but split;
+   * hatched in the party called or leading in more seats while counts
+   * continue; the split pattern on a tie; grey hatch before any report.
+   */
+  export function houseFill(tally: HouseTally): string {
+    if (tally.awaiting >= tally.total) return AWAITING_FILL;
+    const calledTotal = SIDES.reduce((n, side) => n + tally.called[side], 0);
+    const sweep = SIDES.find((side) => tally.called[side] === tally.total);
+    if (sweep) return MAP_FILLS.called[sweep];
+    const seats = SIDES.map((side) => ({
+      side,
+      n: tally.called[side] + tally.leading[side],
+    })).sort((a, b) => b.n - a.n);
+    if (seats[0].n === 0) return AWAITING_FILL;
+    if (seats[0].n === seats[1].n) return HOUSE_SPLIT_FILL;
+    return calledTotal === tally.total
+      ? MAP_FILLS.leading[seats[0].side]
+      : HOUSE_LEAD_FILLS[seats[0].side];
+  }
+
+  /** "D 12 called · 8 leading; R 3 called · 2 leading; 27 awaiting" */
+  export function houseTallyLine(tally: HouseTally): string {
+    const parts: string[] = [];
+    for (const side of SIDES) {
+      const called = tally.called[side];
+      const leading = tally.leading[side];
+      if (!called && !leading) continue;
+      const label = side === "O" ? "Other" : side;
+      const bits = [
+        ...(called ? [`${called} called`] : []),
+        ...(leading ? [`${leading} leading`] : []),
+      ];
+      parts.push(`${label} ${bits.join(" · ")}`);
+    }
+    if (tally.awaiting) parts.push(`${tally.awaiting} awaiting`);
+    return parts.join("; ");
+  }
+
+  function houseBadge(tally: HouseTally): {
+    badge: string;
+    badgeClass: string;
+  } {
+    if (tally.awaiting >= tally.total)
+      return {
+        badge: "Awaiting results",
+        badgeClass: "bg-slate-500! text-white!",
+      };
+    const called = SIDES.reduce((n, side) => n + tally.called[side], 0);
+    return {
+      badge: `${called} of ${tally.total} called`,
+      badgeClass: "bg-slate-700! text-white!",
+    };
+  }
+
+  /** The results page's race list, narrowed to one state's House races. */
+  export function houseStateHref(state: string): string {
+    return `/results/?${new URLSearchParams({ state, office: "house" })}#results-list`;
+  }
+
+  /** Each state shaded by its House delegation: seats called and leading. */
+  export function buildHouseMap(races: MapRace[]): ResultsMapData {
+    const data = emptyMapData();
+    const tallies = new Map<string, HouseTally>();
+    data.rows = races
+      .filter((race) => race.office === "house" && race.state !== "Other")
+      .map((race) => ({ race, call: mapCall(race.result) }))
+      .sort(
+        (a, b) =>
+          a.race.state.localeCompare(b.race.state) ||
+          a.race.id.localeCompare(b.race.id, undefined, { numeric: true }),
+      );
+    for (const { race, call } of data.rows) {
+      const tally = tallies.get(race.state) ?? {
+        called: { D: 0, R: 0, O: 0 },
+        leading: { D: 0, R: 0, O: 0 },
+        awaiting: 0,
+        total: 0,
+      };
+      tally.total += 1;
+      if (call.stage === "awaiting" || !call.side) {
+        tally.awaiting += 1;
+        data.counts.awaiting += 1;
+      } else {
+        tally[call.stage][call.side] += 1;
+        data.counts[call.stage][call.side] += 1;
+      }
+      tallies.set(race.state, tally);
+    }
+    for (const [state, tally] of tallies) {
+      const line = houseTallyLine(tally);
+      const href = houseStateHref(state);
+      data.activeStates.add(state);
+      data.colors[state] = houseFill(tally);
+      data.hrefs[state] = href;
+      data.raceCounts[state] = tally.total;
+      data.tooltips[state] = {
+        title: state,
+        subtitle: `${tally.total} House ${tally.total === 1 ? "seat" : "seats"}`,
+        ...houseBadge(tally),
+        details: [line],
+      };
+      data.stateRows.push({ state, tally: line, href });
+    }
+    return data;
+  }
+
+  function emptyMapData(): ResultsMapData {
+    return {
+      activeStates: new Set(),
+      colors: {},
+      tooltips: {},
+      hrefs: {},
+      raceCounts: {},
+      rows: [],
+      counts: {
+        called: { D: 0, R: 0, O: 0 },
+        leading: { D: 0, R: 0, O: 0 },
+        awaiting: 0,
+      },
+      stateRows: [],
+    };
   }
 
   export function raceHref(id: string): string {
@@ -170,6 +315,7 @@
     races: MapRace[],
     office: MapOffice,
   ): ResultsMapData {
+    if (office === "house") return buildHouseMap(races);
     const rows = races
       .filter((race) => race.office === office && race.state !== "Other")
       .map((race) => ({ race, call: mapCall(race.result) }))
@@ -181,19 +327,7 @@
             Number(/special/i.test(b.race.id)) ||
           a.race.id.localeCompare(b.race.id),
       );
-    const data: ResultsMapData = {
-      activeStates: new Set(),
-      colors: {},
-      tooltips: {},
-      hrefs: {},
-      raceCounts: {},
-      rows,
-      counts: {
-        called: { D: 0, R: 0, O: 0 },
-        leading: { D: 0, R: 0, O: 0 },
-        awaiting: 0,
-      },
-    };
+    const data: ResultsMapData = { ...emptyMapData(), rows };
     for (const { race, call } of rows) {
       if (call.stage === "awaiting" || !call.side) data.counts.awaiting += 1;
       else data.counts[call.stage][call.side] += 1;
@@ -245,19 +379,40 @@
   const OFFICES: { id: MapOffice; label: string }[] = [
     { id: "senate", label: "Senate" },
     { id: "governor", label: "Governor" },
+    { id: "house", label: "House" },
   ];
+  const OFFICE_NAMES: Record<MapOffice, string> = {
+    senate: "Senate",
+    governor: "Governor",
+    house: "House",
+  };
 
   let office: MapOffice = "senate";
 
   $: map = buildResultsMap(races, office);
-  $: officeLabel = office === "senate" ? "Senate" : "governor";
+  $: officeName = OFFICE_NAMES[office];
 
-  const SWATCHES: { label: string; fill: string; hatch?: boolean }[] = [
+  const SWATCHES: {
+    label: string;
+    fill: string;
+    hatch?: boolean;
+    house?: boolean;
+  }[] = [
     { label: "Called D", fill: "var(--color-safe-d)" },
     { label: "Leading D", fill: "var(--color-lean-d)" },
     { label: "Leading R", fill: "var(--color-lean-r)" },
     { label: "Called R", fill: "var(--color-safe-r)" },
     { label: "Other party", fill: "var(--results-map-o)" },
+    {
+      label: "House: still counting (leader hatched)",
+      fill: "repeating-linear-gradient(45deg, var(--color-safe-d) 0 3px, var(--color-holdover-d-solid) 3px 6px)",
+      house: true,
+    },
+    {
+      label: "House: even split",
+      fill: "repeating-linear-gradient(45deg, var(--color-holdover-d-solid) 0 4px, var(--color-holdover-r-solid) 4px 8px)",
+      house: true,
+    },
     {
       label: "Awaiting results",
       fill: "repeating-linear-gradient(45deg, var(--color-no-forecast-bg) 0 2px, var(--color-no-forecast-line) 2px 4px)",
@@ -290,8 +445,15 @@
     <div>
       <h2 id="results-map-heading" class="h-section">Results map</h2>
       <p class="mt-1 max-w-prose text-sm leading-6 text-content-subtle">
-        Each state with a {officeLabel} race on the ballot, shaded by the party that
-        won it or is ahead in the count so far. Select a state to open its race.
+        {#if office === "house"}
+          Each state shaded by its House delegation: solid when every seat is
+          called for one party, hatched in the party called or ahead in more
+          seats while counts continue. Select a state to list its races.
+        {:else}
+          Each state with a {office === "senate" ? "Senate" : "governor"} race on
+          the ballot, shaded by the party that won it or is ahead in the count so
+          far. Select a state to open its race.
+        {/if}
       </p>
     </div>
     <div class="flex gap-2" role="group" aria-label="Map office">
@@ -312,7 +474,7 @@
     data-testid="results-map-counts"
   >
     <span class="sr-only"
-      >{office === "senate" ? "Senate" : "Governor"} races:
+      >{office === "house" ? "House seats" : `${officeName} races`}:
     </span>{legendSummary(map.counts)}
   </p>
 
@@ -328,7 +490,7 @@
     class="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-stroke pt-4"
     aria-label="Map colors"
   >
-    {#each SWATCHES as swatch (swatch.label)}
+    {#each SWATCHES.filter((swatch) => !swatch.house || office === "house") as swatch (swatch.label)}
       <li class="flex items-center gap-1.5 text-xs text-content-muted">
         <span
           class="block h-3.5 w-3.5 rounded-sm border border-stroke"
@@ -344,7 +506,38 @@
     stays unofficial until the state certifies it.
   </p>
 
-  {#if map.rows.length}
+  {#if office === "house" && map.stateRows.length}
+    <details class="mt-3">
+      <summary
+        class="min-h-11 cursor-pointer py-2 text-sm font-semibold text-primary-700 dark:text-primary-300"
+        >Show the map as a list ({map.stateRows.length}
+        {map.stateRows.length === 1 ? "state" : "states"})</summary
+      >
+      <table class="mt-2 w-full text-left text-sm">
+        <caption class="sr-only">House results by state</caption>
+        <thead class="text-xs text-content-subtle">
+          <tr>
+            <th scope="col" class="py-1.5 pr-3 font-semibold">State</th>
+            <th scope="col" class="py-1.5 font-semibold">Seats</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each map.stateRows as row (row.state)}
+            <tr class="border-t border-stroke">
+              <td class="py-2 pr-3">
+                <a
+                  href={row.href}
+                  class="font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                  >{row.state}</a
+                >
+              </td>
+              <td class="py-2 tabular-nums text-content">{row.tally}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </details>
+  {:else if map.rows.length}
     <details class="mt-3">
       <summary
         class="min-h-11 cursor-pointer py-2 text-sm font-semibold text-primary-700 dark:text-primary-300"
@@ -353,9 +546,7 @@
       >
       <div class="overflow-x-auto">
         <table class="mt-2 w-full text-left text-sm">
-          <caption class="sr-only"
-            >{office === "senate" ? "Senate" : "Governor"} results by state</caption
-          >
+          <caption class="sr-only">{officeName} results by state</caption>
           <thead class="text-xs text-content-subtle">
             <tr>
               <th scope="col" class="py-1.5 pr-3 font-semibold">Race</th>

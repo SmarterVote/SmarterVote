@@ -1,10 +1,16 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
+  import { afterNavigate, replaceState } from "$app/navigation";
+  import { page } from "$app/stores";
   import ResultRaceCard from "$lib/components/results/ResultRaceCard.svelte";
   import ResultsBalanceOfPower from "$lib/components/results/ResultsBalanceOfPower.svelte";
+  import ResultsKeyRaces from "$lib/components/results/ResultsKeyRaces.svelte";
+  import ResultsLatestCalls from "$lib/components/results/ResultsLatestCalls.svelte";
   import ResultsMap from "$lib/components/results/ResultsMap.svelte";
   import ResultsStats from "$lib/components/results/ResultsStats.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PublicRaceResult } from "$lib/types";
+  import { debounce } from "$lib/utils/debounce";
   import { liveForecast } from "$lib/utils/liveForecast";
   import { canonicalRaceState } from "$lib/utils/states";
   import {
@@ -15,15 +21,26 @@
     resultOffice,
     type ResultDirectoryRace,
     type ResultGroup,
-    type ResultOffice,
   } from "$lib/utils/results";
+  import {
+    RESULT_SORTS,
+    formatAgo,
+    isStale,
+    keyRaces,
+    latestCalls,
+    limitAwaiting,
+    parseResultsQuery,
+    resultsQueryString,
+    sortResultsRows,
+    type OfficeFilter,
+    type ResultSort,
+    type StatusFilter,
+  } from "$lib/utils/resultsPage";
   import type { PageData } from "./$types";
 
   export let data: PageData;
 
   type Row = ResultDirectoryRace & { result: PublicRaceResult | null };
-  type Filter = "all" | ResultGroup;
-  type OfficeFilter = "all" | ResultOffice;
 
   const DESCRIPTION =
     "Unofficial 2026 election results with sources, linked to where each candidate stands on the issues.";
@@ -33,7 +50,7 @@
     { id: "pending", label: "Runoff or ranked-choice" },
     { id: "awaiting", label: "Awaiting results" },
   ];
-  const FILTERS: { id: Filter; label: string }[] = [
+  const FILTERS: { id: StatusFilter; label: string }[] = [
     { id: "all", label: "All races" },
     ...TILES,
   ];
@@ -45,7 +62,11 @@
   ];
   const KEY_RACES = "Key races";
   const REPORTING = "Results coming in";
+  /** Awaiting-results cards drawn up front; the rest wait behind a button. */
+  const AWAITING_FIRST = 24;
+  const AWAITING_STEP = 96;
   const priorityIds = new Set(PRIORITY_RESULT_RACES.map((race) => race.id));
+  const isPriority = (id: string) => priorityIds.has(id);
   const pill = (active: boolean) =>
     `min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors ${
       active
@@ -53,11 +74,16 @@
         : "border-stroke bg-surface text-content-muted hover:bg-surface-alt"
     }`;
 
-  let filter: Filter = "all";
+  let filter: StatusFilter = "all";
   let office: OfficeFilter = "all";
   let stateFilter = "all";
   let competitiveOnly = false;
   let query = "";
+  let sort: ResultSort = "default";
+  let awaitingLimit = AWAITING_FIRST;
+  let now = Date.now();
+  let urlReady = false;
+  let clock: ReturnType<typeof setInterval> | undefined;
 
   // The prerendered list names every race on the ballot; the live feed fills in
   // results and adds any race the list missed (a build before it was published).
@@ -95,12 +121,15 @@
     },
     { called: 0, counting: 0, pending: 0, awaiting: 0 },
   );
+  $: calls = latestCalls(rows, 8);
+  $: keyRaceRows = keyRaces(rows, isPriority, 12);
   $: needle = query.trim().toLocaleLowerCase();
   $: narrowed =
     office !== "all" ||
     stateFilter !== "all" ||
     competitiveOnly ||
     needle !== "";
+  // Filters always run over every race; only drawing the cards is capped.
   $: visible = rows.filter(
     (row) =>
       (filter === "all" || resultGroup(row.result?.status) === filter) &&
@@ -117,38 +146,127 @@
   const hasCount = (row: Row) => resultGroup(row.result?.status) !== "awaiting";
   const newestFirst = (a: Row, b: Row) =>
     String(b.result?.as_of ?? "").localeCompare(String(a.result?.as_of ?? ""));
-  // Key races lead the unfiltered page, then every race already reporting
-  // (newest first) so counts are not buried among hundreds of empty cards;
-  // any narrowing shows plain state groups with reporting races first.
-  $: groups = [
-    ...(narrowed
-      ? []
+  const sortLabel = (id: ResultSort) =>
+    RESULT_SORTS.find((option) => option.id === id)?.label ?? "";
+  // Default order: key races lead the unfiltered page, then every race
+  // already reporting (newest first) so counts are not buried among hundreds
+  // of empty cards; any narrowing shows plain state groups with reporting
+  // races first. Any other sort is one flat list.
+  $: sections =
+    sort !== "default"
+      ? [
+          {
+            state: `Sorted by ${sortLabel(sort).toLocaleLowerCase()}`,
+            rows: sortResultsRows(visible, sort),
+          },
+        ]
       : [
-          {
-            state: KEY_RACES,
-            rows: visible.filter((row) => priorityIds.has(row.id)),
-          },
-          {
-            state: REPORTING,
+          ...(narrowed
+            ? []
+            : [
+                {
+                  state: KEY_RACES,
+                  rows: visible.filter((row) => priorityIds.has(row.id)),
+                },
+                {
+                  state: REPORTING,
+                  rows: visible
+                    .filter((row) => !priorityIds.has(row.id) && hasCount(row))
+                    .sort(newestFirst),
+                },
+              ]),
+          ...states.map((state) => ({
+            state,
             rows: visible
-              .filter((row) => !priorityIds.has(row.id) && hasCount(row))
-              .sort(newestFirst),
-          },
-        ]),
-    ...states.map((state) => ({
-      state,
-      rows: visible
-        .filter(
-          (row) =>
-            row.state === state &&
-            (narrowed || (!priorityIds.has(row.id) && !hasCount(row))),
-        )
-        .sort((a, b) => Number(hasCount(b)) - Number(hasCount(a))),
-    })),
-  ].filter((group) => group.rows.length > 0);
+              .filter(
+                (row) =>
+                  row.state === state &&
+                  (narrowed || (!priorityIds.has(row.id) && !hasCount(row))),
+              )
+              .sort((a, b) => Number(hasCount(b)) - Number(hasCount(a))),
+          })),
+        ];
+  // Every reporting race is drawn; awaiting cards past the limit wait behind
+  // "Show more" so first paint stays light on phones.
+  $: capped = limitAwaiting(
+    sections.flatMap((section) =>
+      section.rows.map((row) => ({
+        section: section.state,
+        row,
+        result: row.result,
+      })),
+    ),
+    awaitingLimit,
+  );
+  $: groups = sections
+    .map((section) => ({
+      state: section.state,
+      rows: capped.rows
+        .filter((item) => item.section === section.state)
+        .map((item) => item.row),
+    }))
+    .filter((group) => group.rows.length > 0);
+  $: hiddenCount = capped.hidden;
+  // A new filter or sort starts the awaiting list short again.
+  $: resetAwaiting(filter, office, stateFilter, competitiveOnly, needle, sort);
+
   $: updatedAt = $liveResultsState.updatedAt?.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+  });
+  // The feed's own timestamp goes stale when the pipeline stalls, even while
+  // this tab keeps fetching the same file each minute.
+  $: feedTime = $liveResultsState.generatedAt ?? $liveResultsState.updatedAt;
+  $: feedAgo = formatAgo(feedTime, now);
+  $: stale = isStale(feedTime, now);
+
+  const writeUrl = debounce((search: string) => {
+    if (search === window.location.search) return;
+    const url = new URL(window.location.href);
+    url.search = search;
+    replaceState(url, $page.state);
+  }, 250);
+  $: if (urlReady)
+    writeUrl(
+      resultsQueryString({
+        status: filter,
+        office,
+        state: stateFilter,
+        competitive: competitiveOnly,
+        q: query,
+        sort,
+      }),
+    );
+
+  function resetAwaiting(..._deps: unknown[]) {
+    awaitingLimit = AWAITING_FIRST;
+  }
+
+  // Read the query in the browser (the page is prerendered without one), on
+  // load and on in-page links such as a House map state. Typing only writes
+  // the URL shallowly, which is not a navigation, so it never echoes back.
+  afterNavigate(({ to }) => {
+    writeUrl.cancel();
+    const initial = parseResultsQuery(
+      to?.url.searchParams ?? new URLSearchParams(window.location.search),
+      states,
+    );
+    filter = initial.status;
+    office = initial.office;
+    stateFilter = initial.state;
+    competitiveOnly = initial.competitive;
+    query = initial.q;
+    sort = initial.sort;
+    urlReady = true;
+  });
+
+  onMount(() => {
+    now = Date.now();
+    clock = setInterval(() => (now = Date.now()), 30_000);
+  });
+  onDestroy(() => {
+    if (clock) clearInterval(clock);
+    writeUrl.cancel();
   });
 
   function reset() {
@@ -157,6 +275,7 @@
     stateFilter = "all";
     competitiveOnly = false;
     query = "";
+    sort = "default";
   }
 </script>
 
@@ -195,13 +314,25 @@
             ? `. Last updated ${updatedAt}`
             : ""}</span
         >
+      {:else if stale}
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+          data-testid="results-stale"
+        >
+          <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"
+          ></span>
+          Results feed last updated {feedAgo}. Counts may be behind.
+        </span>
       {:else if updatedAt}
-        <span class="inline-flex items-center gap-1.5">
+        <span
+          class="inline-flex items-center gap-1.5"
+          data-testid="results-live"
+        >
           <span
             class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
             aria-hidden="true"
           ></span>
-          Updated {updatedAt}, refreshes each minute
+          Live · updated {feedAgo || updatedAt}, refreshes each minute
         </span>
       {:else}
         <span>Checking for results…</span>
@@ -226,12 +357,19 @@
     {/each}
   </dl>
 
+  <div class="grid gap-6 lg:grid-cols-3">
+    <div class="lg:col-span-2">
+      <ResultsKeyRaces races={keyRaceRows} />
+    </div>
+    <ResultsLatestCalls {calls} {now} />
+  </div>
+
   <ResultsStats {rows} forecast={$liveForecast} />
 
   <ResultsBalanceOfPower file={$liveForecast} />
   <ResultsMap races={rows} />
 
-  <div class="space-y-3">
+  <div class="scroll-mt-20 space-y-3" id="results-list">
     <div
       class="flex flex-wrap gap-2"
       role="group"
@@ -292,10 +430,20 @@
         class="min-h-11 w-full max-w-xs rounded-lg border border-stroke bg-surface px-3 text-sm text-content"
         bind:value={query}
       />
+      <label class="sr-only" for="results-sort">Sort races</label>
+      <select
+        id="results-sort"
+        class="min-h-11 rounded-lg border border-stroke bg-surface px-3 text-sm text-content"
+        bind:value={sort}
+      >
+        {#each RESULT_SORTS as option (option.id)}
+          <option value={option.id}>Sort: {option.label}</option>
+        {/each}
+      </select>
       <span class="text-sm text-content-subtle" aria-live="polite"
         >{visible.length} of {rows.length} races</span
       >
-      {#if narrowed || filter !== "all"}
+      {#if narrowed || filter !== "all" || sort !== "default"}
         <button
           type="button"
           class="min-h-11 px-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300"
@@ -310,11 +458,32 @@
       <h2 class="h-section mb-4">{group.state}</h2>
       <div class="grid gap-4 md:grid-cols-2">
         {#each group.rows as row (row.id)}
-          <ResultRaceCard id={row.id} title={row.title} result={row.result} />
+          <ResultRaceCard
+            id={row.id}
+            title={row.title}
+            result={row.result}
+            {now}
+          />
         {/each}
       </div>
     </section>
   {:else}
     <p class="alert-info">No races match these filters.</p>
   {/each}
+
+  {#if hiddenCount > 0}
+    <div class="flex flex-col items-center gap-2 text-center">
+      <p class="text-sm text-content-muted">
+        {hiddenCount} more {hiddenCount === 1 ? "race is" : "races are"} awaiting
+        results. Search and filters cover every race.
+      </p>
+      <button
+        type="button"
+        class={pill(false)}
+        on:click={() => (awaitingLimit += AWAITING_STEP)}
+      >
+        Show {Math.min(hiddenCount, AWAITING_STEP)} more
+      </button>
+    </div>
+  {/if}
 </div>

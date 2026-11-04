@@ -6,12 +6,15 @@
     formatPctReporting,
     namesWinner,
   } from "$lib/utils/results";
+  import { formatAgo } from "$lib/utils/resultsPage";
   import ResultBars from "./ResultBars.svelte";
   import ResultStatusPill from "./ResultStatusPill.svelte";
 
   export let id: string;
   export let title: string;
   export let result: PublicRaceResult | null = null;
+  /** The page's clock (ms), so "Updated N min ago" ticks; null hides it. */
+  export let now: number | null = null;
 
   $: hasRows = !!result?.candidates?.length;
   $: winner =
@@ -26,10 +29,11 @@
         minute: "2-digit",
       })
     : "";
+  $: ago = result?.as_of && now !== null ? formatAgo(result.as_of, now) : "";
 </script>
 
 <article
-  class="card flex flex-col gap-4 p-5 transition-colors hover:border-primary-400/60 dark:hover:border-primary-500/60"
+  class="result-card card flex flex-col gap-4 p-5 transition-colors hover:border-primary-400/60 dark:hover:border-primary-500/60"
 >
   <div class="flex flex-col gap-2">
     <a
@@ -92,7 +96,19 @@
       Compare positions <UiIcon name="arrow-right" size="sm" />
     </a>
     {#if asOf}
-      <span class="text-xs text-content-subtle">As of {asOf}</span>
+      <time
+        class="text-xs text-content-subtle"
+        datetime={result?.as_of ?? undefined}
+        title={`As of ${asOf}`}>{ago ? `Updated ${ago}` : `As of ${asOf}`}</time
+      >
     {/if}
   </div>
 </article>
+
+<style>
+  /* Hundreds of cards: let the browser skip layout and paint off-screen. */
+  .result-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+  }
+</style>
