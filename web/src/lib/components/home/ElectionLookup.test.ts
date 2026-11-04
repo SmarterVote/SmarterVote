@@ -44,6 +44,10 @@ const races = [
 
 describe("ElectionLookup", () => {
   beforeEach(() => {
+    // Past elections are hidden by design, so pin "today" before Election Day.
+    // Only Date is faked; real timers keep waitFor and debounces working.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
     lookupElectionGeography.mockReset();
     replaceState.mockReset();
     suggestUsAddresses.mockReset();
@@ -56,7 +60,7 @@ describe("ElectionLookup", () => {
     cleanup();
   });
 
-  it.skip("explains privacy and renders matched national research", async () => {
+  it("explains privacy and renders matched national research", async () => {
     lookupElectionGeography.mockResolvedValue({
       state: "Maryland",
       congressionalDistrict: "04",
@@ -106,7 +110,7 @@ describe("ElectionLookup", () => {
     ).toBeTruthy();
   });
 
-  it.skip("restores a saved district directly from URL parameters", async () => {
+  it("restores a saved district directly from URL parameters", async () => {
     window.history.replaceState(
       {},
       "",
@@ -228,7 +232,7 @@ describe("ElectionLookup", () => {
     expect(document.getElementById("address-suggestions")).toBeNull();
   });
 
-  it.skip("moves focus to the results and announces them, then back to the input", async () => {
+  it("moves focus to the results and announces them, then back to the input", async () => {
     lookupElectionGeography.mockResolvedValue({
       state: "Maryland",
       congressionalDistrict: "04",

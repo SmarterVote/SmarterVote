@@ -237,7 +237,7 @@ describe("matchingNationalRaces", () => {
     ).toEqual(["at-large"]);
   });
 
-  it.skip("does not confuse Virginia with West Virginia", () => {
+  it("does not confuse Virginia with West Virginia", () => {
     const races = [
       race({
         id: "virginia-senate",
@@ -252,10 +252,11 @@ describe("matchingNationalRaces", () => {
     ];
 
     expect(
-      matchingNationalRaces(races, {
-        state: "Virginia",
-        congressionalDistrict: "01",
-      }).map(({ id }) => id),
+      matchingNationalRaces(
+        races,
+        { state: "Virginia", congressionalDistrict: "01" },
+        new Date("2026-10-20T12:00:00Z"),
+      ).map(({ id }) => id),
     ).toEqual(["virginia-senate"]);
   });
 
