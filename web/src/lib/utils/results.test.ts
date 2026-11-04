@@ -92,3 +92,14 @@ describe("resultDirectory", () => {
     expect(rows.map((row) => row.state)).toEqual(["California", "California"]);
   });
 });
+
+describe("lastName", () => {
+  it("keeps surname particles and drops suffixes", async () => {
+    const { lastName } = await import("./results");
+    expect(lastName("Beth Van Duyne")).toBe("Van Duyne");
+    expect(lastName("Ray De La Cruz")).toBe("De La Cruz");
+    expect(lastName("Thomas Kean Jr.")).toBe("Kean");
+    expect(lastName("Amy Acton")).toBe("Acton");
+    expect(lastName("Cher")).toBe("Cher");
+  });
+});

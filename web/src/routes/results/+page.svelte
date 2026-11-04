@@ -1,6 +1,7 @@
 <script lang="ts">
   import ResultRaceCard from "$lib/components/results/ResultRaceCard.svelte";
   import ResultsBalanceOfPower from "$lib/components/results/ResultsBalanceOfPower.svelte";
+  import ResultsMap from "$lib/components/results/ResultsMap.svelte";
   import ResultsStats from "$lib/components/results/ResultsStats.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PublicRaceResult } from "$lib/types";
@@ -228,6 +229,7 @@
   <ResultsStats {rows} forecast={$liveForecast} />
 
   <ResultsBalanceOfPower file={$liveForecast} />
+  <ResultsMap races={rows} />
 
   <div class="space-y-3">
     <div

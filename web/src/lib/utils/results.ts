@@ -158,7 +158,7 @@ export const PRIORITY_RESULT_RACES: {
 
 const STATUS_LABELS: Record<RaceResultStatus, string> = {
   not_yet_reported: "No votes reported yet",
-  counting: "Votes counted so far: not a call",
+  counting: "Counting",
   too_close: "Too close to call",
   called: "Projected winner",
   runoff_required: "Headed to a runoff",
@@ -169,6 +169,48 @@ const STATUS_LABELS: Record<RaceResultStatus, string> = {
 
 export function resultStatusLabel(status: RaceResultStatus): string {
   return STATUS_LABELS[status] ?? "Results pending";
+}
+
+export function lastName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const suffix = /^(jr\.?|sr\.?|ii|iii|iv)$/i;
+  if (parts.length > 1 && suffix.test(parts[parts.length - 1])) parts.pop();
+  let start = parts.length - 1;
+  // Keep surname particles: "Beth Van Duyne" is Van Duyne, "Ray De La Cruz" is De La Cruz.
+  const particle = /^(van|von|de|del|della|der|den|di|da|du|la|le|st\.?)$/i;
+  while (start > 1 && particle.test(parts[start - 1])) start -= 1;
+  return parts.slice(start).join(" ").replace(/,$/, "");
+}
+
+/**
+ * Who is ahead in a race still being counted, e.g. "Wittman leads by 0.7 pts",
+ * from the candidates' shares (or votes when no shares are reported).
+ */
+export function resultLeadLabel(
+  result:
+    | {
+        status: RaceResultStatus;
+        candidates?:
+          { name: string; pct?: number | null; votes?: number | null }[] | null;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!result || !isStillCounting(result.status)) return null;
+  const rows = (result.candidates ?? []).filter(
+    (row) => typeof row.pct === "number" || typeof row.votes === "number",
+  );
+  if (rows.length < 2) return null;
+  const usePct = rows.every((row) => typeof row.pct === "number");
+  const value = (row: (typeof rows)[number]) =>
+    (usePct ? row.pct : row.votes) ?? 0;
+  const [first, second] = [...rows].sort((a, b) => value(b) - value(a));
+  const margin = value(first) - value(second);
+  if (margin <= 0) return "Tied";
+  const amount = usePct
+    ? `${margin.toFixed(1)} pts`
+    : `${margin.toLocaleString()} votes`;
+  return `${lastName(first.name)} leads by ${amount}`;
 }
 
 /** Every result is unofficial until the election authority certifies it. */
