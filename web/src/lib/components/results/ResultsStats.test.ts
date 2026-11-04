@@ -94,11 +94,14 @@ describe("ResultsStats", () => {
     const link = within(closest).getByRole("link");
     expect(link.getAttribute("href")).toBe("/races/oh-senate-2026/");
     expect(within(closest).getByText("Ohio U.S. Senate")).toBeTruthy();
-    expect(within(closest).getByText(/D \+0\.8/)).toBeTruthy();
+    expect(link.textContent).toMatch(/D lead \+0\.8/);
+    expect(within(closest).getByText("Razor-thin")).toBeTruthy();
 
     const upsets = screen.getByTestId("results-upsets");
-    expect(within(upsets).getByText(/forecast picked Rob Rep/)).toBeTruthy();
-    expect(within(upsets).getByText("Dana Dem (D)")).toBeTruthy();
+    const upset = within(upsets).getByRole("link");
+    expect(upset.textContent).toMatch(/Forecast:.*Rob Rep/);
+    expect(upset.textContent).toMatch(/Leading:.*Dana Dem/);
+    expect(within(upsets).getByText("Possible upset")).toBeTruthy();
   });
 
   it("renders empty states before any votes", () => {

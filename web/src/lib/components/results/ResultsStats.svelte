@@ -1,6 +1,12 @@
 <script lang="ts">
+  import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import type { LiveForecastFile } from "$lib/types";
-  import { partyAbbr, partyBadgeClass } from "$lib/utils/party";
+  import {
+    partyAbbr,
+    partyBadgeClass,
+    partyBarClass,
+    partyRing,
+  } from "$lib/utils/party";
   import {
     biggestLeads,
     chamberSeats,
@@ -11,11 +17,13 @@
     sumSeats,
     upsetWatch,
     type ChamberSeats,
-    type RaceMargin,
     type ResultStatsRow,
     type SeatCounts,
     type StatsChamber,
+    type UpsetWatch,
   } from "$lib/utils/results";
+  import ResultsCountedBar from "./ResultsCountedBar.svelte";
+  import ResultsRaceTile from "./ResultsRaceTile.svelte";
 
   export let rows: ResultStatsRow[] = [];
   export let forecast: LiveForecastFile | null = null;
@@ -45,20 +53,6 @@
 
   const pct = (part: number, whole: number) =>
     whole > 0 ? `${(part / whole) * 100}%` : "0%";
-
-  function margin(value: number): string {
-    if (value <= 0) return "Tied";
-    if (value < 0.1) return "+<0.1";
-    return `+${value.toFixed(1)}`;
-  }
-
-  function surname(name: string): string {
-    const parts = name.trim().split(/\s+/);
-    const last = parts[parts.length - 1] ?? name;
-    return /^(jr\.?|sr\.?|ii|iii|iv)$/i.test(last) && parts.length > 1
-      ? parts[parts.length - 2]
-      : last;
-  }
 
   function partyLine(
     label: string,
@@ -107,9 +101,40 @@
     ].filter((segment) => segment.n > 0);
   }
 
-  function reportingLabel(race: RaceMargin): string {
-    const shown = formatPctReporting(race.pctReporting);
-    return shown ? `${shown} counted` : "share counted unknown";
+  const PANELS = [
+    {
+      id: "closest",
+      title: "Closest races",
+      note: "Still counting, narrowest lead first",
+    },
+    {
+      id: "leads",
+      title: "Biggest leads",
+      note: "Still counting, widest lead first",
+    },
+  ] as const;
+
+  /** The forecast pick and the actual leader, side by side on an upset card. */
+  function upsetSides(race: UpsetWatch) {
+    return [
+      {
+        label: "Forecast",
+        name: race.predicted,
+        party: race.predictedParty,
+        image: race.predictedImage ?? null,
+        // A forecast that names only a party has no headshot or badge.
+        person: !!race.predicted && race.predicted !== race.predictedParty,
+        muted: true,
+      },
+      {
+        label: race.called ? "Won" : "Leading",
+        name: race.leader,
+        party: race.leaderParty,
+        image: race.leaderImage ?? null,
+        person: true,
+        muted: false,
+      },
+    ];
   }
 </script>
 
@@ -215,16 +240,16 @@
     {/each}
   </div>
 
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    <div class="card p-4" data-testid="results-progress">
+  <div class="grid gap-3 lg:grid-cols-3">
+    <div class="card flex flex-col p-4" data-testid="results-progress">
       <h3 class="text-sm font-bold text-content">Counting progress</h3>
       <p class="mt-2 flex items-baseline gap-2">
-        <span class="text-3xl font-bold tabular-nums text-content"
+        <span class="text-4xl font-extrabold tabular-nums text-content"
           >{progress.averagePct === null
             ? "—"
             : formatPctReporting(progress.averagePct)}</span
         >
-        <span class="text-xs text-content-muted"
+        <span class="text-xs leading-snug text-content-muted"
           >average counted in races still counting</span
         >
       </p>
@@ -234,20 +259,39 @@
         aria-label={`${progress.reporting} of ${totalRaces} races reporting, ${progress.awaiting} awaiting results`}
       >
         <div
-          class="h-full bg-emerald-600 dark:bg-emerald-500"
+          class="h-full rounded-full bg-emerald-600 transition-[width] duration-500 dark:bg-emerald-500"
           style="width: {pct(progress.reporting, totalRaces)}"
         ></div>
       </div>
-      <p
-        class="mt-1.5 flex justify-between text-xs font-semibold tabular-nums text-content-subtle"
-        aria-hidden="true"
-      >
-        <span>{progress.reporting} reporting</span>
-        <span>{progress.awaiting} awaiting</span>
-      </p>
+      <div class="mt-3 grid grid-cols-2 gap-2" aria-hidden="true">
+        <div class="rounded-lg bg-surface-alt px-3 py-2">
+          <p
+            class="flex items-center gap-1.5 text-[11px] font-semibold text-content-subtle"
+          >
+            <span
+              class="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-500"
+            ></span>Reporting
+          </p>
+          <p class="text-lg font-bold tabular-nums text-content">
+            {progress.reporting}
+          </p>
+        </div>
+        <div class="rounded-lg bg-surface-alt px-3 py-2">
+          <p
+            class="flex items-center gap-1.5 text-[11px] font-semibold text-content-subtle"
+          >
+            <span class="h-2 w-2 rounded-full border border-content-subtle"
+            ></span>Awaiting
+          </p>
+          <p class="text-lg font-bold tabular-nums text-content">
+            {progress.awaiting}
+          </p>
+        </div>
+      </div>
       {#if anyCounting}
-        <table class="mt-3 w-full text-xs">
-          <caption class="sr-only"
+        <table class="mt-4 w-full text-xs">
+          <caption
+            class="mb-1.5 text-left text-[11px] font-semibold text-content-subtle"
             >Races still counting, by share of the vote counted</caption
           >
           <tbody>
@@ -255,17 +299,22 @@
               <tr>
                 <th
                   scope="row"
-                  class="w-20 whitespace-nowrap py-0.5 pr-2 text-left font-medium text-content-muted"
+                  class="w-20 whitespace-nowrap py-1 pr-2 text-left font-medium tabular-nums text-content-muted"
                   >{bucket.label}</th
                 >
-                <td class="py-0.5">
+                <td class="py-1">
                   <div class="flex items-center gap-2">
                     <div
-                      class="h-2 min-w-0.5 rounded-sm bg-amber-500 dark:bg-amber-400"
-                      style="width: {pct(bucket.count, bucketMax)}"
+                      class="h-2 flex-1 overflow-hidden rounded-full bg-surface-alt"
                       aria-hidden="true"
-                    ></div>
-                    <span class="tabular-nums font-semibold text-content"
+                    >
+                      <div
+                        class="h-full min-w-0.5 rounded-full bg-amber-500 transition-[width] duration-500 dark:bg-amber-400"
+                        style="width: {pct(bucket.count, bucketMax)}"
+                      ></div>
+                    </div>
+                    <span
+                      class="w-7 text-right font-semibold tabular-nums text-content"
                       >{bucket.count}</span
                     >
                   </div>
@@ -277,78 +326,104 @@
       {/if}
     </div>
 
-    {#each [{ id: "closest", title: "Closest races", list: closest, empty: "No contested race is counting yet." }, { id: "leads", title: "Biggest leads", list: leads, empty: "No contested race is counting yet." }] as panel (panel.id)}
-      <div class="card p-4" data-testid={`results-${panel.id}`}>
-        <h3 class="text-sm font-bold text-content">{panel.title}</h3>
-        <p class="text-xs text-content-muted">Still counting, lead in points</p>
-        {#if panel.list.length}
-          <ol class="mt-2 divide-y divide-stroke/60">
-            {#each panel.list as race (race.id)}
-              <li class="py-1.5">
-                <a
-                  href={`/races/${race.id}/`}
-                  class="group flex items-start justify-between gap-2"
-                >
-                  <span class="min-w-0">
-                    <span
-                      class="block truncate text-sm font-semibold text-content group-hover:text-primary-700 group-hover:underline dark:group-hover:text-primary-300"
-                      >{shortRaceTitle(race.title)}</span
-                    >
-                    <span class="block text-xs text-content-muted"
-                      >{race.margin > 0
-                        ? `${surname(race.leader)} ahead`
-                        : "Even"} · {reportingLabel(race)}</span
-                    >
-                  </span>
-                  <span
-                    class="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-bold tabular-nums {partyBadgeClass(
-                      race.party ?? undefined,
-                    )}"
-                    >{race.margin > 0
-                      ? `${partyAbbr(race.party ?? undefined)} ${margin(race.margin)}`
-                      : "Tied"}</span
-                  >
-                </a>
-              </li>
-            {/each}
-          </ol>
-        {:else}
-          <p class="mt-2 text-sm text-content-muted">{panel.empty}</p>
-        {/if}
+    <div class="min-w-0 lg:col-span-2" data-testid="results-upsets">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h3 class="text-sm font-bold text-content">Upsets to watch</h3>
+        <p class="text-xs text-content-subtle">
+          Leader differs from our pre-election forecast
+        </p>
       </div>
-    {/each}
-
-    <div class="card p-4" data-testid="results-upsets">
-      <h3 class="text-sm font-bold text-content">Upsets to watch</h3>
-      <p class="text-xs text-content-muted">
-        Leader differs from our pre-election forecast
-      </p>
       {#if upsets.length}
-        <ol class="mt-2 divide-y divide-stroke/60">
+        <ol class="mt-2 grid gap-2.5 sm:grid-cols-2">
           {#each upsets as race (race.id)}
-            <li class="py-1.5">
-              <a href={`/races/${race.id}/`} class="group block">
+            <li class="min-w-0">
+              <a
+                href={`/races/${race.id}/`}
+                class="card group relative flex h-full flex-col gap-2.5 overflow-hidden p-3 pt-3.5 outline-hidden transition duration-150 hover:-translate-y-0.5 hover:border-primary-400/60 hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page motion-reduce:transform-none dark:hover:border-primary-500/60"
+              >
                 <span
-                  class="block truncate text-sm font-semibold text-content group-hover:text-primary-700 group-hover:underline dark:group-hover:text-primary-300"
-                  >{shortRaceTitle(race.title)}</span
+                  class="absolute inset-x-0 top-0 flex h-1"
+                  aria-hidden="true"
                 >
-                <span class="block text-xs text-content-muted">
-                  <span class="font-semibold text-content"
-                    >{race.leader}{race.leaderParty
-                      ? ` (${partyAbbr(race.leaderParty)})`
-                      : ""}</span
-                  >
-                  {race.called ? "won" : "leads"} · forecast picked {race.predicted}{race.predictedParty &&
-                  race.predicted !== race.predictedParty
-                    ? ` (${partyAbbr(race.predictedParty)})`
-                    : ""}
+                  <span
+                    class="h-full w-1/2 opacity-50 {partyBarClass(
+                      race.predictedParty,
+                    )}"
+                  ></span>
+                  <span class="h-full w-1/2 {partyBarClass(race.leaderParty)}"
+                  ></span>
                 </span>
+                <span class="flex items-start justify-between gap-2">
+                  <span
+                    class="min-w-0 text-sm font-semibold leading-snug text-content group-hover:text-primary-700 dark:group-hover:text-primary-300"
+                    >{shortRaceTitle(race.title)}</span
+                  >
+                  <span
+                    class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold leading-4 {race.called
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+                      : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100'}"
+                    >{race.called ? "Upset called" : "Possible upset"}</span
+                  >
+                </span>
+                <span class="grid grid-cols-2 gap-2">
+                  {#each upsetSides(race) as side (side.label)}
+                    <span
+                      class="relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg bg-surface-alt py-2 pl-3 pr-2"
+                    >
+                      <span
+                        class="absolute inset-y-0 left-0 w-1 {partyBarClass(
+                          side.party,
+                        )} {side.muted ? 'opacity-50' : ''}"
+                        aria-hidden="true"
+                      ></span>
+                      <span
+                        class="text-[10px] font-bold uppercase tracking-wide text-content-subtle"
+                        >{side.label}<span class="sr-only">:</span></span
+                      >
+                      <span class="flex min-w-0 items-center gap-2">
+                        {#if side.person}
+                          <CandidateAvatar
+                            name={side.name}
+                            imageUrl={side.image}
+                            size={28}
+                            class="ring-2 ring-offset-1 ring-offset-surface {partyRing(
+                              side.party,
+                            )} {side.muted ? 'opacity-75 grayscale' : ''}"
+                          />
+                        {/if}
+                        <span class="min-w-0">
+                          <span
+                            class="line-clamp-2 text-xs font-semibold leading-tight break-words {side.muted
+                              ? 'text-content-muted'
+                              : 'text-content'}"
+                            title={side.name}>{side.name}</span
+                          >
+                          {#if side.party && side.person}
+                            <span
+                              class="mt-0.5 inline-block rounded-sm px-1 py-px text-[10px] font-bold leading-4 {partyBadgeClass(
+                                side.party,
+                              )}"
+                              title={side.party}
+                              ><span class="sr-only">Party:&nbsp;</span
+                              >{partyAbbr(side.party)}</span
+                            >
+                          {/if}
+                        </span>
+                      </span>
+                    </span>
+                  {/each}
+                </span>
+                <div class="mt-auto">
+                  <ResultsCountedBar pct={race.pctReporting} />
+                </div>
               </a>
             </li>
           {/each}
         </ol>
       {:else}
-        <p class="mt-2 text-sm text-content-muted">
+        <p
+          class="mt-2 rounded-xl border border-dashed border-stroke p-4 text-sm text-content-muted"
+        >
           {anyCounting || progress.reporting
             ? "Every leader so far matches the forecast."
             : "Shows up once votes are counted."}
@@ -356,6 +431,42 @@
       {/if}
     </div>
   </div>
+
+  {#each PANELS as panel (panel.id)}
+    {@const list = panel.id === "closest" ? closest : leads}
+    <div class="min-w-0" data-testid={`results-${panel.id}`}>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h3 class="text-sm font-bold text-content">{panel.title}</h3>
+        <p class="text-xs text-content-subtle">{panel.note}</p>
+      </div>
+      {#if list.length}
+        <ol
+          class="mt-2 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        >
+          {#each list as race (race.id)}
+            <li class="min-w-0">
+              <ResultsRaceTile
+                id={race.id}
+                title={shortRaceTitle(race.title)}
+                group="counting"
+                leader={race.leader}
+                party={race.party}
+                margin={race.margin}
+                pctReporting={race.pctReporting}
+                contenders={race.contenders}
+              />
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <p
+          class="mt-2 rounded-xl border border-dashed border-stroke p-4 text-sm text-content-muted"
+        >
+          No contested race is counting yet.
+        </p>
+      {/if}
+    </div>
+  {/each}
 </section>
 
 <style>

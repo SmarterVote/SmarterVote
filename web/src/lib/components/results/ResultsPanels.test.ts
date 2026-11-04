@@ -84,9 +84,52 @@ describe("ResultsKeyRaces", () => {
     const items = within(screen.getByTestId("key-races")).getAllByRole(
       "listitem",
     );
-    expect(items[0].textContent).toMatch(/McMorrow ahead · 62% counted/);
-    expect(items[0].textContent).toMatch(/D \+1\.2/);
+    const first = within(items[0]);
+    expect(first.getByRole("link").getAttribute("href")).toBe(
+      "/races/mi-senate-2026/",
+    );
+    expect(items[0].textContent).toMatch(
+      /Mallory McMorrow\s*Party:\s*D\s*Ahead/,
+    );
+    expect(items[0].textContent).toMatch(/62% counted/);
+    expect(items[0].textContent).toMatch(/D lead \+1\.2/);
+    expect(first.getByText("Counting")).toBeTruthy();
     expect(items[1].textContent).toMatch(/Awaiting results/);
+  });
+
+  it("flags a lead under a point as razor-thin", () => {
+    render(ResultsKeyRaces, {
+      races: [
+        {
+          id: "nc-senate-2026",
+          title: "North Carolina U.S. Senate",
+          office: "senate",
+          group: "counting",
+          leader: "Roy Cooper",
+          party: "Democratic",
+          margin: 0.4,
+          pctReporting: 88,
+          contenders: [
+            {
+              name: "Roy Cooper",
+              party: "Democratic",
+              pct: 49.9,
+              imageUrl: null,
+            },
+            {
+              name: "Mike Whatley",
+              party: "Republican",
+              pct: 49.5,
+              imageUrl: null,
+            },
+          ],
+        },
+      ],
+    });
+    const item = within(screen.getByTestId("key-races")).getByRole("listitem");
+    expect(within(item).getByText("Razor-thin")).toBeTruthy();
+    expect(item.textContent).toMatch(/Cooper 49\.9%/);
+    expect(item.textContent).toMatch(/Whatley 49\.5%/);
   });
 
   it("renders nothing without races", () => {
