@@ -3,11 +3,18 @@
   import {
     isStillCounting,
     isUnofficial,
+    resultLeadLabel,
     resultStatusClass,
     resultStatusLabel,
   } from "$lib/utils/results";
 
   export let status: RaceResultStatus | null = null;
+  /** The race's candidates, so a count in progress names who leads. */
+  export let candidates:
+    { name: string; pct?: number | null; votes?: number | null }[] | null =
+    null;
+
+  $: lead = status ? resultLeadLabel({ status, candidates }) : null;
 </script>
 
 <span class="inline-flex flex-wrap items-center gap-1.5">
@@ -22,7 +29,7 @@
         aria-hidden="true"
       ></span>
     {/if}
-    {status ? resultStatusLabel(status) : "Awaiting results"}
+    {lead ?? (status ? resultStatusLabel(status) : "Awaiting results")}
   </span>
   {#if status && isUnofficial(status)}
     <span
