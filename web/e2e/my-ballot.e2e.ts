@@ -19,11 +19,11 @@ test.describe("my-ballot address lookup", () => {
     await mockSummaries(page, FIXTURE_SUMMARIES);
   });
 
-  // Skipped on election night (Nov 4, 2026): it began failing once Election Day passed, which is
-  // unrelated to the results fix shipping with it. Re-enable after the election.
-  test.skip("finds and displays races matching the resolved district", async ({
+  test("finds and displays races matching the resolved district", async ({
     page,
   }) => {
+    // Past elections are hidden by design; pin the browser clock before Election Day.
+    await page.clock.setFixedTime(new Date("2026-10-20T12:00:00Z"));
     await mockCensusGeocoder(page, OHIO_DISTRICT_05_CENSUS_RESPONSE);
     await mockRaceJson(page, FIXTURE_RACE_IDS.senate, ohSenateRace);
     await page.goto("/my-ballot/");
