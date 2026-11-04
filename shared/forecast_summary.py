@@ -1027,9 +1027,15 @@ def build_live_chamber_projection(
     for chamber in ("house", "senate", "governors"):
         races = _chamber_races(summaries, chamber)
         called_ids = [race_id for race in races if (race_id := str(race.get("id") or "")) in called]
-        summary = summarize_chamber(
-            live_summaries, chamber, narrative=None, report_decided_exactly=True, swing_weights=swing_weights
-        )
+        # Control reads exactly 0 or 1 only when the calls alone decide it. Under the
+        # swing posterior an undecided chamber can round to 1.0, and the site then
+        # read "100%" with 130 of 218 needed seats called; keep that capped at 99%.
+        decided = summarize_chamber(live_summaries, chamber, narrative=None, report_decided_exactly=True)
+        clinched = decided["control_probability"] in (0.0, 1.0)
+        if swing_weights is None or clinched:
+            summary = decided
+        else:
+            summary = summarize_chamber(live_summaries, chamber, narrative=None, swing_weights=swing_weights)
         stamps = [str(rows[race_id]["as_of"]) for race_id in called_ids if rows[race_id].get("as_of")]
         chambers[chamber] = {
             **{key: summary[key] for key in _LIVE_CHAMBER_FIELDS if key in summary},
