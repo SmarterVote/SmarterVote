@@ -52,6 +52,15 @@ describe("CSP _headers generator", () => {
     ]);
   });
 
+  it("adds the live feeds origin when VITE_LIVE_FEEDS_URL is set", () => {
+    expect(
+      dataConnectSrcOrigins({
+        VITE_RACES_API_URL: "https://api.example.org",
+        VITE_LIVE_FEEDS_URL: "https://storage.googleapis.com/feeds-bucket",
+      }),
+    ).toEqual(["https://api.example.org", "https://storage.googleapis.com"]);
+  });
+
   it("dedupes identical origins and ignores non-http values", () => {
     expect(
       dataConnectSrcOrigins({

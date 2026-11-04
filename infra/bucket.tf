@@ -11,7 +11,7 @@ resource "google_storage_bucket" "sv_data" {
   # workflow fetches with the deploy identity, and the races API reads it with
   # its own service account. Enforced prevention blocks any future allUsers /
   # allAuthenticatedUsers grant (which would also expose drafts/). Serve
-  # public static data from a separate bucket if VITE_PUBLIC_DATA_URL is ever
+  # public static data from a separate bucket (see live-feeds.tf) if VITE_PUBLIC_DATA_URL is ever
   # needed. No CORS policy for the same reason: no browser reads this bucket.
   public_access_prevention = "enforced"
 
