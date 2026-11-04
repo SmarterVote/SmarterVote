@@ -3,7 +3,13 @@
 import pytest
 
 from shared.election_results import RESULT_STATUSES, WINNER_STATUSES
-from shared.forecast_math import correlated_seat_distribution
+from shared.forecast_math import (
+    SWING_LIKELIHOOD_POWER,
+    SWING_POSTERIOR_MIN_SD,
+    correlated_seat_distribution,
+    posterior_probability,
+    swing_posterior,
+)
 from shared.forecast_summary import (
     LIVE_WINNER_STATUSES,
     SEAT_HOLDERS_UP,
@@ -190,3 +196,128 @@ def test_certain_seats_shift_the_correlated_distribution_without_smearing():
     assert with_certain[:2] == [0.0, 0.0]
     assert with_certain[2:5] == pytest.approx(uncertain)
     assert with_certain[5] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Learning the national swing from calls
+# ---------------------------------------------------------------------------
+
+D_FAVORED = [race for race in SENATE_RACES if race["forecast"]["predicted_winner_party"] == "Democratic"]
+R_FAVORED = [race for race in SENATE_RACES if race["forecast"]["predicted_winner_party"] == "Republican"]
+
+
+def _no_update(rows):
+    """The projection these calls would give with the national swing left at its prior."""
+    return summarize_chamber(apply_called_results(SENATE_RACES, _index(*rows)), "senate", report_decided_exactly=True)
+
+
+def test_prior_weights_reproduce_the_unweighted_math():
+    prior = swing_posterior([])["weights"]
+    probs = [0.2, 0.5, 0.71, 1.0, 0.0]
+    assert correlated_seat_distribution(probs, swing_weights=prior) == pytest.approx(correlated_seat_distribution(probs))
+    assert posterior_probability(0.71, prior) == pytest.approx(0.71, abs=1e-9)
+
+
+def test_calls_matching_the_favorites_sharpen_control():
+    rows = [_call(race, "Democratic") for race in D_FAVORED[:4]] + [_call(race, "Republican") for race in R_FAVORED[:4]]
+    live = build_live_chamber_projection(SENATE_RACES, _index(*rows))
+    baseline = _no_update(rows)
+    posterior = live["swing_posterior"]
+    assert posterior["informative_calls"] == 8
+    assert posterior["sd_logit"] < posterior["prior_sd_logit"]
+    assert abs(posterior["mean_logit"]) < 0.1
+    assert posterior["direction"] == "accurate"
+    assert baseline["control_party"] == live["chambers"]["senate"]["control_party"] == "Democratic"
+    assert live["chambers"]["senate"]["control_probability"] > baseline["control_probability"]
+
+
+def test_upsets_shift_the_swing_toward_the_winner():
+    rows = [_call(race, "Republican") for race in D_FAVORED[:6]]
+    live = build_live_chamber_projection(SENATE_RACES, _index(*rows))
+    baseline = _no_update(rows)
+    posterior = live["swing_posterior"]
+    assert posterior["mean_logit"] > 0.1
+    assert posterior["direction"] == "Republican"
+    assert "underestimated Republicans" in posterior["summary"]
+    senate = live["chambers"]["senate"]
+    assert senate["outcome_probabilities"]["Democratic"] < baseline["outcome_probabilities"]["Democratic"]
+    # Uncalled races move with the swing, so the projected tally can shift past the locked-in calls.
+    assert senate["projected_seats"]["Republican"] >= baseline["projected_seats"]["Republican"]
+
+
+def test_too_few_informative_calls_leave_the_prior_alone():
+    # Four informative calls plus safe-race calls (>= 97%) that do not count toward the minimum.
+    safe = [
+        {
+            **race,
+            "id": f"{race['id']}-safe",
+            "forecast": {**race["forecast"], "party_probabilities": {"Democratic": 0.98, "Republican": 0.02}},
+        }
+        for race in D_FAVORED[4:8]
+    ]
+    races = SENATE_RACES + safe
+    rows = [_call(race, "Democratic") for race in D_FAVORED[:4]] + [_call(race, "Democratic", id=race["id"]) for race in safe]
+    live = build_live_chamber_projection(races, _index(*rows))
+    assert "swing_posterior" not in live
+    baseline = summarize_chamber(apply_called_results(races, _index(*rows)), "senate", report_decided_exactly=True)
+    for key in LIVE_FIELDS:
+        assert live["chambers"]["senate"][key] == baseline[key], key
+
+
+def test_the_posterior_sd_never_falls_below_the_floor():
+    evidence = [(0.6, "Democratic")] * 300 + [(0.6, "Republican")] * 300
+    tight = swing_posterior(evidence, min_sd=0.0)
+    assert tight["sd_logit"] < SWING_POSTERIOR_MIN_SD
+    floored = swing_posterior(evidence)
+    assert floored["applied"]
+    assert floored["sd_logit"] == pytest.approx(SWING_POSTERIOR_MIN_SD, abs=0.005)
+    assert floored["sd_logit"] >= SWING_POSTERIOR_MIN_SD - 1e-6
+    assert floored["likelihood_power"] < SWING_LIKELIHOOD_POWER
+    assert sum(floored["weights"]) == pytest.approx(1.0)
+
+
+def test_certain_and_non_major_evidence_is_ignored():
+    assert swing_posterior([(1.0, "Democratic"), (0.0, "Republican"), (0.6, "Other")] * 10)["calls"] == 0
+
+
+def test_same_party_contests_are_not_evidence():
+    races = [
+        {
+            "id": f"ca-{n:02d}-house-2026",
+            "office": "U.S. House",
+            "state": "California",
+            "candidates": [{"name": f"Ann {n}", "party": "Democratic"}, {"name": f"Ben {n}", "party": "Democratic"}],
+            # Top-two between Democrats: the candidate-level 60% must not read as a Democratic 60% seat.
+            "forecast": {"party_probabilities": {"Democratic": 1.0}, "win_probability": 0.6, "rating": "lean_d"},
+        }
+        for n in range(1, 9)
+    ]
+    rows = [
+        {"id": race["id"], "status": "called", "winner_name": f"Ben {n}", "winner_party": "Democratic"}
+        for n, race in enumerate(races, 1)
+    ]
+    live = build_live_chamber_projection(races + SENATE_RACES, _index(*rows))
+    assert live["chambers"]["house"]["called_count"] == 8
+    assert "swing_posterior" not in live
+
+
+def test_calls_in_one_chamber_inform_the_others():
+    house = [
+        {
+            "id": f"oh-{n:02d}-house-2026",
+            "office": "U.S. House",
+            "state": "Ohio",
+            "candidates": [{"name": f"Dana {n}", "party": "Democratic"}, {"name": f"Riley {n}", "party": "Republican"}],
+            "forecast": {
+                "predicted_winner_party": "Democratic",
+                "party_probabilities": {"Democratic": 0.7, "Republican": 0.3},
+            },
+        }
+        for n in range(1, 7)
+    ]
+    rows = [{"id": race["id"], "status": "called", "winner_name": f"Riley {n}"} for n, race in enumerate(house, 1)]
+    live = build_live_chamber_projection(SENATE_RACES + house, _index(*rows))
+    assert live["swing_posterior"]["direction"] == "Republican"
+    assert live["chambers"]["senate"]["called_count"] == 0
+    baseline = summarize_chamber(SENATE_RACES, "senate", report_decided_exactly=True)
+    assert live["chambers"]["senate"]["outcome_probabilities"]["Democratic"] < baseline["outcome_probabilities"]["Democratic"]

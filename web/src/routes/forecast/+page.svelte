@@ -347,6 +347,7 @@
             {activeTab}
             preElectionProbability={chamberSummary?.control_probability}
             preElectionParty={chamberSummary ? controlParty : null}
+            swingPosterior={$liveForecast?.swing_posterior}
           />
         {/if}
 
