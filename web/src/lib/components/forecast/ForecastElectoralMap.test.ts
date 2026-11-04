@@ -130,4 +130,34 @@ describe("ForecastElectoralMap", () => {
     render(ForecastElectoralMap, { activeTab: "house", ...baseProps() });
     expect(screen.queryByTestId("map-selection-summary")).toBeNull();
   });
+
+  it("hides the results toggle until a race has results", () => {
+    render(ForecastElectoralMap, { activeTab: "senate", ...baseProps() });
+    expect(screen.queryByTestId("map-view-toggle")).toBeNull();
+    expect(screen.queryByTestId("map-results-legend")).toBeNull();
+  });
+
+  it("opens on the results view once results exist and keeps the forecast view", async () => {
+    render(ForecastElectoralMap, {
+      activeTab: "senate",
+      ...baseProps(),
+      resultColors: { Georgia: "var(--color-safe-r)" },
+      resultTooltips: {},
+    });
+
+    const results = screen.getByRole("button", { name: "Show results" });
+    const forecast = screen.getByRole("button", { name: "Forecast" });
+    expect(results.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Results map")).toBeTruthy();
+    expect(screen.getByTestId("map-results-legend")).toBeTruthy();
+    expect(screen.getByText("Called D")).toBeTruthy();
+    // The forecast ramp still explains the uncalled states.
+    expect(screen.getByText("Safe R")).toBeTruthy();
+
+    await fireEvent.click(forecast);
+
+    expect(forecast.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Electoral map")).toBeTruthy();
+    expect(screen.queryByTestId("map-results-legend")).toBeNull();
+  });
 });

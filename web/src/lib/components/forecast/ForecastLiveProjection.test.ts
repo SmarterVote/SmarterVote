@@ -132,4 +132,22 @@ describe("ForecastLiveProjection", () => {
     });
     expect(screen.queryByText(/As of /)).toBeNull();
   });
+
+  it("shows live seats and the pre-election odds beside the live ones", () => {
+    render(ForecastLiveProjection, {
+      props: {
+        projection: senate,
+        activeTab: "senate",
+        preElectionProbability: 0.55,
+        preElectionParty: "Democratic",
+      },
+    });
+    expect(screen.getByText("Live projected seats")).toBeTruthy();
+    expect(
+      screen.getByRole("img", { name: /^Live projected seats: Democratic 49/ }),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("forecast-live-pre-election").textContent,
+    ).toMatch(/Pre-election: 55\.0%\s+Democratic/);
+  });
 });

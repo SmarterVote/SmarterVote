@@ -1,5 +1,8 @@
 <script lang="ts">
-  import type { RaceSummary } from "$lib/types";
+  import type { PublicRaceResult, RaceSummary } from "$lib/types";
+  import { resultGroup } from "$lib/utils/results";
+  import ForecastResultBadge from "./ForecastResultBadge.svelte";
+  import ForecastResultLine from "./ForecastResultLine.svelte";
   import {
     formatRating,
     getRaceState,
@@ -16,6 +19,8 @@
   import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[];
+  /** Election night: live results by race id (empty before any load). */
+  export let results: Map<string, PublicRaceResult> = new Map();
 
   /**
    * Card label: a House seat needs its district ("AZ-01 · Arizona"), or two
@@ -105,6 +110,9 @@
       {#each races as race}
         {@const uncontested = isUncontestedForecastRace(race)}
         {@const rating = race.forecast?.rating}
+        {@const result = results.get(race.id) ?? null}
+        {@const settled = resultGroup(result?.status) === "called"}
+
         {@const ratingBorderColor = rating
           ? rating.endsWith("_d")
             ? "border-l-blue-500"
@@ -114,6 +122,7 @@
           : "border-l-slate-400"}
         <div
           class={`card snap-start shrink-0 w-[min(300px,85vw)] flex flex-col p-4 hover:shadow-md transition-all border-l-[3px] ${ratingBorderColor}`}
+          data-result-settled={settled ? "true" : undefined}
         >
           <div class="flex items-center justify-between mb-2">
             <a
@@ -122,16 +131,28 @@
             >
               <span class="truncate">{keyRaceLabel(race)}</span>
             </a>
-            {#if rating}
-              <span
-                class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
-                  uncontested ? "other" : rating,
-                )}`}
-              >
-                {uncontested ? "Uncontested" : formatRating(rating)}
-              </span>
-            {/if}
+            <div class="ml-2 flex shrink-0 items-center gap-1">
+              <ForecastResultBadge {result} />
+              {#if rating}
+                <span
+                  class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${ratingClass(
+                    uncontested ? "other" : rating,
+                  )}`}
+                >
+                  {uncontested ? "Uncontested" : formatRating(rating)}
+                </span>
+              {/if}
+            </div>
           </div>
+          {#if result}
+            <div class="mb-2">
+              <ForecastResultLine
+                {result}
+                href={raceHref(race.id)}
+                raceLabel={keyRaceLabel(race)}
+              />
+            </div>
+          {/if}
 
           {#if race.forecast && !uncontested}
             <div class="flex items-center gap-3 mb-2">

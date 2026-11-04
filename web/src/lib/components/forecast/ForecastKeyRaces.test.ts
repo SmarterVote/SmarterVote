@@ -64,4 +64,29 @@ describe("ForecastKeyRaces", () => {
     expect(screen.getByText("AZ-01 · Arizona")).toBeTruthy();
     expect(screen.getByText("AZ-06 · Arizona")).toBeTruthy();
   });
+
+  it("marks a called key race and links its result to the race page", () => {
+    render(ForecastKeyRaces, {
+      races: [race],
+      results: new Map([
+        [
+          race.id,
+          {
+            id: race.id,
+            status: "called" as const,
+            winner_name: "Alex Moreno",
+            winner_party: "Republican",
+            candidates: [],
+            sources: [],
+          },
+        ],
+      ]),
+    });
+
+    expect(screen.getByTestId("forecast-result-badge")).toBeTruthy();
+    const line = screen.getByTestId("forecast-result-line");
+    expect(line.textContent).toContain("Called: Alex Moreno (R)");
+    expect(line.getAttribute("href")).toBe("/races/az-senate-2026/");
+    expect(screen.getByText("Tilt R")).toBeTruthy();
+  });
 });

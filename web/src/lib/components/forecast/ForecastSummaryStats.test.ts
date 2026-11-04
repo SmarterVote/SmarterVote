@@ -42,4 +42,23 @@ describe("ForecastSummaryStats", () => {
     expect(screen.queryByText("Includes 50-50 tie-break via VP")).toBeNull();
     expect(screen.getByText("—")).toBeTruthy();
   });
+
+  it("labels itself pre-election once the live projection is shown", () => {
+    render(ForecastSummaryStats, {
+      activeTab: "senate",
+      controlParty: "Republican",
+      controlProbability: 0.72,
+      vpTiebreakParty: undefined,
+      mostLikelyOutcome: { key: "51D - 49R", probability: 0.23 },
+      tossupCount: 4,
+      competitiveRaceCount: 9,
+      cycleYear: "2026",
+      preElection: true,
+    });
+
+    expect(screen.getByText("2026 Senate Pre-election Summary")).toBeTruthy();
+    expect(
+      screen.getByText(/Republican control projected before results/),
+    ).toBeTruthy();
+  });
 });

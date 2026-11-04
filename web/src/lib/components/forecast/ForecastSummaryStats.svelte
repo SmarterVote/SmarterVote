@@ -11,6 +11,11 @@
   export let competitiveRaceCount: number;
   /** Election year this summary describes; null when the races do not say. */
   export let cycleYear: string | null = null;
+  /**
+   * Election night, once the live projection is shown above: these are the
+   * pre-election numbers, so say so rather than compete with the live ones.
+   */
+  export let preElection = false;
 </script>
 
 <div class="lg:col-span-6 flex flex-col space-y-6">
@@ -24,7 +29,7 @@
             : activeTab === "senate"
               ? "Senate"
               : "Governor",
-          "Election Summary",
+          preElection ? "Pre-election Summary" : "Election Summary",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -50,9 +55,9 @@
               : 'bg-slate-500 dark:bg-slate-400'}"
         ></span>
         {#if controlParty === "Other"}
-          No clear control projected
+          No clear control projected{preElection ? " before results" : ""}
         {:else}
-          {controlParty} control projected
+          {controlParty} control projected{preElection ? " before results" : ""}
         {/if}
       </span>
 

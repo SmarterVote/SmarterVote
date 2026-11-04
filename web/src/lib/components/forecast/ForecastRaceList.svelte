@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ChamberForecastDetails } from "$lib/types";
+  import type { ChamberForecastDetails, PublicRaceResult } from "$lib/types";
   import {
     filterForecastRaces,
     sortForecastRaces,
@@ -16,6 +16,8 @@
   export let onClearStateFilter: () => void;
   /** Anchor the map's "View races" control scrolls to and focuses. */
   export let sectionId = "forecast-race-list";
+  /** Election night: live results by race id (empty before any load). */
+  export let results: Map<string, PublicRaceResult> = new Map();
 
   let filterRating = "all";
   let filterParty = "all";
@@ -98,6 +100,7 @@
       {#each sortedRaces.slice(0, visibleRaceCount) as race (race.id)}
         <ForecastRaceCard
           {race}
+          result={results.get(race.id) ?? null}
           isExpanded={expandedRaceIds.has(race.id)}
           onToggleExpand={() => toggleExpand(race.id)}
         />

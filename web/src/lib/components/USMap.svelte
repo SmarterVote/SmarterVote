@@ -406,6 +406,38 @@
             fill="var(--color-holdover-r-solid)"
           />
         </pattern>
+        <!-- Election night: a race still being counted, hatched in the
+             leader's color so it never reads as a call (solid). -->
+        <pattern
+          id="map-result-lead-d"
+          patternUnits="userSpaceOnUse"
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <rect width="8" height="8" fill="var(--color-holdover-d-solid)" />
+          <rect width="4" height="8" fill="var(--color-safe-d)" />
+        </pattern>
+        <pattern
+          id="map-result-lead-r"
+          patternUnits="userSpaceOnUse"
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <rect width="8" height="8" fill="var(--color-holdover-r-solid)" />
+          <rect width="4" height="8" fill="var(--color-safe-r)" />
+        </pattern>
+        <pattern
+          id="map-result-lead-other"
+          patternUnits="userSpaceOnUse"
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <rect width="8" height="8" fill="var(--color-result-other-bg)" />
+          <rect width="4" height="8" fill="var(--color-result-other)" />
+        </pattern>
       </defs>
       {#each stateFeatures as state (state.id)}
         {@const canClick = activeStates.has(state.name)}
@@ -597,6 +629,11 @@
     --color-holdover-r: rgba(239, 68, 68, 0.18);
     --color-holdover-d-solid: #dbeafe;
     --color-holdover-r-solid: #fee2e2;
+    /* Election-night results: a winner outside the two major parties. */
+    --color-result-other: #7e22ce;
+    --color-result-other-bg: #f3e8ff;
+    /* What forecast colors fade toward in the results view. */
+    --color-result-faded: #f8fafc;
     /* Distinct from Toss-up: a hatched neutral for "no forecast yet". */
     --color-no-forecast-bg: #f8fafc;
     --color-no-forecast-line: #cbd5e1;
@@ -632,6 +669,9 @@
     --color-holdover-r: rgba(239, 68, 68, 0.12);
     --color-holdover-d-solid: #1b2c4d;
     --color-holdover-r-solid: #3a1e26;
+    --color-result-other: #a855f7;
+    --color-result-other-bg: #2e1a47;
+    --color-result-faded: #111827;
     --color-no-forecast-bg: #0f172a;
     --color-no-forecast-line: #475569;
   }

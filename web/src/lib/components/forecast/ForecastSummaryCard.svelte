@@ -19,6 +19,8 @@
   export let narrative: string;
   export let updatedAt: string | undefined;
   export let cycleYear: string | null = null;
+  /** True when the live projection above supersedes these numbers. */
+  export let preElection = false;
 </script>
 
 <!-- Forecast Above-The-Fold Layout: Election Summary -->
@@ -34,6 +36,7 @@
       {tossupCount}
       {competitiveRaceCount}
       {cycleYear}
+      {preElection}
     />
 
     <!-- Right Column: Charts / Stats -->
@@ -46,7 +49,13 @@
         {projectedSeats}
         {vpTiebreakParty}
       />
-      <ForecastSeatsBar {activeTab} {projectedSeats} {totalSeats} {threshold} />
+      <ForecastSeatsBar
+        {activeTab}
+        {projectedSeats}
+        {totalSeats}
+        {threshold}
+        label={preElection ? "Pre-election projected seats" : "Projected seats"}
+      />
     </div>
 
     <!-- Full-Width Bottom Row: Forecast Overview -->

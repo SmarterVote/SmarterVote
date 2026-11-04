@@ -1,11 +1,21 @@
 <script lang="ts">
   import type { LiveChamberProjection } from "$lib/types";
-  import { getMostLikelySeatOutcome } from "$lib/utils/forecast";
+  import {
+    getMostLikelySeatOutcome,
+    type ForecastTab,
+  } from "$lib/utils/forecast";
+  import { controlProbability as formatPreElectionProbability } from "$lib/utils/forecastPresentation";
+  import ForecastSeatsBar from "./ForecastSeatsBar.svelte";
   import { formatLiveControlProbability } from "$lib/utils/liveForecast";
 
   export let projection: LiveChamberProjection;
   /** Fallback when no called race carries its own as-of time. */
   export let resultsUpdatedAt: string | null = null;
+  export let activeTab: ForecastTab = "senate";
+  /** The pre-election control chance, shown beside the live one for comparison. */
+  export let preElectionProbability: number | undefined = undefined;
+  export let preElectionParty: "Democratic" | "Republican" | "Other" | null =
+    null;
 
   function formatTime(value: string | null | undefined): string {
     if (!value) return "";
@@ -54,6 +64,15 @@
         {formatLiveControlProbability(projection.control_probability)}
       </div>
       <div class="mt-0.5 text-xs text-content-muted">{party}</div>
+      {#if preElectionParty && typeof preElectionProbability === "number"}
+        <div
+          class="mt-1 text-xs text-content-subtle"
+          data-testid="forecast-live-pre-election"
+        >
+          Pre-election: {formatPreElectionProbability(preElectionProbability)}
+          {preElectionParty}
+        </div>
+      {/if}
     </div>
 
     <div
@@ -67,6 +86,18 @@
       </div>
     </div>
   </div>
+
+  {#if projection.projected_seats && projection.total_seats > 0}
+    <div class="mt-5 pb-5">
+      <ForecastSeatsBar
+        {activeTab}
+        projectedSeats={projection.projected_seats}
+        totalSeats={projection.total_seats}
+        threshold={projection.threshold}
+        label="Live projected seats"
+      />
+    </div>
+  {/if}
 
   <p class="mt-3 text-xs text-content-muted">
     Called races count as decided; all other races use the pre-election
