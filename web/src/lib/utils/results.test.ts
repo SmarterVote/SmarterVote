@@ -103,3 +103,33 @@ describe("lastName", () => {
     expect(lastName("Cher")).toBe("Cher");
   });
 });
+
+describe("fillMissingShares", () => {
+  it("fills a winner's blank share from votes, scaled by an opponent", async () => {
+    const { fillMissingShares } = await import("./results");
+    const out = fillMissingShares({
+      id: "co-senate-2026",
+      status: "called",
+      candidates: [
+        {
+          name: "John Hickenlooper",
+          party: "Democratic",
+          votes: 741956,
+          pct: null,
+        },
+        { name: "Mark Baisley", party: "Republican", votes: 392930, pct: 33.2 },
+      ],
+    } as never) as { candidates: { pct: number | null }[] };
+    expect(out.candidates[0].pct).toBe(62.7);
+    expect(out.candidates[1].pct).toBe(33.2);
+  });
+  it("leaves results without votes alone", async () => {
+    const { fillMissingShares } = await import("./results");
+    const input = {
+      id: "x",
+      status: "counting",
+      candidates: [{ name: "A", party: "D", votes: null, pct: null }],
+    } as never;
+    expect(fillMissingShares(input)).toBe(input);
+  });
+});
