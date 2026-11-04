@@ -5,9 +5,11 @@
   export let projectedSeats: Record<string, number>;
   export let totalSeats: number;
   export let threshold: number;
+  /** Heading above the bar; the live projection names itself "Live projected seats". */
+  export let label = "Projected seats";
 
   $: seatsLabel = [
-    `Projected seats: Democratic ${projectedSeats.Democratic ?? 0}`,
+    `${label}: Democratic ${projectedSeats.Democratic ?? 0}`,
     `Republican ${projectedSeats.Republican ?? 0}`,
     ...(projectedSeats.Other ? [`Other ${projectedSeats.Other}`] : []),
     `of ${totalSeats}`,
@@ -19,7 +21,7 @@
 
 <div class="space-y-3">
   <div class="flex items-center justify-between">
-    <span class="eyebrow text-content-subtle">Projected seats</span>
+    <span class="eyebrow text-content-subtle">{label}</span>
   </div>
 
   <div class="space-y-2">

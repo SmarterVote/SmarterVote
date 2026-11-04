@@ -35,6 +35,12 @@
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
   import { liveChamberProjection, liveForecast } from "$lib/utils/liveForecast";
+  import {
+    buildResultMapOverlay,
+    hasAnyResults,
+    withResultTooltips,
+  } from "$lib/utils/forecastResults";
+  import { isResultsSeason, liveResults } from "$lib/utils/results";
   import { canonicalStateName } from "$lib/utils/states";
   import { scrollBehavior } from "$lib/utils/motion";
 
@@ -192,6 +198,29 @@
   $: liveProjection = hydrated
     ? liveChamberProjection($liveForecast, activeTab)
     : null;
+
+  // Election night: per-race results for the cards, lists and map. Before
+  // hydration (and before the first load) the map stays empty, so the
+  // prerendered page is the forecast alone.
+  $: results = hydrated ? $liveResults : new Map();
+  $: anyResults = hasAnyResults(results);
+  $: tabHasResults = hasAnyResults(
+    results,
+    races.filter((r) => isRaceInForecastTab(r, activeTab)).map((r) => r.id),
+  );
+  $: resultOverlay = tabHasResults
+    ? buildResultMapOverlay(races, activeTab, results)
+    : null;
+  $: resultTooltips = resultOverlay
+    ? withResultTooltips(stateTooltips, resultOverlay)
+    : null;
+  // In the prerendered HTML from Election Day on; in the browser, also once
+  // the results file has any votes (a reader whose clock is a day behind).
+  let resultsSeason = isResultsSeason();
+  onMount(() => {
+    resultsSeason = isResultsSeason();
+  });
+  $: showResultsCallout = resultsSeason || anyResults;
 </script>
 
 <svelte:head>
@@ -262,6 +291,35 @@
     </div>
   </header>
 
+  {#if showResultsCallout}
+    <a
+      href="/results/"
+      class="card flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-primary-200 px-4 py-3 text-sm transition-colors hover:border-primary-400 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-5 dark:border-primary-800/60 dark:hover:border-primary-600"
+      data-testid="forecast-results-callout"
+    >
+      <span class="flex min-w-0 items-center gap-2.5">
+        <span class="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+          <span
+            class="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60 motion-safe:animate-ping"
+          ></span>
+          <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600"
+          ></span>
+        </span>
+        <span class="font-semibold text-content"
+          >Results are coming in.
+          <span class="font-normal text-content-muted"
+            >This page is the pre-election forecast, with live results marked on
+            each race.</span
+          ></span
+        >
+      </span>
+      <span
+        class="inline-flex shrink-0 items-center gap-1.5 font-bold text-primary-700 dark:text-primary-300"
+        >See live results <UiIcon name="arrow-right" size="sm" /></span
+      >
+    </a>
+  {/if}
+
   {#if (!races || races.length === 0) && (!chamberForecasts || !chamberForecasts.chambers)}
     <ForecastUnavailable loadError={racesLoadError || forecastsLoadError} />
   {:else}
@@ -286,6 +344,9 @@
           <ForecastLiveProjection
             projection={liveProjection}
             resultsUpdatedAt={$liveForecast?.results_updated_at ?? null}
+            {activeTab}
+            preElectionProbability={chamberSummary?.control_probability}
+            preElectionParty={chamberSummary ? controlParty : null}
           />
         {/if}
 
@@ -310,6 +371,7 @@
             {threshold}
             narrative={chamberNarrative}
             updatedAt={chamberForecasts?.updated_at}
+            preElection={Boolean(liveProjection)}
           />
         </div>
 
@@ -324,6 +386,8 @@
             {stateRaceCounts}
             {stateColors}
             {stateTooltips}
+            resultColors={resultOverlay?.colors ?? null}
+            {resultTooltips}
             onStateClick={handleStateClick}
             onClearFilter={clearStateFilter}
             onViewResults={scrollToRaceList}
@@ -332,7 +396,9 @@
           <!-- Stats Panel Column -->
           <div class="space-y-6 h-full flex flex-col">
             <ForecastProjectionSummary
-              label={aggregate.label}
+              label={liveProjection
+                ? `Pre-election ${aggregate.label}`
+                : aggregate.label}
               {controlParty}
               {threshold}
               {projectedSeats}
@@ -357,7 +423,7 @@
           ratingCounts={aggregate.ratingCounts}
         />
 
-        <ForecastKeyRaces races={keyRacesList} />
+        <ForecastKeyRaces races={keyRacesList} {results} />
 
         <ForecastOutlookAnalysis
           {activeTab}
@@ -372,6 +438,7 @@
           {chamberSummary}
           onClearStateFilter={clearStateFilter}
           sectionId={RACE_LIST_ID}
+          {results}
         />
 
         <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />
