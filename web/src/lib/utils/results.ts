@@ -144,12 +144,15 @@ export function resultStatusLabel(status: RaceResultStatus): string {
   return STATUS_LABELS[status] ?? "Results pending";
 }
 
-function lastName(name: string): string {
+export function lastName(name: string): string {
   const parts = name.trim().split(/\s+/);
   const suffix = /^(jr\.?|sr\.?|ii|iii|iv)$/i;
-  return parts.length > 1 && suffix.test(parts[parts.length - 1])
-    ? parts[parts.length - 2].replace(/,$/, "")
-    : parts[parts.length - 1];
+  if (parts.length > 1 && suffix.test(parts[parts.length - 1])) parts.pop();
+  let start = parts.length - 1;
+  // Keep surname particles: "Beth Van Duyne" is Van Duyne, "Ray De La Cruz" is De La Cruz.
+  const particle = /^(van|von|de|del|della|der|den|di|da|du|la|le|st\.?)$/i;
+  while (start > 1 && particle.test(parts[start - 1])) start -= 1;
+  return parts.slice(start).join(" ").replace(/,$/, "");
 }
 
 /**
