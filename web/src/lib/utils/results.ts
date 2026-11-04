@@ -36,6 +36,64 @@ export function calledRaceCount(
 const RESULTS_URL = "/results-live.json";
 const REFRESH_MS = 60_000;
 
+export type ResultOffice = "governor" | "senate" | "house" | "other";
+
+/** One row of the results page's full list, trimmed from the race summaries. */
+export interface ResultDirectoryRace {
+  id: string;
+  title: string;
+  state: string;
+  office: ResultOffice;
+  competitive: boolean;
+}
+
+const OFFICE_ORDER: Record<ResultOffice, number> = {
+  governor: 0,
+  senate: 1,
+  house: 2,
+  other: 3,
+};
+
+export function resultOffice(
+  office: string | null | undefined,
+  id = "",
+): ResultOffice {
+  const text = `${office ?? ""} ${id}`.toLocaleLowerCase();
+  if (text.includes("governor") || text.includes("gubernatorial"))
+    return "governor";
+  if (text.includes("senate")) return "senate";
+  if (text.includes("house") || text.includes("representative")) return "house";
+  return "other";
+}
+
+/** Every Election Day race, sorted by state, then governor, Senate, House. */
+export function resultDirectory(
+  races: {
+    id: string;
+    title?: string | null;
+    office?: string | null;
+    state?: string | null;
+    election_date?: string | null;
+    forecast?: { rating?: string | null } | null;
+  }[],
+): ResultDirectoryRace[] {
+  return races
+    .filter((race) => race.election_date === GENERAL_ELECTION_DATE)
+    .map((race) => ({
+      id: race.id,
+      title: race.title ?? race.id,
+      state: race.state ?? "Other",
+      office: resultOffice(race.office, race.id),
+      competitive: /^(tossup|tilt_|lean_)/.test(race.forecast?.rating ?? ""),
+    }))
+    .sort(
+      (a, b) =>
+        a.state.localeCompare(b.state) ||
+        OFFICE_ORDER[a.office] - OFFICE_ORDER[b.office] ||
+        a.id.localeCompare(b.id, undefined, { numeric: true }),
+    );
+}
+
 /** The races Phase 1 covers first: already drawing traffic before Election Day. */
 export const PRIORITY_RESULT_RACES: {
   id: string;

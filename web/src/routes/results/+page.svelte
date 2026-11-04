@@ -7,16 +7,18 @@
     liveResults,
     liveResultsState,
     resultGroup,
+    resultOffice,
+    type ResultDirectoryRace,
     type ResultGroup,
+    type ResultOffice,
   } from "$lib/utils/results";
+  import type { PageData } from "./$types";
 
-  type Row = {
-    id: string;
-    title: string;
-    state: string;
-    result: PublicRaceResult | null;
-  };
+  export let data: PageData;
+
+  type Row = ResultDirectoryRace & { result: PublicRaceResult | null };
   type Filter = "all" | ResultGroup;
+  type OfficeFilter = "all" | ResultOffice;
 
   const DESCRIPTION =
     "Unofficial 2026 election results with sources, linked to where each candidate stands on the issues.";
@@ -30,24 +32,57 @@
     { id: "all", label: "All races" },
     ...TILES,
   ];
+  const OFFICES: { id: OfficeFilter; label: string }[] = [
+    { id: "all", label: "All offices" },
+    { id: "governor", label: "Governor" },
+    { id: "senate", label: "Senate" },
+    { id: "house", label: "House" },
+  ];
+  const KEY_RACES = "Key races";
   const priorityIds = new Set(PRIORITY_RESULT_RACES.map((race) => race.id));
+  const pill = (active: boolean) =>
+    `min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors ${
+      active
+        ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200"
+        : "border-stroke bg-surface text-content-muted hover:bg-surface-alt"
+    }`;
 
   let filter: Filter = "all";
+  let office: OfficeFilter = "all";
+  let stateFilter = "all";
+  let competitiveOnly = false;
+  let query = "";
 
-  $: rows = [
-    ...PRIORITY_RESULT_RACES.map((race): Row => ({
-      ...race,
-      result: $liveResults.get(race.id) ?? null,
-    })),
-    ...[...$liveResults.values()]
-      .filter((row) => !priorityIds.has(row.id))
-      .map((row): Row => ({
-        id: row.id,
-        title: row.title ?? row.id,
-        state: "More races",
-        result: row,
+  // The prerendered list names every race on the ballot; the live feed fills in
+  // results and adds any race the list missed (a build before it was published).
+  $: directory = new Map<string, ResultDirectoryRace>(
+    [
+      ...PRIORITY_RESULT_RACES.map((race) => ({
+        ...race,
+        office: resultOffice(race.title, race.id),
+        competitive: true,
       })),
+      ...data.races,
+    ].map((race) => [race.id, race]),
+  );
+  $: rows = [
+    ...[...directory.values()].map(
+      (race): Row => ({ ...race, result: $liveResults.get(race.id) ?? null }),
+    ),
+    ...[...$liveResults.values()]
+      .filter((row) => !directory.has(row.id))
+      .map(
+        (row): Row => ({
+          id: row.id,
+          title: row.title ?? row.id,
+          state: "Other",
+          office: resultOffice(row.title, row.id),
+          competitive: false,
+          result: row,
+        }),
+      ),
   ];
+  $: states = [...new Set(rows.map((row) => row.state))].sort();
   $: counts = rows.reduce<Record<ResultGroup, number>>(
     (totals, row) => {
       totals[resultGroup(row.result?.status)] += 1;
@@ -55,17 +90,54 @@
     },
     { called: 0, counting: 0, pending: 0, awaiting: 0 },
   );
+  $: needle = query.trim().toLocaleLowerCase();
+  $: narrowed =
+    office !== "all" ||
+    stateFilter !== "all" ||
+    competitiveOnly ||
+    needle !== "";
   $: visible = rows.filter(
-    (row) => filter === "all" || resultGroup(row.result?.status) === filter,
+    (row) =>
+      (filter === "all" || resultGroup(row.result?.status) === filter) &&
+      (office === "all" || row.office === office) &&
+      (stateFilter === "all" || row.state === stateFilter) &&
+      (!competitiveOnly || row.competitive || priorityIds.has(row.id)) &&
+      (needle === "" ||
+        `${row.title} ${row.state} ${(row.result?.candidates ?? [])
+          .map((c) => c.name)
+          .join(" ")}`
+          .toLocaleLowerCase()
+          .includes(needle)),
   );
-  $: groups = [...new Set(visible.map((row) => row.state))].map((state) => ({
-    state,
-    rows: visible.filter((row) => row.state === state),
-  }));
+  // Key races lead the unfiltered page; any narrowing shows plain state groups.
+  $: groups = [
+    ...(narrowed
+      ? []
+      : [
+          {
+            state: KEY_RACES,
+            rows: visible.filter((row) => priorityIds.has(row.id)),
+          },
+        ]),
+    ...states.map((state) => ({
+      state,
+      rows: visible.filter(
+        (row) => row.state === state && (narrowed || !priorityIds.has(row.id)),
+      ),
+    })),
+  ].filter((group) => group.rows.length > 0);
   $: updatedAt = $liveResultsState.updatedAt?.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
   });
+
+  function reset() {
+    filter = "all";
+    office = "all";
+    stateFilter = "all";
+    competitiveOnly = false;
+    query = "";
+  }
 </script>
 
 <svelte:head>
@@ -134,20 +206,70 @@
     {/each}
   </dl>
 
-  <div class="flex flex-wrap gap-2" role="group" aria-label="Filter races">
-    {#each FILTERS as option (option.id)}
+  <div class="space-y-3">
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
+      {#each FILTERS as option (option.id)}
+        <button
+          type="button"
+          class={pill(filter === option.id)}
+          aria-pressed={filter === option.id}
+          on:click={() => (filter = option.id)}
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Filter by office">
+      {#each OFFICES as option (option.id)}
+        <button
+          type="button"
+          class={pill(office === option.id)}
+          aria-pressed={office === option.id}
+          on:click={() => (office = option.id)}
+        >
+          {option.label}
+        </button>
+      {/each}
       <button
         type="button"
-        class="min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors {filter ===
-        option.id
-          ? 'border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
-          : 'border-stroke bg-surface text-content-muted hover:bg-surface-alt'}"
-        aria-pressed={filter === option.id}
-        on:click={() => (filter = option.id)}
+        class={pill(competitiveOnly)}
+        aria-pressed={competitiveOnly}
+        on:click={() => (competitiveOnly = !competitiveOnly)}
       >
-        {option.label}
+        Competitive only
       </button>
-    {/each}
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="sr-only" for="results-state">State</label>
+      <select
+        id="results-state"
+        class="min-h-11 rounded-lg border border-stroke bg-surface px-3 text-sm text-content"
+        bind:value={stateFilter}
+      >
+        <option value="all">All states</option>
+        {#each states as state (state)}
+          <option value={state}>{state}</option>
+        {/each}
+      </select>
+      <label class="sr-only" for="results-search">Search races</label>
+      <input
+        id="results-search"
+        type="search"
+        placeholder="Search a race or candidate"
+        class="min-h-11 w-full max-w-xs rounded-lg border border-stroke bg-surface px-3 text-sm text-content"
+        bind:value={query}
+      />
+      <span class="text-sm text-content-subtle" aria-live="polite"
+        >{visible.length} of {rows.length} races</span
+      >
+      {#if narrowed || filter !== "all"}
+        <button
+          type="button"
+          class="min-h-11 px-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300"
+          on:click={reset}>Clear filters</button
+        >
+      {/if}
+    </div>
   </div>
 
   {#each groups as group (group.state)}
@@ -160,6 +282,6 @@
       </div>
     </section>
   {:else}
-    <p class="alert-info">No races match this filter yet.</p>
+    <p class="alert-info">No races match these filters.</p>
   {/each}
 </div>
