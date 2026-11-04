@@ -1,6 +1,7 @@
 import { browser } from "$app/environment";
 import { readable, writable } from "svelte/store";
 import { daysUntilElection } from "$lib/utils/electionDate";
+import { canonicalRaceState } from "$lib/utils/states";
 import type {
   PublicRaceResult,
   PublicResultCandidate,
@@ -82,7 +83,7 @@ export function resultDirectory(
     .map((race) => ({
       id: race.id,
       title: race.title ?? race.id,
-      state: race.state ?? "Other",
+      state: canonicalRaceState(race) ?? "Other",
       office: resultOffice(race.office, race.id),
       competitive: /^(tossup|tilt_|lean_)/.test(race.forecast?.rating ?? ""),
     }))
@@ -194,6 +195,19 @@ export function sortResultRows(
     (a, b) =>
       (b.pct ?? -1) - (a.pct ?? -1) || (b.votes ?? -1) - (a.votes ?? -1),
   );
+}
+
+/**
+ * The share of the expected vote counted, as a short label, or "" when the
+ * feed has no usable figure. Never rounds a partial count up to 100%.
+ */
+export function formatPctReporting(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    return "";
+  if (value >= 100) return "100%";
+  if (value > 0 && value < 1) return "<1%";
+  const shown = value >= 99 ? Math.floor(value) : Math.round(value);
+  return `${shown}%`;
 }
 
 export function compareHref(raceId: string): string {

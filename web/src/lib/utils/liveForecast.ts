@@ -16,6 +16,8 @@ const isCount = (value: unknown): value is number =>
 export function liveChamberProjection(
   file: LiveForecastFile | null | undefined,
   tab: ForecastTab,
+  /** The results page shows the projection before the first call, too. */
+  minCalled = 1,
 ): LiveChamberProjection | null {
   const row = file?.chambers?.[tab];
   if (!row || typeof row !== "object") return null;
@@ -23,7 +25,7 @@ export function liveChamberProjection(
   if (
     !isCount(row.called_count) ||
     !isCount(row.total_count) ||
-    row.called_count < 1 ||
+    row.called_count < minCalled ||
     row.called_count > row.total_count ||
     typeof probability !== "number" ||
     !Number.isFinite(probability) ||

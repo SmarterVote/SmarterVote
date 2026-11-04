@@ -1,7 +1,10 @@
 <script lang="ts">
   import ResultRaceCard from "$lib/components/results/ResultRaceCard.svelte";
+  import ResultsBalanceOfPower from "$lib/components/results/ResultsBalanceOfPower.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import type { PublicRaceResult } from "$lib/types";
+  import { liveForecast } from "$lib/utils/liveForecast";
+  import { canonicalRaceState } from "$lib/utils/states";
   import {
     PRIORITY_RESULT_RACES,
     liveResults,
@@ -39,6 +42,7 @@
     { id: "house", label: "House" },
   ];
   const KEY_RACES = "Key races";
+  const REPORTING = "Results coming in";
   const priorityIds = new Set(PRIORITY_RESULT_RACES.map((race) => race.id));
   const pill = (active: boolean) =>
     `min-h-11 rounded-full border px-4 text-sm font-semibold transition-colors ${
@@ -75,7 +79,7 @@
       .map((row): Row => ({
         id: row.id,
         title: row.title ?? row.id,
-        state: "Other",
+        state: canonicalRaceState({ id: row.id }) ?? "Other",
         office: resultOffice(row.title, row.id),
         competitive: false,
         result: row,
@@ -108,7 +112,12 @@
           .toLocaleLowerCase()
           .includes(needle)),
   );
-  // Key races lead the unfiltered page; any narrowing shows plain state groups.
+  const hasCount = (row: Row) => resultGroup(row.result?.status) !== "awaiting";
+  const newestFirst = (a: Row, b: Row) =>
+    String(b.result?.as_of ?? "").localeCompare(String(a.result?.as_of ?? ""));
+  // Key races lead the unfiltered page, then every race already reporting
+  // (newest first) so counts are not buried among hundreds of empty cards;
+  // any narrowing shows plain state groups with reporting races first.
   $: groups = [
     ...(narrowed
       ? []
@@ -117,12 +126,22 @@
             state: KEY_RACES,
             rows: visible.filter((row) => priorityIds.has(row.id)),
           },
+          {
+            state: REPORTING,
+            rows: visible
+              .filter((row) => !priorityIds.has(row.id) && hasCount(row))
+              .sort(newestFirst),
+          },
         ]),
     ...states.map((state) => ({
       state,
-      rows: visible.filter(
-        (row) => row.state === state && (narrowed || !priorityIds.has(row.id)),
-      ),
+      rows: visible
+        .filter(
+          (row) =>
+            row.state === state &&
+            (narrowed || (!priorityIds.has(row.id) && !hasCount(row))),
+        )
+        .sort((a, b) => Number(hasCount(b)) - Number(hasCount(a))),
     })),
   ].filter((group) => group.rows.length > 0);
   $: updatedAt = $liveResultsState.updatedAt?.toLocaleTimeString(undefined, {
@@ -204,6 +223,8 @@
       </div>
     {/each}
   </dl>
+
+  <ResultsBalanceOfPower file={$liveForecast} />
 
   <div class="space-y-3">
     <div

@@ -7,7 +7,11 @@
   import { formatElectionDate } from "$lib/utils/electionDate";
   import { getHostname } from "$lib/utils/forecastPresentation";
   import { partyBadgeClass } from "$lib/utils/party";
-  import { compareHref, namesWinner } from "$lib/utils/results";
+  import {
+    compareHref,
+    formatPctReporting,
+    namesWinner,
+  } from "$lib/utils/results";
   import { isExternalUrl } from "$lib/utils/url";
 
   export let raceId: string;
@@ -37,6 +41,7 @@
     (winnerRow as { image_url?: string | null } | undefined)?.image_url ??
     candidates.find((candidate) => candidate.name === result.winner_name)
       ?.image_url;
+  $: reporting = formatPctReporting(result.pct_reporting);
   $: sourceLinks = (result.sources ?? []).filter((source) =>
     isExternalUrl(String(source.url)),
   );
@@ -116,10 +121,10 @@
         />
       {/if}
 
-      {#if result.pct_reporting != null}
+      {#if reporting}
         <div class="mt-5">
           <p class="text-xs font-semibold text-content-subtle">
-            About {result.pct_reporting}% of votes counted
+            About {reporting} of votes counted
           </p>
           <div
             class="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-alt"
@@ -127,7 +132,7 @@
           >
             <div
               class="h-full rounded-full bg-content-subtle/60"
-              style="width: {Math.min(100, result.pct_reporting)}%"
+              style="width: {Math.min(100, result.pct_reporting ?? 0)}%"
             ></div>
           </div>
         </div>
