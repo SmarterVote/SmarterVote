@@ -14,6 +14,7 @@ function props() {
     sortedOutcomes: chart.outcomes,
     maxProbability: chart.maxProbability,
     svgData: chart.svgData,
+    threshold: 51,
   };
 }
 
@@ -24,7 +25,9 @@ describe("ForecastSeatOutcomeChart", () => {
     render(ForecastSeatOutcomeChart, props());
 
     expect(screen.getByText("Seat Outcome Distribution")).toBeTruthy();
-    expect(screen.getAllByText("Tie (50-50)").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Tie (50-50) or no majority").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText("35.0%")).toBeTruthy();
   });
 
@@ -44,6 +47,21 @@ describe("ForecastSeatOutcomeChart", () => {
 
     expect(screen.getByText("49D (Min)")).toBeTruthy();
     expect(screen.getByText("51D (Max)")).toBeTruthy();
-    expect(screen.getByText("50-50 Tie Threshold")).toBeTruthy();
+    expect(screen.getByText("51D majority line")).toBeTruthy();
+  });
+
+  it("colors House histogram bars by who reaches 218, not by 51 seats", async () => {
+    const house = { "220D-215R": 0.5, "217D-218R": 0.5 };
+    const chart = buildSeatOutcomeChart(house, 218);
+    const { container } = render(ForecastSeatOutcomeChart, {
+      seatBuckets: groupSeatDistribution(house, "house"),
+      sortedOutcomes: chart.outcomes,
+      maxProbability: chart.maxProbability,
+      svgData: chart.svgData,
+      threshold: 218,
+    });
+    await fireEvent.click(screen.getByText("Histogram"));
+    expect(container.querySelectorAll(".bg-blue-500").length).toBe(1);
+    expect(container.querySelectorAll(".bg-red-500").length).toBe(1);
   });
 });

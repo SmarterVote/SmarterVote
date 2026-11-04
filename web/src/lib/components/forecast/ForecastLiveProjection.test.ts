@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/svelte";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ForecastLiveProjection from "./ForecastLiveProjection.svelte";
 import type { LiveChamberProjection, LiveForecastFile } from "$lib/types";
 import {
   fetchLiveForecast,
+  fetchLiveForecastSnapshot,
   formatLiveControlProbability,
   liveChamberProjection,
   swingPosteriorNote,
@@ -110,7 +111,7 @@ describe("ForecastLiveProjection", () => {
   it("shows the live odds, the likeliest split, and how many races are called", () => {
     render(ForecastLiveProjection, { props: { projection: senate } });
     expect(screen.getByText("Live projection")).toBeTruthy();
-    expect(screen.getByText("4 of 35 races called")).toBeTruthy();
+    expect(screen.getByText("4 of 35 Senate races called")).toBeTruthy();
     expect(screen.getByText("62.0%")).toBeTruthy();
     expect(screen.getByText("Republican")).toBeTruthy();
     expect(screen.getByText("51R-49D")).toBeTruthy();
@@ -164,7 +165,7 @@ describe("swingPosteriorNote", () => {
         direction: "Democratic",
       }),
     ).toBe(
-      "Updated with 102 called races: results so far point to polls underestimating Democrats.",
+      "National swing estimated from 102 called races across the House, Senate and governors: results so far point to polls underestimating Democrats.",
     );
     expect(
       swingPosteriorNote({
@@ -173,7 +174,7 @@ describe("swingPosteriorNote", () => {
         informative_calls: 6,
       }),
     ).toBe(
-      "Updated with 6 called races: results so far point to polls being about right.",
+      "National swing estimated from 6 called races across the House, Senate and governors: results so far point to polls being about right.",
     );
     expect(
       swingPosteriorNote({
@@ -214,7 +215,63 @@ describe("swingPosteriorNote", () => {
       },
     });
     expect(screen.getByTestId("forecast-live-swing").textContent).toMatch(
-      /Updated with 9 called races: results so far point to polls being about right\./,
+      /National swing estimated from 9 called races across the House, Senate and governors: results so far point to polls being about right\./,
     );
+  });
+});
+
+describe("ForecastLiveProjection on the governors tab", () => {
+  const governors: LiveChamberProjection = {
+    control_party: "Democratic",
+    control_probability: 0.99,
+    outcome_probabilities: { Democratic: 0.99, Republican: 0.01 },
+    projected_seats: { Democratic: 30, Republican: 20, Other: 0 },
+    seat_distribution: { "30D-20R": 0.47, "29D-21R": 0.34 },
+    threshold: 26,
+    total_seats: 50,
+    called_count: 26,
+    total_count: 36,
+    as_of: "2026-11-04T03:00:00Z",
+  };
+
+  it("counts governorships instead of claiming control of a chamber", () => {
+    render(ForecastLiveProjection, {
+      props: { projection: governors, activeTab: "governors" },
+    });
+    expect(screen.getByText("26 of 36 governor races called")).toBeTruthy();
+    expect(screen.getByText("Chance of most governorships")).toBeTruthy();
+    expect(screen.queryByText("Control chance")).toBeNull();
+    expect(
+      screen.getByTestId("forecast-live-governorships").textContent?.trim(),
+    ).toBe("D 30 · R 20");
+    expect(screen.getByText("Most (26)")).toBeTruthy();
+    expect(screen.queryByText(/Majority/)).toBeNull();
+  });
+});
+
+describe("fetchLiveForecastSnapshot", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("skips the build-time read when only the root Function route exists", async () => {
+    vi.stubEnv("VITE_LIVE_FEEDS_URL", "");
+    const fetchFn = vi.fn(respond(file({ senate })));
+    expect(await fetchLiveForecastSnapshot(fetchFn)).toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("reads the static bucket copy and fails closed", async () => {
+    vi.stubEnv("VITE_LIVE_FEEDS_URL", "https://storage.example/feeds");
+    const body = file({ senate });
+    const fetchFn = vi.fn(respond(body));
+    expect(await fetchLiveForecastSnapshot(fetchFn)).toEqual(body);
+    expect(fetchFn.mock.calls[0][0]).toBe(
+      "https://storage.example/feeds/forecast-live.json",
+    );
+    expect(await fetchLiveForecastSnapshot(respond(body, false))).toBeNull();
+    expect(await fetchLiveForecastSnapshot(respond({ nope: 1 }))).toBeNull();
+    const failing = (async () => {
+      throw new Error("timeout");
+    }) as unknown as typeof fetch;
+    expect(await fetchLiveForecastSnapshot(failing)).toBeNull();
   });
 });

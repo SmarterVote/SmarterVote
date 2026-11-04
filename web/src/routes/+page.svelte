@@ -4,9 +4,25 @@
   import InteractiveRaceCompare from "$lib/components/home/InteractiveRaceCompare.svelte";
   import TrustPrinciples from "$lib/components/home/TrustPrinciples.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
+  import type { PublicRaceResult } from "$lib/types";
   import { jsonLdScript } from "$lib/utils/racePage";
+  import { fetchLiveResults, isResultsSeason } from "$lib/utils/results";
+  import { onMount } from "svelte";
   import type { PageData } from "./$types";
   export let data: PageData;
+
+  // From Election Day on, one read of the live results feeds both the callout's
+  // called count and the featured comparison, so a called race shows its
+  // winner instead of only the pre-election odds.
+  let resultsSeason = isResultsSeason();
+  let liveResults: Map<string, PublicRaceResult> = new Map();
+  onMount(() => {
+    resultsSeason = isResultsSeason();
+    if (!resultsSeason) return;
+    void fetchLiveResults().then((loaded) => {
+      if (loaded) liveResults = loaded;
+    });
+  });
 
   // Site-level structured data belongs on the home page only, not on every
   // page of the site.
@@ -58,7 +74,7 @@
       aria-hidden="true"
     ></div>
     <div class="page-container relative">
-      <HomeResultsCallout />
+      <HomeResultsCallout results={liveResults} />
     </div>
     <div
       class="page-container relative grid items-start gap-9 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] lg:gap-10 xl:gap-14"
@@ -94,7 +110,9 @@
               ></span
             >
             <span class="mt-1 block text-sm text-white"
-              >Find the national races tied to your address</span
+              >{resultsSeason
+                ? "See results for the races tied to your address"
+                : "Find the national races tied to your address"}</span
             >
           </a>
           <a
@@ -114,7 +132,10 @@
         </div>
       </div>
       <div class="min-w-0 pb-4 lg:pt-2">
-        <InteractiveRaceCompare races={data.gradeARaces} />
+        <InteractiveRaceCompare
+          races={data.gradeARaces}
+          results={liveResults}
+        />
       </div>
     </div>
   </section>

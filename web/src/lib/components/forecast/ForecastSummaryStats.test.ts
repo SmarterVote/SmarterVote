@@ -62,3 +62,24 @@ describe("ForecastSummaryStats", () => {
     ).toBeTruthy();
   });
 });
+
+describe("ForecastSummaryStats on the governors tab", () => {
+  afterEach(cleanup);
+
+  it("talks about most governorships, not control", () => {
+    render(ForecastSummaryStats, {
+      activeTab: "governors",
+      controlParty: "Democratic",
+      controlProbability: 0.8,
+      vpTiebreakParty: undefined,
+      mostLikelyOutcome: { key: "28D-22R", probability: 0.2 },
+      tossupCount: 2,
+      competitiveRaceCount: 8,
+    });
+    expect(
+      screen.getByText(/Democrats projected to hold most governorships/),
+    ).toBeTruthy();
+    expect(screen.getByText("Chance of most governorships")).toBeTruthy();
+    expect(screen.queryByText(/control/i)).toBeNull();
+  });
+});

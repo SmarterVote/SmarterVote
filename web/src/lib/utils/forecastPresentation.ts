@@ -15,6 +15,60 @@ import { GOVERNOR_HOLDOVERS, SENATE_HOLDOVERS } from "./holdovers";
 import { raceDisplayTitle } from "./raceTitle";
 import { STATE_NAMES_BY_CODE } from "./states";
 
+type ControlParty = "Democratic" | "Republican" | "Other";
+
+/**
+ * Wording for "who wins" on each tab. The House and Senate are chambers with a
+ * majority to control; the governorships are 50 separate offices, so that tab
+ * talks about holding most governorships instead of "control" or a "majority".
+ */
+export interface ControlCopy {
+  /** Label over the headline probability tile. */
+  chanceLabel: string;
+  /** Badge text, e.g. "Republican control projected". */
+  projectedStatus: (party: ControlParty) => string;
+  /** Heading over the control-probability bar. */
+  probabilitiesHeading: string;
+  /** Short marker on the seats bar, e.g. "Majority (218)". */
+  thresholdMarker: (threshold: number) => string;
+  /** Sentence under a projection, e.g. "218 seats needed for majority". */
+  thresholdNote: (threshold: number) => string;
+  /** Plural noun for what is counted: "seats" or "governorships". */
+  unit: string;
+}
+
+const PARTY_PLURAL: Record<"Democratic" | "Republican", string> = {
+  Democratic: "Democrats",
+  Republican: "Republicans",
+};
+
+export function controlCopy(tab: ForecastTab): ControlCopy {
+  if (tab === "governors") {
+    return {
+      chanceLabel: "Chance of most governorships",
+      projectedStatus: (party) =>
+        party === "Other"
+          ? "No party projected to hold most governorships"
+          : `${PARTY_PLURAL[party]} projected to hold most governorships`,
+      probabilitiesHeading: "Chance of holding most governorships",
+      thresholdMarker: (threshold) => `Most (${threshold})`,
+      thresholdNote: (threshold) => `${threshold} of 50 is most governorships`,
+      unit: "governorships",
+    };
+  }
+  return {
+    chanceLabel: "Control chance",
+    projectedStatus: (party) =>
+      party === "Other"
+        ? "No clear control projected"
+        : `${party} control projected`,
+    probabilitiesHeading: "Chamber Control Probabilities",
+    thresholdMarker: (threshold) => `Majority (${threshold})`,
+    thresholdNote: (threshold) => `${threshold} seats needed for majority`,
+    unit: "seats",
+  };
+}
+
 /**
  * Compact race label for badges and cards: "AZ-01" for a House district,
  * "AK-AL" for an at-large seat, and the state code ("TX") otherwise. Parsed
