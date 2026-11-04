@@ -53,7 +53,7 @@
       class="flex flex-wrap items-center justify-between gap-3 border-b border-stroke bg-surface-alt/50 px-5 py-3 sm:px-6"
     >
       <h2 id="result-heading" class="eyebrow">2026 general election results</h2>
-      <ResultStatusPill status={result.status} />
+      <ResultStatusPill status={result.status} candidates={result.candidates} />
     </div>
 
     <div class="p-5 sm:p-6">
@@ -109,7 +109,7 @@
         </div>
       {:else}
         <p class="mb-5 text-sm text-content-muted">
-          These are partial counts. A candidate ahead now has not won.
+          Votes are still being counted, and no winner has been projected yet.
         </p>
       {/if}
 

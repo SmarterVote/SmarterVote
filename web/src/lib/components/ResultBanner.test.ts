@@ -22,9 +22,9 @@ function show(overrides: Partial<PublicRaceResult> = {}) {
 }
 
 describe("ResultBanner", () => {
-  it("says a partial count is not a call and names no winner", () => {
+  it("names who leads a partial count and names no winner", () => {
     show();
-    expect(screen.getByText("Votes counted so far: not a call")).toBeTruthy();
+    expect(screen.getByText(/leads by|Tied|Counting/)).toBeTruthy();
     expect(screen.queryByLabelText("Winner")).toBeNull();
     expect(screen.getByText("Unofficial")).toBeTruthy();
     expect(screen.queryByText(/Called by/)).toBeNull();
