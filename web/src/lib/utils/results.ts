@@ -308,13 +308,42 @@ export function compareHref(raceId: string): string {
 }
 
 /** The fresher of the copy built into the page and the live file. */
+/**
+ * Fill a share the source left blank from that candidate's votes, scaled by a
+ * candidate who has both (votes and share come from the same count). Without
+ * it a winner with votes but no share drew as 0% beside opponents' shares.
+ */
+export function fillMissingShares<T extends RaceResult | PublicRaceResult>(
+  result: T,
+): T {
+  const rows = result?.candidates ?? [];
+  if (!rows.some((row) => row.pct == null && (row.votes ?? 0) > 0)) {
+    return result;
+  }
+  const reference = rows
+    .filter((row) => (row.votes ?? 0) > 0 && (row.pct ?? 0) > 0)
+    .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))[0];
+  if (!reference) return result;
+  const perVote = (reference.pct as number) / (reference.votes as number);
+  return {
+    ...result,
+    candidates: rows.map((row) =>
+      row.pct == null && (row.votes ?? 0) > 0
+        ? { ...row, pct: Math.round((row.votes as number) * perVote * 10) / 10 }
+        : row,
+    ),
+  };
+}
+
 export function newestResult(
   built: RaceResult | PublicRaceResult | null | undefined,
   live: PublicRaceResult | null | undefined,
 ): RaceResult | PublicRaceResult | null {
-  if (!built) return live ?? null;
-  if (!live) return built;
-  return String(live.as_of ?? "") >= String(built.as_of ?? "") ? live : built;
+  if (!built) return live ? fillMissingShares(live) : null;
+  if (!live) return fillMissingShares(built);
+  return fillMissingShares(
+    String(live.as_of ?? "") >= String(built.as_of ?? "") ? live : built,
+  );
 }
 
 /** The live file's rows by id, plus when the feed itself was written. */
@@ -331,7 +360,9 @@ export async function fetchLiveResultsFile(
     if (!Array.isArray(file?.races)) return null;
     const stamp = file.generated_at ? new Date(file.generated_at) : null;
     return {
-      results: new Map(file.races.map((row) => [row.id, row])),
+      results: new Map(
+        file.races.map((row) => [row.id, fillMissingShares(row)]),
+      ),
       generatedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
     };
   } catch {
