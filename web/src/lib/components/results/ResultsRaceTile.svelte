@@ -6,7 +6,12 @@
    * bar and a counted meter. The whole card is one link to the race page.
    */
   import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
-  import type { ResultGroup, ResultContender } from "$lib/utils/results";
+  import type { RaceResultStatus } from "$lib/types";
+  import {
+    formatLead,
+    type ResultGroup,
+    type ResultContender,
+  } from "$lib/utils/results";
   import {
     partyAbbr,
     partyBadgeClass,
@@ -22,33 +27,53 @@
   export let leader: string | null = null;
   export let party: string | null = null;
   export let margin: number | null = null;
+  /** Lead in votes, which breaks a tie in rounded shares. */
+  export let voteMargin: number | null = null;
   export let pctReporting: number | null = null;
   export let contenders: ResultContender[] = [];
+  /** The feed status, so a ranked-choice count is not read as a party lead. */
+  export let status: RaceResultStatus | null = null;
 
   $: called = group === "called";
+  $: rcv = status === "rcv_pending";
+  // A runoff or ranked-choice count has no party lead to claim yet.
+  $: pending = group === "pending";
   $: hasLeader = group !== "awaiting" && !!leader;
   $: razor = group === "counting" && margin !== null && margin < 1;
+  $: shown = formatLead(margin, voteMargin);
+  $: tied = !called && shown?.value === "Tied";
   $: leaderImage =
     contenders.find((c) => c.name === leader)?.imageUrl ??
     (contenders[0]?.name === leader ? contenders[0]?.imageUrl : null);
   $: statusText =
     group === "awaiting"
-      ? "Awaiting results"
+      ? "No results yet"
       : group === "pending"
-        ? "Runoff or ranked-choice"
+        ? rcv
+          ? "Ranked-choice pending"
+          : "Runoff or ranked-choice"
         : called
           ? "Called"
           : razor
             ? "Razor-thin"
             : "Counting";
-  $: verb = called ? "Wins" : margin !== null && margin <= 0 ? "Tied" : "Ahead";
-
-  function lead(value: number | null): string {
-    if (value === null) return "";
-    if (value <= 0) return "Tied";
-    if (value < 0.1) return "+<0.1";
-    return `+${value.toFixed(1)}`;
-  }
+  $: verb = called
+    ? "Wins"
+    : tied
+      ? "Tied"
+      : rcv
+        ? "Leads first choices"
+        : pending
+          ? "Leads first round"
+          : "Ahead";
+  /** Screen-reader words before the number, e.g. "D lead ", never on a tie. */
+  $: leadPrefix = tied
+    ? ""
+    : pending
+      ? "first-choice lead "
+      : party
+        ? `${partyAbbr(party)} lead `
+        : "";
 </script>
 
 <a
@@ -57,7 +82,7 @@
   class:razor
 >
   <span
-    class="absolute inset-x-0 top-0 h-1 {hasLeader
+    class="absolute inset-x-0 top-0 h-1 {hasLeader && !pending
       ? partyBarClass(party)
       : 'bg-stroke'}"
     aria-hidden="true"
@@ -124,19 +149,17 @@
           <span>{verb}</span>
         </span>
       </span>
-      {#if margin !== null}
+      {#if shown}
         <span class="shrink-0 text-right leading-none">
           <span
             class="block text-xl font-extrabold tabular-nums {razor
               ? 'text-amber-700 dark:text-amber-300'
               : 'text-content'}"
-            ><span class="sr-only"
-              >{party ? `${partyAbbr(party)} lead ` : ""}</span
-            >{lead(margin)}</span
+            ><span class="sr-only">{leadPrefix}</span>{shown.value}</span
           >
           <span
             class="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-content-subtle"
-            >{margin > 0 ? "pts" : ""}</span
+            >{shown.unit}</span
           >
         </span>
       {/if}
@@ -145,7 +168,7 @@
   {:else}
     <span class="text-xs text-content-muted">
       {group === "awaiting"
-        ? "No votes reported yet"
+        ? "No results collected yet"
         : group === "pending"
           ? "Headed to a runoff or ranked-choice count"
           : "Counting has started"}
