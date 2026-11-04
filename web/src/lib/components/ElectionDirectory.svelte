@@ -2,6 +2,9 @@
   import type { RaceSummary } from "$lib/types";
   import USMap, { RACE_COUNT_BUCKETS } from "$lib/components/USMap.svelte";
   import RaceCard from "$lib/components/RaceCard.svelte";
+  import { readable } from "svelte/store";
+  import { isResultsSeason, liveResults } from "$lib/utils/results";
+  import type { PublicRaceResult } from "$lib/types";
   import { page } from "$app/stores";
   import { browser } from "$app/environment";
   import { onMount } from "svelte";
@@ -256,6 +259,11 @@
     ...new Set([...activeStates, ...(selectedState ? [selectedState] : [])]),
   ].sort();
 
+  // The live feed is only fetched once results exist (Election Day onward).
+  const results = isResultsSeason()
+    ? liveResults
+    : readable(new Map<string, PublicRaceResult>());
+
   $: resultAnnouncement = loadError
     ? ""
     : hasActiveFilters
@@ -472,12 +480,18 @@
   </section>
 
   <!-- Results grid -->
-  <section>
+  <section aria-labelledby="election-results-heading">
+    <h2 id="election-results-heading" class="sr-only">Races</h2>
     <div class="flex items-center justify-between mb-4">
+      <!-- The count is announced by the live region below, so it is hidden
+           from screen readers here to avoid reading it twice. -->
       <p class="text-sm text-content-muted">
         {#if hasActiveFilters}
-          <span class="font-medium text-content">{filteredRaces.length}</span>
-          {filteredRaces.length === 1 ? "race" : "races"} found
+          <span aria-hidden="true"
+            ><span class="font-medium text-content">{filteredRaces.length}</span
+            >
+            {filteredRaces.length === 1 ? "race" : "races"} found</span
+          >
           <button
             type="button"
             on:click={clearFilters}
@@ -485,11 +499,13 @@
             >clear filters</button
           >
         {:else if !loading}
-          Showing <span class="font-medium text-content"
-            >{visibleRaces.length}</span
+          <span aria-hidden="true"
+            >Showing <span class="font-medium text-content"
+              >{visibleRaces.length}</span
+            >
+            of <span class="font-medium text-content">{races.length}</span>
+            races</span
           >
-          of <span class="font-medium text-content">{races.length}</span>
-          races
         {/if}
       </p>
     </div>
@@ -584,7 +600,7 @@
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
       >
         {#each visibleRaces as race (race.id)}
-          <RaceCard {race} />
+          <RaceCard {race} result={$results.get(race.id)} />
         {/each}
       </div>
       {#if visibleRaces.length < filteredRaces.length}

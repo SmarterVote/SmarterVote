@@ -6,14 +6,15 @@
     type CheckoutStatus,
   } from "$lib/services/supportService";
 
-  let status: CheckoutStatus | "checking" | "error" = "checking";
+  let status: CheckoutStatus | "checking" | "error" | "none" = "checking";
 
   onMount(async () => {
     const sessionId = new URL(window.location.href).searchParams.get(
       "session_id",
     );
     if (!sessionId) {
-      status = "error";
+      // Arrived by a direct link, not from Stripe: nothing to verify.
+      status = "none";
       return;
     }
     try {
@@ -52,6 +53,16 @@
         <p>
           Stripe has not confirmed the payment yet. Check your receipt or return
           to this page shortly.
+        </p>
+      </div>
+    {:else if status === "none"}
+      <div
+        class="rounded-xl border border-stroke bg-surface-alt p-6 text-content"
+      >
+        <h2 class="h-card mb-2 text-inherit">No checkout to confirm</h2>
+        <p>
+          This page confirms a payment after you return from Stripe checkout. If
+          you just made a payment, check for a Stripe receipt in your email.
         </p>
       </div>
     {:else if status === "error"}

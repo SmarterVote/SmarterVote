@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RaceSummary } from "$lib/types";
+  import type { RaceResult, RaceSummary } from "$lib/types";
   import { partyAbbr, partyRing } from "$lib/utils/party";
   import { raceShortLabel } from "$lib/utils/forecastPresentation";
   import { formatElectionDate } from "$lib/utils/electionDate";
@@ -10,8 +10,18 @@
   } from "$lib/utils/candidates";
   import { avatarSrc } from "$lib/utils/avatar";
   import { headshotFallback } from "$lib/utils/racePageImage";
+  import {
+    namesWinner,
+    resultGroup,
+    resultStatusLabel,
+  } from "$lib/utils/results";
 
   export let race: RaceSummary;
+  /** The race's result, when one has been reported; shown in the footer. */
+  export let result:
+    | Pick<RaceResult, "status" | "winner_name" | "winner_party">
+    | null
+    | undefined = undefined;
 
   function formatDate(dateString: string): string {
     return formatElectionDate(dateString, {
@@ -39,6 +49,19 @@
   $: location = raceShortLabel(race);
 
   $: candidates = neutralCandidateOrder(race.candidates);
+
+  /** "Projected winner: Name (D)", "Counting", or nothing before any count. */
+  function resultLine(row: typeof result): string | null {
+    if (!row || resultGroup(row.status) === "awaiting") return null;
+    const label = resultStatusLabel(row.status);
+    if (namesWinner(row.status) && row.winner_name) {
+      const party = row.winner_party ? ` (${partyAbbr(row.winner_party)})` : "";
+      return `${label}: ${row.winner_name}${party}`;
+    }
+    return label;
+  }
+
+  $: resultText = resultLine(result);
 
   let imageErrors: Set<string> = new Set();
   function handleImageError(name: string) {
@@ -132,9 +155,17 @@
   <div
     class="mt-auto flex items-center justify-between gap-2 border-t border-stroke px-4 py-2.5 text-xs"
   >
-    <span class="text-content-subtle">{formatDate(race.election_date)}</span>
+    {#if resultText}
+      <span
+        class="min-w-0 truncate font-medium text-content"
+        data-testid="race-result"
+        title={resultText}>{resultText}</span
+      >
+    {:else}
+      <span class="text-content-subtle">{formatDate(race.election_date)}</span>
+    {/if}
     <span
-      class="inline-flex items-center gap-1 font-medium text-primary-700 dark:text-primary-300"
+      class="inline-flex shrink-0 items-center gap-1 font-medium text-primary-700 dark:text-primary-300"
     >
       View race
       <svg
