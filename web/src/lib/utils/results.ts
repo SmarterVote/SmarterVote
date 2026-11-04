@@ -56,6 +56,27 @@ export interface ResultDirectoryRace {
   /** The pre-election forecast's pick, kept only when the summary has one. */
   predicted_winner_name?: string | null;
   predicted_winner_party?: string | null;
+  /**
+   * The party holding the seat now, kept only when exactly one candidate is
+   * flagged as the incumbent and their party is a named one. Open seats and
+   * member-vs-member races carry nothing, so no flip is ever guessed.
+   */
+  holder_party?: string | null;
+}
+
+/**
+ * The seat's current party from the candidate list: the lone incumbent's
+ * party, or null when there is no incumbent, more than one, or the party
+ * label does not name a party.
+ */
+export function seatHolderParty(
+  candidates:
+    { incumbent?: boolean | null; party?: string | null }[] | null | undefined,
+): string | null {
+  const incumbents = (candidates ?? []).filter((c) => c?.incumbent === true);
+  if (incumbents.length !== 1) return null;
+  const party = incumbents[0].party?.trim() ?? "";
+  return party && partyKey(party) !== "other" ? party : null;
 }
 
 const OFFICE_ORDER: Record<ResultOffice, number> = {
@@ -91,6 +112,7 @@ export function resultDirectory(
     office?: string | null;
     state?: string | null;
     election_date?: string | null;
+    candidates?: { incumbent?: boolean | null; party?: string | null }[] | null;
     forecast?: {
       rating?: string | null;
       predicted_winner_name?: string | null;
@@ -103,6 +125,7 @@ export function resultDirectory(
     .map((race) => {
       const name = forecastPick(race.forecast?.predicted_winner_name);
       const party = forecastPick(race.forecast?.predicted_winner_party);
+      const holder = seatHolderParty(race.candidates);
       return {
         id: race.id,
         title: race.title ?? race.id,
@@ -112,6 +135,7 @@ export function resultDirectory(
         ...(name || party
           ? { predicted_winner_name: name, predicted_winner_party: party }
           : {}),
+        ...(holder ? { holder_party: holder } : {}),
       };
     })
     .sort(
@@ -293,25 +317,44 @@ export function newestResult(
   return String(live.as_of ?? "") >= String(built.as_of ?? "") ? live : built;
 }
 
-export async function fetchLiveResults(
+/** The live file's rows by id, plus when the feed itself was written. */
+export async function fetchLiveResultsFile(
   fetchFn: typeof fetch = fetch,
-): Promise<Map<string, PublicRaceResult> | null> {
+): Promise<{
+  results: Map<string, PublicRaceResult>;
+  generatedAt: Date | null;
+} | null> {
   try {
     const response = await fetchFn(RESULTS_URL);
     if (!response.ok) return null;
     const file = (await response.json()) as PublicResultsFile;
     if (!Array.isArray(file?.races)) return null;
-    return new Map(file.races.map((row) => [row.id, row]));
+    const stamp = file.generated_at ? new Date(file.generated_at) : null;
+    return {
+      results: new Map(file.races.map((row) => [row.id, row])),
+      generatedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
+    };
   } catch {
     return null;
   }
 }
 
-/** Whether the live file has loaded, for the page's freshness line. */
+export async function fetchLiveResults(
+  fetchFn: typeof fetch = fetch,
+): Promise<Map<string, PublicRaceResult> | null> {
+  return (await fetchLiveResultsFile(fetchFn))?.results ?? null;
+}
+
+/**
+ * Whether the live file has loaded, for the page's freshness line.
+ * `updatedAt` is when this tab last fetched it; `generatedAt` is when the
+ * feed was written, which is what goes stale if the pipeline stalls.
+ */
 export const liveResultsState = writable<{
   status: "loading" | "ready" | "error";
   updatedAt: Date | null;
-}>({ status: "loading", updatedAt: null });
+  generatedAt: Date | null;
+}>({ status: "loading", updatedAt: null, generatedAt: null });
 
 /**
  * Live results, refreshed each minute while the tab is visible. A failed fetch
@@ -323,10 +366,14 @@ export const liveResults = readable<Map<string, PublicRaceResult>>(
     if (!browser) return;
     const refresh = async () => {
       if (document.visibilityState !== "visible") return;
-      const next = await fetchLiveResults();
+      const next = await fetchLiveResultsFile();
       if (next) {
-        set(next);
-        liveResultsState.set({ status: "ready", updatedAt: new Date() });
+        set(next.results);
+        liveResultsState.set({
+          status: "ready",
+          updatedAt: new Date(),
+          generatedAt: next.generatedAt,
+        });
       } else {
         liveResultsState.update((state) => ({ ...state, status: "error" }));
       }
