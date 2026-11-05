@@ -170,6 +170,13 @@ describe("forecast utilities", () => {
     expect(parseForecastTab(null)).toBe("house");
   });
 
+  it("accepts the spellings people type for a tab", () => {
+    expect(parseForecastTab("governor")).toBe("governors");
+    expect(parseForecastTab("Governors")).toBe("governors");
+    expect(parseForecastTab(" gov ")).toBe("governors");
+    expect(parseForecastTab("SENATE")).toBe("senate");
+  });
+
   it("aggregates senate forecasts with holdover baseline", () => {
     const races: RaceSummary[] = [
       {
@@ -252,7 +259,7 @@ describe("forecast utilities", () => {
     expect(buckets[1].probability).toBe(0.35);
 
     // Tie (50-50): 0.25
-    expect(buckets[2].label).toBe("Tie (50-50)");
+    expect(buckets[2].label).toBe("Tie (50-50) or no majority");
     expect(buckets[2].probability).toBe(0.25);
 
     // Narrow R (51-52R) should sum 51R (49D) and 52R (48D): 0.15 + 0.08 = 0.23
@@ -275,8 +282,35 @@ describe("forecast utilities", () => {
 
     expect(buckets[1].label).toBe("Narrow D (218-224D)");
     expect(buckets[1].probability).toBe(0.4);
-    expect(buckets[2].label).toBe("Near Tie (212-217D)");
-    expect(buckets[2].probability).toBe(0.6);
+    // 217D-218R is a Republican majority, not a tie.
+    expect(buckets[3].label).toBe("Narrow R (218-224R)");
+    expect(buckets[3].probability).toBe(0.6);
+    expect(buckets[2].probability).toBe(0);
+  });
+
+  it("puts every House outcome in exactly one bucket, by who reaches 218", () => {
+    const dist: Record<string, number> = {};
+    for (let d = 205; d <= 230; d += 1) dist[`${d}D-${435 - d}R`] = 1 / 26;
+    dist["216D-216R-3I"] = 0.01;
+    const buckets = groupSeatDistribution(dist, "house");
+    const byLabel = Object.fromEntries(
+      buckets.map((b) => [b.label, b.outcomes.map((o) => o.key)]),
+    );
+    expect(byLabel["Narrow R (218-224R)"]).toContain("217D-218R");
+    expect(byLabel["Narrow R (218-224R)"]).toContain("211D-224R");
+    expect(byLabel["Strong R (225R+)"]).toContain("210D-225R");
+    expect(byLabel["Narrow D (218-224D)"]).toContain("218D-217R");
+    expect(byLabel["No majority (neither 218)"]).toEqual(["216D-216R-3I"]);
+    const placed = buckets.reduce((n, b) => n + b.outcomes.length, 0);
+    expect(placed).toBe(Object.keys(dist).length);
+  });
+
+  it("never drops a Senate or governors outcome that leaves both parties short", () => {
+    const senate = groupSeatDistribution({ "49D-49R-2I": 1 }, "senate");
+    expect(senate[2].probability).toBe(1);
+    const governors = groupSeatDistribution({ "25D-24R-1I": 1 }, "governors");
+    expect(governors[2].label).toBe("Even (neither party 26+)");
+    expect(governors[2].probability).toBe(1);
   });
 
   it("builds a race href", () => {

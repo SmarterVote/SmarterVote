@@ -6,6 +6,16 @@
   export let sortedOutcomes: SeatOutcomeChart["outcomes"];
   export let maxProbability: number;
   export let svgData: SeatOutcomeChart["svgData"];
+  /** Seats for a majority (51 Senate, 218 House, 26 governorships). */
+  export let threshold = 51;
+
+  // A histogram bar is blue or red only when that party reaches the line;
+  // anything else (a 50-50 Senate, an even governors split) is grey.
+  function barClass(outcome: { dSeats: number; rSeats: number }): string {
+    if (outcome.dSeats >= threshold) return "bg-blue-500 dark:bg-blue-600";
+    if (outcome.rSeats >= threshold) return "bg-red-500 dark:bg-red-600";
+    return "bg-slate-400 dark:bg-slate-500";
+  }
 
   let activeChartType: "buckets" | "histogram" | "curve" = "buckets";
 </script>
@@ -113,8 +123,6 @@
     {:else if activeChartType === "histogram"}
       <div class="space-y-2 max-h-[280px] overflow-y-auto pr-1 select-none">
         {#each sortedOutcomes as outcome}
-          {@const isTie = outcome.dSeats === 50}
-          {@const isDem = outcome.dSeats >= 51}
           <div class="flex items-center gap-3 text-xs">
             <!-- Label e.g. "52D - 48R" -->
             <span
@@ -127,13 +135,9 @@
               class="flex-1 bg-surface-alt rounded-full h-3 overflow-hidden border border-stroke/40 relative"
             >
               <div
-                class={`h-full rounded-full transition-all duration-300 ${
-                  isTie
-                    ? "bg-slate-400 dark:bg-slate-500"
-                    : isDem
-                      ? "bg-blue-500 dark:bg-blue-600"
-                      : "bg-red-500 dark:bg-red-600"
-                }`}
+                class={`h-full rounded-full transition-all duration-300 ${barClass(
+                  outcome,
+                )}`}
                 style={`width: ${(outcome.probability / maxProbability) * 100}%`}
               ></div>
             </div>
@@ -247,7 +251,7 @@
           class="flex justify-between text-xs font-bold text-content-subtle px-2 border-t border-stroke/20 pt-1.5 mt-1"
         >
           <span>{svgData.minD}D (Min)</span>
-          <span class="text-content-muted">50-50 Tie Threshold</span>
+          <span class="text-content-muted">{threshold}D majority line</span>
           <span>{svgData.maxD}D (Max)</span>
         </div>
       </div>

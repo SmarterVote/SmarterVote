@@ -37,6 +37,13 @@
   export let result: PublicRaceResult | null = null;
 
   $: settled = resultGroup(result?.status) === "called";
+  // Once votes are in, the odds and margin are a record of what was expected,
+  // not the headline: label them and drop them to secondary text, so a called
+  // race never leads with the loser's "58%".
+  $: reported = resultGroup(result?.status) !== "awaiting";
+  $: metricClass = reported
+    ? "mt-0.5 text-sm font-semibold tabular-nums text-content-muted"
+    : "mt-0.5 text-lg font-bold tabular-nums text-content";
 
   $: party = normalizeForecastParty(
     race.forecast.predicted_winner_party,
@@ -144,7 +151,7 @@
         <dt class="text-xs text-content-subtle">
           {uncontested
             ? "Unopposed"
-            : resultGroup(result?.status) !== "awaiting"
+            : reported
               ? "Pre-election pick"
               : "Projected"}
         </dt>
@@ -171,14 +178,18 @@
         </dd>
       </div>
       <div>
-        <dt class="text-xs text-content-subtle">Win probability</dt>
-        <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
+        <dt class="text-xs text-content-subtle">
+          {reported ? "Pre-election odds" : "Win probability"}
+        </dt>
+        <dd class={metricClass} data-testid="forecast-card-win-probability">
           {uncontested ? "n/a" : probability(race.forecast.win_probability)}
         </dd>
       </div>
       <div>
-        <dt class="text-xs text-content-subtle">Est. margin</dt>
-        <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
+        <dt class="text-xs text-content-subtle">
+          {reported ? "Pre-election margin" : "Est. margin"}
+        </dt>
+        <dd class={metricClass}>
           {uncontested ||
           race.forecast.margin_estimate === undefined ||
           race.forecast.margin_estimate === null

@@ -3,8 +3,15 @@
   import { onMount, tick } from "svelte";
   import { getRace } from "$lib/api";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import ForecastResultLine from "$lib/components/forecast/ForecastResultLine.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
-  import type { Candidate, Race, RaceSummary } from "$lib/types";
+  import type {
+    Candidate,
+    PublicRaceResult,
+    Race,
+    RaceSummary,
+  } from "$lib/types";
+  import { liveResults, newestResult, resultGroup } from "$lib/utils/results";
   import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { formatElectionDate } from "$lib/utils/electionDate";
 
@@ -163,6 +170,16 @@
   $: candidates = selectedRace
     ? candidatesFor(selectedRace, selectedCandidates)
     : [];
+  // Once a race has votes, lead with the result and mark the forecast row as
+  // the pre-election estimate it now is.
+  $: currentResult = selectedRace
+    ? newestResult(selectedRace.result, $liveResults.get(selectedRace.id))
+    : null;
+  $: hasResult = resultGroup(currentResult?.status) !== "awaiting";
+  $: displayResult =
+    currentResult && selectedRace
+      ? ({ ...currentResult, id: selectedRace.id } as PublicRaceResult)
+      : null;
 </script>
 
 {#if races.length}
@@ -273,6 +290,15 @@
             <p class="mt-1 text-sm text-content-muted">
               {formatElectionDate(selectedRace.election_date)}
             </p>
+            {#if hasResult && displayResult}
+              <div class="mt-3" data-testid="ballot-race-result">
+                <ForecastResultLine
+                  result={displayResult}
+                  href="/races/{selectedRace.id}/"
+                  raceLabel={selectedRace.title ?? ""}
+                />
+              </div>
+            {/if}
           </div>
           <div class="shrink-0 sm:text-right">
             <a
@@ -292,6 +318,7 @@
             {candidates}
             compact
             minSelected={2}
+            preElectionForecast={hasResult}
             onToggle={(candidateName) =>
               toggleCandidate(selectedRace, candidateName)}
           />

@@ -306,6 +306,28 @@ describe("ForecastRaceCard", () => {
       );
     });
 
+    it("relabels and mutes the odds once votes are in", () => {
+      render(ForecastRaceCard, {
+        race,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+        result: {
+          id: race.id,
+          status: "called",
+          winner_name: "Sam Cole",
+          winner_party: "Republican",
+          candidates: [],
+          sources: [],
+        },
+      });
+      expect(screen.getByText("Pre-election odds")).toBeTruthy();
+      expect(screen.getByText("Pre-election margin")).toBeTruthy();
+      expect(screen.queryByText("Win probability")).toBeNull();
+      const odds = screen.getByTestId("forecast-card-win-probability");
+      expect(odds.className).toContain("text-content-muted");
+      expect(odds.className).not.toContain("text-lg");
+    });
+
     it("shows no result line before votes are reported", () => {
       render(ForecastRaceCard, {
         race,
