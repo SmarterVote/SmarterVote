@@ -35,6 +35,7 @@ async def test_smartervote_mcp_exposes_lean_tool_surface():
         "health",
         "refresh_race_results",
         "publish_race_results",
+        "set_race_result",
         "get_public_results",
         "list_published_races",
         "list_race_summaries",
@@ -1861,3 +1862,27 @@ async def test_assess_publish_readiness_warns_on_large_move_from_one_new_poll(mo
     assert single["forecast_probability_shift"] == pytest.approx(0.19)
     assert "forecast_moved_without_new_polls" not in single["warnings"]
     assert "forecast_large_move_on_one_new_poll" not in multiple["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_set_race_result_puts_the_draft_result_and_never_publishes(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    client = type("Client", (), {"put": AsyncMock(return_value={"race_id": "tx-house-09-2026"}), "post": AsyncMock()})()
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    await server.set_race_result(
+        "tx-house-09-2026",
+        status="counting",
+        candidates=[{"name": "Leticia Gutierrez", "pct": 57.6}],
+        sources=[{"url": "https://www.nbcnews.com/x", "type": "news"}],
+        set_by="command center",
+    )
+
+    path, kwargs = client.put.await_args.args[0], client.put.await_args.kwargs
+    assert path == "/api/races/tx-house-09-2026/result"
+    assert kwargs["json"]["set_by"] == "command center"
+    assert kwargs["json"]["candidates"] == [{"name": "Leticia Gutierrez", "pct": 57.6}]
+    client.post.assert_not_called()

@@ -587,6 +587,16 @@ class ResultCandidate(BaseModel):
     pct: Optional[float] = Field(None, ge=0, le=100)
 
 
+class ResultAudit(BaseModel):
+    """Who set a result by hand, and from which sources, instead of the results step."""
+
+    method: Literal["admin_set_result"] = "admin_set_result"
+    set_by: str
+    set_at: datetime
+    source_urls: List[str] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
 class RaceResult(BaseModel):
     """Unofficial election result, until ``status`` is ``certified``."""
 
@@ -603,6 +613,7 @@ class RaceResult(BaseModel):
     correction_note: Optional[str] = None
     sources: List[Source] = Field(default_factory=list)
     as_of: datetime
+    audit: Optional[ResultAudit] = None
 
 
 class RaceJSON(BaseModel):
