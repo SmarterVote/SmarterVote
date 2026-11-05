@@ -24,13 +24,16 @@
   } from "$lib/utils/results";
   import {
     RESULT_SORTS,
+    capSection,
     formatAgo,
     isStale,
     keyRaces,
     latestCalls,
     limitAwaiting,
+    nextStep,
     parseResultsQuery,
     resultsQueryString,
+    showMoreLabel,
     sortResultsRows,
     type OfficeFilter,
     type ResultSort,
@@ -48,7 +51,7 @@
     { id: "called", label: "Called" },
     { id: "counting", label: "Still counting" },
     { id: "pending", label: "Runoff or ranked-choice" },
-    { id: "awaiting", label: "Awaiting results" },
+    { id: "awaiting", label: "No results collected yet" },
   ];
   const FILTERS: { id: StatusFilter; label: string }[] = [
     { id: "all", label: "All races" },
@@ -60,11 +63,19 @@
     { id: "senate", label: "Senate" },
     { id: "house", label: "House" },
   ];
-  const KEY_RACES = "Key races";
+  // Not "Key races": the strip at the top is "Key Senate and governor races".
+  const KEY_RACES = "Priority races";
   const REPORTING = "Results coming in";
   /** Awaiting-results cards drawn up front; the rest wait behind a button. */
   const AWAITING_FIRST = 24;
   const AWAITING_STEP = 96;
+  /**
+   * Cards per list section drawn up front. "Results coming in" alone held
+   * about 370 cards (55k px at desktop width, far more on a phone), so every
+   * section starts short and grows behind its own "Show more" button.
+   */
+  const SECTION_FIRST = 24;
+  const SECTION_STEP = 48;
   const priorityIds = new Set(PRIORITY_RESULT_RACES.map((race) => race.id));
   const isPriority = (id: string) => priorityIds.has(id);
   const pill = (active: boolean) =>
@@ -81,6 +92,7 @@
   let query = "";
   let sort: ResultSort = "default";
   let awaitingLimit = AWAITING_FIRST;
+  let sectionLimits: Record<string, number> = {};
   let now = Date.now();
   let urlReady = false;
   let clock: ReturnType<typeof setInterval> | undefined;
@@ -121,7 +133,12 @@
     },
     { called: 0, counting: 0, pending: 0, awaiting: 0 },
   );
-  $: calls = latestCalls(rows, 8);
+  // Call times past the feed's own clock are data errors (see latestCalls).
+  $: calls = latestCalls(
+    rows,
+    8,
+    $liveResultsState.generatedAt ?? $liveResultsState.updatedAt ?? now,
+  );
   $: keyRaceRows = keyRaces(rows, isPriority, 12);
   $: needle = query.trim().toLocaleLowerCase();
   $: narrowed =
@@ -199,12 +216,17 @@
     awaitingLimit,
   );
   $: groups = sections
-    .map((section) => ({
-      state: section.state,
-      rows: capped.rows
+    .map((section) => {
+      const all = capped.rows
         .filter((item) => item.section === section.state)
-        .map((item) => item.row),
-    }))
+        .map((item) => item.row);
+      // The priority list is ten races; every other section is capped.
+      const shown =
+        section.state === KEY_RACES
+          ? { rows: all, hidden: 0 }
+          : capSection(all, sectionLimits[section.state] ?? SECTION_FIRST);
+      return { state: section.state, ...shown };
+    })
     .filter((group) => group.rows.length > 0);
   $: hiddenCount = capped.hidden;
   // A new filter or sort starts the awaiting list short again.
@@ -240,6 +262,16 @@
 
   function resetAwaiting(..._deps: unknown[]) {
     awaitingLimit = AWAITING_FIRST;
+    sectionLimits = {};
+  }
+
+  function showMoreIn(section: string, hidden: number) {
+    sectionLimits = {
+      ...sectionLimits,
+      [section]:
+        (sectionLimits[section] ?? SECTION_FIRST) +
+        nextStep(hidden, SECTION_STEP),
+    };
   }
 
   // Read the query in the browser (the page is prerendered without one), on
@@ -304,10 +336,21 @@
       a named organization has called the race and two independent sources
       report it.
     </p>
+    <!-- Only the state (live, behind, unavailable) is announced; the
+         "N min ago" text re-renders every 30 seconds, so it sits outside
+         the live region. -->
     <div
       class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-content-subtle"
-      aria-live="polite"
     >
+      <span class="sr-only" aria-live="polite"
+        >{$liveResultsState.status === "error"
+          ? "Live updates are unavailable right now."
+          : stale
+            ? "Counts may be behind."
+            : updatedAt
+              ? "Live results."
+              : ""}</span
+      >
       {#if $liveResultsState.status === "error"}
         <span class="text-amber-700 dark:text-amber-300"
           >Live updates are unavailable right now{updatedAt
@@ -332,7 +375,7 @@
             class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
             aria-hidden="true"
           ></span>
-          Live · updated {feedAgo || updatedAt}, refreshes each minute
+          Live · updated {feedAgo || updatedAt}, checked each minute
         </span>
       {:else}
         <span>Checking for results…</span>
@@ -364,7 +407,7 @@
     <ResultsLatestCalls {calls} {now} />
   </div>
 
-  <ResultsStats {rows} forecast={$liveForecast} />
+  <ResultsStats {rows} forecast={$liveForecast} {now} />
 
   <ResultsBalanceOfPower file={$liveForecast} />
   <ResultsMap races={rows} />
@@ -466,6 +509,19 @@
           />
         {/each}
       </div>
+      {#if group.hidden > 0}
+        <div class="mt-4 flex justify-center">
+          <button
+            type="button"
+            class={pill(false)}
+            data-testid="section-show-more"
+            on:click={() => showMoreIn(group.state, group.hidden)}
+          >
+            {showMoreLabel(group.hidden, SECTION_STEP)}
+            <span class="sr-only"> in {group.state}</span>
+          </button>
+        </div>
+      {/if}
     </section>
   {:else}
     <p class="alert-info">No races match these filters.</p>
@@ -474,15 +530,15 @@
   {#if hiddenCount > 0}
     <div class="flex flex-col items-center gap-2 text-center">
       <p class="text-sm text-content-muted">
-        {hiddenCount} more {hiddenCount === 1 ? "race is" : "races are"} awaiting
-        results. Search and filters cover every race.
+        {hiddenCount} more {hiddenCount === 1 ? "race has" : "races have"} no results
+        collected yet. Search and filters cover every race.
       </p>
       <button
         type="button"
         class={pill(false)}
-        on:click={() => (awaitingLimit += AWAITING_STEP)}
+        on:click={() => (awaitingLimit += nextStep(hiddenCount, AWAITING_STEP))}
       >
-        Show {Math.min(hiddenCount, AWAITING_STEP)} more
+        {showMoreLabel(hiddenCount, AWAITING_STEP)}
       </button>
     </div>
   {/if}

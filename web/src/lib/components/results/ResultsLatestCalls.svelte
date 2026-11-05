@@ -6,7 +6,7 @@
     partyBarClass,
     partyRing,
   } from "$lib/utils/party";
-  import { formatPctReporting } from "$lib/utils/results";
+  import { formatLead, formatPctReporting } from "$lib/utils/results";
   import { formatAgo, type LatestCall } from "$lib/utils/resultsPage";
 
   export let calls: LatestCall[] = [];
@@ -18,13 +18,6 @@
       hour: "numeric",
       minute: "2-digit",
     });
-
-  function lead(value: number | null | undefined): string {
-    if (value === null || value === undefined) return "";
-    if (value <= 0) return "Tied";
-    if (value < 0.1) return "+<0.1";
-    return `+${value.toFixed(1)}`;
-  }
 </script>
 
 <section aria-labelledby="latest-calls-heading" class="flex min-w-0 flex-col">
@@ -41,6 +34,7 @@
       >
         {#each calls as call (call.id)}
           {@const counted = formatPctReporting(call.pctReporting)}
+          {@const shown = formatLead(call.margin, call.voteMargin)}
           <li
             class="w-[82%] max-w-80 shrink-0 snap-start sm:w-auto sm:max-w-none"
           >
@@ -81,12 +75,14 @@
                     >Flip
                   </span>
                 {/if}
-                <time
-                  class="ml-auto rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold leading-4 tabular-nums text-content-muted"
-                  datetime={call.calledAt}
-                  title={clock(call.calledAt)}
-                  >{formatAgo(call.calledAt, now)}</time
-                >
+                {#if call.calledAt && formatAgo(call.calledAt, now)}
+                  <time
+                    class="ml-auto rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold leading-4 tabular-nums text-content-muted"
+                    datetime={call.calledAt}
+                    title={clock(call.calledAt)}
+                    >{formatAgo(call.calledAt, now)}</time
+                  >
+                {/if}
               </span>
               <span
                 class="text-sm font-semibold leading-snug text-content group-hover:text-primary-700 dark:group-hover:text-primary-300"
@@ -125,16 +121,16 @@
                       .join(" · ")}</span
                   >
                 </span>
-                {#if call.margin !== null && call.margin !== undefined}
+                {#if shown}
                   <span class="shrink-0 text-right leading-none">
                     <span
                       class="block text-lg font-extrabold tabular-nums text-content"
-                      >{lead(call.margin)}</span
+                      >{shown.value}</span
                     >
-                    {#if call.margin > 0}
+                    {#if shown.unit}
                       <span
                         class="mt-1 block text-[10px] font-semibold uppercase tracking-wide text-content-subtle"
-                        >pts</span
+                        >{shown.unit}</span
                       >
                     {/if}
                   </span>

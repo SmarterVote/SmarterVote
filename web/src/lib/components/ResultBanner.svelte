@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
   import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import ResultStatusPill from "$lib/components/results/ResultStatusPill.svelte";
   import ResultBars from "$lib/components/results/ResultBars.svelte";
@@ -10,8 +11,15 @@
   import {
     compareHref,
     formatPctReporting,
+    implausibleCount,
+    isRowStale,
+    isStillCounting,
     namesWinner,
+    rankResultSources,
+    trustedCallTime,
+    usesFederalRcv,
   } from "$lib/utils/results";
+  import { formatAgo } from "$lib/utils/resultsPage";
   import { isExternalUrl } from "$lib/utils/url";
 
   export let raceId: string;
@@ -31,8 +39,27 @@
         });
   }
 
+  // The browser's clock only: a prerendered page never bakes in "stale".
+  let now: number | null = null;
+  let clock: ReturnType<typeof setInterval> | undefined;
+  onMount(() => {
+    now = Date.now();
+    clock = setInterval(() => (now = Date.now()), 60_000);
+  });
+  onDestroy(() => {
+    if (clock) clearInterval(clock);
+  });
+
   $: asOf = formatTime(result.as_of);
-  $: calledAt = formatTime(result.called_at);
+  // A call time in the future or before polls closed is a data error: hide it.
+  $: calledAt =
+    trustedCallTime(result.called_at, now ?? Date.now()) === null
+      ? ""
+      : formatTime(result.called_at);
+  $: review = implausibleCount(result, raceId);
+  $: stale = now !== null && isRowStale(result, now);
+  $: staleAgo = stale && now !== null ? formatAgo(result.as_of, now) : "";
+  $: maineRcv = usesFederalRcv(raceId) && isStillCounting(result.status);
   $: hasWinner = namesWinner(result.status) && !!result.winner_name;
   $: winnerRow = result.candidates?.find(
     (row) => row.name === result.winner_name,
@@ -42,8 +69,10 @@
     candidates.find((candidate) => candidate.name === result.winner_name)
       ?.image_url;
   $: reporting = formatPctReporting(result.pct_reporting);
-  $: sourceLinks = (result.sources ?? []).filter((source) =>
-    isExternalUrl(String(source.url)),
+  $: sourceLinks = rankResultSources(
+    (result.sources ?? []).filter((source) =>
+      isExternalUrl(String(source.url)),
+    ),
   );
 </script>
 
@@ -53,7 +82,10 @@
       class="flex flex-wrap items-center justify-between gap-3 border-b border-stroke bg-surface-alt/50 px-5 py-3 sm:px-6"
     >
       <h2 id="result-heading" class="eyebrow">2026 general election results</h2>
-      <ResultStatusPill status={result.status} candidates={result.candidates} />
+      <ResultStatusPill
+        status={result.status}
+        candidates={review ? null : result.candidates}
+      />
     </div>
 
     <div class="p-5 sm:p-6">
@@ -113,11 +145,28 @@
         </p>
       {/if}
 
+      {#if maineRcv}
+        <p class="alert-info mb-5" data-testid="result-maine-rcv">
+          Maine uses ranked-choice voting for federal races. If no candidate
+          finishes above 50%, the race goes to a ranked-choice count.
+        </p>
+      {/if}
+
+      {#if stale}
+        <p
+          class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
+          data-testid="result-row-stale"
+        >
+          Count last updated {staleAgo} and may be behind.
+        </p>
+      {/if}
+
       {#if result.candidates?.length}
         <ResultBars
           rows={result.candidates}
           roster={candidates}
           winnerName={hasWinner ? result.winner_name : null}
+          {review}
         />
       {/if}
 

@@ -14,7 +14,8 @@
   };
   /** "D" / "R" get party colors; any other party shares one neutral hue. */
   export type MapSide = "D" | "R" | "O";
-  export type MapStage = "called" | "leading" | "awaiting";
+  /** "rcv": first choices are in but the ranked-choice count is not, so no party leads. */
+  export type MapStage = "called" | "leading" | "rcv" | "awaiting";
 
   export interface MapCall {
     stage: MapStage;
@@ -65,6 +66,14 @@
         typeof top.pct === "number" && typeof second?.pct === "number"
           ? Math.max(0, top.pct - second.pct)
           : null;
+      if (result?.status === "rcv_pending")
+        return {
+          stage: "rcv",
+          side: null,
+          who: named(top.name, top.party),
+          margin,
+          counted,
+        };
       return {
         stage: "leading",
         side: sideOf(top.party),
@@ -87,12 +96,16 @@
       R: "var(--color-lean-r)",
       O: "var(--results-map-o-lead)",
     },
+    rcv: { D: "", R: "", O: "" },
     awaiting: { D: "", R: "", O: "" },
   };
   /** The hatch USMap already defines for "nothing to show yet". */
   export const AWAITING_FILL = "url(#map-no-forecast)";
+  /** One neutral shade for a ranked-choice count still to come: no party's color. */
+  export const RCV_FILL = "var(--results-map-rcv)";
 
   export function fillFor(call: MapCall): string {
+    if (call.stage === "rcv") return RCV_FILL;
     return call.stage === "awaiting" || !call.side
       ? AWAITING_FILL
       : MAP_FILLS[call.stage][call.side];
@@ -100,6 +113,10 @@
 
   export function describeCall(call: MapCall): string {
     if (call.stage === "called") return `Winner: ${call.who}`;
+    if (call.stage === "rcv")
+      return `First choices: ${call.who}${
+        call.margin === null ? " ahead" : ` +${call.margin.toFixed(1)}`
+      }, ranked-choice count pending`;
     if (call.stage === "leading")
       return call.margin === null
         ? `${call.who} leads`
@@ -118,10 +135,16 @@
       R: "bg-red-500! text-white!",
       O: "bg-purple-500! text-white!",
     },
+    rcv: { D: "", R: "", O: "" },
     awaiting: { D: "", R: "", O: "" },
   };
 
   function badgeFor(call: MapCall): { badge: string; badgeClass: string } {
+    if (call.stage === "rcv")
+      return {
+        badge: "Ranked-choice pending",
+        badgeClass: "bg-stone-600! text-white!",
+      };
     if (call.stage === "awaiting" || !call.side)
       return {
         badge: "Awaiting results",
@@ -137,6 +160,8 @@
   export interface MapCounts {
     called: Record<MapSide, number>;
     leading: Record<MapSide, number>;
+    /** Ranked-choice counts still to come: counted as no party's lead. */
+    rcv: number;
     awaiting: number;
   }
 
@@ -175,6 +200,7 @@
   export interface HouseTally {
     called: Record<MapSide, number>;
     leading: Record<MapSide, number>;
+    rcv?: number;
     awaiting: number;
     total: number;
   }
@@ -189,6 +215,7 @@
    */
   export function houseFill(tally: HouseTally): string {
     if (tally.awaiting >= tally.total) return AWAITING_FILL;
+    if ((tally.rcv ?? 0) + tally.awaiting >= tally.total) return RCV_FILL;
     const calledTotal = SIDES.reduce((n, side) => n + tally.called[side], 0);
     const sweep = SIDES.find((side) => tally.called[side] === tally.total);
     if (sweep) return MAP_FILLS.called[sweep];
@@ -217,6 +244,7 @@
       ];
       parts.push(`${label} ${bits.join(" · ")}`);
     }
+    if (tally.rcv) parts.push(`${tally.rcv} ranked-choice pending`);
     if (tally.awaiting) parts.push(`${tally.awaiting} awaiting`);
     return parts.join("; ");
   }
@@ -262,7 +290,10 @@
         total: 0,
       };
       tally.total += 1;
-      if (call.stage === "awaiting" || !call.side) {
+      if (call.stage === "rcv") {
+        tally.rcv = (tally.rcv ?? 0) + 1;
+        data.counts.rcv += 1;
+      } else if (call.stage === "awaiting" || !call.side) {
         tally.awaiting += 1;
         data.counts.awaiting += 1;
       } else {
@@ -300,6 +331,7 @@
       counts: {
         called: { D: 0, R: 0, O: 0 },
         leading: { D: 0, R: 0, O: 0 },
+        rcv: 0,
         awaiting: 0,
       },
       stateRows: [],
@@ -329,7 +361,9 @@
       );
     const data: ResultsMapData = { ...emptyMapData(), rows };
     for (const { race, call } of rows) {
-      if (call.stage === "awaiting" || !call.side) data.counts.awaiting += 1;
+      if (call.stage === "rcv") data.counts.rcv += 1;
+      else if (call.stage === "awaiting" || !call.side)
+        data.counts.awaiting += 1;
       else data.counts[call.stage][call.side] += 1;
 
       const state = race.state;
@@ -358,13 +392,14 @@
     return data;
   }
 
-  /** "Called D 3 · R 2 · Leading D 7 · R 5 · Awaiting 10" */
+  /** "Called D 3 · R 2 · Leading D 7 · R 5 · Ranked-choice pending 1 · Awaiting 10" */
   export function legendSummary(counts: MapCounts): string {
     const part = (label: string, by: Record<MapSide, number>) =>
       `${label} D ${by.D} · R ${by.R}${by.O ? ` · Other ${by.O}` : ""}`;
     return [
       part("Called", counts.called),
       part("Leading", counts.leading),
+      ...(counts.rcv ? [`Ranked-choice pending ${counts.rcv}`] : []),
       `Awaiting ${counts.awaiting}`,
     ].join(" · ");
   }
@@ -403,6 +438,7 @@
     { label: "Leading R", fill: "var(--color-lean-r)" },
     { label: "Called R", fill: "var(--color-safe-r)" },
     { label: "Other party", fill: "var(--results-map-o)" },
+    { label: "Ranked-choice count pending", fill: "var(--results-map-rcv)" },
     {
       label: "House: still counting (leader hatched)",
       fill: "repeating-linear-gradient(45deg, var(--color-safe-d) 0 3px, var(--color-holdover-d-solid) 3px 6px)",
@@ -584,10 +620,12 @@
   :global(:root) {
     --results-map-o: #7c3aed;
     --results-map-o-lead: #c4b5fd;
+    --results-map-rcv: #a8a29e;
   }
 
   :global(.dark) {
     --results-map-o: #a78bfa;
     --results-map-o-lead: #4c3a7a;
+    --results-map-rcv: #78716c;
   }
 </style>
