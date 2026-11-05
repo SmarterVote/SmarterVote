@@ -132,12 +132,36 @@ def test_a_runoff_needs_a_later_date():
     [
         {"status": "counting", "winner_name": None},
         {"winner_name": "Bob Ray"},
-        {"candidates": [{"name": "Ann Lee", "votes": 50}]},
+        {"candidates": [{"name": "Ann Lee", "votes": 50}, {"name": "Bob Ray", "votes": 40}]},
     ],
 )
 def test_moving_backward_needs_a_correction_note(change):
     assert errors_for(called(**change), previous=called())
     assert errors_for(called(**change, correction_note="AP retracted its call"), previous=called()) == []
+
+
+@pytest.mark.parametrize("status", ["counting", "called"])
+def test_a_candidate_the_last_count_covered_cannot_be_dropped(status):
+    # tn-house-09: the share for one candidate was rejected as unread, the model
+    # kept the other row alone, and that lone row showed as the leader.
+    previous = called(status="counting", winner_name=None)
+    lone = called(
+        status=status,
+        winner_name="Ann Lee" if status == "called" else None,
+        candidates=[{"name": "Ann Lee", "pct": 49.6}],
+        correction_note="The earlier partial count had the order reversed.",
+    )
+    errors = errors_for(lone, previous=previous)
+    assert any("'Bob Ray'" in error and "dropping" in error for error in errors)
+    both = {**lone, "candidates": [{"name": "Ann Lee", "pct": 49.6}, {"name": "Bob Ray", "pct": 48.5}]}
+    assert errors_for(both, previous=previous) == []
+
+
+def test_a_first_count_or_a_report_without_counts_is_not_a_drop():
+    lone = called(status="counting", winner_name=None, candidates=[{"name": "Ann Lee", "pct": 49.6}])
+    assert not any("dropping" in error for error in errors_for(lone))
+    unreported = {"status": "not_yet_reported", "candidates": [], "sources": []}
+    assert not any("dropping" in error for error in errors_for(unreported, previous=called()))
 
 
 def test_handler_never_stores_a_rejected_result():
