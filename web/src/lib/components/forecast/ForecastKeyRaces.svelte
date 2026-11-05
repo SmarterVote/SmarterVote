@@ -7,8 +7,10 @@
     formatRating,
     getRaceState,
     isUncontestedForecastRace,
+    normalizeForecastParty,
     raceHref,
   } from "$lib/utils/forecast";
+  import { partyAbbr } from "$lib/utils/party";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import {
     cleanDisplayText,
@@ -112,6 +114,7 @@
         {@const rating = race.forecast?.rating}
         {@const result = results.get(race.id) ?? null}
         {@const settled = resultGroup(result?.status) === "called"}
+        {@const reported = resultGroup(result?.status) !== "awaiting"}
 
         {@const ratingBorderColor = rating
           ? rating.endsWith("_d")
@@ -155,9 +158,27 @@
           {/if}
 
           {#if race.forecast && !uncontested}
-            <div class="flex items-center gap-3 mb-2">
-              <span class="text-xs font-bold text-content tabular-nums">
-                {probability(race.forecast.win_probability)} win
+            <!-- After votes are in, the odds are history: say whose they were
+                 and mute them, so a called card never headlines the loser. -->
+            <div
+              class="flex items-center gap-3 mb-2"
+              data-testid="key-race-forecast"
+            >
+              <span
+                class="text-xs tabular-nums {reported
+                  ? 'font-semibold text-content-subtle'
+                  : 'font-bold text-content'}"
+              >
+                {#if reported}Pre-election: {partyAbbr(
+                    normalizeForecastParty(
+                      race.forecast.predicted_winner_party,
+                      race.forecast.party_probabilities,
+                      race.candidates,
+                    ),
+                  )}
+                  {probability(
+                    race.forecast.win_probability,
+                  )}{:else}{probability(race.forecast.win_probability)} win{/if}
               </span>
               {#if race.forecast.margin_estimate !== undefined && race.forecast.margin_estimate !== null}
                 <span

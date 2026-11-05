@@ -146,4 +146,32 @@ describe("toFeaturedComparisonRace", () => {
       ],
     });
   });
+
+  it("keeps the race's result so a called race can show its winner", () => {
+    expect(toFeaturedComparisonRace(full)).not.toHaveProperty("result");
+    const compact = toFeaturedComparisonRace({
+      ...full,
+      result: {
+        status: "called",
+        winner_name: "Jane Doe",
+        winner_party: "Democratic",
+        called_by: "AP",
+        as_of: "2026-11-04T05:00:00Z",
+        pct_reporting: 95,
+        candidates: [
+          { name: "Jane Doe", party: "Democratic", votes: 10, pct: 53 },
+        ],
+        sources: [{ url: "https://example.com/r" }],
+      },
+    });
+    expect(compact.result).toMatchObject({
+      status: "called",
+      winner_name: "Jane Doe",
+      pct_reporting: 95,
+      candidates: [
+        { name: "Jane Doe", party: "Democratic", votes: 10, pct: 53 },
+      ],
+      sources: [],
+    });
+  });
 });

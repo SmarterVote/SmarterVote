@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { formatNet } from "$lib/utils/forecast";
-  import { oneDecimal, partyClass } from "$lib/utils/forecastPresentation";
+  import { formatNet, type ForecastTab } from "$lib/utils/forecast";
+  import {
+    controlCopy,
+    oneDecimal,
+    partyClass,
+  } from "$lib/utils/forecastPresentation";
 
   export let label: string;
   export let controlParty: "Democratic" | "Republican" | "Other";
@@ -9,6 +13,22 @@
   export let totalExpected: number;
   export let expectedSeats: Record<string, number> | undefined;
   export let netChange: Record<string, number>;
+  /** Governors are 50 separate offices, so that tab avoids "control" and "majority". */
+  export let activeTab: ForecastTab = "house";
+
+  $: governors = activeTab === "governors";
+  $: copy = controlCopy(activeTab);
+  $: eyebrow = governors
+    ? `${label.replace(/\s*governors?$/i, "")} Projected Governorships`.trim()
+    : `${label} Projected Seats`;
+  $: headline =
+    controlParty === "Other"
+      ? governors
+        ? "No Clear Leader"
+        : "No Clear Control"
+      : governors
+        ? `${controlParty === "Democratic" ? "Democrats" : "Republicans"} Favored`
+        : `${controlParty} Control`;
 
   // Joined in script so the template never leaves a stray space before a comma.
   $: expectedSeatsText = expectedSeats
@@ -34,19 +54,17 @@
 <!-- Projection Summary Stat Card -->
 <div class="card p-4 sm:p-6">
   <p class="eyebrow text-content-subtle">
-    {label} Projected Seats
+    {eyebrow}
   </p>
 
   <h3 class="mt-2 text-2xl font-bold text-content flex items-baseline gap-2">
     <span class={partyClass(controlParty)}>
-      {controlParty === "Other"
-        ? "No Clear Control"
-        : `${controlParty} Control`}
+      {headline}
     </span>
   </h3>
 
   <p class="mt-1 text-xs text-content-subtle font-medium">
-    {threshold} seats needed for majority
+    {copy.thresholdNote(threshold)}
   </p>
 
   <!-- Seat Distribution Bar Chart -->
@@ -107,7 +125,9 @@
 
     <div class="flex justify-between text-xs text-content-subtle px-1">
       <span>Total: {totalExpected}</span>
-      <span>Majority line: {threshold}</span>
+      <span
+        >{governors ? "Most governorships" : "Majority line"}: {threshold}</span
+      >
     </div>
     {#if expectedSeats}
       <p class="text-xs text-content-subtle">

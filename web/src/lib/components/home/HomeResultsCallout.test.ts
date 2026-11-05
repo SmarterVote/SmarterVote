@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HomeResultsCallout from "./HomeResultsCallout.svelte";
+import type { PublicRaceResult } from "$lib/types";
 
 function respond(body: unknown, ok = true) {
   const fetchMock = vi.fn(
@@ -50,5 +51,27 @@ describe("HomeResultsCallout", () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByText(/races? called/)).toBeNull();
+  });
+});
+
+describe("HomeResultsCallout with page-loaded results", () => {
+  it("uses the page's results without fetching, and is not a heading", () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 4), toFake: ["Date"] });
+    const fetchMock = respond({ races: [] });
+    render(HomeResultsCallout, {
+      props: {
+        results: new Map<string, PublicRaceResult>([
+          ["a", { id: "a", status: "called", candidates: [], sources: [] }],
+        ]),
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/1\s+race called/)).toBeTruthy();
+    expect(
+      screen.queryByRole("heading", { name: "Election results" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("complementary", { name: "Election results" }),
+    ).toBeTruthy();
   });
 });

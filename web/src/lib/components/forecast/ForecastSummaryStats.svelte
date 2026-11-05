@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { ForecastTab } from "$lib/utils/forecast";
-  import { controlProbability as formatControlProbability } from "$lib/utils/forecastPresentation";
+  import {
+    controlCopy,
+    controlProbability as formatControlProbability,
+  } from "$lib/utils/forecastPresentation";
 
   export let activeTab: ForecastTab;
   export let controlParty: "Democratic" | "Republican" | "Other";
@@ -16,6 +19,8 @@
    * pre-election numbers, so say so rather than compete with the live ones.
    */
   export let preElection = false;
+
+  $: copy = controlCopy(activeTab);
 </script>
 
 <div class="lg:col-span-6 flex flex-col space-y-6">
@@ -54,11 +59,9 @@
               ? 'bg-red-600 dark:bg-red-500 animate-pulse'
               : 'bg-slate-500 dark:bg-slate-400'}"
         ></span>
-        {#if controlParty === "Other"}
-          No clear control projected{preElection ? " before results" : ""}
-        {:else}
-          {controlParty} control projected{preElection ? " before results" : ""}
-        {/if}
+        {copy.projectedStatus(controlParty)}{preElection
+          ? " before results"
+          : ""}
       </span>
 
       <!-- VP Tie-break Note -->
@@ -79,7 +82,7 @@
       class="rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center"
     >
       <div class="mb-1 text-xs font-semibold text-content-subtle">
-        Control chance
+        {copy.chanceLabel}
       </div>
       <div
         class={`text-xl font-bold tabular-nums ${

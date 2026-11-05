@@ -17,7 +17,11 @@
   import ForecastTabNav from "$lib/components/forecast/ForecastTabNav.svelte";
   import ForecastUnavailable from "$lib/components/forecast/ForecastUnavailable.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
-  import type { ChamberForecasts, RaceSummary } from "$lib/types";
+  import type {
+    ChamberForecasts,
+    LiveForecastFile,
+    RaceSummary,
+  } from "$lib/types";
   import {
     aggregateForecasts,
     electionCycleYear,
@@ -34,7 +38,11 @@
     buildSeatOutcomeChart,
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
-  import { liveChamberProjection, liveForecast } from "$lib/utils/liveForecast";
+  import {
+    liveChamberProjection,
+    liveForecast,
+    liveForecastStatus,
+  } from "$lib/utils/liveForecast";
   import {
     buildResultMapOverlay,
     hasAnyResults,
@@ -195,9 +203,14 @@
 
   // Election night: shown only once a race in this chamber is called. Until
   // then, or if the live file fails to load, the page is the forecast alone.
-  $: liveProjection = hydrated
-    ? liveChamberProjection($liveForecast, activeTab)
-    : null;
+  // The build bakes in a snapshot of the live file, so the block is already
+  // in the prerendered page (no layout shift when the browser copy lands);
+  // the browser's copy, refreshed each minute, replaces it. Before hydration
+  // activeTab is "house", which is the tab the prerendered HTML shows.
+  $: liveSnapshot = ($page.data.liveForecastSnapshot ??
+    null) as LiveForecastFile | null;
+  $: liveFile = $liveForecast ?? liveSnapshot;
+  $: liveProjection = liveChamberProjection(liveFile, activeTab);
 
   // Election night: per-race results for the cards, lists and map. Before
   // hydration (and before the first load) the map stays empty, so the
@@ -221,6 +234,22 @@
     resultsSeason = isResultsSeason();
   });
   $: showResultsCallout = resultsSeason || anyResults;
+  // Without a build snapshot, hold the live block's space while the first
+  // browser fetch is in flight, so the page does not jump when it arrives.
+  $: reserveLiveSpace =
+    !liveProjection && resultsSeason && $liveForecastStatus === "loading";
+  $: updatedLabel = (() => {
+    const value = chamberForecasts?.updated_at;
+    if (!value) return "";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? ""
+      : parsed.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+  })();
 </script>
 
 <svelte:head>
@@ -272,13 +301,9 @@
                 ? "Senate"
                 : "governor"} race{aggregate.races.length === 1 ? "" : "s"} modeled</span
           >
-          {#if chamberForecasts?.updated_at}
+          {#if updatedLabel}
             <span aria-hidden="true">·</span>
-            <span
-              >Updated {new Date(
-                chamberForecasts.updated_at,
-              ).toLocaleDateString()}</span
-            >
+            <span>Forecast updated {updatedLabel}</span>
           {/if}
           <span aria-hidden="true">·</span>
           <a
@@ -343,18 +368,25 @@
         {#if liveProjection}
           <ForecastLiveProjection
             projection={liveProjection}
-            resultsUpdatedAt={$liveForecast?.results_updated_at ?? null}
+            resultsUpdatedAt={liveFile?.results_updated_at ?? null}
             {activeTab}
             preElectionProbability={chamberSummary?.control_probability}
             preElectionParty={chamberSummary ? controlParty : null}
-            swingPosterior={$liveForecast?.swing_posterior}
+            swingPosterior={liveFile?.swing_posterior}
           />
+        {:else if reserveLiveSpace}
+          <div
+            class="card flex min-h-[22rem] items-center justify-center p-4 text-sm text-content-subtle sm:min-h-[19rem] sm:p-6 motion-safe:animate-pulse"
+            data-testid="forecast-live-placeholder"
+          >
+            Loading the live projection…
+          </div>
         {/if}
 
         <!-- The heading and card share a wrapper so the tab panel's space-y
              gap sits above the heading, not between it and the card. -->
         <div>
-          {#if liveProjection}
+          {#if liveProjection || reserveLiveSpace}
             <h2 class="h-section mb-3">Pre-election forecast</h2>
           {/if}
           <ForecastSummaryCard
@@ -402,6 +434,7 @@
                 : aggregate.label}
               {controlParty}
               {threshold}
+              {activeTab}
               {projectedSeats}
               totalExpected={aggregate.totalExpected}
               {expectedSeats}
@@ -414,6 +447,7 @@
                 sortedOutcomes={seatOutcomeChart.outcomes}
                 maxProbability={seatOutcomeChart.maxProbability}
                 svgData={seatOutcomeChart.svgData}
+                threshold={chamberSummary?.threshold ?? threshold}
               />
             {/if}
           </div>

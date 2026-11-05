@@ -112,6 +112,27 @@ export function toFeaturedComparisonRace(race: Race): Race {
           },
         }
       : {}),
+    // The result the build saw, so a race called before the deploy shows its
+    // winner on first paint; the browser's live copy replaces it when newer.
+    ...(race.result
+      ? {
+          result: {
+            status: race.result.status,
+            winner_name: race.result.winner_name ?? null,
+            winner_party: race.result.winner_party ?? null,
+            called_at: race.result.called_at ?? null,
+            pct_reporting: race.result.pct_reporting ?? null,
+            as_of: race.result.as_of,
+            candidates: (race.result.candidates ?? []).map((row) => ({
+              name: row.name,
+              party: row.party,
+              votes: row.votes,
+              pct: row.pct,
+            })),
+            sources: [],
+          },
+        }
+      : {}),
     candidates: (race.candidates ?? []).map(compactCandidate),
   } as Race;
 }

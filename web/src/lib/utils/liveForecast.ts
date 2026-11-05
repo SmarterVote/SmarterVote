@@ -1,12 +1,12 @@
 import { browser } from "$app/environment";
-import { readable } from "svelte/store";
+import { readable, writable } from "svelte/store";
 import type {
   LiveChamberProjection,
   LiveForecastFile,
   LiveSwingPosterior,
 } from "$lib/types";
 import type { ForecastTab } from "$lib/utils/forecast";
-import { fetchLiveFeed } from "$lib/utils/liveFeedUrl";
+import { fetchLiveFeed, liveFeedUrl } from "$lib/utils/liveFeedUrl";
 
 const LIVE_FORECAST_FILE = "forecast-live.json";
 const REFRESH_MS = 60_000;
@@ -73,7 +73,10 @@ export function swingPosteriorNote(
     direction === "accurate"
       ? "polls being about right"
       : `polls underestimating ${direction === "Republican" ? "Republicans" : "Democrats"}`;
-  return `Updated with ${calls} called ${calls === 1 ? "race" : "races"}: results so far point to ${finding}.`;
+  // `calls` spans every office, so say so: printed beside one chamber's
+  // "236 of 435 races called", a bare "287 called races" reads as a
+  // contradiction.
+  return `National swing estimated from ${calls} called ${calls === 1 ? "race" : "races"} across the House, Senate and governors: results so far point to ${finding}.`;
 }
 
 /** Like the pre-election card's format, except an outcome the calls settle reads 0% / 100%. */
@@ -91,14 +94,53 @@ export async function fetchLiveForecast(
   try {
     const response = await fetchLiveFeed(LIVE_FORECAST_FILE, fetchFn);
     if (!response.ok) return null;
-    const file = (await response.json()) as LiveForecastFile;
-    if (!file || typeof file !== "object" || !file.chambers) return null;
-    if (typeof file.chambers !== "object") return null;
-    return file;
+    return asLiveForecastFile(await response.json());
   } catch {
     return null;
   }
 }
+
+/** Checks the shape fetchLiveForecast relies on; null for anything else. */
+function asLiveForecastFile(value: unknown): LiveForecastFile | null {
+  const file = value as LiveForecastFile | null;
+  if (!file || typeof file !== "object") return null;
+  if (!file.chambers || typeof file.chambers !== "object") return null;
+  return file;
+}
+
+/**
+ * Build-time copy of the live projection, so the prerendered forecast page
+ * already holds the live block instead of inserting it seconds after load
+ * (a large layout shift, and crawlers never saw it). Only an absolute feed
+ * URL (VITE_LIVE_FEEDS_URL) is reachable while prerendering; the root-relative
+ * Function route is not, so without one this returns null. Any failure or a
+ * slow bucket also returns null: the page then falls back to the browser fetch.
+ */
+export async function fetchLiveForecastSnapshot(
+  fetchFn: typeof fetch = fetch,
+  timeoutMs = 5_000,
+): Promise<LiveForecastFile | null> {
+  const url = liveFeedUrl(LIVE_FORECAST_FILE);
+  if (!/^https?:\/\//i.test(url)) return null;
+  try {
+    const response = await fetchFn(url, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return null;
+    return asLiveForecastFile(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the browser has heard back from the live projection feed yet, so a
+ * page can hold the live block's space while the first fetch is in flight
+ * and release it once the feed answers (or fails).
+ */
+export const liveForecastStatus = writable<"loading" | "ready" | "error">(
+  "loading",
+);
 
 /**
  * The live projection file, refreshed each minute while the tab is visible.
@@ -110,7 +152,15 @@ export const liveForecast = readable<LiveForecastFile | null>(null, (set) => {
   const refresh = async () => {
     if (document.visibilityState !== "visible") return;
     const next = await fetchLiveForecast();
-    if (next) set(next);
+    if (next) {
+      set(next);
+      liveForecastStatus.set("ready");
+    } else {
+      // Keep "ready" once a good copy has arrived; a later miss keeps it.
+      liveForecastStatus.update((status) =>
+        status === "ready" ? status : "error",
+      );
+    }
   };
   void refresh();
   const timer = setInterval(refresh, REFRESH_MS);

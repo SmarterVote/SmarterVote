@@ -4,7 +4,10 @@
     getMostLikelySeatOutcome,
     type ForecastTab,
   } from "$lib/utils/forecast";
-  import { controlProbability as formatPreElectionProbability } from "$lib/utils/forecastPresentation";
+  import {
+    controlCopy,
+    controlProbability as formatPreElectionProbability,
+  } from "$lib/utils/forecastPresentation";
   import ForecastSeatsBar from "./ForecastSeatsBar.svelte";
   import {
     formatLiveControlProbability,
@@ -37,6 +40,23 @@
   $: outcome = getMostLikelySeatOutcome(projection.seat_distribution);
   $: asOf = formatTime(projection.as_of ?? resultsUpdatedAt);
   $: swingNote = swingPosteriorNote(swingPosterior);
+  $: governors = activeTab === "governors";
+  $: copy = controlCopy(activeTab);
+  // Name the office so this chamber's count is not confused with the swing
+  // note's all-office count of calls.
+  $: officeLabel =
+    activeTab === "house"
+      ? "House"
+      : activeTab === "senate"
+        ? "Senate"
+        : "governor";
+  $: seatsSplit = [
+    `D ${projection.projected_seats?.Democratic ?? 0}`,
+    `R ${projection.projected_seats?.Republican ?? 0}`,
+    ...(projection.projected_seats?.Other
+      ? [`Other ${projection.projected_seats.Other}`]
+      : []),
+  ].join(" · ");
 </script>
 
 <section
@@ -47,7 +67,8 @@
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 id="forecast-live-heading" class="h-section">Live projection</h2>
     <span class="text-xs font-semibold text-content-subtle">
-      {projection.called_count} of {projection.total_count} races called
+      {projection.called_count} of {projection.total_count}
+      {officeLabel} races called
     </span>
   </div>
 
@@ -56,7 +77,7 @@
       class="rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center"
     >
       <div class="mb-1 text-xs font-semibold text-content-subtle">
-        Control chance
+        {copy.chanceLabel}
       </div>
       <div
         class={`text-xl font-bold tabular-nums ${
@@ -84,12 +105,24 @@
     <div
       class="rounded-xl border border-stroke bg-surface-alt/40 p-3 text-center"
     >
-      <div class="mb-1 text-xs font-semibold text-content-subtle">
-        Most likely exact split
-      </div>
-      <div class="text-xl font-bold text-content tabular-nums">
-        {outcome.key || "—"}
-      </div>
+      {#if governors}
+        <div class="mb-1 text-xs font-semibold text-content-subtle">
+          Projected governorships
+        </div>
+        <div
+          class="text-xl font-bold text-content tabular-nums"
+          data-testid="forecast-live-governorships"
+        >
+          {seatsSplit}
+        </div>
+      {:else}
+        <div class="mb-1 text-xs font-semibold text-content-subtle">
+          Most likely exact split
+        </div>
+        <div class="text-xl font-bold text-content tabular-nums">
+          {outcome.key || "—"}
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -100,7 +133,9 @@
         projectedSeats={projection.projected_seats}
         totalSeats={projection.total_seats}
         threshold={projection.threshold}
-        label="Live projected seats"
+        label={governors
+          ? "Live projected governorships"
+          : "Live projected seats"}
       />
     </div>
   {/if}

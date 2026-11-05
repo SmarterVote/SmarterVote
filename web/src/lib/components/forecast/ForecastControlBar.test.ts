@@ -84,7 +84,9 @@ describe("ForecastControlBar", () => {
       projectedSeats: { Democratic: 24, Republican: 26, Other: 0 },
     });
 
-    expect(screen.getByText("Control Probabilities")).toBeTruthy();
+    expect(
+      screen.getByText("Chance of holding most governorships"),
+    ).toBeTruthy();
     expect(container.querySelector("[role=img]")).toBeNull();
   });
 });

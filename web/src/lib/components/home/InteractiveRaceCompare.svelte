@@ -1,7 +1,9 @@
 <script lang="ts">
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
+  import ForecastResultLine from "$lib/components/forecast/ForecastResultLine.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
-  import type { Race } from "$lib/types";
+  import type { PublicRaceResult, Race } from "$lib/types";
+  import { newestResult, resultGroup } from "$lib/utils/results";
   import { neutralCandidateOrder } from "$lib/utils/candidates";
   import { candidateSlug } from "$lib/utils/format";
   import { scrollBehavior } from "$lib/utils/motion";
@@ -36,6 +38,8 @@
   }
 
   export let races: Race[] = [];
+  /** Election night: live results by race id; the newer of these and the build's result wins. */
+  export let results: Map<string, PublicRaceResult> = new Map();
   let selectedId = races[0]?.id ?? "";
   let pillList: HTMLDivElement | undefined;
   $: if (races.length && !races.some((race) => race.id === selectedId))
@@ -45,6 +49,16 @@
   $: candidates = neutralCandidateOrder(
     selectedRace?.candidates.filter((candidate) => !candidate.withdrawn),
   );
+  // After a race is called the comparison's forecast row becomes a record of
+  // what was expected, and the result leads.
+  $: currentResult = selectedRace
+    ? newestResult(selectedRace.result, results.get(selectedRace.id))
+    : null;
+  $: displayResult = currentResult
+    ? ({ ...currentResult, id: selectedRace.id } as PublicRaceResult)
+    : null;
+  $: hasResult = resultGroup(currentResult?.status) !== "awaiting";
+
   // Keep the active pill visible when the selection changes from either the
   // arrow buttons or a pill click.
   $: centerPill(selectedIndex);
@@ -81,6 +95,15 @@
         >
           {selectedRace.title}
         </h2>
+        {#if hasResult && displayResult}
+          <div class="mt-3" data-testid="featured-race-result">
+            <ForecastResultLine
+              result={displayResult}
+              href="/races/{selectedRace.id}/"
+              raceLabel={selectedRace.title ?? ""}
+            />
+          </div>
+        {/if}
       </div>
       <a
         href="/races/{selectedRace.id}/"
@@ -140,6 +163,7 @@
         compact
         collapseText
         showQuality
+        preElectionForecast={hasResult}
       />
       <div class="mt-4 flex justify-end">
         <a
