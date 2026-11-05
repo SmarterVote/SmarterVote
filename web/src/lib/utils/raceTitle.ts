@@ -226,8 +226,10 @@ function raceHeadline(labels: RaceLabels): string {
 
 /** A page title within TITLE_LIMIT: the site suffix is dropped first when it does not fit. */
 function withSiteSuffix(...options: string[]): string {
+  // Drop empty options first, or " | Smarter.Vote" alone would "fit".
+  const usable = options.map((option) => option.trim()).filter(Boolean);
   return firstThatFits(
-    [...options.map((option) => `${option}${SITE_SUFFIX}`), ...options],
+    [...usable.map((option) => `${option}${SITE_SUFFIX}`), ...usable],
     TITLE_LIMIT,
   );
 }
@@ -361,6 +363,18 @@ export function compareMetaDescription(
   );
 }
 
+/** A shorter office label for long names: "TX-12 2026", "SC Senate 2026". */
+function compactOffice(name: string, labels: RaceLabels): string {
+  const year = labels.year ?? "";
+  if (labels.kind === "house")
+    return `${name} – ${labels.short.replace(/ House$/, "")} ${year}`.trim();
+  const code = labels.state ? STATE_CODES_BY_NAME.get(labels.state) : undefined;
+  if (!code || (labels.kind !== "senate" && labels.kind !== "governor"))
+    return "";
+  const office = labels.kind === "senate" ? "Senate" : "Governor";
+  return `${name} – ${code} ${office} ${labels.special ? "special " : ""}${year}`.trim();
+}
+
 /** "Name (D) – TX-12 House 2026 | Smarter.Vote", shortened to fit 60 characters. */
 export function candidatePageTitle(
   candidate: Pick<Candidate, "name"> & Partial<Pick<Candidate, "party">>,
@@ -374,9 +388,7 @@ export function candidatePageTitle(
     .join(" ");
   return withSiteSuffix(
     `${name} – ${office}`,
-    labels.kind === "house"
-      ? `${name} – ${labels.short.replace(/ House$/, "")} ${labels.year ?? ""}`.trim()
-      : "",
+    compactOffice(name, labels),
     name,
   );
 }

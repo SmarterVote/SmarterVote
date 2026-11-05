@@ -367,13 +367,9 @@
         >
       </form>
 
-      <p class="mt-4 flex gap-2 text-xs leading-5 text-content-subtle">
-        <span aria-hidden="true">⌁</span>
-        <span
-          >Optional suggestions come directly from Google; completed addresses
-          go directly to the U.S. Census Geocoder. Smarter.Vote does not save
-          them.</span
-        >
+      <p class="mt-4 text-xs leading-5 text-content-subtle">
+        Optional suggestions come directly from Google; completed addresses go
+        directly to the U.S. Census Geocoder. Smarter.Vote does not save them.
       </p>
       <div class="mt-4 border-t border-stroke pt-4 text-sm text-content-muted">
         <strong class="text-content">Coverage today:</strong> U.S. House,
