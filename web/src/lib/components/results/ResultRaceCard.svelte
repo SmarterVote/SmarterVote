@@ -4,6 +4,9 @@
   import {
     compareHref,
     formatPctReporting,
+    implausibleCount,
+    isRowStale,
+    FIRST_POLL_CLOSE,
     namesWinner,
   } from "$lib/utils/results";
   import { formatAgo } from "$lib/utils/resultsPage";
@@ -30,6 +33,10 @@
       })
     : "";
   $: ago = result?.as_of && now !== null ? formatAgo(result.as_of, now) : "";
+  $: review = implausibleCount(result, id);
+  // Only with the page's clock, so a prerendered card never claims it.
+  $: stale = now !== null && isRowStale(result, now);
+  $: afterPollsClose = now !== null && now >= Date.parse(FIRST_POLL_CLOSE);
 </script>
 
 <article
@@ -44,7 +51,7 @@
     </a>
     <ResultStatusPill
       status={result?.status ?? null}
-      candidates={result?.candidates ?? null}
+      candidates={review ? null : (result?.candidates ?? null)}
     />
   </div>
 
@@ -55,7 +62,16 @@
         winnerName={winner}
         limit={3}
         compact
+        {review}
       />
+      {#if stale}
+        <p
+          class="mt-2 text-xs font-semibold text-amber-800 dark:text-amber-200"
+          data-testid="result-row-stale"
+        >
+          Count last updated {ago} and may be behind.
+        </p>
+      {/if}
       {#if winner && result.status === "called" && result.called_by}
         <p class="mt-2 text-xs text-content-muted">
           Called by {result.called_by}
@@ -81,7 +97,9 @@
       <p
         class="rounded-xl border border-dashed border-stroke bg-surface-alt/40 px-4 py-5 text-center text-sm text-content-subtle"
       >
-        Counts appear here after polls close and votes are reported.
+        {afterPollsClose
+          ? "No results collected yet."
+          : "Counts appear here after polls close and votes are reported."}
       </p>
     {/if}
   </div>

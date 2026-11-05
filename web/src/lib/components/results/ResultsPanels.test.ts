@@ -94,7 +94,7 @@ describe("ResultsKeyRaces", () => {
     expect(items[0].textContent).toMatch(/62% counted/);
     expect(items[0].textContent).toMatch(/D lead \+1\.2/);
     expect(first.getByText("Counting")).toBeTruthy();
-    expect(items[1].textContent).toMatch(/Awaiting results/);
+    expect(items[1].textContent).toMatch(/No results yet/);
   });
 
   it("flags a lead under a point as razor-thin", () => {

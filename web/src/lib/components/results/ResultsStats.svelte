@@ -27,6 +27,8 @@
 
   export let rows: ResultStatsRow[] = [];
   export let forecast: LiveForecastFile | null = null;
+  /** The page's clock, so a count stalled for 12 hours drops out of the panels. */
+  export let now: number = Date.now();
 
   const CHAMBERS: {
     id: StatsChamber;
@@ -46,10 +48,11 @@
   $: progress = countingProgress(rows);
   $: totalRaces = progress.reporting + progress.awaiting;
   $: bucketMax = Math.max(1, ...progress.buckets.map((b) => b.count));
-  $: closest = closestRaces(rows);
-  $: leads = biggestLeads(rows);
+  $: closest = closestRaces(rows, 5, now);
+  $: leads = biggestLeads(rows, 5, now);
   $: upsets = upsetWatch(rows);
   $: anyCounting = progress.counting > 0;
+  $: anyPending = chambers.some((chamber) => chamber.seats.pending > 0);
 
   const pct = (part: number, whole: number) =>
     whole > 0 ? `${(part / whole) * 100}%` : "0%";
@@ -66,6 +69,20 @@
     return bits.join(" + ");
   }
 
+  /**
+   * The line the bar's marker stands for. Governors are not a chamber, so
+   * there is no majority to control: 26 is simply most governorships.
+   */
+  function thresholdText(seats: ChamberSeats): string {
+    return seats.office === "governor"
+      ? `${seats.threshold} for most governorships`
+      : `${seats.threshold} for a majority`;
+  }
+
+  function pendingText(n: number): string {
+    return `${n} ranked-choice or runoff ${n === 1 ? "count" : "counts"} pending`;
+  }
+
   function seatSummary(label: string, seats: ChamberSeats): string {
     const up = seats.total - sumSeats(seats.holdovers);
     const line = (party: keyof SeatCounts, name: string) =>
@@ -73,7 +90,7 @@
         seats.holdovers[party] ? `, ${seats.holdovers[party]} not up` : ""
       }`;
     return [
-      `${label}: ${up} of ${seats.total} up this year, ${seats.threshold} for a majority`,
+      `${label}: ${up} of ${seats.total} up this year, ${thresholdText(seats)}`,
       line("Democratic", "Democrats"),
       line("Republican", "Republicans"),
       ...(seats.called.Other || seats.leading.Other
@@ -82,6 +99,7 @@
       ...(seats.holdovers.Other
         ? [`${seats.holdovers.Other} seats not up this year`]
         : []),
+      ...(seats.pending ? [pendingText(seats.pending)] : []),
       `${seats.open} with no call or lead yet`,
     ].join(". ");
   }
@@ -94,6 +112,7 @@
       { key: "o-called", n: seats.called.Other, cls: "seg-o-called" },
       { key: "o-lead", n: seats.leading.Other, cls: "seg-o-lead" },
       { key: "open", n: seats.open, cls: "seg-open" },
+      { key: "pending", n: seats.pending, cls: "seg-pending" },
       { key: "hold-other", n: seats.holdovers.Other, cls: "seg-hold" },
       { key: "r-lead", n: seats.leading.Republican, cls: "seg-r-lead" },
       { key: "r-called", n: seats.called.Republican, cls: "seg-r-called" },
@@ -105,12 +124,12 @@
     {
       id: "closest",
       title: "Closest races",
-      note: "Still counting, narrowest lead first",
+      note: "Still counting and updated in the last 12 hours, narrowest lead first",
     },
     {
       id: "leads",
       title: "Biggest leads",
-      note: "Still counting, widest lead first",
+      note: "Still counting and updated in the last 12 hours, widest lead first",
     },
   ] as const;
 
@@ -159,6 +178,12 @@
         <span class="swatch seg-d-hold" aria-hidden="true"></span>Not up this
         year
       </li>
+      {#if anyPending}
+        <li class="inline-flex items-center gap-1.5">
+          <span class="swatch seg-pending" aria-hidden="true"
+          ></span>Ranked-choice or runoff
+        </li>
+      {/if}
       <li class="inline-flex items-center gap-1.5">
         <span class="swatch seg-open" aria-hidden="true"></span>No result yet
       </li>
@@ -173,7 +198,7 @@
         <div class="flex flex-wrap items-baseline justify-between gap-x-2">
           <h3 class="text-sm font-bold text-content">{chamber.label}</h3>
           <span class="text-xs font-semibold text-content-subtle"
-            >{up} {chamber.unit} up · {s.threshold} for a majority</span
+            >{up} {chamber.unit} up · {thresholdText(s)}</span
           >
         </div>
         <div
@@ -223,6 +248,15 @@
             )}</span
           >
         </div>
+        {#if s.pending}
+          <p
+            class="mt-1 text-xs text-content-muted tabular-nums"
+            aria-hidden="true"
+            data-testid={`results-pending-${chamber.id}`}
+          >
+            {pendingText(s.pending)}
+          </p>
+        {/if}
         {#if s.called.Other || s.leading.Other || s.holdovers.Other}
           <p
             class="mt-1 text-xs text-content-muted tabular-nums"
@@ -452,6 +486,7 @@
                 leader={race.leader}
                 party={race.party}
                 margin={race.margin}
+                voteMargin={race.voteMargin}
                 pctReporting={race.pctReporting}
                 contenders={race.contenders}
               />
@@ -514,6 +549,18 @@
   }
   .seg-open {
     background: transparent;
+  }
+  /* Neutral and hatched: a ranked-choice or runoff count is no party's lead. */
+  .seg-pending {
+    background-color: #a8a29e;
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgb(255 255 255 / 0.45) 0 2px,
+      transparent 2px 5px
+    );
+  }
+  :global(.dark) .seg-pending {
+    background-color: #57534e;
   }
   .swatch.seg-open {
     border: 1px solid rgb(148 163 184 / 0.7);

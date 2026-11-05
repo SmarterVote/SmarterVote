@@ -28,6 +28,8 @@
             leader={race.leader}
             party={race.party}
             margin={race.margin}
+            voteMargin={race.voteMargin ?? null}
+            status={race.status ?? null}
             pctReporting={race.pctReporting}
             contenders={race.contenders ?? []}
           />
