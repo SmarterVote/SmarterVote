@@ -12,14 +12,12 @@
     compareHref,
     formatPctReporting,
     implausibleCount,
-    isRowStale,
     isStillCounting,
     namesWinner,
     rankResultSources,
     trustedCallTime,
     usesFederalRcv,
   } from "$lib/utils/results";
-  import { formatAgo } from "$lib/utils/resultsPage";
   import { isExternalUrl } from "$lib/utils/url";
 
   export let raceId: string;
@@ -57,8 +55,6 @@
       ? ""
       : formatTime(result.called_at);
   $: review = implausibleCount(result, raceId);
-  $: stale = now !== null && isRowStale(result, now);
-  $: staleAgo = stale && now !== null ? formatAgo(result.as_of, now) : "";
   $: maineRcv = usesFederalRcv(raceId) && isStillCounting(result.status);
   $: hasWinner = namesWinner(result.status) && !!result.winner_name;
   $: winnerRow = result.candidates?.find(
@@ -149,15 +145,6 @@
         <p class="alert-info mb-5" data-testid="result-maine-rcv">
           Maine uses ranked-choice voting for federal races. If no candidate
           finishes above 50%, the race goes to a ranked-choice count.
-        </p>
-      {/if}
-
-      {#if stale}
-        <p
-          class="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
-          data-testid="result-row-stale"
-        >
-          Count last updated {staleAgo} and may be behind.
         </p>
       {/if}
 
