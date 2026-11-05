@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { PublicRaceResult } from "$lib/types";
 import {
   DEFAULT_RESULTS_QUERY,
+  capSection,
   formatAgo,
   isFlip,
   isStale,
   keyRaces,
   latestCalls,
   limitAwaiting,
+  nextStep,
   parseResultsQuery,
   resultsQueryString,
   rowMargin,
+  showMoreLabel,
   sortResultsRows,
   type ResultsPageRow,
 } from "./resultsPage";
@@ -160,10 +163,10 @@ describe("freshness", () => {
     expect(formatAgo(null, now)).toBe("");
     expect(formatAgo("not a date", now)).toBe("");
   });
-  it("flags a feed older than ten minutes", () => {
-    expect(isStale("2026-11-04T04:21:00Z", now)).toBe(false);
-    expect(isStale("2026-11-04T04:19:00Z", now)).toBe(true);
-    expect(isStale(new Date(now - 11 * 60_000), now)).toBe(true);
+  it("flags a feed older than one two-hour refresh cycle plus a margin", () => {
+    expect(isStale("2026-11-04T02:01:00Z", now)).toBe(false);
+    expect(isStale("2026-11-04T01:59:00Z", now)).toBe(true);
+    expect(isStale(new Date(now - 46 * 60_000), now)).toBe(false);
     expect(isStale(null, now)).toBe(false);
   });
 });
@@ -249,7 +252,7 @@ describe("keyRaces", () => {
     const races = keyRaces(
       [
         row("house", counting(50, 50), { competitive: true }),
-        row("safe-senate", counting(50, 50), { office: "senate" }),
+        row("safe-senate", counting(60, 40), { office: "senate" }),
         row("sen-wide", counting(60, 40, { pct_reporting: 30 }), {
           office: "senate",
           competitive: true,
@@ -328,5 +331,79 @@ describe("seatHolderParty", () => {
     ]);
     expect(held.holder_party).toBe("Democratic");
     expect("holder_party" in open).toBe(false);
+  });
+});
+
+describe("audit fixes", () => {
+  const generated = Date.parse("2026-11-04T21:19:00Z");
+  const call = (at: string | null, asOf: string) => ({
+    status: "called" as const,
+    winner_name: "Dan Meuser",
+    winner_party: "Republican",
+    called_by: "The Associated Press",
+    called_at: at,
+    as_of: asOf,
+  });
+
+  it("never pins a future call time on top as just now (PA-09)", () => {
+    const calls = latestCalls(
+      [
+        row("pa-09", call("2026-11-04T23:13:00-05:00", "2026-11-04T04:13:00Z")),
+        row("fresh", call("2026-11-04T12:00:00Z", "2026-11-04T12:00:00Z")),
+        row("early", call("2026-11-03T10:00:00Z", "2026-11-04T02:00:00Z")),
+      ],
+      8,
+      generated,
+    );
+    expect(calls.map((c) => [c.id, c.calledAt])).toEqual([
+      ["fresh", "2026-11-04T12:00:00Z"],
+      ["pa-09", null],
+      ["early", null],
+    ]);
+  });
+
+  it("shows no relative time for a timestamp well in the future", () => {
+    const now = Date.parse("2026-11-04T04:30:00Z");
+    expect(formatAgo("2026-11-05T05:13:00Z", now)).toBe("");
+    expect(formatAgo("2026-11-04T04:31:00Z", now)).toBe("just now");
+  });
+
+  it("adds a tied Senate race whatever its pre-election rating (MS)", () => {
+    const races = keyRaces([
+      row(
+        "ms-senate-2026",
+        {
+          status: "too_close",
+          candidates: [
+            {
+              name: "Cindy Hyde-Smith",
+              party: "Republican",
+              pct: 48.9,
+              votes: 462778,
+            },
+            {
+              name: "Scott Colom",
+              party: "Democratic",
+              pct: 48.9,
+              votes: 462821,
+            },
+          ],
+        },
+        { office: "senate" },
+      ),
+      row("close-gov", counting(51, 49), { office: "governor" }),
+      row("safe-gov", counting(60, 40), { office: "governor" }),
+    ]);
+    expect(races.map((r) => r.id)).toEqual(["ms-senate-2026", "close-gov"]);
+    expect(races[0]).toMatchObject({ leader: "Scott Colom", voteMargin: 43 });
+  });
+
+  it("caps a section and labels the next step", () => {
+    expect(capSection([1, 2, 3, 4], 2)).toEqual({ rows: [1, 2], hidden: 2 });
+    expect(capSection([1, 2], 24)).toEqual({ rows: [1, 2], hidden: 0 });
+    expect(showMoreLabel(99, 96)).toBe("Show all 99");
+    expect(nextStep(99, 96)).toBe(99);
+    expect(showMoreLabel(300, 48)).toBe("Show 48 more of 300");
+    expect(nextStep(300, 48)).toBe(48);
   });
 });

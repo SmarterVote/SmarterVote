@@ -3,7 +3,7 @@
  * freshness, the latest-calls feed and the key-races strip. Pure functions
  * over the page's rows, so the page and its tests share one definition.
  */
-import type { PublicRaceResult } from "$lib/types";
+import type { PublicRaceResult, RaceResultStatus } from "$lib/types";
 import { partyKey } from "$lib/utils/party";
 import { canonicalStateName } from "$lib/utils/states";
 import {
@@ -12,6 +12,7 @@ import {
   resultGroup,
   resultLeader,
   shortRaceTitle,
+  trustedCallTime,
   type ResultContender,
   type ResultGroup,
   type ResultOffice,
@@ -82,6 +83,36 @@ export function sortResultsRows<T extends ResultsPageRow>(
       return a.value - b.value || a.index - b.index;
     })
     .map(({ row }) => row);
+}
+
+/**
+ * The first `limit` rows of one list section, and how many wait behind its
+ * "Show more" button. Filtering runs on all rows first; only drawing is
+ * capped, so a phone never lays out hundreds of cards at once.
+ */
+export function capSection<T>(
+  rows: T[],
+  limit: number,
+): { rows: T[]; hidden: number } {
+  if (!Number.isFinite(limit) || rows.length <= limit)
+    return { rows, hidden: 0 };
+  return { rows: rows.slice(0, limit), hidden: rows.length - limit };
+}
+
+/**
+ * How many more cards a "Show more" click adds: everything when the rest is
+ * at most a step and a bit, so "Show all 99" never leaves three behind.
+ */
+export function nextStep(hidden: number, step: number): number {
+  return hidden <= step * 1.25 ? hidden : step;
+}
+
+/** "Show all 99" or "Show 48 more of 300". */
+export function showMoreLabel(hidden: number, step: number): string {
+  const next = nextStep(hidden, step);
+  return next >= hidden
+    ? `Show all ${hidden}`
+    : `Show ${next} more of ${hidden}`;
 }
 
 /**
@@ -182,24 +213,32 @@ export function resultsQueryString(query: ResultsQuery): string {
 // ---------------------------------------------------------------------------
 // Freshness
 
-export const STALE_AFTER_MS = 10 * 60_000;
+/**
+ * The feed is rebuilt about every two hours, so it only counts as behind once
+ * it is older than one cycle plus a margin; a 10-minute line was always on.
+ */
+export const STALE_AFTER_MS = 150 * 60_000;
+/** A timestamp this far ahead of the clock is a data error, not "just now". */
+const FUTURE_SLACK_MS = 5 * 60_000;
 
 const toTime = (value: Date | string | null | undefined): number => {
   if (!value) return NaN;
   return value instanceof Date ? value.getTime() : Date.parse(value);
 };
 
-/** "just now", "4 min ago", "2 hr ago", or "" for a missing timestamp. */
+/**
+ * "just now", "4 min ago", "2 hr ago", or "" for a missing timestamp or one
+ * more than a few minutes in the future (never "just now" for a bad time).
+ */
 export function formatAgo(
   value: Date | string | null | undefined,
   now: Date | number = Date.now(),
 ): string {
   const time = toTime(value);
   if (!Number.isFinite(time)) return "";
-  const minutes = Math.floor(
-    Math.max(0, (typeof now === "number" ? now : now.getTime()) - time) /
-      60_000,
-  );
+  const age = (typeof now === "number" ? now : now.getTime()) - time;
+  if (age < -FUTURE_SLACK_MS) return "";
+  const minutes = Math.floor(Math.max(0, age) / 60_000);
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
@@ -228,13 +267,15 @@ export interface LatestCall {
   winner: string;
   party: string | null;
   calledBy: string | null;
-  calledAt: string;
+  /** Null when the feed's call time is missing, in the future or before polls closed. */
+  calledAt: string | null;
   /** The winner's party differs from the seat's current holder. */
   flip: boolean;
   /** The winner's headshot, from the count, when the feed carries one. */
   winnerImage?: string | null;
   /** Lead in points over second place, and the share counted. */
   margin?: number | null;
+  voteMargin?: number | null;
   pctReporting?: number | null;
   contenders?: ResultContender[];
 }
@@ -268,25 +309,37 @@ function winnerParty(result: PublicRaceResult): string | null {
   return winnerRow(result)?.party ?? null;
 }
 
-/** The newest calls, by `called_at`, newest first. */
-export function latestCalls(rows: ResultsPageRow[], limit = 8): LatestCall[] {
+/**
+ * The newest calls, newest first. Only a trusted `called_at` (after polls
+ * closed and not past `reference`, the feed's generated time) is shown and
+ * sorts the list; a call with a bad time sorts by its count's `as_of`
+ * instead and shows no time, so a typo never pins it on top as "just now".
+ */
+export function latestCalls(
+  rows: ResultsPageRow[],
+  limit = 8,
+  reference: Date | number = Date.now(),
+): LatestCall[] {
   const out: (LatestCall & { time: number })[] = [];
   for (const row of rows) {
     const result = row.result;
     if (!result || !namesWinner(result.status) || !result.winner_name) continue;
-    const time = toTime(result.called_at);
-    if (!Number.isFinite(time)) continue;
+    const calledTime = trustedCallTime(result.called_at, reference);
+    const time = calledTime ?? trustedCallTime(result.as_of, reference);
+    if (time === null) continue;
     const party = winnerParty(result);
+    const leader = resultLeader(result);
     out.push({
       id: row.id,
       title: shortRaceTitle(row.title),
       winner: result.winner_name,
       party,
       calledBy: result.called_by ?? null,
-      calledAt: result.called_at as string,
+      calledAt: calledTime === null ? null : (result.called_at as string),
       flip: isFlip(party, row.holder_party),
       winnerImage: winnerRow(result)?.image_url ?? null,
       margin: rowMargin(row),
+      voteMargin: leader?.voteMargin ?? null,
       pctReporting: finite(result.pct_reporting) ? result.pct_reporting : null,
       contenders: resultContenders(result),
       time,
@@ -306,9 +359,11 @@ export interface KeyRace {
   title: string;
   office: "governor" | "senate";
   group: ResultGroup;
+  status?: RaceResultStatus | null;
   leader: string | null;
   party: string | null;
   margin: number | null;
+  voteMargin?: number | null;
   pctReporting: number | null;
   /** The top two by vote share, for the card's margin bar and headshots. */
   contenders?: ResultContender[];
@@ -321,9 +376,21 @@ const GROUP_RANK: Record<ResultGroup, number> = {
   awaiting: 3,
 };
 
+/** A race still counting this close is key whatever it was rated before. */
+export const KEY_RACE_CLOSE_POINTS = 3;
+
+/** Whether a race became close on the night: too close to call, or a lead under 3 pts. */
+function closeOnTheNight(row: ResultsPageRow): boolean {
+  if (row.result?.status === "too_close") return true;
+  if (resultGroup(row.result?.status) !== "counting") return false;
+  const margin = rowMargin(row);
+  return margin !== null && margin < KEY_RACE_CLOSE_POINTS;
+}
+
 /**
- * Senate and governor races rated competitive (or on the priority list):
- * still counting first, closest margin first, then called, then awaiting.
+ * Senate and governor races rated competitive, on the priority list, or
+ * close on the night (a Likely R seat that is tied belongs here): still
+ * counting first, closest margin first, then called, then awaiting.
  */
 export function keyRaces(
   rows: ResultsPageRow[],
@@ -334,7 +401,7 @@ export function keyRaces(
     .filter(
       (row) =>
         (row.office === "senate" || row.office === "governor") &&
-        (row.competitive || isPriority(row.id)),
+        (row.competitive || isPriority(row.id) || closeOnTheNight(row)),
     )
     .map((row): KeyRace => {
       const group = resultGroup(row.result?.status);
@@ -345,6 +412,7 @@ export function keyRaces(
         title: shortRaceTitle(row.title),
         office: row.office as "governor" | "senate",
         group,
+        status: row.result?.status ?? null,
         leader: called
           ? (row.result?.winner_name ?? null)
           : (leader?.name ?? null),
@@ -354,6 +422,7 @@ export function keyRaces(
             : null
           : (leader?.party ?? null),
         margin: rowMargin(row),
+        voteMargin: leader?.voteMargin ?? null,
         pctReporting:
           group !== "awaiting" && finite(row.result?.pct_reporting)
             ? (row.result?.pct_reporting as number)
@@ -365,6 +434,7 @@ export function keyRaces(
       (a, b) =>
         GROUP_RANK[a.group] - GROUP_RANK[b.group] ||
         (a.margin ?? Infinity) - (b.margin ?? Infinity) ||
+        (a.voteMargin ?? Infinity) - (b.voteMargin ?? Infinity) ||
         a.title.localeCompare(b.title),
     )
     .slice(0, limit);

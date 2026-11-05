@@ -209,7 +209,10 @@ export function lastName(name: string): string {
 
 /**
  * Who is ahead in a race still being counted, e.g. "Wittman leads by 0.7 pts",
- * from the candidates' shares (or votes when no shares are reported).
+ * from the candidates' shares (or votes when no shares are reported). Rows
+ * are compared on one basis only: shares when every row has one, else votes
+ * when every row has one, else the rows that have a share. When the shares
+ * round to a tie, the vote counts break it ("Colom leads by 43 votes").
  */
 export function resultLeadLabel(
   result:
@@ -222,20 +225,202 @@ export function resultLeadLabel(
     | undefined,
 ): string | null {
   if (!result || !isStillCounting(result.status)) return null;
-  const rows = (result.candidates ?? []).filter(
-    (row) => typeof row.pct === "number" || typeof row.votes === "number",
+  const all = (result.candidates ?? []).filter(
+    (row) => finiteNumber(row.pct) || finiteNumber(row.votes),
   );
+  const usePct =
+    all.every((row) => finiteNumber(row.pct)) ||
+    !all.every((row) => finiteNumber(row.votes));
+  const rows = usePct ? all.filter((row) => finiteNumber(row.pct)) : all;
   if (rows.length < 2) return null;
-  const usePct = rows.every((row) => typeof row.pct === "number");
   const value = (row: (typeof rows)[number]) =>
     (usePct ? row.pct : row.votes) ?? 0;
-  const [first, second] = [...rows].sort((a, b) => value(b) - value(a));
+  const [first, second] = [...rows].sort(
+    (a, b) => value(b) - value(a) || (b.votes ?? -1) - (a.votes ?? -1),
+  );
   const margin = value(first) - value(second);
+  if (usePct && margin < TIE_POINTS) {
+    const votes =
+      finiteNumber(first.votes) && finiteNumber(second.votes)
+        ? first.votes - second.votes
+        : 0;
+    return votes > 0
+      ? `${lastName(first.name)} leads by ${votes.toLocaleString("en-US")} ${votes === 1 ? "vote" : "votes"}`
+      : "Tied";
+  }
   if (margin <= 0) return "Tied";
   const amount = usePct
     ? `${margin.toFixed(1)} pts`
-    : `${margin.toLocaleString()} votes`;
+    : `${margin.toLocaleString("en-US")} votes`;
   return `${lastName(first.name)} leads by ${amount}`;
+}
+
+/** A share lead below this rounds to "0.0 pts", so it reads as a tie. */
+export const TIE_POINTS = 0.05;
+
+const finiteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+/**
+ * A lead for a compact card: "+2.4" pts, "+43" votes when the shares round
+ * to a tie, or "Tied". Null when there is no margin to show.
+ */
+export function formatLead(
+  margin: number | null | undefined,
+  voteMargin: number | null | undefined = null,
+): { value: string; unit: "pts" | "votes" | "" } | null {
+  if (!finiteNumber(margin)) return null;
+  if (margin < TIE_POINTS) {
+    return finiteNumber(voteMargin) && voteMargin > 0
+      ? { value: `+${voteMargin.toLocaleString("en-US")}`, unit: "votes" }
+      : { value: "Tied", unit: "" };
+  }
+  if (margin < 0.1) return { value: "+<0.1", unit: "pts" };
+  return { value: `+${margin.toFixed(1)}`, unit: "pts" };
+}
+
+// ---------------------------------------------------------------------------
+// Data-quality guards. The feed is assembled from many sources on election
+// night; these keep a bad row from being drawn as if it were a real count.
+
+/** The earliest poll close on general Election Day (6 p.m. ET in Indiana and Kentucky). */
+export const FIRST_POLL_CLOSE = `${GENERAL_ELECTION_DATE}T23:00:00Z`;
+/** How far past the feed's own clock a timestamp may run (clock skew). */
+const FUTURE_TOLERANCE_MS = 5 * 60_000;
+
+/**
+ * A call time that can be shown, in ms, or null. Rejects unparseable values,
+ * a bare date or a zone-less midnight (the extractor's "time unknown"),
+ * anything before the first polls closed, and anything later than
+ * `reference` (the feed's generated time, else now) plus a few minutes.
+ */
+export function trustedCallTime(
+  value: string | null | undefined,
+  reference: Date | number = Date.now(),
+): number | null {
+  const text = value?.trim() ?? "";
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}(T00:00(:00(\.0+)?)?)?$/.test(text)) return null;
+  const time = Date.parse(text);
+  if (!Number.isFinite(time)) return null;
+  const ref = typeof reference === "number" ? reference : reference.getTime();
+  if (time < Date.parse(FIRST_POLL_CLOSE)) return null;
+  if (Number.isFinite(ref) && time > ref + FUTURE_TOLERANCE_MS) return null;
+  return time;
+}
+
+/** A row still counting whose count has not moved in this long may be behind. */
+export const ROW_STALE_AFTER_MS = 12 * 60 * 60_000;
+
+/** Whether a race still being counted has an `as_of` older than 12 hours. */
+export function isRowStale(
+  result:
+    { status: RaceResultStatus; as_of?: string | null } | null | undefined,
+  now: Date | number = Date.now(),
+): boolean {
+  if (!result || !isStillCounting(result.status) || !result.as_of) return false;
+  const time = Date.parse(result.as_of);
+  if (!Number.isFinite(time)) return false;
+  const ref = typeof now === "number" ? now : now.getTime();
+  return ref - time > ROW_STALE_AFTER_MS;
+}
+
+/** More votes than any one House district casts (2024's largest was under 450k). */
+export const HOUSE_MAX_VOTES = 600_000;
+/** The implied full count for a House district, from votes and share counted. */
+export const HOUSE_MAX_IMPLIED_VOTES = 1_000_000;
+
+/**
+ * Whether a House row's vote total is impossible for one district: above
+ * 600k counted, or above 1M once scaled up by the share counted (from 20%
+ * counted on, so a tiny early count is not blown up). Such rows are almost
+ * always statewide or wrong-race numbers, so they are held "under review".
+ */
+export function implausibleCount(
+  result:
+    | {
+        id?: string;
+        title?: string | null;
+        pct_reporting?: number | null;
+        candidates?: { votes?: number | null }[] | null;
+      }
+    | null
+    | undefined,
+  id = result?.id ?? "",
+): boolean {
+  if (!result || resultOffice(result.title, id) !== "house") return false;
+  const total = (result.candidates ?? []).reduce(
+    (sum, row) =>
+      sum + (finiteNumber(row.votes) && row.votes > 0 ? row.votes : 0),
+    0,
+  );
+  if (total > HOUSE_MAX_VOTES) return true;
+  const counted = result.pct_reporting;
+  return (
+    finiteNumber(counted) &&
+    counted >= 20 &&
+    counted <= 100 &&
+    total / (counted / 100) > HOUSE_MAX_IMPLIED_VOTES
+  );
+}
+
+/**
+ * Whether the reported shares cover far less than the whole vote (below
+ * 90%), e.g. a winner listed alone at 51% or two of five candidates.
+ */
+export function isPartialCount(
+  rows: { pct?: number | null }[] | null | undefined,
+): boolean {
+  const shares = (rows ?? []).filter(
+    (row) => finiteNumber(row.pct) && row.pct > 0,
+  );
+  if (!shares.length) return false;
+  return shares.reduce((sum, row) => sum + (row.pct as number), 0) < 90;
+}
+
+/** Whether no candidate has a vote count or share to draw. */
+export function hasNoCount(
+  rows: { pct?: number | null; votes?: number | null }[] | null | undefined,
+): boolean {
+  return (rows ?? []).every((row) => row.pct == null && row.votes == null);
+}
+
+const SOCIAL_HOSTS =
+  /(^|\.)(facebook|fb|instagram|twitter|x|threads|tiktok|youtube|reddit)\.com$|(^|\.)t\.co$/i;
+const AUTHORITATIVE_HOSTS =
+  /(^|\.)(gov|us)$|(^|\.)(ap\.org|apnews\.com|nbcnews\.com|decisiondeskhq\.com)$/i;
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Result sources in the order worth reading: official (.gov) and wire or
+ * network desks first, then the rest. Social media posts are dropped, since
+ * they are not one of the two independent sources a result rests on.
+ */
+export function rankResultSources<T extends { url: string | URL }>(
+  sources: T[],
+): T[] {
+  const rank = (host: string) => (AUTHORITATIVE_HOSTS.test(host) ? 0 : 1);
+  return sources
+    .map((source, index) => ({
+      source,
+      index,
+      host: hostOf(String(source.url)),
+    }))
+    .filter(({ host }) => !SOCIAL_HOSTS.test(host))
+    .sort((a, b) => rank(a.host) - rank(b.host) || a.index - b.index)
+    .map(({ source }) => source);
+}
+
+/** Maine counts its federal races by ranked choice when no one passes 50%. */
+export function usesFederalRcv(id: string): boolean {
+  return /^me-(senate|house)-/.test(id);
 }
 
 /** Every result is unofficial until the election authority certifies it. */
@@ -308,41 +493,73 @@ export function compareHref(raceId: string): string {
   return `/races/${encodeURIComponent(raceId)}/compare/`;
 }
 
-/** The fresher of the copy built into the page and the live file. */
 /**
- * Fill a share the source left blank from that candidate's votes, scaled by a
- * candidate who has both (votes and share come from the same count). Without
- * it a winner with votes but no share drew as 0% beside opponents' shares.
+ * Clean one feed row before it is drawn:
+ * - placeholder zeros (every candidate at 0 votes and 0%) mean no count has
+ *   come in, so they become blanks, not a called winner at 0.0%;
+ * - an explicit 0% beside a positive vote count is a blank share too;
+ * - a blank share is filled from that candidate's votes, scaled by a
+ *   candidate who has both (votes and share come from the same count);
+ * - with no such candidate, when every candidate has votes, shares are each
+ *   candidate's part of the votes listed.
  */
-export function fillMissingShares<T extends RaceResult | PublicRaceResult>(
+export function normalizeResult<T extends RaceResult | PublicRaceResult>(
   result: T,
 ): T {
-  const rows = result?.candidates ?? [];
+  const original = result?.candidates ?? [];
+  if (!original.length) return result;
+  if (original.every((row) => (row.votes ?? 0) === 0 && (row.pct ?? 0) === 0)) {
+    return original.some((row) => row.votes != null || row.pct != null)
+      ? {
+          ...result,
+          candidates: original.map((row) => ({
+            ...row,
+            votes: null,
+            pct: null,
+          })),
+        }
+      : result;
+  }
+  let rows = original.map((row) =>
+    row.pct === 0 && (row.votes ?? 0) > 0 ? { ...row, pct: null } : row,
+  );
   if (!rows.some((row) => row.pct == null && (row.votes ?? 0) > 0)) {
-    return result;
+    return rows.some((row, i) => row !== original[i])
+      ? { ...result, candidates: rows }
+      : result;
   }
   const reference = rows
     .filter((row) => (row.votes ?? 0) > 0 && (row.pct ?? 0) > 0)
     .sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0))[0];
-  if (!reference) return result;
-  const perVote = (reference.pct as number) / (reference.votes as number);
-  return {
-    ...result,
-    candidates: rows.map((row) =>
+  const round = (value: number) => Math.round(value * 10) / 10;
+  if (reference) {
+    const perVote = (reference.pct as number) / (reference.votes as number);
+    rows = rows.map((row) =>
       row.pct == null && (row.votes ?? 0) > 0
-        ? { ...row, pct: Math.round((row.votes as number) * perVote * 10) / 10 }
+        ? { ...row, pct: round((row.votes as number) * perVote) }
         : row,
-    ),
-  };
+    );
+  } else if (rows.every((row) => finiteNumber(row.votes) && row.pct == null)) {
+    const total = rows.reduce((sum, row) => sum + (row.votes as number), 0);
+    rows = rows.map((row) => ({
+      ...row,
+      pct: round(((row.votes as number) / total) * 100),
+    }));
+  }
+  return { ...result, candidates: rows };
 }
 
+/** The same clean-up under its earlier name. */
+export const fillMissingShares = normalizeResult;
+
+/** The fresher of the copy built into the page and the live file. */
 export function newestResult(
   built: RaceResult | PublicRaceResult | null | undefined,
   live: PublicRaceResult | null | undefined,
 ): RaceResult | PublicRaceResult | null {
-  if (!built) return live ? fillMissingShares(live) : null;
-  if (!live) return fillMissingShares(built);
-  return fillMissingShares(
+  if (!built) return live ? normalizeResult(live) : null;
+  if (!live) return normalizeResult(built);
+  return normalizeResult(
     String(live.as_of ?? "") >= String(built.as_of ?? "") ? live : built,
   );
 }
@@ -361,9 +578,7 @@ export async function fetchLiveResultsFile(
     if (!Array.isArray(file?.races)) return null;
     const stamp = file.generated_at ? new Date(file.generated_at) : null;
     return {
-      results: new Map(
-        file.races.map((row) => [row.id, fillMissingShares(row)]),
-      ),
+      results: new Map(file.races.map((row) => [row.id, normalizeResult(row)])),
       generatedAt: stamp && Number.isFinite(stamp.getTime()) ? stamp : null,
     };
   } catch {
@@ -454,10 +669,19 @@ export function seatParty(party: string | null | undefined): SeatParty {
   return key === "dem" ? "Democratic" : key === "rep" ? "Republican" : "Other";
 }
 
-/** The candidate ahead and the margin over second place, in points. */
-export function resultLeader(
-  result: PublicRaceResult | null | undefined,
-): { name: string; party: string | null; pct: number; margin: number } | null {
+/**
+ * The candidate ahead, the margin over second place in points, and the
+ * margin in votes when both have a count. Null for a row whose vote total
+ * is under review, so it never ranks as a lead.
+ */
+export function resultLeader(result: PublicRaceResult | null | undefined): {
+  name: string;
+  party: string | null;
+  pct: number;
+  margin: number;
+  voteMargin: number | null;
+} | null {
+  if (implausibleCount(result)) return null;
   const rows = sortResultRows(result?.candidates ?? []).filter(
     (row) => typeof row.pct === "number" && Number.isFinite(row.pct),
   );
@@ -469,6 +693,10 @@ export function resultLeader(
     party: first.party ?? null,
     pct,
     margin: pct - (second?.pct ?? 0),
+    voteMargin:
+      finiteNumber(first.votes) && finiteNumber(second?.votes)
+        ? first.votes - (second.votes as number)
+        : null,
   };
 }
 
@@ -509,7 +737,12 @@ export interface ChamberSeats {
   called: SeatCounts;
   /** Races still counting, by the party of the candidate ahead. */
   leading: SeatCounts;
-  /** Seats on the ballot with no call and no lead yet. */
+  /**
+   * Races headed to a ranked-choice count or a runoff: no party lead is
+   * claimed for them, whoever is ahead on first choices.
+   */
+  pending: number;
+  /** Seats on the ballot with no call, no lead and nothing pending yet. */
   open: number;
 }
 
@@ -570,6 +803,7 @@ export function chamberSeats(
 
   const called = emptySeats();
   const leading = emptySeats();
+  let pending = 0;
   for (const row of scoped) {
     const group = resultGroup(row.result?.status);
     if (group === "called") {
@@ -579,13 +813,28 @@ export function chamberSeats(
     } else if (group === "counting") {
       const leader = resultLeader(row.result);
       if (leader) leading[seatParty(leader.party)] += 1;
+    } else if (group === "pending") {
+      pending += 1;
     }
   }
   const open = Math.max(
     0,
-    total - sumSeats(holdovers) - sumSeats(called) - sumSeats(leading),
+    total -
+      sumSeats(holdovers) -
+      sumSeats(called) -
+      sumSeats(leading) -
+      pending,
   );
-  return { office, total, threshold, holdovers, called, leading, open };
+  return {
+    office,
+    total,
+    threshold,
+    holdovers,
+    called,
+    leading,
+    pending,
+    open,
+  };
 }
 
 export interface CountingProgress {
@@ -642,15 +891,26 @@ export interface RaceMargin {
   party: string | null;
   /** Lead over second place, in percentage points. */
   margin: number;
+  /** Lead in votes, when both have a count (breaks a rounded tie). */
+  voteMargin: number | null;
   pctReporting: number | null;
   /** The top two by vote share, for the card's margin bar and headshot. */
   contenders: ResultContender[];
 }
 
-function countingMargins(rows: ResultStatsRow[]): RaceMargin[] {
+/**
+ * Races still counting with a measurable lead. A count that has not moved in
+ * 12 hours (as of `now`) or whose total is under review is left out, so a
+ * stalled or broken row never ranks as a live lead.
+ */
+function countingMargins(
+  rows: ResultStatsRow[],
+  now: Date | number = Date.now(),
+): RaceMargin[] {
   const out: RaceMargin[] = [];
   for (const row of rows) {
     if (resultGroup(row.result?.status) !== "counting") continue;
+    if (isRowStale(row.result, now)) continue;
     const shares = (row.result?.candidates ?? []).filter(
       (c) => typeof c.pct === "number" && Number.isFinite(c.pct),
     );
@@ -663,6 +923,7 @@ function countingMargins(rows: ResultStatsRow[]): RaceMargin[] {
       leader: leader.name,
       party: leader.party,
       margin: leader.margin,
+      voteMargin: leader.voteMargin,
       pctReporting: row.result?.pct_reporting ?? null,
       contenders: resultContenders(row.result),
     });
@@ -671,15 +932,28 @@ function countingMargins(rows: ResultStatsRow[]): RaceMargin[] {
 }
 
 /** Contested races still counting with the narrowest leads. */
-export function closestRaces(rows: ResultStatsRow[], limit = 5): RaceMargin[] {
-  return countingMargins(rows)
-    .sort((a, b) => a.margin - b.margin || a.id.localeCompare(b.id))
+export function closestRaces(
+  rows: ResultStatsRow[],
+  limit = 5,
+  now: Date | number = Date.now(),
+): RaceMargin[] {
+  return countingMargins(rows, now)
+    .sort(
+      (a, b) =>
+        a.margin - b.margin ||
+        (a.voteMargin ?? Infinity) - (b.voteMargin ?? Infinity) ||
+        a.id.localeCompare(b.id),
+    )
     .slice(0, limit);
 }
 
 /** Contested races still counting with the widest leads. */
-export function biggestLeads(rows: ResultStatsRow[], limit = 5): RaceMargin[] {
-  return countingMargins(rows)
+export function biggestLeads(
+  rows: ResultStatsRow[],
+  limit = 5,
+  now: Date | number = Date.now(),
+): RaceMargin[] {
+  return countingMargins(rows, now)
     .sort((a, b) => b.margin - a.margin || a.id.localeCompare(b.id))
     .slice(0, limit);
 }
