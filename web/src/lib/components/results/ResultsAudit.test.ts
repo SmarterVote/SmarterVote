@@ -88,7 +88,7 @@ describe("ResultBars", () => {
 
 describe("ResultRaceCard", () => {
   const now = Date.parse("2026-11-04T21:30:00Z");
-  it("warns when a count still running has not updated in 12 hours", () => {
+  it("shows no staleness warning when a count has not updated in 12 hours", () => {
     render(ResultRaceCard, {
       id: "ga-senate-2026",
       title: "Georgia",
@@ -102,9 +102,8 @@ describe("ResultRaceCard", () => {
         ],
       }),
     });
-    expect(screen.getByTestId("result-row-stale").textContent).toMatch(
-      /16 hr ago and may be behind/,
-    );
+    expect(screen.queryByTestId("result-row-stale")).toBeNull();
+    expect(screen.queryByText(/may be behind/)).toBeNull();
   });
 
   it("says no results are collected once polls have closed", () => {

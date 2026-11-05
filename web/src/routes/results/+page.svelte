@@ -346,7 +346,7 @@
         >{$liveResultsState.status === "error"
           ? "Live updates are unavailable right now."
           : stale
-            ? "Counts may be behind."
+            ? ""
             : updatedAt
               ? "Live results."
               : ""}</span
@@ -358,14 +358,7 @@
             : ""}</span
         >
       {:else if stale}
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
-          data-testid="results-stale"
-        >
-          <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true"
-          ></span>
-          Results feed last updated {feedAgo}. Counts may be behind.
-        </span>
+        <span data-testid="results-updated">Updated {feedAgo}</span>
       {:else if updatedAt}
         <span
           class="inline-flex items-center gap-1.5"
