@@ -204,6 +204,16 @@ export interface RaceResult {
   correction_note?: string | null;
   sources: Source[];
   as_of: string;
+  audit?: ResultAudit | null;
+}
+
+/** Who set a result by hand (admin set-result tool), and from which sources. */
+export interface ResultAudit {
+  method: "admin_set_result";
+  set_by: string;
+  set_at: string;
+  source_urls: string[];
+  note?: string | null;
 }
 
 /** A count row in the public results file, which also carries the headshot. */

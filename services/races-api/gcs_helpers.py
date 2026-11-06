@@ -467,6 +467,32 @@ def publish_race_result(race_id: str) -> Dict[str, Any]:
     return published
 
 
+def set_draft_race_result(race_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Put a supplied result on the race's draft, after the checks ``publish_race_result`` runs.
+
+    The results step's unread-counts check is skipped: the caller copies the
+    counts from the named sources rather than a model reading pages. The
+    roster and previous result come from the published race, as they do at
+    publish time. With no active draft, the draft starts as a copy of the
+    published race; only its ``result`` is ever published from here.
+    """
+    published = _gcs_get_race_json(race_id, "races")
+    if not published:
+        raise ValueError("Results can only be set on a published race")
+    errors = validate_race_result(result, published, previous=published.get("result"))
+    if errors:
+        raise ValueError("; ".join(errors))
+    draft = _gcs_get_race_json(race_id, "drafts")
+    if draft:
+        _gcs_archive_active_if_present(race_id, "drafts", "draft")
+    else:
+        draft = dict(published)
+    draft["result"] = result
+    if not _gcs_put_race_json(race_id, "drafts", draft):
+        raise RuntimeError(f"Failed to write draft race blob for {race_id}")
+    return draft
+
+
 def update_results_index(entries: Dict[str, Dict[str, Any]], max_attempts: int = 5) -> None:
     """Merge rows into races/results.json, retrying if another publish wrote first."""
     client = _get_gcs_admin()
