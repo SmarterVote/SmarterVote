@@ -219,8 +219,41 @@ def validate_race_result(
     if total_pct > 100.5:
         errors.append(f"Vote shares total {total_pct:.1f}%")
 
+    errors.extend(_dropped_candidate_errors(result, previous))
     errors.extend(_regression_errors(result, previous))
     return errors
+
+
+def _counted_names(result: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    return {
+        str(row.get("name") or "").strip().casefold(): str(row.get("name") or "").strip()
+        for row in (result or {}).get("candidates") or []
+        if isinstance(row, dict) and (row.get("votes") is not None or row.get("pct") is not None)
+    }
+
+
+def _dropped_candidate_errors(result: Dict[str, Any], previous: Optional[Dict[str, Any]]) -> List[str]:
+    """A count may change, but a candidate it covered must not vanish from the next one.
+
+    When the read check rejected one candidate's share, the model kept the other
+    row alone and that passed: the lone candidate then showed as the leader
+    (tn-house-09: Taylor only; tx-house-09: Gutierrez only). A correction_note
+    does not excuse this, because the note explains a changed count, not a
+    missing one.
+    """
+    if not isinstance(previous, dict) or result.get("status") not in COUNTED_STATUSES:
+        return []
+    counted = _counted_names(result)
+    if not counted:
+        return []  # the missing-counts error already covers an empty result
+    missing = [name for key, name in _counted_names(previous).items() if key not in counted]
+    if not missing:
+        return []
+    return [
+        "The previous count covered "
+        + ", ".join(repr(name) for name in missing)
+        + "; give votes or pct for them as well, copied from a source, rather than dropping them"
+    ]
 
 
 def _regression_errors(result: Dict[str, Any], previous: Optional[Dict[str, Any]]) -> List[str]:
