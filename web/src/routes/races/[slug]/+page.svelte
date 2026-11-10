@@ -15,6 +15,8 @@
   import { fade, slide } from "svelte/transition";
   import VoterResources from "$lib/components/VoterResources.svelte";
   import ResultBanner from "$lib/components/ResultBanner.svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
+  import { raceElectionYear } from "$lib/utils/archive";
   import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
   import { formatModelName, candidateSlug } from "$lib/utils/format";
@@ -516,6 +518,8 @@
         </div>
       </div>
     {/if}
+
+    <ArchiveNotice year={raceElectionYear(race)} class="mb-4" />
 
     <!-- Race Header -->
     <Card tag="header" class="race-header">

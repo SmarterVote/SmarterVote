@@ -5,6 +5,8 @@
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
   import ResultBanner from "$lib/components/ResultBanner.svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
+  import { raceElectionYear } from "$lib/utils/archive";
   import { liveResults, newestResult } from "$lib/utils/results";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import { getDraftRace, getRace } from "$lib/api";
@@ -318,6 +320,7 @@
           {raceDisplayTitle(race)}
         </p>{/if}
       <p class="sr-only" role="status" aria-live="polite">{copyStatus}</p>
+      <ArchiveNotice year={raceElectionYear(race)} class="mt-4" />
       {#if race && currentResult}
         <div class="mt-4">
           <ResultBanner

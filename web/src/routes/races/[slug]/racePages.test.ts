@@ -174,3 +174,61 @@ describe("duplicate roster entries", () => {
     expect(compare.getAllByRole("checkbox").length).toBe(4);
   });
 });
+
+describe("2026 archive notice", () => {
+  const COPY =
+    /2026 election archive: final pre-election research and forecasts, no\s+longer updated\./;
+  const race2028 = { ...race, id: "x-race-2028", election_date: "2028-11-07" };
+
+  beforeEach(() => {
+    h.getRace.mockReset();
+    h.getDraftRace.mockReset();
+  });
+  afterEach(cleanup);
+
+  it("race, candidate and compare pages show it for a 2026 race", async () => {
+    h.getRace.mockResolvedValue(race);
+    h.url = "https://smarter.vote/races/x-race/";
+    h.params = { slug: "x-race" };
+    const RacePage = (await import("./+page.svelte")).default;
+    const racePage = render(RacePage, {
+      props: { data: { prerenderedRace: race as never } },
+    });
+    await settle();
+    expect(racePage.getByRole("note").textContent).toMatch(COPY);
+    racePage.unmount();
+
+    h.url = "https://smarter.vote/races/x-race/jane-doe/";
+    h.params = { slug: "x-race", candidate: "jane-doe" };
+    const CandidatePage = (await import("./[candidate]/+page.svelte")).default;
+    const candidate = render(CandidatePage, {
+      props: { data: { prerenderedRace: race as never } },
+    });
+    await settle();
+    expect(candidate.getByRole("note").textContent).toMatch(COPY);
+    candidate.unmount();
+
+    h.url =
+      "https://smarter.vote/races/x-race/compare/?candidates=jane-doe,john-roe";
+    h.params = { slug: "x-race" };
+    const ComparePage = (await import("./compare/+page.svelte")).default;
+    const compare = render(ComparePage, {
+      props: { data: { prerenderedRace: race as never } },
+    });
+    await settle();
+    expect(compare.getByRole("note").textContent).toMatch(COPY);
+  });
+
+  it("race page omits it for a 2028 race", async () => {
+    h.getRace.mockResolvedValue(race2028);
+    h.url = "https://smarter.vote/races/x-race-2028/";
+    h.params = { slug: "x-race-2028" };
+    const RacePage = (await import("./+page.svelte")).default;
+    const racePage = render(RacePage, {
+      props: { data: { prerenderedRace: race2028 as never } },
+    });
+    await settle();
+    expect(racePage.getByRole("heading", { level: 1 })).toBeTruthy();
+    expect(racePage.queryByText(/election archive/)).toBeNull();
+  });
+});
