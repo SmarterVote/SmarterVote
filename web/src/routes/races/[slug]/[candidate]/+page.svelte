@@ -7,6 +7,8 @@
   import Card from "$lib/components/Card.svelte";
   import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
+  import { raceElectionYear } from "$lib/utils/archive";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import IssueTable from "$lib/components/IssueTable.svelte";
   import DonorTable from "$lib/components/DonorTable.svelte";
@@ -367,6 +369,7 @@
         >
       </div>
     {/if}
+    <ArchiveNotice year={raceElectionYear(race)} class="mb-4" />
     {#if candidate.withdrawn}
       <div class="alert-info mb-4 flex items-start gap-3">
         <svg

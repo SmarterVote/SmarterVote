@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
   import ForecastElectoralMap from "$lib/components/forecast/ForecastElectoralMap.svelte";
   import ForecastHoldovers from "$lib/components/forecast/ForecastHoldovers.svelte";
   import ForecastKeyRaces from "$lib/components/forecast/ForecastKeyRaces.svelte";
@@ -315,6 +316,10 @@
       </div>
     </div>
   </header>
+
+  <!-- Labels the pre-election forecast only; the live projection and results
+       below keep updating. -->
+  <ArchiveNotice year={cycleYear} />
 
   {#if showResultsCallout}
     <a
