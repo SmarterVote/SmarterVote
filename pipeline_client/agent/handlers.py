@@ -2161,7 +2161,12 @@ def _make_editing_handlers(
                 return f"ERROR: contest_stage must be one of: {', '.join(sorted(_CONTEST_STAGES))}."
         if field == "ballotpedia_url":
             default_url = default_ballotpedia_race_url(str(race_json.get("id") or ""))
-            if default_url and "_Congressional_District" in default_url and "ballotpedia.org" in str(value):
+            value_host = (urlparse(str(value)).hostname or "").lower()
+            if (
+                default_url
+                and "_Congressional_District" in default_url
+                and (value_host == "ballotpedia.org" or value_host.endswith(".ballotpedia.org"))
+            ):
                 value = default_url
         if field == "description":
             from .review import is_substantive_race_description

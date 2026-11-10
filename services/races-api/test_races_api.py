@@ -1286,3 +1286,14 @@ def test_generate_single_chamber_needs_a_draft_to_keep(client, monkeypatch):
 
     assert resp.status_code == 409
     assert "regenerate all chambers" in resp.json()["detail"]
+
+
+def test_local_race_read_never_leaves_data_directory(tmp_path):
+    from simple_publish_service import SimplePublishService
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (tmp_path / "secret.json").write_text('{"id": "secret"}')
+    service = SimplePublishService(data_directory=str(data_dir))
+
+    assert service._get_race_data_local("../secret") is None
