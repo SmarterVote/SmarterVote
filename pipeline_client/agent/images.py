@@ -1421,7 +1421,6 @@ def _is_valid_image_url(url: Any) -> bool:
     try:
         parsed = urlparse(url)
         path = parsed.path.lower()
-        netloc = parsed.netloc.lower()
 
         if is_ephemeral_image_host(url):
             return False
@@ -1443,14 +1442,12 @@ def _is_valid_image_url(url: Any) -> bool:
             return True
 
         # Ballotpedia stores images under /wiki/images/
-        if "ballotpedia.org" in netloc and "/wiki/images/" in path:
+        host = _image_host(url)
+        if _host_matches(host, ("ballotpedia.org",)) and "/wiki/images/" in path:
             return True
 
-        # Common image CDNs
-        if any(
-            host in netloc
-            for host in ("cloudfront.net", "githubusercontent.com", "twimg.com", "fbcdn.net", "brightspotcdn.com")
-        ):
+        # Common image CDNs (match the host's domain, not a substring of it)
+        if _host_matches(host, ("cloudfront.net", "githubusercontent.com", "twimg.com", "fbcdn.net", "brightspotcdn.com")):
             return True
 
     except Exception:

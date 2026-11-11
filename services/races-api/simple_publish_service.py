@@ -413,8 +413,13 @@ class SimplePublishService:
 
     def _get_race_data_local(self, race_id: str) -> Optional[Dict]:
         """Get race data from local file."""
-        file_path = self.data_directory / f"{race_id}.json"
-        if file_path.exists():
+        # Defense in depth: routes validate race IDs, but never read outside the data directory.
+        base_dir = os.path.realpath(self.data_directory)
+        file_path = os.path.realpath(os.path.join(base_dir, f"{race_id}.json"))
+        if not file_path.startswith(base_dir + os.sep):
+            logger.warning("Rejected race id resolving outside data directory: %r", race_id)
+            return None
+        if os.path.exists(file_path):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
