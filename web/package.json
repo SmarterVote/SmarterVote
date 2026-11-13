@@ -58,7 +58,7 @@
   "type": "module",
   "dependencies": {
     "@auth0/auth0-spa-js": "^2.28.2",
-    "@tanstack/table-core": "8.21.3",
+    "@tanstack/table-core": "9.3.1",
     "chart.js": "^4.5.1",
     "d3-geo": "^3.1.1",
     "svelte-chartjs": "4.0.1",
