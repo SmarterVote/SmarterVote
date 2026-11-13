@@ -484,3 +484,8 @@ def _clear_public_race_cache(request: Request) -> None:
     clear_cache = getattr(service, "clear_cache", None)
     if callable(clear_cache):
         clear_cache()
+    # Published races or results changed, so the static live feeds may have too.
+    # Imported here because routers.results imports this module.
+    from routers.results import refresh_live_feeds
+
+    refresh_live_feeds(service)

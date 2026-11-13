@@ -13,6 +13,7 @@ _FIXED_STEP_COST_USD = {
     "polling": 0.08,
     "forecast": 0.07,
     "voter_resources": 0.03,
+    "results": 0.01,
     "review": 0.18,
     "iteration": 0.25,
 }

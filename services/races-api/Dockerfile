@@ -31,6 +31,7 @@ COPY services/races-api/firestore_helpers.py .
 COPY services/races-api/gcs_helpers.py .
 COPY services/races-api/cloud_run_jobs.py .
 COPY services/races-api/rate_limit.py .
+COPY services/races-api/live_feeds.py .
 COPY services/races-api/routers ./routers
 COPY shared /app/shared
 COPY pipeline_client/__init__.py /app/pipeline_client/__init__.py

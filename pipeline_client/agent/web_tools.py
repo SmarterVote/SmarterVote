@@ -11,7 +11,9 @@ import random
 import re
 import socket
 import weakref
-from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -33,6 +35,39 @@ _SEARCH_MAX_QUERY_CHARS = 500
 # ---------------------------------------------------------------------------
 # Search cache
 # ---------------------------------------------------------------------------
+
+
+#: Set by the results phase: a count cached an hour ago is a wrong count.
+_fresh_reads_only: ContextVar[bool] = ContextVar("fresh_reads_only", default=False)
+
+
+#: Every page and search result text read inside fresh_web_reads, so a reported
+#: count can be checked against what was actually read.
+_fresh_read_texts: ContextVar[Optional[List[str]]] = ContextVar("fresh_read_texts", default=None)
+
+
+@contextmanager
+def fresh_web_reads() -> Iterator[List[str]]:
+    """Skip cached searches and pages inside this block, and collect what is read."""
+    texts: List[str] = []
+    token = _fresh_reads_only.set(True)
+    texts_token = _fresh_read_texts.set(texts)
+    try:
+        yield texts
+    finally:
+        _fresh_read_texts.reset(texts_token)
+        _fresh_reads_only.reset(token)
+
+
+def fresh_read_texts() -> Optional[List[str]]:
+    """What this fresh-read block has read so far, or None outside one."""
+    return _fresh_read_texts.get()
+
+
+def _collect_read_text(text: str) -> None:
+    texts = _fresh_read_texts.get()
+    if texts is not None and text:
+        texts.append(text)
 
 
 def _get_search_cache():
@@ -585,6 +620,12 @@ def _get_search_client() -> httpx.AsyncClient:
 
 async def _fetch_page(url: str) -> str:
     """Fetch a URL and return stripped text content, with caching and fallback."""
+    text = await _fetch_page_text(url)
+    _collect_read_text(text)
+    return text
+
+
+async def _fetch_page_text(url: str) -> str:
     try:
         await _validate_url_async(url)
     except UnresolvableHostError:
@@ -595,7 +636,7 @@ async def _fetch_page(url: str) -> str:
         logger.warning("Blocked fetch of disallowed URL %s: %s", url, exc)
         return f"[Blocked: {exc}]"
 
-    cache = _get_search_cache()
+    cache = None if _fresh_reads_only.get() else _get_search_cache()
     if cache:
         cached = cache.get_page(url)
         if cached:
@@ -1163,6 +1204,21 @@ async def _cached_searlo_search(
     run_budget: RunBudget | None,
     images: bool,
 ) -> List[Dict[str, Any]]:
+    results = await _uncollected_searlo_search(
+        query, num_results=num_results, race_id=race_id, run_budget=run_budget, images=images
+    )
+    _collect_read_text("\n".join(f"{item.get('title', '')} {item.get('snippet', '')}" for item in results))
+    return results
+
+
+async def _uncollected_searlo_search(
+    query: str,
+    *,
+    num_results: int,
+    race_id: Optional[str],
+    run_budget: RunBudget | None,
+    images: bool,
+) -> List[Dict[str, Any]]:
     label = "image search" if images else "search"
     normalized_query = re.sub(r"\s+", " ", query or "").strip()
     if not normalized_query:
@@ -1184,7 +1240,7 @@ async def _cached_searlo_search(
             normalized_query[:_SEARCH_MAX_QUERY_CHARS].rsplit(" ", 1)[0] or normalized_query[:_SEARCH_MAX_QUERY_CHARS]
         )
 
-    cache = _get_search_cache()
+    cache = None if _fresh_reads_only.get() else _get_search_cache()
     if cache:
         cached = cache.get(normalized_query, race_id)
         if cached:

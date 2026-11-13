@@ -14,6 +14,9 @@
   import EmptyState from "$lib/components/EmptyState.svelte";
   import { fade, slide } from "svelte/transition";
   import VoterResources from "$lib/components/VoterResources.svelte";
+  import ResultBanner from "$lib/components/ResultBanner.svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
+  import { raceElectionYear } from "$lib/utils/archive";
   import type { Race } from "$lib/types";
   import { getRace, getDraftRace } from "$lib/api";
   import { formatModelName, candidateSlug } from "$lib/utils/format";
@@ -21,6 +24,7 @@
   import { isExternalUrl } from "$lib/utils/url";
   import { ballotReturnHref } from "$lib/utils/ballotSession";
   import { formatRating } from "$lib/utils/forecast";
+  import { liveResults, newestResult } from "$lib/utils/results";
   import {
     marketAsOf,
     marketSignalTarget,
@@ -278,6 +282,14 @@
     ? isUncontestedRace(race, activeCandidates.length)
     : false;
   $: showForecast = !!race?.forecast && !uncontested;
+  $: currentResult = race
+    ? newestResult(race.result, $liveResults.get(race.id))
+    : null;
+  // A runoff still needs its voting links; any other result means voting is over.
+  $: votingEnded =
+    !!currentResult &&
+    currentResult.status !== "not_yet_reported" &&
+    currentResult.status !== "runoff_required";
   $: noPollInputs = race?.forecast?.based_on_poll_count === 0;
   // Every model that produced this page, shown with the review details.
   $: researchModels = [
@@ -507,6 +519,8 @@
       </div>
     {/if}
 
+    <ArchiveNotice year={raceElectionYear(race)} class="mb-4" />
+
     <!-- Race Header -->
     <Card tag="header" class="race-header">
       <div class="header-top">
@@ -581,14 +595,16 @@
           >
         </span>
       </div>
-      {#if race.election_date || activeCandidates.length > 1}
+      {#if !currentResult && (race.election_date || activeCandidates.length > 1)}
         <div class="header-actions">
           {#if race.election_date}
-            <div class="min-w-0 sm:flex-1">
-              <ElectionCountdown electionDate={race.election_date} />
-            </div>
+            {#if !currentResult}
+              <div class="min-w-0 sm:flex-1">
+                <ElectionCountdown electionDate={race.election_date} />
+              </div>
+            {/if}
           {/if}
-          {#if activeCandidates.length > 1}
+          {#if activeCandidates.length > 1 && !currentResult}
             <a href={compareAllHref} class="btn-primary shrink-0">
               {activeCandidates.length === 2
                 ? "Compare both candidates"
@@ -598,6 +614,16 @@
         </div>
       {/if}
     </Card>
+
+    {#if currentResult}
+      <div class="my-6">
+        <ResultBanner
+          raceId={race.id}
+          result={currentResult}
+          candidates={race.candidates}
+        />
+      </div>
+    {/if}
 
     <div class="race-layout">
       <!-- Race Overview -->
@@ -696,7 +722,9 @@
       >
         {#if showForecast || (latestPoll && latestMatchup)}
           <div class="card glance-card">
-            <p class="eyebrow">At a glance</p>
+            <p class="eyebrow">
+              {currentResult ? "Before the election" : "At a glance"}
+            </p>
             {#if showForecast && race.forecast}
               {@const glance = forecastHeadline(race.forecast)}
               <div class="glance-block">
@@ -764,7 +792,12 @@
             {/if}
           </div>
         {/if}
-        <VoterResources {ballotpediaUrl} {registerToVoteUrl} {howToVoteUrl} />
+        <VoterResources
+          {ballotpediaUrl}
+          {registerToVoteUrl}
+          {howToVoteUrl}
+          showVotingLinks={!votingEnded}
+        />
       </aside>
 
       <!-- Candidates Section -->
@@ -865,7 +898,9 @@
       {@const headline = forecastHeadline(forecast)}
       {@const segments = partyProbabilitySegments(forecast.party_probabilities)}
       <section id="forecast" class="page-section scroll-mt-24" tabindex="-1">
-        <h2 class="h-section section-title">Forecast</h2>
+        <h2 class="h-section section-title">
+          {currentResult ? "Pre-election forecast" : "Forecast"}
+        </h2>
         <Card class="forecast-card">
           <div class="forecast-header">
             <div>

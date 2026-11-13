@@ -3,9 +3,11 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
   import ForecastElectoralMap from "$lib/components/forecast/ForecastElectoralMap.svelte";
   import ForecastHoldovers from "$lib/components/forecast/ForecastHoldovers.svelte";
   import ForecastKeyRaces from "$lib/components/forecast/ForecastKeyRaces.svelte";
+  import ForecastLiveProjection from "$lib/components/forecast/ForecastLiveProjection.svelte";
   import ForecastMissingRaces from "$lib/components/forecast/ForecastMissingRaces.svelte";
   import ForecastOutlookAnalysis from "$lib/components/forecast/ForecastOutlookAnalysis.svelte";
   import ForecastProjectionSummary from "$lib/components/forecast/ForecastProjectionSummary.svelte";
@@ -16,7 +18,11 @@
   import ForecastTabNav from "$lib/components/forecast/ForecastTabNav.svelte";
   import ForecastUnavailable from "$lib/components/forecast/ForecastUnavailable.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
-  import type { ChamberForecasts, RaceSummary } from "$lib/types";
+  import type {
+    ChamberForecasts,
+    LiveForecastFile,
+    RaceSummary,
+  } from "$lib/types";
   import {
     aggregateForecasts,
     electionCycleYear,
@@ -33,6 +39,17 @@
     buildSeatOutcomeChart,
     buildStateMapData,
   } from "$lib/utils/forecastPresentation";
+  import {
+    liveChamberProjection,
+    liveForecast,
+    liveForecastStatus,
+  } from "$lib/utils/liveForecast";
+  import {
+    buildResultMapOverlay,
+    hasAnyResults,
+    withResultTooltips,
+  } from "$lib/utils/forecastResults";
+  import { isResultsSeason, liveResults } from "$lib/utils/results";
   import { canonicalStateName } from "$lib/utils/states";
   import { scrollBehavior } from "$lib/utils/motion";
 
@@ -184,6 +201,56 @@
   $: mostLikelyOutcome = getMostLikelySeatOutcome(
     chamberSummary?.seat_distribution ?? {},
   );
+
+  // Election night: shown only once a race in this chamber is called. Until
+  // then, or if the live file fails to load, the page is the forecast alone.
+  // The build bakes in a snapshot of the live file, so the block is already
+  // in the prerendered page (no layout shift when the browser copy lands);
+  // the browser's copy, refreshed each minute, replaces it. Before hydration
+  // activeTab is "house", which is the tab the prerendered HTML shows.
+  $: liveSnapshot = ($page.data.liveForecastSnapshot ??
+    null) as LiveForecastFile | null;
+  $: liveFile = $liveForecast ?? liveSnapshot;
+  $: liveProjection = liveChamberProjection(liveFile, activeTab);
+
+  // Election night: per-race results for the cards, lists and map. Before
+  // hydration (and before the first load) the map stays empty, so the
+  // prerendered page is the forecast alone.
+  $: results = hydrated ? $liveResults : new Map();
+  $: anyResults = hasAnyResults(results);
+  $: tabHasResults = hasAnyResults(
+    results,
+    races.filter((r) => isRaceInForecastTab(r, activeTab)).map((r) => r.id),
+  );
+  $: resultOverlay = tabHasResults
+    ? buildResultMapOverlay(races, activeTab, results)
+    : null;
+  $: resultTooltips = resultOverlay
+    ? withResultTooltips(stateTooltips, resultOverlay)
+    : null;
+  // In the prerendered HTML from Election Day on; in the browser, also once
+  // the results file has any votes (a reader whose clock is a day behind).
+  let resultsSeason = isResultsSeason();
+  onMount(() => {
+    resultsSeason = isResultsSeason();
+  });
+  $: showResultsCallout = resultsSeason || anyResults;
+  // Without a build snapshot, hold the live block's space while the first
+  // browser fetch is in flight, so the page does not jump when it arrives.
+  $: reserveLiveSpace =
+    !liveProjection && resultsSeason && $liveForecastStatus === "loading";
+  $: updatedLabel = (() => {
+    const value = chamberForecasts?.updated_at;
+    if (!value) return "";
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? ""
+      : parsed.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+  })();
 </script>
 
 <svelte:head>
@@ -235,13 +302,9 @@
                 ? "Senate"
                 : "governor"} race{aggregate.races.length === 1 ? "" : "s"} modeled</span
           >
-          {#if chamberForecasts?.updated_at}
+          {#if updatedLabel}
             <span aria-hidden="true">·</span>
-            <span
-              >Updated {new Date(
-                chamberForecasts.updated_at,
-              ).toLocaleDateString()}</span
-            >
+            <span>Forecast updated {updatedLabel}</span>
           {/if}
           <span aria-hidden="true">·</span>
           <a
@@ -253,6 +316,39 @@
       </div>
     </div>
   </header>
+
+  <!-- Labels the pre-election forecast only; the live projection and results
+       below keep updating. -->
+  <ArchiveNotice year={cycleYear} />
+
+  {#if showResultsCallout}
+    <a
+      href="/results/"
+      class="card flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-primary-200 px-4 py-3 text-sm transition-colors hover:border-primary-400 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-5 dark:border-primary-800/60 dark:hover:border-primary-600"
+      data-testid="forecast-results-callout"
+    >
+      <span class="flex min-w-0 items-center gap-2.5">
+        <span class="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+          <span
+            class="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60 motion-safe:animate-ping"
+          ></span>
+          <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600"
+          ></span>
+        </span>
+        <span class="font-semibold text-content"
+          >Results are coming in.
+          <span class="font-normal text-content-muted"
+            >This page is the pre-election forecast, with live results marked on
+            each race.</span
+          ></span
+        >
+      </span>
+      <span
+        class="inline-flex shrink-0 items-center gap-1.5 font-bold text-primary-700 dark:text-primary-300"
+        >See live results <UiIcon name="arrow-right" size="sm" /></span
+      >
+    </a>
+  {/if}
 
   {#if (!races || races.length === 0) && (!chamberForecasts || !chamberForecasts.chambers)}
     <ForecastUnavailable loadError={racesLoadError || forecastsLoadError} />
@@ -274,22 +370,48 @@
         aria-labelledby="forecast-tab-{activeTab}"
         class="space-y-8"
       >
-        <ForecastSummaryCard
-          {activeTab}
-          {controlParty}
-          controlProbability={chamberSummary?.control_probability}
-          vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
-          {mostLikelyOutcome}
-          tossupCount={chamberSummary?.tossup_count ?? 0}
-          competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
-          {cycleYear}
-          {outcomeProbabilities}
-          {projectedSeats}
-          {totalSeats}
-          {threshold}
-          narrative={chamberNarrative}
-          updatedAt={chamberForecasts?.updated_at}
-        />
+        {#if liveProjection}
+          <ForecastLiveProjection
+            projection={liveProjection}
+            resultsUpdatedAt={liveFile?.results_updated_at ?? null}
+            {activeTab}
+            preElectionProbability={chamberSummary?.control_probability}
+            preElectionParty={chamberSummary ? controlParty : null}
+            swingPosterior={liveFile?.swing_posterior}
+          />
+        {:else if reserveLiveSpace}
+          <div
+            class="card flex min-h-[22rem] items-center justify-center p-4 text-sm text-content-subtle sm:min-h-[19rem] sm:p-6 motion-safe:animate-pulse"
+            data-testid="forecast-live-placeholder"
+          >
+            Loading the live projection…
+          </div>
+        {/if}
+
+        <!-- The heading and card share a wrapper so the tab panel's space-y
+             gap sits above the heading, not between it and the card. -->
+        <div>
+          {#if liveProjection || reserveLiveSpace}
+            <h2 class="h-section mb-3">Pre-election forecast</h2>
+          {/if}
+          <ForecastSummaryCard
+            {activeTab}
+            {controlParty}
+            controlProbability={chamberSummary?.control_probability}
+            vpTiebreakParty={chamberSummary?.vp_tiebreak_party}
+            {mostLikelyOutcome}
+            tossupCount={chamberSummary?.tossup_count ?? 0}
+            competitiveRaceCount={chamberSummary?.competitive_race_count ?? 0}
+            {cycleYear}
+            {outcomeProbabilities}
+            {projectedSeats}
+            {totalSeats}
+            {threshold}
+            narrative={chamberNarrative}
+            updatedAt={chamberForecasts?.updated_at}
+            preElection={Boolean(liveProjection)}
+          />
+        </div>
 
         <!-- Interactive Map & Statistics Dashboard Grid -->
         <section
@@ -302,6 +424,8 @@
             {stateRaceCounts}
             {stateColors}
             {stateTooltips}
+            resultColors={resultOverlay?.colors ?? null}
+            {resultTooltips}
             onStateClick={handleStateClick}
             onClearFilter={clearStateFilter}
             onViewResults={scrollToRaceList}
@@ -310,9 +434,12 @@
           <!-- Stats Panel Column -->
           <div class="space-y-6 h-full flex flex-col">
             <ForecastProjectionSummary
-              label={aggregate.label}
+              label={liveProjection
+                ? `Pre-election ${aggregate.label}`
+                : aggregate.label}
               {controlParty}
               {threshold}
+              {activeTab}
               {projectedSeats}
               totalExpected={aggregate.totalExpected}
               {expectedSeats}
@@ -325,6 +452,7 @@
                 sortedOutcomes={seatOutcomeChart.outcomes}
                 maxProbability={seatOutcomeChart.maxProbability}
                 svgData={seatOutcomeChart.svgData}
+                threshold={chamberSummary?.threshold ?? threshold}
               />
             {/if}
           </div>
@@ -335,7 +463,7 @@
           ratingCounts={aggregate.ratingCounts}
         />
 
-        <ForecastKeyRaces races={keyRacesList} />
+        <ForecastKeyRaces races={keyRacesList} {results} />
 
         <ForecastOutlookAnalysis
           {activeTab}
@@ -350,6 +478,7 @@
           {chamberSummary}
           onClearStateFilter={clearStateFilter}
           sectionId={RACE_LIST_ID}
+          {results}
         />
 
         <ForecastMissingRaces races={filteredMissingRaces} {activeTab} />

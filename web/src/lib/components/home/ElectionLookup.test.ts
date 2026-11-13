@@ -44,6 +44,10 @@ const races = [
 
 describe("ElectionLookup", () => {
   beforeEach(() => {
+    // Past elections are hidden by design, so pin "today" before Election Day.
+    // Only Date is faked; real timers keep waitFor and debounces working.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-20T12:00:00Z"));
     lookupElectionGeography.mockReset();
     replaceState.mockReset();
     suggestUsAddresses.mockReset();

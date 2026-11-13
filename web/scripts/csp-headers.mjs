@@ -34,7 +34,7 @@ export function urlOrigin(value) {
 /**
  * Data hosts the app fetches from: the races API (falling back to the
  * production default, as the built app does) plus the public data bucket
- * origin when VITE_PUBLIC_DATA_URL points off-site (e.g. storage.googleapis.com).
+ * origin when VITE_PUBLIC_DATA_URL / VITE_LIVE_FEEDS_URL point off-site (e.g. storage.googleapis.com).
  * @param {Record<string, string | undefined>} env
  * @returns {string[]}
  */
@@ -42,6 +42,7 @@ export function dataConnectSrcOrigins(env) {
   const origins = [
     urlOrigin(env.VITE_RACES_API_URL) ?? urlOrigin(DEFAULT_RACES_API_URL),
     urlOrigin(env.VITE_PUBLIC_DATA_URL),
+    urlOrigin(env.VITE_LIVE_FEEDS_URL),
   ].filter(/** @returns {o is string} */ (o) => Boolean(o));
   return [...new Set(origins)];
 }

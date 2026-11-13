@@ -64,4 +64,60 @@ describe("ForecastKeyRaces", () => {
     expect(screen.getByText("AZ-01 · Arizona")).toBeTruthy();
     expect(screen.getByText("AZ-06 · Arizona")).toBeTruthy();
   });
+
+  it("marks a called key race and links its result to the race page", () => {
+    render(ForecastKeyRaces, {
+      races: [race],
+      results: new Map([
+        [
+          race.id,
+          {
+            id: race.id,
+            status: "called" as const,
+            winner_name: "Alex Moreno",
+            winner_party: "Republican",
+            candidates: [],
+            sources: [],
+          },
+        ],
+      ]),
+    });
+
+    expect(screen.getByTestId("forecast-result-badge")).toBeTruthy();
+    const line = screen.getByTestId("forecast-result-line");
+    expect(line.textContent).toContain("Called: Alex Moreno (R)");
+    expect(line.getAttribute("href")).toBe("/races/az-senate-2026/");
+    expect(screen.getByText("Tilt R")).toBeTruthy();
+  });
+
+  it("labels the odds as pre-election once a race is called", () => {
+    render(ForecastKeyRaces, {
+      races: [
+        {
+          ...race,
+          forecast: forecast({
+            win_probability: 0.58,
+            predicted_winner_party: "Republican",
+          }),
+        },
+      ],
+      results: new Map([
+        [
+          race.id,
+          {
+            id: race.id,
+            status: "called" as const,
+            winner_name: "Dana Fields",
+            winner_party: "Democratic",
+            candidates: [],
+            sources: [],
+          },
+        ],
+      ]),
+    });
+
+    const odds = screen.getByTestId("key-race-forecast").textContent ?? "";
+    expect(odds).toMatch(/Pre-election: R\s+58%/);
+    expect(odds).not.toMatch(/58% win/);
+  });
 });

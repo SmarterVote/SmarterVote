@@ -4,7 +4,7 @@
 
 <TrustPage
   title="Checkout cancelled"
-  description="Your checkout was cancelled — no payment was taken."
+  description="Your Smarter.Vote support checkout was cancelled."
   path="/support/cancel/"
   noindex
 >

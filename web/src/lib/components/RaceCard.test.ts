@@ -314,3 +314,45 @@ describe("RaceCard candidate avatars", () => {
     }
   });
 });
+
+describe("RaceCard result line", () => {
+  it("shows the election date before any result", () => {
+    const { queryByTestId, getByText } = render(RaceCard, {
+      props: { race: makeRace() },
+    });
+    expect(queryByTestId("race-result")).toBeNull();
+    expect(getByText("Nov 5, 2024")).toBeTruthy();
+  });
+
+  it("names a projected winner once the race is called", () => {
+    const { getByTestId } = render(RaceCard, {
+      props: {
+        race: makeRace(),
+        result: {
+          status: "called",
+          winner_name: "John Roe",
+          winner_party: "Republican",
+        },
+      },
+    });
+    expect(getByTestId("race-result").textContent?.trim()).toBe(
+      "Projected winner: John Roe (R)",
+    );
+  });
+
+  it("shows the counting state without naming anyone", () => {
+    const { getByTestId } = render(RaceCard, {
+      props: { race: makeRace(), result: { status: "too_close" } },
+    });
+    expect(getByTestId("race-result").textContent?.trim()).toBe(
+      "Too close to call",
+    );
+  });
+
+  it("ignores a row with no votes reported", () => {
+    const { queryByTestId } = render(RaceCard, {
+      props: { race: makeRace(), result: { status: "not_yet_reported" } },
+    });
+    expect(queryByTestId("race-result")).toBeNull();
+  });
+});

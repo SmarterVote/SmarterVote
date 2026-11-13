@@ -173,6 +173,12 @@ resource "google_cloud_run_v2_service" "races_api" {
         value = local.races_api_oidc_audience
       }
 
+      # Public bucket the API writes results-live.json / forecast-live.json to
+      env {
+        name  = "LIVE_FEEDS_BUCKET"
+        value = google_storage_bucket.live_feeds.name
+      }
+
       # GCS bucket name (also exposed as GCS_BUCKET for admin GCS helpers)
       env {
         name  = "GCS_BUCKET"

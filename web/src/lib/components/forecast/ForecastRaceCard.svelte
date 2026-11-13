@@ -23,12 +23,27 @@
     ratingClass,
   } from "$lib/utils/forecastPresentation";
   import { partyAbbr, partyBadgeClass } from "$lib/utils/party";
+  import type { PublicRaceResult } from "$lib/types";
+  import { resultGroup } from "$lib/utils/results";
   import ForecastEvidenceLineage from "./ForecastEvidenceLineage.svelte";
+  import ForecastResultBadge from "./ForecastResultBadge.svelte";
+  import ForecastResultLine from "./ForecastResultLine.svelte";
   import UiIcon from "$lib/components/UiIcon.svelte";
 
   export let race: ForecastRace;
   export let isExpanded: boolean;
   export let onToggleExpand: () => void;
+  /** Election night: this race's live result, when the results file has it. */
+  export let result: PublicRaceResult | null = null;
+
+  $: settled = resultGroup(result?.status) === "called";
+  // Once votes are in, the odds and margin are a record of what was expected,
+  // not the headline: label them and drop them to secondary text, so a called
+  // race never leads with the loser's "58%".
+  $: reported = resultGroup(result?.status) !== "awaiting";
+  $: metricClass = reported
+    ? "mt-0.5 text-sm font-semibold tabular-nums text-content-muted"
+    : "mt-0.5 text-lg font-bold tabular-nums text-content";
 
   $: party = normalizeForecastParty(
     race.forecast.predicted_winner_party,
@@ -89,7 +104,10 @@
 </script>
 
 <article
-  class="card p-5 hover:border-primary-400/60 dark:hover:border-primary-500/60 transition-colors flex flex-col justify-between gap-4"
+  class="card p-5 hover:border-primary-400/60 dark:hover:border-primary-500/60 transition-colors flex flex-col justify-between gap-4 {settled
+    ? 'border-emerald-300/80 dark:border-emerald-800/70'
+    : ''}"
+  data-result-settled={settled ? "true" : undefined}
 >
   <div class="space-y-4">
     <!-- Card Header: Title, Rating, and Details Link -->
@@ -120,7 +138,9 @@
         >
           {uncontested ? "Uncontested" : formatRating(rating)}
         </span>
+        <ForecastResultBadge {result} />
       </div>
+      <ForecastResultLine {result} href={raceHref(race.id)} raceLabel={title} />
     </div>
 
     <!-- Card Metrics Dashboard -->
@@ -129,7 +149,11 @@
     >
       <div class="col-span-2 min-w-0 xl:col-span-1">
         <dt class="text-xs text-content-subtle">
-          {uncontested ? "Unopposed" : "Projected"}
+          {uncontested
+            ? "Unopposed"
+            : reported
+              ? "Pre-election pick"
+              : "Projected"}
         </dt>
         <dd class="mt-1 flex min-w-0 items-start gap-1.5">
           <span
@@ -154,14 +178,18 @@
         </dd>
       </div>
       <div>
-        <dt class="text-xs text-content-subtle">Win probability</dt>
-        <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
+        <dt class="text-xs text-content-subtle">
+          {reported ? "Pre-election odds" : "Win probability"}
+        </dt>
+        <dd class={metricClass} data-testid="forecast-card-win-probability">
           {uncontested ? "n/a" : probability(race.forecast.win_probability)}
         </dd>
       </div>
       <div>
-        <dt class="text-xs text-content-subtle">Est. margin</dt>
-        <dd class="mt-0.5 text-lg font-bold tabular-nums text-content">
+        <dt class="text-xs text-content-subtle">
+          {reported ? "Pre-election margin" : "Est. margin"}
+        </dt>
+        <dd class={metricClass}>
           {uncontested ||
           race.forecast.margin_estimate === undefined ||
           race.forecast.margin_estimate === null

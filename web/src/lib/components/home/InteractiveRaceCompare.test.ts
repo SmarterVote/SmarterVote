@@ -266,3 +266,77 @@ describe("InteractiveRaceCompare race selection", () => {
     await waitFor(() => expect(selectedIndex(container)).toBe(0));
   });
 });
+
+describe("InteractiveRaceCompare after a race is called", () => {
+  const forecastRace = () =>
+    ({
+      ...race("me-senate-2026"),
+      forecast: {
+        predicted_winner_name: "John Roe",
+        predicted_winner_party: "Republican",
+        win_probability: 0.73,
+        party_probabilities: { Democratic: 0.27, Republican: 0.73 },
+        rating: "lean_r",
+      },
+    }) as unknown as Race;
+
+  it("shows only the forecast before any result", () => {
+    const { container } = render(InteractiveRaceCompare, {
+      races: [forecastRace()],
+    });
+    expect(
+      container.querySelector('[data-testid="featured-race-result"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("Pre-election forecast");
+  });
+
+  it("leads with the live result and labels the forecast pre-election", () => {
+    const { container } = render(InteractiveRaceCompare, {
+      races: [forecastRace()],
+      results: new Map([
+        [
+          "me-senate-2026",
+          {
+            id: "me-senate-2026",
+            status: "called" as const,
+            winner_name: "Jane Doe",
+            winner_party: "Democratic",
+            as_of: "2026-11-04T05:00:00Z",
+            candidates: [],
+            sources: [],
+          },
+        ],
+      ]),
+    });
+    const line = container.querySelector(
+      '[data-testid="featured-race-result"]',
+    );
+    expect(line?.textContent).toContain("Called: Jane Doe (D)");
+    expect(line?.querySelector("a")?.getAttribute("href")).toBe(
+      "/races/me-senate-2026/",
+    );
+    expect(container.textContent).toContain("Pre-election forecast");
+  });
+
+  it("uses the result baked into the build when the live file has none", () => {
+    const { container } = render(InteractiveRaceCompare, {
+      races: [
+        {
+          ...forecastRace(),
+          result: {
+            status: "called",
+            winner_name: "Jane Doe",
+            winner_party: "Democratic",
+            as_of: "2026-11-04T05:00:00Z",
+            candidates: [],
+            sources: [],
+          },
+        } as Race,
+      ],
+    });
+    expect(
+      container.querySelector('[data-testid="featured-race-result"]')
+        ?.textContent,
+    ).toContain("Called: Jane Doe (D)");
+  });
+});

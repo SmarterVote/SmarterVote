@@ -1,11 +1,16 @@
 <script lang="ts">
-  import type { RaceSummary } from "$lib/types";
+  import type { PublicRaceResult, RaceSummary } from "$lib/types";
+  import { resultGroup } from "$lib/utils/results";
+  import ForecastResultBadge from "./ForecastResultBadge.svelte";
+  import ForecastResultLine from "./ForecastResultLine.svelte";
   import {
     formatRating,
     getRaceState,
     isUncontestedForecastRace,
+    normalizeForecastParty,
     raceHref,
   } from "$lib/utils/forecast";
+  import { partyAbbr } from "$lib/utils/party";
   import UiIcon from "$lib/components/UiIcon.svelte";
   import {
     cleanDisplayText,
@@ -16,6 +21,8 @@
   import { scrollBehavior } from "$lib/utils/motion";
 
   export let races: RaceSummary[];
+  /** Election night: live results by race id (empty before any load). */
+  export let results: Map<string, PublicRaceResult> = new Map();
 
   /**
    * Card label: a House seat needs its district ("AZ-01 · Arizona"), or two
@@ -105,6 +112,10 @@
       {#each races as race}
         {@const uncontested = isUncontestedForecastRace(race)}
         {@const rating = race.forecast?.rating}
+        {@const result = results.get(race.id) ?? null}
+        {@const settled = resultGroup(result?.status) === "called"}
+        {@const reported = resultGroup(result?.status) !== "awaiting"}
+
         {@const ratingBorderColor = rating
           ? rating.endsWith("_d")
             ? "border-l-blue-500"
@@ -114,6 +125,7 @@
           : "border-l-slate-400"}
         <div
           class={`card snap-start shrink-0 w-[min(300px,85vw)] flex flex-col p-4 hover:shadow-md transition-all border-l-[3px] ${ratingBorderColor}`}
+          data-result-settled={settled ? "true" : undefined}
         >
           <div class="flex items-center justify-between mb-2">
             <a
@@ -122,21 +134,51 @@
             >
               <span class="truncate">{keyRaceLabel(race)}</span>
             </a>
-            {#if rating}
-              <span
-                class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ml-2 ${ratingClass(
-                  uncontested ? "other" : rating,
-                )}`}
-              >
-                {uncontested ? "Uncontested" : formatRating(rating)}
-              </span>
-            {/if}
+            <div class="ml-2 flex shrink-0 items-center gap-1">
+              <ForecastResultBadge {result} />
+              {#if rating}
+                <span
+                  class={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${ratingClass(
+                    uncontested ? "other" : rating,
+                  )}`}
+                >
+                  {uncontested ? "Uncontested" : formatRating(rating)}
+                </span>
+              {/if}
+            </div>
           </div>
+          {#if result}
+            <div class="mb-2">
+              <ForecastResultLine
+                {result}
+                href={raceHref(race.id)}
+                raceLabel={keyRaceLabel(race)}
+              />
+            </div>
+          {/if}
 
           {#if race.forecast && !uncontested}
-            <div class="flex items-center gap-3 mb-2">
-              <span class="text-xs font-bold text-content tabular-nums">
-                {probability(race.forecast.win_probability)} win
+            <!-- After votes are in, the odds are history: say whose they were
+                 and mute them, so a called card never headlines the loser. -->
+            <div
+              class="flex items-center gap-3 mb-2"
+              data-testid="key-race-forecast"
+            >
+              <span
+                class="text-xs tabular-nums {reported
+                  ? 'font-semibold text-content-subtle'
+                  : 'font-bold text-content'}"
+              >
+                {#if reported}Pre-election: {partyAbbr(
+                    normalizeForecastParty(
+                      race.forecast.predicted_winner_party,
+                      race.forecast.party_probabilities,
+                      race.candidates,
+                    ),
+                  )}
+                  {probability(
+                    race.forecast.win_probability,
+                  )}{:else}{probability(race.forecast.win_probability)} win{/if}
               </span>
               {#if race.forecast.margin_estimate !== undefined && race.forecast.margin_estimate !== null}
                 <span

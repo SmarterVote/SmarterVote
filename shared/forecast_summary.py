@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Literal, Optional
+from typing import Any, Dict, Iterable, Literal, Optional, Sequence
 
-from shared.forecast_math import NATIONAL_SWING_LOGIT_SD, correlated_seat_distribution, major_party
+from shared.forecast_math import (
+    NATIONAL_SWING_LOGIT_SD,
+    correlated_seat_distribution,
+    major_party,
+    posterior_probability,
+    swing_posterior,
+)
 
 Party = Literal["Democratic", "Republican", "Other"]
 Chamber = Literal["house", "senate", "governors"]
@@ -434,6 +440,10 @@ def _race_party_probabilities(forecast: Dict[str, Any]) -> Dict[Party, float]:
     rep = totals.get("Republican", 0.0)
     if dem or rep:
         return {"Democratic": dem, "Republican": rep, "Other": max(0.0, 1.0 - dem - rep)}
+    if totals.get("Other", 0.0) >= SAME_PARTY_PROBABILITY:
+        # A seat certain for a non-major party (e.g. a called Independent win) is
+        # not a major-party toss-up; without this it fell through to the 50/50 default.
+        return {"Democratic": 0.0, "Republican": 0.0, "Other": 1.0}
 
     party = normalize_party(forecast.get("predicted_winner_party"))
     win_probability = forecast.get("win_probability")
@@ -514,6 +524,26 @@ def forecast_winner_party(forecast: Dict[str, Any]) -> Optional[Party]:
     return classify_party(forecast.get("predicted_winner_party")) or _probable_party(forecast)
 
 
+def _major_leader(probs: Dict[Party, float]) -> Optional[Party]:
+    dem, rep = probs.get("Democratic", 0.0), probs.get("Republican", 0.0)
+    return "Democratic" if dem > rep else "Republican" if rep > dem else None
+
+
+def _posterior_party_probabilities(probs: Dict[Party, float], swing_weights: Sequence[float]) -> Dict[Party, float]:
+    """A race's party probabilities with the national shift integrated over *swing_weights*.
+
+    The Republican probability moves exactly as it does in the seat
+    distribution; the Democratic one takes up the difference, so any "Other"
+    share is unchanged. Certain races (called, same-party) come back as they are.
+    """
+    rep = probs.get("Republican", 0.0)
+    if not 0.0 < rep < 1.0:
+        return probs
+    rep_post = posterior_probability(rep, swing_weights)
+    dem_post = max(0.0, probs.get("Democratic", 0.0) + rep - rep_post)
+    return {**probs, "Democratic": dem_post, "Republican": rep_post}
+
+
 def _chamber_races(summaries: Iterable[Dict[str, Any]], chamber: Chamber) -> list[Dict[str, Any]]:
     return [race for race in summaries if is_chamber_control_race(race, chamber)]
 
@@ -582,9 +612,40 @@ def _race_note(race: Dict[str, Any]) -> str:
     return f"{title} ({rating})"
 
 
+def _bounded_control_probability(value: float, report_decided_exactly: bool) -> float:
+    """Keep a modeled control probability off 0/1; optionally let a decided outcome read exactly."""
+    if report_decided_exactly and value <= _DECIDED_TOLERANCE:
+        return 0.0
+    if report_decided_exactly and value >= 1.0 - _DECIDED_TOLERANCE:
+        return 1.0
+    return max(0.01, min(0.99, value))
+
+
+_DECIDED_TOLERANCE = 1e-9
+
+
 def summarize_chamber(
-    summaries: list[Dict[str, Any]], chamber: Chamber, narrative: str | None = None, analysis: Dict[str, Any] | None = None
+    summaries: list[Dict[str, Any]],
+    chamber: Chamber,
+    narrative: str | None = None,
+    analysis: Dict[str, Any] | None = None,
+    *,
+    report_decided_exactly: bool = False,
+    swing_weights: Sequence[float] | None = None,
 ) -> Dict[str, Any]:
+    """Seat math for one chamber. Pure: the narrative is passed in, never generated here.
+
+    ``report_decided_exactly`` lets a control probability that the seat
+    distribution makes exactly 0 or 1 (every path to the threshold is closed by
+    certain seats, e.g. called races) read as 0/1 instead of the 1%/99% bounds
+    a modeled forecast is kept within.
+
+    ``swing_weights`` (election night only; see
+    :func:`shared.forecast_math.swing_posterior`) replaces the prior weights of
+    the national shift. Race forecasts stay pre-election: the seat distribution
+    and each uncertain race's expected and projected seat are integrated over
+    the posterior instead of the prior.
+    """
     races = _chamber_races(summaries, chamber)
     active_states = {state for race in races if (state := race_state(race))}
     projected: Dict[Party, int] = {"Democratic": 0, "Republican": 0, "Other": 0}
@@ -630,11 +691,18 @@ def summarize_chamber(
         # Mirrors aggregateForecasts in web/src/lib/utils/forecast.ts: the
         # forecast's own party, then its probabilities, then the seat holder.
         party = forecast_winner_party(forecast) or fallback_party_for_race(race)
+        race_probs = _race_party_probabilities(forecast)
+        if swing_weights is not None:
+            prior_probs = race_probs
+            race_probs = _posterior_party_probabilities(race_probs, swing_weights)
+            prior_leader, posterior_leader = _major_leader(prior_probs), _major_leader(race_probs)
+            if posterior_leader and posterior_leader != prior_leader:
+                party = posterior_leader
         if party is None:
             uncounted += 1
         else:
             projected[party] += 1
-        for key, value in _race_party_probabilities(forecast).items():
+        for key, value in race_probs.items():
             expected[key] += value
         # A same-party contest's rating is candidate-level; control of its seat is certain.
         rating = control_rating(forecast)
@@ -663,7 +731,7 @@ def summarize_chamber(
     # polling misses do. An independent Poisson binomial here made the tails
     # far too thin (House control read 96.6%). Each race still keeps its own
     # published probability — see shared.forecast_math.
-    dp = correlated_seat_distribution(rep_probs)
+    dp = correlated_seat_distribution(rep_probs, swing_weights=swing_weights)
 
     # Exact control and tie probabilities from DP
     if chamber == "senate":
@@ -714,8 +782,8 @@ def summarize_chamber(
             "Other": 0,
         }
 
-    dem_control_probability = max(0.01, min(0.99, dem_control_probability))
-    republican_probability = max(0.01, min(0.99, republican_probability))
+    dem_control_probability = _bounded_control_probability(dem_control_probability, report_decided_exactly)
+    republican_probability = _bounded_control_probability(republican_probability, report_decided_exactly)
 
     if dem_control_probability > republican_probability:
         control_party: Party = "Democratic"
@@ -824,6 +892,215 @@ def build_chamber_forecasts(
         "governors": chambers["governors"]["narrative"],
         "chambers": chambers,
         "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Live projection on election night
+# ---------------------------------------------------------------------------
+#
+# A race whose published result names a winner counts as certain for that
+# winner's party. Every other race keeps its frozen pre-election forecast, but
+# the national shift those forecasts share is updated from the calls: each
+# called race (House, Senate and governors alike, since they share one national
+# environment) is evidence about how far the polls missed, and the chamber math
+# integrates the uncalled races over the posterior swing instead of the prior
+# (`shared.forecast_math.swing_posterior`). Calls that match the forecast
+# narrow the swing and sharpen control; upsets shift it toward the winner.
+#
+# Guardrails: with fewer than SWING_MIN_INFORMATIVE_CALLS informative calls
+# (winner below 97% beforehand) the prior is used unchanged, so with no calls
+# the projection is exactly the pre-election chamber math. The likelihood is
+# tempered and the posterior SD is floored, because calls are correlated
+# beyond the national swing and early calls skew toward easy races.
+
+#: Result statuses that name a winner; tests pin this to shared.election_results.WINNER_STATUSES.
+LIVE_WINNER_STATUSES = frozenset({"called", "certified", "unopposed"})
+
+_LIVE_CHAMBER_FIELDS = (
+    "control_party",
+    "control_probability",
+    "outcome_probabilities",
+    "projected_seats",
+    "seat_distribution",
+    "threshold",
+    "total_seats",
+    "vp_tiebreak_party",
+)
+
+
+def _result_rows(results_index: Any) -> Dict[str, Dict[str, Any]]:
+    """Result rows keyed by race id, from races/results.json (or a bare list of rows)."""
+    rows = results_index.get("races") if isinstance(results_index, dict) else results_index
+    if not isinstance(rows, list):
+        return {}
+    return {str(row["id"]): row for row in rows if isinstance(row, dict) and row.get("id")}
+
+
+def called_result_party(race: Dict[str, Any], result: Optional[Dict[str, Any]]) -> Optional[Party]:
+    """The party of a published winner, or None when the race is uncalled or the party is unclear.
+
+    The winner must match exactly one candidate on the race's roster. The
+    roster's party and the result's own ``winner_party`` must agree when both
+    are readable; a disagreement, or no readable party at all, returns None so
+    the race keeps its pre-election probabilities instead of being guessed.
+    """
+    if not isinstance(result, dict) or result.get("status") not in LIVE_WINNER_STATUSES:
+        return None
+    winner = str(result.get("winner_name") or "").strip().casefold()
+    if not winner:
+        return None
+    candidates = race.get("candidates") if isinstance(race.get("candidates"), list) else []
+    matches = [
+        candidate
+        for candidate in candidates
+        if isinstance(candidate, dict) and str(candidate.get("name") or "").strip().casefold() == winner
+    ]
+    if len(matches) != 1:
+        return None
+    roster_party = classify_party(matches[0].get("party"))
+    result_party = classify_party(result.get("winner_party"))
+    if roster_party and result_party and roster_party != result_party:
+        return None
+    return roster_party or result_party
+
+
+def _called_parties(summaries: Iterable[Dict[str, Any]], results_index: Any) -> Dict[str, Party]:
+    rows = _result_rows(results_index)
+    called: Dict[str, Party] = {}
+    for race in summaries:
+        race_id = str(race.get("id") or "")
+        party = called_result_party(race, rows.get(race_id)) if race_id else None
+        if party:
+            called[race_id] = party
+    return called
+
+
+def _certain_forecast(party: Party) -> Dict[str, Any]:
+    probabilities: Dict[str, float] = {"Democratic": 0.0, "Republican": 0.0, "Other": 0.0}
+    probabilities[party] = 1.0
+    rating = {"Democratic": "safe_d", "Republican": "safe_r"}.get(party, "")
+    return {"predicted_winner_party": party, "win_probability": 1.0, "party_probabilities": probabilities, "rating": rating}
+
+
+def _apply_called(summaries: list[Dict[str, Any]], called: Dict[str, Party]) -> list[Dict[str, Any]]:
+    updated: list[Dict[str, Any]] = []
+    for race in summaries:
+        party = called.get(str(race.get("id") or ""))
+        forecast = race.get("forecast") if isinstance(race.get("forecast"), dict) else None
+        # A same-party contest's seat control is already certain; leave it as published.
+        if party is None or (forecast and same_party_contest_party(forecast)):
+            updated.append(dict(race))
+        else:
+            updated.append({**race, "forecast": _certain_forecast(party)})
+    return updated
+
+
+def apply_called_results(summaries: list[Dict[str, Any]], results_index: Any) -> list[Dict[str, Any]]:
+    """Copies of *summaries* where each called race is certain for its winner's party.
+
+    Uncalled races (runoff_required, rcv_pending, too_close, counting,
+    not_yet_reported, or no result) and races whose winner's party cannot be
+    read come back unchanged. The inputs are not modified.
+    """
+    return _apply_called(summaries, _called_parties(summaries, results_index))
+
+
+def build_live_chamber_projection(
+    summaries: list[Dict[str, Any]], results_index: Any, now: Optional[datetime] = None
+) -> Dict[str, Any]:
+    """Chamber control with called races locked in and the national swing learned from them.
+
+    Reuses :func:`summarize_chamber` with no narrative, so no model is called.
+    ``called_count`` / ``total_count`` count this cycle's chamber-control races
+    (holdover seats are in the seat math but are not races to call). When the
+    calls are informative enough to update the national swing, the top-level
+    ``swing_posterior`` describes the update; otherwise it is absent and every
+    uncalled race is integrated over the pre-election prior.
+    """
+    called = _called_parties(summaries, results_index)
+    live_summaries = _apply_called(summaries, called)
+    rows = _result_rows(results_index)
+    posterior = swing_posterior(_swing_evidence(summaries, called))
+    swing_weights = posterior["weights"] if posterior["applied"] else None
+    chambers: Dict[str, Dict[str, Any]] = {}
+    for chamber in ("house", "senate", "governors"):
+        races = _chamber_races(summaries, chamber)
+        called_ids = [race_id for race in races if (race_id := str(race.get("id") or "")) in called]
+        # Control reads exactly 0 or 1 only when the calls alone decide it. Under the
+        # swing posterior an undecided chamber can round to 1.0, and the site then
+        # read "100%" with 130 of 218 needed seats called; keep that capped at 99%.
+        decided = summarize_chamber(live_summaries, chamber, narrative=None, report_decided_exactly=True)
+        clinched = decided["control_probability"] in (0.0, 1.0)
+        if swing_weights is None or clinched:
+            summary = decided
+        else:
+            summary = summarize_chamber(live_summaries, chamber, narrative=None, swing_weights=swing_weights)
+        stamps = [str(rows[race_id]["as_of"]) for race_id in called_ids if rows[race_id].get("as_of")]
+        chambers[chamber] = {
+            **{key: summary[key] for key in _LIVE_CHAMBER_FIELDS if key in summary},
+            "called_count": len(called_ids),
+            "total_count": len(races),
+            "as_of": max(stamps) if stamps else None,
+        }
+    live: Dict[str, Any] = {
+        "schema_version": "forecast_live.v1",
+        "results_updated_at": results_index.get("generated_at") if isinstance(results_index, dict) else None,
+        "generated_at": (now or datetime.now(timezone.utc)).isoformat(),
+        "chambers": chambers,
+    }
+    if posterior["applied"]:
+        live["swing_posterior"] = _swing_posterior_payload(posterior)
+    return live
+
+
+def _swing_evidence(summaries: Iterable[Dict[str, Any]], called: Dict[str, Party]) -> list[tuple[float, str]]:
+    """(winner's pre-election probability, winner's party) for every called chamber-control race.
+
+    One entry per race across all three chambers. Same-party contests and
+    non-major winners say nothing about the two-party swing and are skipped;
+    probabilities of exactly 0 or 1 are dropped by ``swing_posterior``.
+    """
+    evidence: list[tuple[float, str]] = []
+    seen: set[str] = set()
+    for chamber in ("house", "senate", "governors"):
+        for race in _chamber_races(summaries, chamber):
+            race_id = str(race.get("id") or "")
+            party = called.get(race_id)
+            forecast = race.get("forecast") if isinstance(race.get("forecast"), dict) else None
+            if race_id in seen or party not in ("Democratic", "Republican") or not forecast:
+                continue
+            if same_party_contest_party(forecast):
+                continue
+            seen.add(race_id)
+            evidence.append((_race_party_probabilities(forecast)[party], party))
+    return evidence
+
+
+#: Posterior mean shifts (log-odds) below this read as "about right"; below the second, "slightly".
+_SWING_ACCURATE_LOGIT = 0.1
+_SWING_SLIGHT_LOGIT = 0.25
+
+
+def _swing_posterior_payload(posterior: Dict[str, Any]) -> Dict[str, Any]:
+    mean = float(posterior["mean_logit"])
+    if abs(mean) < _SWING_ACCURATE_LOGIT:
+        direction = "accurate"
+        summary = "Results so far suggest the polls were about right."
+    else:
+        direction = "Republican" if mean > 0 else "Democratic"
+        size = "slightly " if abs(mean) < _SWING_SLIGHT_LOGIT else ""
+        side = "Republicans" if mean > 0 else "Democrats"
+        summary = f"Results so far suggest the polls {size}underestimated {side}."
+    return {
+        "mean_logit": round(mean, 3),
+        "sd_logit": round(float(posterior["sd_logit"]), 3),
+        "prior_sd_logit": round(float(posterior["prior_sd_logit"]), 3),
+        "informative_calls": posterior["informative_calls"],
+        "calls": posterior["calls"],
+        "likelihood_power": round(float(posterior["likelihood_power"]), 3),
+        "direction": direction,
+        "summary": summary,
     }
 
 

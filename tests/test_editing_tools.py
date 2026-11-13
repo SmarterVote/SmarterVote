@@ -3469,3 +3469,15 @@ def test_get_other_state_candidates_logs_when_firestore_lookup_fails(monkeypatch
         assert _get_other_state_candidates("ga-governor-2026", "Georgia") == set()
 
     assert any("contamination guard" in r.getMessage() and "firestore down" in r.getMessage() for r in caplog.records)
+
+
+def test_update_race_field_ballotpedia_rewrite_ignores_lookalike_hosts():
+    from pipeline_client.agent.agent import _make_editing_handlers
+
+    race_json = {"id": "ar-house-03-2026", "candidates": []}
+    handlers = _make_editing_handlers(race_json, lambda *_: None)
+    lookalike = "https://ballotpedia.org.evil.example/Arkansas_3rd_Congressional_District"
+
+    handlers["update_race_field"]({"field": "ballotpedia_url", "value": lookalike})
+
+    assert race_json["ballotpedia_url"] == lookalike

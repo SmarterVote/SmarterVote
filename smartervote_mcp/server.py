@@ -1255,6 +1255,73 @@ async def queue_races(
 
 
 @mcp.tool(structured_output=False)
+async def refresh_race_results(race_ids: List[str], note: str | None = None) -> Dict[str, Any]:
+    """Queue the bounded results check on the published baseline. Never publishes."""
+    return await queue_races(
+        race_ids,
+        cheap_mode=True,
+        baseline_source="published",
+        enabled_steps=["results"],
+        note=note or "Election results check.",
+    )
+
+
+@mcp.tool(structured_output=False)
+async def publish_race_results(race_ids: List[str]) -> Dict[str, Any]:
+    """Publish only the checked result block from each draft; failed races are listed, not published."""
+    return await _client().post("/api/results/publish", json={"race_ids": race_ids})
+
+
+@mcp.tool(structured_output=False)
+async def set_race_result(
+    race_id: str,
+    status: Literal[
+        "not_yet_reported", "counting", "too_close", "called", "runoff_required", "rcv_pending", "certified", "unopposed"
+    ],
+    candidates: List[Dict[str, Any]],
+    sources: List[Dict[str, Any]],
+    set_by: str,
+    pct_reporting: float | None = None,
+    winner_name: str | None = None,
+    called_by: str | None = None,
+    called_at: str | None = None,
+    runoff_date: str | None = None,
+    correction_note: str | None = None,
+    note: str | None = None,
+) -> Dict[str, Any]:
+    """Set a published race's DRAFT result by hand, when the results step cannot. Never publishes.
+
+    ``candidates`` rows are {name, party?, pct?, votes?} with roster names; ``sources``
+    are {url, type: "news"|"government", title?, published_at?}. Copy every count
+    exactly from a named source. The same checks as the results step run (roster,
+    call needs called_by/called_at and two independent domains, regressions need
+    a correction_note), except the unread-counts check. ``set_by`` and the source
+    URLs are kept as an audit note on the result. Follow with
+    ``publish_race_results`` and ``clear_races_api_cache``.
+    """
+    payload = {
+        "status": status,
+        "candidates": candidates,
+        "sources": sources,
+        "set_by": set_by,
+        "pct_reporting": pct_reporting,
+        "winner_name": winner_name,
+        "called_by": called_by,
+        "called_at": called_at,
+        "runoff_date": runoff_date,
+        "correction_note": correction_note,
+        "note": note,
+    }
+    return await _client().put(f"/api/races/{_path_id(race_id, 'race_id')}/result", json=payload)
+
+
+@mcp.tool(structured_output=False)
+async def get_public_results() -> Dict[str, Any]:
+    """Read the published results file that the site shows."""
+    return await _client().get("/public/results")
+
+
+@mcp.tool(structured_output=False)
 async def refresh_race_core(
     race_ids: List[str],
     baseline_source: Literal["latest", "published"] = "latest",

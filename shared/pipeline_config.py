@@ -22,8 +22,13 @@ PIPELINE_STEP_ORDER: tuple[str, ...] = (
     "voter_resources",
     "review",
     "iteration",
+    "results",
 )
 PIPELINE_STEP_IDS = frozenset(PIPELINE_STEP_ORDER)
+
+# Never part of a run that did not ask for it by name: it reports what happened
+# on election night, and has nothing to do before polls close.
+EXPLICIT_ONLY_PIPELINE_STEPS = frozenset({"results"})
 
 # Existing profiles should get a targeted maintenance pass by default. Issue
 # research and multi-model review remain explicit opt-ins because they dominate
@@ -50,13 +55,14 @@ PIPELINE_STEP_LABELS: dict[str, str] = {
     "voter_resources": "Voter Resources",
     "review": "AI Review",
     "iteration": "Review Iteration",
+    "results": "Election Results",
 }
 
 # Weights for progress computation. These must sum to 100.
 PIPELINE_STEP_WEIGHTS: dict[str, int] = {
     "discovery": 12,
     "images": 4,
-    "issues": 28,
+    "issues": 26,
     "finance": 9,
     "refinement": 11,
     "polling": 7,
@@ -64,6 +70,7 @@ PIPELINE_STEP_WEIGHTS: dict[str, int] = {
     "voter_resources": 5,
     "review": 12,
     "iteration": 8,
+    "results": 2,
 }
 
 # MODEL_PROFILES and MODEL_ROLES are imported from shared.model_catalog, which

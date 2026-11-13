@@ -14,6 +14,34 @@
   export let onClearFilter: () => void;
   /** Scroll to and focus the race list (filtered to the selected state). */
   export let onViewResults: (() => void) | undefined = undefined;
+  /**
+   * Election night: fills for states results recolor, or null before any race
+   * in this tab has votes. Non-null turns on the "Results" view by default.
+   */
+  export let resultColors: Record<string, string> | null = null;
+  /** The forecast tooltips with result lines added; used in the results view. */
+  export let resultTooltips: Record<string, StateTooltip> | null = null;
+
+  // null until the reader picks a view; then their choice sticks.
+  let viewChoice: "results" | "forecast" | null = null;
+  $: hasResults = resultColors !== null;
+  $: showResults = hasResults && (viewChoice ?? "results") === "results";
+  // In the results view the forecast colors fade back, so a call (solid) never
+  // reads as a Safe rating and the states with results stand out.
+  $: shownColors =
+    showResults && resultColors
+      ? {
+          ...Object.fromEntries(
+            Object.entries(stateColors).map(([state, fill]) => [
+              state,
+              fadeForecastFill(fill),
+            ]),
+          ),
+          ...resultColors,
+        }
+      : stateColors;
+  $: shownTooltips =
+    showResults && resultTooltips ? resultTooltips : stateTooltips;
 
   let mobileMapOpen = true;
   $: mapPanelId = `forecast-map-${activeTab}`;
@@ -32,14 +60,44 @@
     { id: "safe-r", label: "Safe R" },
   ];
 
-  $: mapTitle =
-    activeTab === "house" ? "House races by state" : "Electoral map";
-  $: mapDescription =
-    activeTab === "house"
+  $: mapTitle = showResults
+    ? activeTab === "house"
+      ? "House results by state"
+      : "Results map"
+    : activeTab === "house"
+      ? "House races by state"
+      : "Electoral map";
+  $: mapDescription = showResults
+    ? activeTab === "house"
+      ? "A state turns solid once every House race shown there is called for one party. Hover or tap a state for its called and counting races; other states keep a faded forecast color."
+      : "Solid states are called; hatched states are still counting and show the current leader, which is not a call. States without results keep a faded forecast color."
+    : activeTab === "house"
       ? "House control is decided district by district, so this is not a state result map. Each state takes the color of its most competitive House race; select a state to see every district below."
       : activeTab === "senate"
         ? "States are shaded by the projected rating of this cycle's Senate race, or by the party holding seats not up this cycle."
         : "States are shaded by the projected rating of this cycle's governor race, or by the party holding governorships not up this cycle.";
+
+  function fadeForecastFill(fill: string): string {
+    // Patterns (no forecast, split holdover) are already muted.
+    if (!fill.startsWith("var(")) return fill;
+    return `color-mix(in srgb, ${fill} 38%, var(--color-result-faded))`;
+  }
+
+  const hatch = (fg: string, bg: string) =>
+    `repeating-linear-gradient(45deg, var(${fg}) 0 3px, var(${bg}) 3px 6px)`;
+  const resultLegend = [
+    { label: "Called D", swatch: "var(--color-safe-d)" },
+    { label: "Called R", swatch: "var(--color-safe-r)" },
+    { label: "Called other", swatch: "var(--color-result-other)" },
+    {
+      label: "D leading",
+      swatch: hatch("--color-safe-d", "--color-holdover-d-solid"),
+    },
+    {
+      label: "R leading",
+      swatch: hatch("--color-safe-r", "--color-holdover-r-solid"),
+    },
+  ];
 
   $: stateOptions = [...activeStates].sort((a, b) => a.localeCompare(b));
 
@@ -69,6 +127,35 @@
       </p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
+      {#if hasResults}
+        <div
+          class="inline-flex rounded-lg border border-stroke bg-surface-alt/40 p-0.5"
+          role="group"
+          aria-label="Map view"
+          data-testid="map-view-toggle"
+        >
+          <button
+            type="button"
+            class="rounded-md px-3 text-xs font-semibold transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 {showResults
+              ? 'bg-surface text-content shadow-xs'
+              : 'text-content-muted hover:text-content'}"
+            aria-pressed={showResults}
+            on:click={() => (viewChoice = "results")}
+          >
+            Show results
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-3 text-xs font-semibold transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 {showResults
+              ? 'text-content-muted hover:text-content'
+              : 'bg-surface text-content shadow-xs'}"
+            aria-pressed={!showResults}
+            on:click={() => (viewChoice = "forecast")}
+          >
+            Forecast
+          </button>
+        </div>
+      {/if}
       {#if selectedState}
         <button
           on:click={onClearFilter}
@@ -150,8 +237,8 @@
         {activeStates}
         {selectedState}
         raceCounts={stateRaceCounts}
-        {stateColors}
-        {stateTooltips}
+        stateColors={shownColors}
+        stateTooltips={shownTooltips}
         on:stateClick={handleStateClick}
       />
     </div>
@@ -161,6 +248,26 @@
       <span class="block text-xs font-semibold text-content-muted"
         >Map legend</span
       >
+      {#if showResults}
+        <ul
+          class="flex flex-wrap gap-x-4 gap-y-2"
+          aria-label="Result colors"
+          data-testid="map-results-legend"
+        >
+          {#each resultLegend as item (item.label)}
+            <li class="flex items-center gap-1.5 text-xs text-content-muted">
+              <span
+                class="block h-3.5 w-3.5 rounded-sm border border-stroke"
+                style="background: {item.swatch};"
+              ></span>
+              {item.label}
+            </li>
+          {/each}
+        </ul>
+        <span class="block text-xs text-content-subtle"
+          >States without results show their forecast rating, faded:</span
+        >
+      {/if}
       <ul class="grid grid-cols-9 gap-0.5" aria-label="Forecast rating colors">
         {#each ratingRamp as step (step.id)}
           {@const anchor =
@@ -178,7 +285,9 @@
               class="block h-3 w-full"
               class:rounded-l={step.id === "safe-d"}
               class:rounded-r={step.id === "safe-r"}
-              style="background: var(--color-{step.id});"
+              style="background: {showResults
+                ? fadeForecastFill(`var(--color-${step.id})`)
+                : `var(--color-${step.id})`};"
               title={step.label}
             ></span>
             <!-- Phones label only the two ends and the middle; every step keeps

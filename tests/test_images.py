@@ -2201,3 +2201,12 @@ def test_given_name_nicknames_match(nickname, given):
 
     assert _given_names_match(nickname, given)
     assert _given_names_match(given, nickname)
+
+
+def test_image_host_rules_match_the_domain_not_a_substring():
+    """A lookalike host that merely contains a trusted domain is not an image CDN."""
+    assert _is_valid_image_url("https://ballotpedia.org/wiki/images/a/ab/Photo")
+    assert _is_valid_image_url("https://d123.cloudfront.net/photo")
+    assert not _is_valid_image_url("https://ballotpedia.org.evil.example/wiki/images/a/ab/Photo")
+    assert not _is_valid_image_url("https://evil-cloudfront.net/photo")
+    assert not _is_valid_image_url("https://cloudfront.net.evil.example/photo")

@@ -57,6 +57,7 @@ const fixedPrerenderEntries = [
   "/my-ballot/",
   "/partners/",
   "/privacy/",
+  "/results/",
   "/support/",
   "/support/cancel/",
   "/support/success/",

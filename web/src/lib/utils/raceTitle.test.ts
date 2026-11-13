@@ -207,6 +207,48 @@ describe("raceDisplayTitle", () => {
     ).toBe("Jane Doe (D) – Georgia Senate 2026 | Smarter.Vote");
   });
 
+  it("never returns a blank title for long Senate and governor names", () => {
+    const races = [
+      { id: "sc-senate-2026", office: "U.S. Senate", state: "South Carolina" },
+      {
+        id: "ar-governor-2026",
+        office: "Governor",
+        state: "Arkansas",
+      },
+      {
+        id: "fl-senate-2026-special",
+        office: "U.S. Senate",
+        state: "Florida",
+      },
+    ];
+    const candidates = [
+      { name: "Darline Graham", party: "Democratic" },
+      { name: "Sarah Huckabee Sanders", party: "Republican" },
+      { name: "Ashley B. Moody", party: "Republican" },
+      { name: "Bartholomew Montgomery-Fitzgerald III", party: "Independent" },
+    ];
+    for (const race of races) {
+      for (const candidate of candidates) {
+        const title = candidatePageTitle(candidate, race);
+        expect(title.startsWith(" |")).toBe(false);
+        expect(title.startsWith(candidate.name)).toBe(true);
+        expect(title.length).toBeLessThanOrEqual(60);
+      }
+    }
+    expect(
+      candidatePageTitle(
+        { name: "Darline Graham", party: "Democratic" },
+        races[0],
+      ),
+    ).toBe("Darline Graham (D) – SC Senate 2026 | Smarter.Vote");
+    expect(
+      candidatePageTitle(
+        { name: "Sarah Huckabee Sanders", party: "Republican" },
+        races[1],
+      ),
+    ).toBe("Sarah Huckabee Sanders (R) – AR Governor 2026 | Smarter.Vote");
+  });
+
   it("describes discovery-only candidates by party, incumbency and office", () => {
     const race = {
       id: "tx-house-12-2026",

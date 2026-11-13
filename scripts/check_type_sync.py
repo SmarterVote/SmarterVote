@@ -111,6 +111,9 @@ CHECKED_MODELS: Dict[str, Type[BaseModel]] = {
     "ForecastEvidence": shared_models.ForecastEvidence,
     "ForecastPanelEstimate": shared_models.ForecastPanelEstimate,
     "RaceForecast": shared_models.RaceForecast,
+    "RaceResult": shared_models.RaceResult,
+    "ResultCandidate": shared_models.ResultCandidate,
+    "ResultAudit": shared_models.ResultAudit,
     "Candidate": shared_models.Candidate,
     "PollMatchup": shared_models.PollMatchup,
     "PollEntry": shared_models.PollEntry,
@@ -148,6 +151,13 @@ FRONTEND_ONLY_OR_OTHER_BACKEND_TYPES: Dict[str, str] = {
     "IssueKey": "Superset of CanonicalIssue plus legacy issue-name strings; covered by FIELD_TYPE_OVERRIDES + check_legacy_issue_names(), not an independent enum.",
     "CANONICAL_ISSUES": "Derived const array mirroring the CanonicalIssue enum values; covered transitively by check_frozen_canonical_issues().",
     "RENAMED_ISSUE_NOTES": "Frontend-only user-facing copy (tooltip text) for renamed issues; has no backend equivalent.",
+    "RaceResultStatus": "Named alias for the Literal on shared/models.py:RaceResult.status; RaceResult is checked structurally.",
+    "PublicResultCandidate": "A shared/models.py:ResultCandidate row plus the headshot result_index_entry adds for the public file.",
+    "PublicRaceResult": "Mirrors shared/election_results.py:result_index_entry (the compact row in races/results.json), not a Pydantic model.",
+    "PublicResultsFile": "Mirrors services/races-api/routers/results.py:public_results.",
+    "LiveChamberProjection": "One chamber of shared/forecast_summary.py:build_live_chamber_projection, not a Pydantic model.",
+    "LiveForecastFile": "Mirrors services/races-api/routers/results.py:public_forecast_live.",
+    "LiveSwingPosterior": "Mirrors shared/forecast_summary.py:_swing_posterior_payload (forecast-live swing_posterior), not a Pydantic model.",
     "CandidateSummary": "Mirrors services/races-api/schemas.py:CandidateSummary (search/listing projection), not shared/models.py:Candidate.",
     "RaceSummary": "Mirrors services/races-api/schemas.py:RaceSummary, not shared/models.py:RaceJSON.",
     "RaceForecastSummary": "Mirrors services/races-api/schemas.py:RaceForecastSummary (the compact forecast on a summary), not shared/models.py:RaceForecast.",
@@ -240,6 +250,8 @@ FIELD_TYPE_OVERRIDES: Dict[tuple, str] = {
     # Dict keyed by CanonicalIssue, but IssueKey (a superset including legacy
     # names) + Partial is the deliberately more tolerant TS rendering.
     ("Candidate", "issues"): "Partial<Record<IssueKey, IssueStance>>",
+    # Named so the results UI can key its label table on it.
+    ("RaceResult", "status"): "RaceResultStatus",
 }
 
 # Fields checked by a bespoke function below instead of the generic matcher

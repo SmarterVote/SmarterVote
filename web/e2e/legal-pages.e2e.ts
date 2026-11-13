@@ -27,7 +27,7 @@ for (const { path, heading } of STATIC_PAGES) {
   });
 }
 
-test("/support/success/ without a session id shows a verification error, not a crash", async ({
+test("/support/success/ without a session id shows a neutral notice, not a crash", async ({
   page,
 }) => {
   await page.goto("/support/success/");
@@ -36,6 +36,6 @@ test("/support/success/ without a session id shows a verification error, not a c
     page.getByRole("heading", { name: "Checkout status", level: 1 }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "We could not verify this payment" }),
+    page.getByRole("heading", { name: "No checkout to confirm" }),
   ).toBeVisible();
 });

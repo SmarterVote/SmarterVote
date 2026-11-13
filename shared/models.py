@@ -578,6 +578,44 @@ class PipelineState(BaseModel):
     neutrality_unfixed: List[str] = Field(default_factory=list)
 
 
+class ResultCandidate(BaseModel):
+    """One candidate's reported count."""
+
+    name: str
+    party: Optional[str] = None
+    votes: Optional[int] = Field(None, ge=0)
+    pct: Optional[float] = Field(None, ge=0, le=100)
+
+
+class ResultAudit(BaseModel):
+    """Who set a result by hand, and from which sources, instead of the results step."""
+
+    method: Literal["admin_set_result"] = "admin_set_result"
+    set_by: str
+    set_at: datetime
+    source_urls: List[str] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
+class RaceResult(BaseModel):
+    """Unofficial election result, until ``status`` is ``certified``."""
+
+    status: Literal[
+        "not_yet_reported", "counting", "too_close", "called", "runoff_required", "rcv_pending", "certified", "unopposed"
+    ]
+    winner_name: Optional[str] = None
+    winner_party: Optional[str] = None
+    called_by: Optional[str] = None
+    called_at: Optional[datetime] = None
+    pct_reporting: Optional[float] = Field(None, ge=0, le=100)
+    candidates: List[ResultCandidate] = Field(default_factory=list)
+    runoff_date: Optional[str] = None
+    correction_note: Optional[str] = None
+    sources: List[Source] = Field(default_factory=list)
+    as_of: datetime
+    audit: Optional[ResultAudit] = None
+
+
 class RaceJSON(BaseModel):
     """RaceJSON v0.3 — Final output format."""
 
@@ -617,6 +655,7 @@ class RaceJSON(BaseModel):
     polling: List[PollEntry] = Field(default_factory=list)
     polling_note: Optional[str] = None  # set when no public polls are found
     forecast: Optional[RaceForecast] = None
+    result: Optional[RaceResult] = None
 
     # Voter action links
     ballotpedia_url: Optional[str] = Field(None, description="URL to the Ballotpedia election page")
