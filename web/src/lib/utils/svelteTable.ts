@@ -1,42 +1,41 @@
 import {
-  createTable,
-  functionalUpdate,
+  constructTable,
   type RowData,
   type Table,
+  type TableFeatures,
   type TableOptions,
 } from "@tanstack/table-core";
-import { derived, writable, type Readable } from "svelte/store";
+import { derived, type Readable } from "svelte/store";
 
-/** Minimal Svelte store adapter for TanStack Table core. */
-export function createSvelteTable<TData extends RowData>(
-  options: Readable<TableOptions<TData>>,
-): Readable<Table<TData>> {
-  const table = createTable<TData>({
-    state: {},
-    onStateChange: () => undefined,
-    renderFallbackValue: null,
-    ...getInitialOptions(options),
-  });
-  const state = writable(table.initialState);
+/**
+ * Minimal Svelte store adapter for TanStack Table core (v9). Controlled state
+ * is passed through `options.state` and updated by the caller's `on*Change`
+ * callbacks; uncontrolled slices stay inside the table.
+ */
+export function createSvelteTable<
+  TFeatures extends TableFeatures,
+  TData extends RowData,
+>(
+  options: Readable<TableOptions<TFeatures, TData>>,
+): Readable<Table<TFeatures, TData>> {
+  const table = constructTable<TFeatures, TData>(getInitialOptions(options));
 
-  return derived([state, options], ([$state, $options]) => {
+  return derived(options, ($options) => {
     table.setOptions((previous) => ({
       ...previous,
       ...$options,
-      state: { ...$state, ...$options.state },
-      onStateChange: (updater) => {
-        state.update((current) => functionalUpdate(updater, current));
-        $options.onStateChange?.(updater);
-      },
     }));
     return table;
   });
 }
 
-function getInitialOptions<TData extends RowData>(
-  options: Readable<TableOptions<TData>>,
-): TableOptions<TData> {
-  let initial!: TableOptions<TData>;
+function getInitialOptions<
+  TFeatures extends TableFeatures,
+  TData extends RowData,
+>(
+  options: Readable<TableOptions<TFeatures, TData>>,
+): TableOptions<TFeatures, TData> {
+  let initial!: TableOptions<TFeatures, TData>;
   const unsubscribe = options.subscribe((value) => (initial = value));
   unsubscribe();
   return initial;

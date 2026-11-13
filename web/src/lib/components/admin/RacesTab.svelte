@@ -2,15 +2,24 @@
   import { onMount } from "svelte";
   import { writable } from "svelte/store";
   import {
-    getCoreRowModel,
-    getFilteredRowModel,
-    getSortedRowModel,
+    columnFilteringFeature,
+    createFilteredRowModel,
+    createSortedRowModel,
+    globalFilteringFeature,
+    columnVisibilityFeature,
+    rowSelectionFeature,
+    rowSortingFeature,
+    sortFn_alphanumeric,
+    sortFn_basic,
+    tableFeatures,
   } from "@tanstack/table-core";
+  import { storeReactivityBindings } from "@tanstack/table-core/store-reactivity-bindings";
   import type {
     ColumnDef,
     ColumnFiltersState,
     FilterFn,
-    SortingFn,
+    SortFn,
+    RowSelectionState,
     SortingState,
     TableOptions,
     Updater,
@@ -43,7 +52,7 @@
   let statusFilter: RaceStatusType | "all" = "all";
   let sorting: SortingState = [{ id: "draft_updated_at", desc: true }];
   let columnFilters: ColumnFiltersState = [];
-  let rowSelection = {};
+  let rowSelection: RowSelectionState = {};
 
   // Advanced filters
   let onlyUnpublishedFilter = false;
@@ -156,13 +165,34 @@
       .toLowerCase();
   }
 
-  const textFilter: FilterFn<RaceRecord> = (row, columnId, value) => {
+  const features = tableFeatures({
+    coreReactivityFeature: storeReactivityBindings(),
+    columnFilteringFeature,
+    globalFilteringFeature,
+    rowSortingFeature,
+    columnVisibilityFeature,
+    rowSelectionFeature,
+    filteredRowModel: createFilteredRowModel(),
+    sortedRowModel: createSortedRowModel(),
+    sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic },
+  });
+  type RaceFeatures = typeof features;
+
+  const textFilter: FilterFn<RaceFeatures, RaceRecord> = (
+    row,
+    columnId,
+    value,
+  ) => {
     const needle = normalize(value);
     if (!needle) return true;
     return normalize(row.getValue(columnId)).includes(needle);
   };
 
-  const statusExactFilter: FilterFn<RaceRecord> = (row, columnId, value) => {
+  const statusExactFilter: FilterFn<RaceFeatures, RaceRecord> = (
+    row,
+    columnId,
+    value,
+  ) => {
     const filter = normalize(value);
     return (
       !filter ||
@@ -171,7 +201,11 @@
     );
   };
 
-  const globalRaceFilter: FilterFn<RaceRecord> = (row, _columnId, value) => {
+  const globalRaceFilter: FilterFn<RaceFeatures, RaceRecord> = (
+    row,
+    _columnId,
+    value,
+  ) => {
     const needle = normalize(value);
     if (!needle) return true;
     const race = row.original;
@@ -187,7 +221,7 @@
     ].some((item) => normalize(item).includes(needle));
   };
 
-  const dateSort: SortingFn<RaceRecord> = (a, b, columnId) => {
+  const dateSort: SortFn<RaceFeatures, RaceRecord> = (a, b, columnId) => {
     const av = Date.parse(String(a.getValue(columnId) || ""));
     const bv = Date.parse(String(b.getValue(columnId) || ""));
     if (Number.isNaN(av) && Number.isNaN(bv)) return 0;
@@ -196,7 +230,7 @@
     return av - bv;
   };
 
-  const columns: ColumnDef<RaceRecord>[] = [
+  const columns: ColumnDef<RaceFeatures, RaceRecord>[] = [
     {
       id: "select",
       header: "Select",
@@ -207,45 +241,45 @@
       accessorKey: "race_id",
       header: "Race ID",
       filterFn: textFilter,
-      sortingFn: "alphanumeric",
+      sortFn: "alphanumeric",
     },
     {
       accessorKey: "title",
       header: "Title",
       filterFn: textFilter,
-      sortingFn: "alphanumeric",
+      sortFn: "alphanumeric",
     },
     {
       accessorKey: "jurisdiction",
       header: "Jurisdiction",
       filterFn: textFilter,
-      sortingFn: "alphanumeric",
+      sortFn: "alphanumeric",
     },
     {
       accessorKey: "candidate_count",
       header: "Cands",
       filterFn: textFilter,
-      sortingFn: "basic",
+      sortFn: "basic",
     },
     {
       id: "draft_updated_at",
       header: "Updated",
       accessorFn: draftTimestamp,
       filterFn: textFilter,
-      sortingFn: dateSort,
+      sortFn: dateSort,
       sortUndefined: "last",
     },
     {
       accessorKey: "status",
       header: "Status",
       filterFn: statusExactFilter,
-      sortingFn: "alphanumeric",
+      sortFn: "alphanumeric",
     },
     {
       accessorKey: "total_runs",
       header: "Runs",
       filterFn: textFilter,
-      sortingFn: "basic",
+      sortFn: "basic",
     },
     {
       id: "quality",
@@ -256,7 +290,7 @@
         if (!needle) return true;
         return normalize(row.original.quality_grade).includes(needle);
       },
-      sortingFn: "basic",
+      sortFn: "basic",
     },
     {
       id: "actions",
@@ -295,7 +329,8 @@
     });
   }
 
-  const options = writable<TableOptions<RaceRecord>>({
+  const options = writable<TableOptions<RaceFeatures, RaceRecord>>({
+    features,
     data: filteredRows,
     columns,
     state: {
@@ -304,20 +339,12 @@
       globalFilter,
       rowSelection,
     },
-    filterFns: {
-      text: textFilter,
-      statusExact: statusExactFilter,
-      globalRace: globalRaceFilter,
-    },
     globalFilterFn: globalRaceFilter,
     getRowId: (row) => row.race_id,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: setRowSelection,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   const table = createSvelteTable(options);
@@ -335,7 +362,7 @@
   $: footerCounts = countStatuses(rows);
 
   function pruneHiddenSelection(visible: Set<string>) {
-    const selection = rowSelection as Record<string, boolean>;
+    const selection = rowSelection;
     const kept = Object.fromEntries(
       Object.entries(selection).filter(
         ([raceId, selected]) => selected && visible.has(raceId),
@@ -401,7 +428,7 @@
     updateTableState();
   }
 
-  function setRowSelection(updater: Updater<Record<string, boolean>>) {
+  function setRowSelection(updater: Updater<RowSelectionState>) {
     rowSelection = resolveUpdater(updater, rowSelection);
     updateTableState();
   }
