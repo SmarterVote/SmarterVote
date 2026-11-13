@@ -9,7 +9,7 @@
   description="A plain-language description of how Smarter.Vote handles visitor, inquiry, and payment data."
   path="/privacy/"
   eyebrow="Policy"
-  updated="2026-10-01"
+  updated="2026-11-04"
 >
   <PolicySection title="Data we handle">
     <p>
@@ -30,13 +30,23 @@
       storage. It sets no advertising or tracking cookies.
     </p>
   </PolicySection>
-  <PolicySection title="Candidate photos and other images">
+  <PolicySection title="Candidate photos">
     <p>
-      Many candidate photos are loaded directly from the sites that publish
-      them, such as Wikimedia Commons, campaign sites, and government sites.
-      When your browser loads one of those images, that host receives your IP
-      address, browser user agent, and that the request came from smarter.vote,
-      and handles it under its own policies.
+      We do not host candidate photos ourselves. Each headshot is loaded by your
+      browser straight from the site that publishes it: Wikimedia Commons,
+      official government sites such as house.gov and senate.gov, campaign
+      websites (many of them run on hosts such as Wix or Squarespace), social
+      media image servers, and others. A busy page such as Results can load
+      photos from dozens of different sites at once.
+    </p>
+    <p>
+      Each of those sites receives your IP address, your browser's user agent,
+      and the address of the image itself, as with any image on the web. Our
+      pages ask your browser not to send the address of the Smarter.Vote page
+      you were on. Those sites handle that request data under their own
+      policies, which we do not control, and some may set or read their own
+      cookies. If a photo fails to load, the site shows the candidate's initials
+      instead.
     </p>
   </PolicySection>
   <PolicySection title="Address lookup">

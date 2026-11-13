@@ -175,6 +175,121 @@ export interface ForecastPanelEstimate {
   confidence: ConfidenceLevel;
 }
 
+export type RaceResultStatus =
+  | "not_yet_reported"
+  | "counting"
+  | "too_close"
+  | "called"
+  | "runoff_required"
+  | "rcv_pending"
+  | "certified"
+  | "unopposed";
+
+export interface ResultCandidate {
+  name: string;
+  party?: string | null;
+  votes?: number | null;
+  pct?: number | null;
+}
+
+export interface RaceResult {
+  status: RaceResultStatus;
+  winner_name?: string | null;
+  winner_party?: string | null;
+  called_by?: string | null;
+  called_at?: string | null;
+  pct_reporting?: number | null;
+  candidates: ResultCandidate[];
+  runoff_date?: string | null;
+  correction_note?: string | null;
+  sources: Source[];
+  as_of: string;
+  audit?: ResultAudit | null;
+}
+
+/** Who set a result by hand (admin set-result tool), and from which sources. */
+export interface ResultAudit {
+  method: "admin_set_result";
+  set_by: string;
+  set_at: string;
+  source_urls: string[];
+  note?: string | null;
+}
+
+/** A count row in the public results file, which also carries the headshot. */
+export interface PublicResultCandidate extends ResultCandidate {
+  image_url?: string | null;
+}
+
+/** One row of the public results file (shared/election_results.py). */
+export interface PublicRaceResult {
+  id: string;
+  title?: string | null;
+  status: RaceResultStatus;
+  winner_name?: string | null;
+  winner_party?: string | null;
+  called_by?: string | null;
+  called_at?: string | null;
+  pct_reporting?: number | null;
+  runoff_date?: string | null;
+  as_of?: string | null;
+  candidates: PublicResultCandidate[];
+  sources: { url: string; title?: string | null }[];
+}
+
+export interface PublicResultsFile {
+  generated_at: string | null;
+  races: PublicRaceResult[];
+}
+
+/** One chamber of shared/forecast_summary.py:build_live_chamber_projection. */
+export interface LiveChamberProjection {
+  control_party: "Democratic" | "Republican" | "Other";
+  control_probability: number;
+  outcome_probabilities: Record<string, number>;
+  projected_seats: Record<string, number>;
+  seat_distribution: Record<string, number>;
+  threshold: number;
+  total_seats: number;
+  vp_tiebreak_party?: string;
+  /** Chamber-control races whose published result names a winner. */
+  called_count: number;
+  /** Chamber-control races on this cycle's ballot (holdover seats excluded). */
+  total_count: number;
+  /** Latest result as_of among the called races, or null with none called. */
+  as_of: string | null;
+}
+
+/**
+ * The national swing learned from called races, from
+ * shared/forecast_summary.py:_swing_posterior_payload. Positive mean_logit is a
+ * Republican-ward shift relative to the pre-election forecast.
+ */
+export interface LiveSwingPosterior {
+  mean_logit: number;
+  sd_logit: number;
+  /** Called races whose winner was below 97% before the election. */
+  informative_calls: number;
+  prior_sd_logit?: number;
+  /** Every called race used as evidence, informative or not. */
+  calls?: number;
+  likelihood_power?: number;
+  direction?: "accurate" | "Democratic" | "Republican";
+  summary?: string;
+}
+
+/** Mirrors services/races-api/routers/results.py:public_forecast_live. */
+export interface LiveForecastFile {
+  schema_version: string;
+  results_updated_at: string | null;
+  generated_at: string;
+  chambers: Partial<
+    Record<"house" | "senate" | "governors", LiveChamberProjection>
+  >;
+  /** Present only once enough informative calls have updated the national swing. */
+  swing_posterior?: LiveSwingPosterior;
+}
+
 export interface RaceForecast {
   predicted_winner_name?: string | null;
   predicted_winner_party?: string | null;
@@ -378,6 +493,7 @@ export interface Race {
   polling: PollEntry[];
   polling_note?: string | null;
   forecast?: RaceForecast | null;
+  result?: RaceResult | null;
   reviews: AgentReview[];
   validation_grade?: ValidationGrade | null;
   pipeline_state?: PipelineState | null;
@@ -484,7 +600,8 @@ export type PipelineStepId =
   | "forecast"
   | "voter_resources"
   | "review"
-  | "iteration";
+  | "iteration"
+  | "results";
 
 export const PIPELINE_STEPS: {
   id: PipelineStepId;
@@ -493,7 +610,7 @@ export const PIPELINE_STEPS: {
 }[] = [
   { id: "discovery", label: "Discovery", weight: 12 },
   { id: "images", label: "Image Resolution", weight: 4 },
-  { id: "issues", label: "Issue Research", weight: 28 },
+  { id: "issues", label: "Issue Research", weight: 26 },
   { id: "finance", label: "Finance & Voting", weight: 9 },
   { id: "refinement", label: "Refinement", weight: 11 },
   { id: "polling", label: "Polling", weight: 7 },
@@ -501,12 +618,14 @@ export const PIPELINE_STEPS: {
   { id: "voter_resources", label: "Voter Resources", weight: 5 },
   { id: "review", label: "AI Review", weight: 12 },
   { id: "iteration", label: "Review Iteration", weight: 8 },
+  { id: "results", label: "Election Results", weight: 2 },
 ];
 
 const UPDATE_OPT_IN_STEPS = new Set<PipelineStepId>([
   "issues",
   "review",
   "iteration",
+  "results",
 ]);
 export const DEFAULT_UPDATE_PIPELINE_STEP_IDS: PipelineStepId[] =
   PIPELINE_STEPS.filter((step) => !UPDATE_OPT_IN_STEPS.has(step.id)).map(

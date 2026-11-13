@@ -161,7 +161,10 @@ describe("ElectionDirectory rendering", () => {
     const { getByRole, container } = renderDirectory();
 
     await waitFor(() => expect(cards(container)).toHaveLength(1));
-    expect(fetchMock).not.toHaveBeenCalled();
+    // The live results feed may load; the map topology must not.
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("states-10m.json"),
+    );
     expect(container.querySelector(".map-container")).toBeNull();
 
     await fireEvent.click(

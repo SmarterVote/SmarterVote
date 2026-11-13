@@ -13,6 +13,12 @@ if sys.platform == "win32":
 
 
 @pytest.fixture(autouse=True)
+def allow_post_election_steps(monkeypatch):
+    """Fixtures date races 2026-11-03; the wall clock must not freeze their steps."""
+    monkeypatch.setenv("PIPELINE_ALLOW_POST_ELECTION_STEPS", "1")
+
+
+@pytest.fixture(autouse=True)
 def isolate_search_provider_env(monkeypatch):
     """Keep a developer's .env out of the search tests.
 

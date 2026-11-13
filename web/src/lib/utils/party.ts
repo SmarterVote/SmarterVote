@@ -113,6 +113,20 @@ export function partyRing(party: string | null | undefined): string {
   return RING_CLASS[partyKey(party)];
 }
 
+const BAR_CLASS: Record<PartyKey, string> = {
+  dem: "bg-blue-600 dark:bg-blue-500",
+  rep: "bg-red-600 dark:bg-red-500",
+  ind: "bg-purple-500",
+  grn: "bg-emerald-500",
+  lib: "bg-amber-500",
+  other: "bg-slate-500",
+};
+
+/** Tailwind fill for a vote-share bar. */
+export function partyBarClass(party: string | null | undefined): string {
+  return party ? BAR_CLASS[partyKey(party)] : BAR_CLASS.other;
+}
+
 const INITIAL_BG_CLASS: Record<PartyKey, string> = {
   dem: "bg-blue-500",
   rep: "bg-red-500",

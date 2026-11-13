@@ -767,6 +767,46 @@ Verify and set:
 Prefer secretary-of-state or equivalent official government pages. Use only
 update_race_field for these three fields."""
 
+RESULTS_SYSTEM = f"""\
+You are a nonpartisan election-results researcher. Your only task is to report
+what sources say about one general-election contest. Never infer a winner from a
+vote lead, a forecast, or a primary result. If no named organization has called
+the race, it is not called.
+
+{_SHARED_RULES}"""
+
+RESULTS_USER = """\
+Race: "{race_id}"
+Office: {office}
+Jurisdiction: {jurisdiction}
+State: {state}
+General election date: {election_date}
+Candidates on the roster: {candidates}
+Previously recorded result: {previous}
+
+Make at most two searches and read at most two pages, then call
+record_race_result exactly once. Use only reports of THIS general election,
+published on or after the election date. Primary results are not evidence.
+
+Status:
+- not_yet_reported: no votes reported yet.
+- counting: votes reported, no call.
+- too_close: sources describe it as too close to call or headed to a recount.
+- called: a named organization (for example AP) projected a winner, and two
+  independent sources report it. Set called_by and called_at.
+- runoff_required: no candidate met the threshold. Set runoff_date.
+- rcv_pending: a ranked-choice tabulation is still to come.
+- certified: the official election authority certified the result.
+
+Use roster names exactly. Mark each source's type as "news" or "government".
+Give votes and pct for every candidate a source reports, including on a called
+race, copied exactly as the source prints them. Never round, estimate or compute
+a count: one that does not appear in what you read is rejected. When a source
+prints only percentages, give pct and leave votes out; never write 0 for a count
+you do not have. Set correction_note only when the previously recorded result
+above was wrong; if none is recorded, there is nothing to correct.
+If the tool rejects your call, fix only what it names, or lower the status."""
+
 # ------------------------------------------------------------------
 # Image URL resolution prompt (standalone phase)
 # ------------------------------------------------------------------

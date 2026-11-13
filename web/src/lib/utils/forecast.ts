@@ -479,10 +479,22 @@ export function isForecastTab(
   return !!value && (FORECAST_TABS as string[]).includes(value);
 }
 
+/** Spellings people type for a tab ("?tab=governor"), mapped to the real id. */
+const FORECAST_TAB_ALIASES: Record<string, ForecastTab> = {
+  governor: "governors",
+  gov: "governors",
+  govs: "governors",
+  gubernatorial: "governors",
+  senates: "senate",
+  houses: "house",
+};
+
 export function parseForecastTab(
   value: string | null | undefined,
 ): ForecastTab {
-  return isForecastTab(value) ? value : "house";
+  const key = (value ?? "").trim().toLowerCase();
+  if (isForecastTab(key)) return key;
+  return FORECAST_TAB_ALIASES[key] ?? "house";
 }
 
 export function isRaceInForecastTab(
@@ -737,10 +749,10 @@ export function groupSeatDistribution(
         test: (o) => o.dSeats >= 51 && o.dSeats <= 52,
       },
       {
-        label: "Tie (50-50)",
+        label: "Tie (50-50) or no majority",
         colorClass: "bg-slate-400",
         textClass: "text-slate-950",
-        test: (o) => o.dSeats === 50,
+        test: (o) => o.dSeats < 51 && o.rSeats < 51,
       },
       {
         label: "Narrow R (51-52R)",
@@ -770,10 +782,10 @@ export function groupSeatDistribution(
         test: (o) => o.dSeats >= 26 && o.dSeats <= 27,
       },
       {
-        label: "Tie (25-25)",
+        label: "Even (neither party 26+)",
         colorClass: "bg-slate-400",
         textClass: "text-slate-950",
-        test: (o) => o.dSeats === 25,
+        test: (o) => o.dSeats < 26 && o.rSeats < 26,
       },
       {
         label: "Narrow R (26-27R)",
@@ -804,10 +816,14 @@ export function groupSeatDistribution(
         test: (o) => o.dSeats >= 218 && o.dSeats <= 224,
       },
       {
-        label: "Near Tie (212-217D)",
+        // Every bucket keys on who reaches 218, so they never overlap: a
+        // 217D-218R outcome is a Republican majority, not a "near tie". With
+        // 435 seats split two ways this bucket is empty and is hidden; it
+        // holds only outcomes where independents leave both parties short.
+        label: "No majority (neither 218)",
         colorClass: "bg-slate-400",
         textClass: "text-slate-950",
-        test: (o) => o.dSeats >= 212 && o.dSeats <= 217,
+        test: (o) => o.dSeats < 218 && o.rSeats < 218,
       },
       {
         label: "Narrow R (218-224R)",

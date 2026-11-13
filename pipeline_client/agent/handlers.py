@@ -49,6 +49,8 @@ from pipeline_client.agent.roster_contract import (
 )
 from pipeline_client.agent.source_types import normalize_source_type
 from pipeline_client.agent.utils import iso_timestamp_or_now
+from pipeline_client.agent.web_tools import fresh_read_texts
+from shared.election_results import unread_counts, validate_race_result
 from shared.name_variants import canonical_given_name, text_names_given_name
 
 logger = logging.getLogger("pipeline")
@@ -2159,7 +2161,12 @@ def _make_editing_handlers(
                 return f"ERROR: contest_stage must be one of: {', '.join(sorted(_CONTEST_STAGES))}."
         if field == "ballotpedia_url":
             default_url = default_ballotpedia_race_url(str(race_json.get("id") or ""))
-            if default_url and "_Congressional_District" in default_url and "ballotpedia.org" in str(value):
+            value_host = (urlparse(str(value)).hostname or "").lower()
+            if (
+                default_url
+                and "_Congressional_District" in default_url
+                and (value_host == "ballotpedia.org" or value_host.endswith(".ballotpedia.org"))
+            ):
                 value = default_url
         if field == "description":
             from .review import is_substantive_race_description
@@ -2415,3 +2422,57 @@ def _make_editing_handlers(
             handlers[tool_name] = _scope_guard(tool_name, handlers[tool_name])
 
     return handlers
+
+
+def _make_results_handlers(race_json: Dict[str, Any], log: Callable) -> Dict[str, Any]:
+    """The results phase's only write. Anything the checks reject is never stored."""
+
+    def record_race_result(args: Dict[str, Any]) -> str:
+        now = datetime.now(timezone.utc)
+        party_by_name = {
+            str(c.get("name") or "").casefold(): c.get("party") for c in race_json.get("candidates", []) if isinstance(c, dict)
+        }
+        result: Dict[str, Any] = {
+            key: args.get(key)
+            for key in ("status", "winner_name", "called_by", "called_at", "pct_reporting", "runoff_date", "correction_note")
+        }
+        result["candidates"] = [
+            {**row, "party": party_by_name.get(str(row.get("name") or "").casefold())}
+            for row in args.get("candidates") or []
+            if isinstance(row, dict)
+        ]
+        # Most network results pages print only shares, and the model then wrote votes 0 as a placeholder
+        # ("0" matches almost any page). A zero beside a nonzero share, or zero for everyone once precincts
+        # report, is a missing count: drop it and keep the share.
+        reporting = result.get("pct_reporting")
+        all_zero = bool(result["candidates"]) and all(row.get("votes") == 0 for row in result["candidates"])
+        for row in result["candidates"]:
+            pct = row.get("pct")
+            if row.get("votes") == 0 and (
+                (isinstance(pct, (int, float)) and pct > 0)
+                or (all_zero and isinstance(reporting, (int, float)) and reporting > 0)
+            ):
+                row["votes"] = None
+        result["sources"] = [{**source, "last_accessed": now.isoformat()} for source in args.get("sources") or []]
+        result["winner_party"] = party_by_name.get(str(args.get("winner_name") or "").casefold())
+        result["as_of"] = now.isoformat()
+        previous = race_json.get("result")
+        if not isinstance(previous, dict):
+            # The note is what lets a retraction past the regression check, so it needs something to correct.
+            result["correction_note"] = None
+        errors = list(validate_race_result(result, race_json, previous=previous, now=now))
+        texts = fresh_read_texts()
+        if texts is not None:
+            unread = unread_counts(result, texts)
+            if unread:
+                errors.append(
+                    "These counts appear in no page or search result read this run; copy counts exactly "
+                    "as a source prints them, or leave them out: " + "; ".join(unread)
+                )
+        if errors:
+            log("warning", f"  Result rejected: {'; '.join(errors)}")
+            return "Rejected, nothing stored: " + "; ".join(errors)
+        race_json["result"] = result
+        return f"Recorded status {result['status']}."
+
+    return {"record_race_result": record_race_result}

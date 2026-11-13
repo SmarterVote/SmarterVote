@@ -209,4 +209,4 @@ def test_the_combined_run_deliberately_omits_roster_and_asset_work():
     work rather than alongside it."""
     from shared.pipeline_config import PIPELINE_STEP_IDS
 
-    assert PIPELINE_STEP_IDS - repair_planner._ISSUE_RESEARCH_SAFETY_STEPS == {"discovery", "images"}
+    assert PIPELINE_STEP_IDS - repair_planner._ISSUE_RESEARCH_SAFETY_STEPS == {"discovery", "images", "results"}

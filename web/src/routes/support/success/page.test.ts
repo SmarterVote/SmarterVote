@@ -15,13 +15,14 @@ describe("support success page", () => {
   });
   afterEach(cleanup);
 
-  it("does not claim success without a checkout session", async () => {
+  it("shows a neutral state, not a failure, without a checkout session", async () => {
     render(Page);
     await waitFor(() =>
       expect(screen.getByRole("status").textContent).toContain(
-        "could not verify",
+        "No checkout to confirm",
       ),
     );
+    expect(screen.queryByText(/could not verify/)).toBeNull();
     // Exactly one live region, so the state change is announced once.
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull();

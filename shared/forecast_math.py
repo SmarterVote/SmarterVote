@@ -420,7 +420,11 @@ def _poisson_binomial(probs: Sequence[float]) -> List[float]:
     return dp
 
 
-def correlated_seat_distribution(probs: Sequence[float], national_sd: float = NATIONAL_SWING_LOGIT_SD) -> List[float]:
+def correlated_seat_distribution(
+    probs: Sequence[float],
+    national_sd: float = NATIONAL_SWING_LOGIT_SD,
+    swing_weights: Optional[Sequence[float]] = None,
+) -> List[float]:
     """Probability of winning exactly j of the given races, for every j.
 
     Every uncertain race shares one national shift drawn from a normal
@@ -428,6 +432,12 @@ def correlated_seat_distribution(probs: Sequence[float], national_sd: float = NA
     on that shift the races are independent. With ``national_sd == 0`` this is
     exactly the Poisson binomial. Races that are already certain (probability 0
     or 1, e.g. uncontested or holdover-equivalent) do not swing.
+
+    *swing_weights*, when given, replaces the prior weight of each grid point
+    (one per point, in grid order; see :func:`swing_posterior`). *probs* stay
+    the pre-election probabilities: each race's base logit is solved against
+    the prior grid exactly as without weights, and only the weighting of the
+    national shift changes.
     """
     if national_sd <= 0:
         return _poisson_binomial(probs)
@@ -442,9 +452,153 @@ def correlated_seat_distribution(probs: Sequence[float], national_sd: float = NA
     grid = _grid(national_sd)
     bases = [_base_logit(p, grid) for p in uncertain]
     dist = [0.0] * size
-    for shift, weight in grid:
+    for shift, weight in _weighted(grid, swing_weights):
         conditional = _poisson_binomial([_sigmoid(b + shift) for b in bases])
         for j, value in enumerate(conditional):
             dist[certain_wins + j] += weight * value
     total = sum(dist)
     return [value / total for value in dist] if total > 0 else dist
+
+
+# ---------------------------------------------------------------------------
+# Learning the national swing from called races (election night)
+# ---------------------------------------------------------------------------
+#
+# The shared national shift above is a prior: before any votes are counted it
+# is N(0, NATIONAL_SWING_LOGIT_SD) on the quadrature grid. A called race is a
+# noisy observation of that shift. Conditional on shift z, the winning party
+# had probability sigmoid(b + s*z) of winning, where b is the race's base logit
+# for that party (solved on the prior grid, exactly as in the seat math) and s
+# is +1 for Republicans, -1 for Democrats (positive z is a Republican-ward
+# shift). Multiplying the prior grid weights by those likelihoods and
+# normalizing gives the posterior over the same grid, which the chamber math
+# then uses for every uncalled race.
+
+#: Below this many informative calls the posterior is not used at all.
+SWING_MIN_INFORMATIVE_CALLS = 5
+#: A call is informative when the winner's pre-election probability was below this.
+SWING_INFORMATIVE_MAX_PROBABILITY = 0.97
+#: Power applied to the log-likelihood. Calls are not independent draws given
+#: the national shift: neighbouring races share regional and demographic
+#: swings the one-factor model leaves out, so treating each call as a full
+#: observation would overstate the evidence. 0.5 counts each call as half an
+#: independent race, so one or two surprises (or one region reporting first)
+#: cannot swing everything.
+SWING_LIKELIHOOD_POWER = 0.5
+#: Floor on the posterior standard deviation of the shift, in log-odds. Early
+#: calls are biased toward easy, lopsided races and toward the states that
+#: count first, so the evidence is never allowed to pin the national shift
+#: down more tightly than this. When the tempered posterior is narrower, the
+#: likelihood power is lowered further (by bisection) until it is not.
+SWING_POSTERIOR_MIN_SD = 0.15
+
+
+def _weighted(grid: Sequence[tuple[float, float]], weights: Optional[Sequence[float]]) -> List[tuple[float, float]]:
+    if weights is None:
+        return list(grid)
+    if len(weights) != len(grid):
+        raise ValueError(f"expected {len(grid)} swing weights, got {len(weights)}")
+    return [(shift, float(weight)) for (shift, _), weight in zip(grid, weights)]
+
+
+def _log_sigmoid(x: float) -> float:
+    return -(max(-x, 0.0) + math.log1p(math.exp(-abs(x))))
+
+
+def _moments(shifts: Sequence[float], weights: Sequence[float]) -> tuple[float, float]:
+    mean = sum(w * z for z, w in zip(shifts, weights))
+    var = sum(w * (z - mean) ** 2 for z, w in zip(shifts, weights))
+    return mean, math.sqrt(max(var, 0.0))
+
+
+def _tempered(log_prior: Sequence[float], log_lik: Sequence[float], power: float) -> List[float]:
+    logs = [lp + power * ll for lp, ll in zip(log_prior, log_lik)]
+    top = max(logs)
+    raw = [math.exp(value - top) for value in logs]
+    total = sum(raw)
+    return [value / total for value in raw]
+
+
+def swing_posterior(
+    evidence: Sequence[tuple[float, str]],
+    national_sd: float = NATIONAL_SWING_LOGIT_SD,
+    *,
+    min_informative: int = SWING_MIN_INFORMATIVE_CALLS,
+    likelihood_power: float = SWING_LIKELIHOOD_POWER,
+    min_sd: float = SWING_POSTERIOR_MIN_SD,
+) -> Dict[str, object]:
+    """Posterior over the national shift given called races.
+
+    *evidence* holds one ``(probability, party)`` pair per called race: the
+    winning major party and its pre-election probability of winning. Pairs
+    whose probability is not strictly between 0 and 1, or whose party is not
+    Democratic or Republican, carry no information and are dropped.
+
+    Returns ``weights`` (one per grid point, for
+    :func:`correlated_seat_distribution`; the prior's when ``applied`` is
+    False), the posterior ``mean_logit`` / ``sd_logit`` of the shift (positive
+    is Republican-ward), ``informative_calls``, ``calls`` (usable calls) and the
+    ``likelihood_power`` actually used.
+    """
+    grid = _grid(national_sd)
+    shifts = [shift for shift, _ in grid]
+    prior = [weight for _, weight in grid]
+    usable = [
+        (float(p), 1.0 if party == "Republican" else -1.0)
+        for p, party in evidence
+        if party in MAJOR_PARTIES and isinstance(p, (int, float)) and 0.0 < float(p) < 1.0
+    ]
+    informative = sum(1 for p, _ in usable if p < SWING_INFORMATIVE_MAX_PROBABILITY)
+    prior_mean, prior_sd = _moments(shifts, prior)
+    result: Dict[str, object] = {
+        "applied": False,
+        "weights": prior,
+        "mean_logit": prior_mean,
+        "sd_logit": prior_sd,
+        "prior_sd_logit": prior_sd,
+        "informative_calls": informative,
+        "calls": len(usable),
+        "likelihood_power": 0.0,
+    }
+    if national_sd <= 0 or informative < min_informative:
+        return result
+
+    log_prior = [math.log(weight) for weight in prior]
+    log_lik = [0.0] * len(grid)
+    for p, sign in usable:
+        base = _base_logit(p, grid)
+        for k, shift in enumerate(shifts):
+            log_lik[k] += _log_sigmoid(base + sign * shift)
+
+    power = likelihood_power
+    weights = _tempered(log_prior, log_lik, power)
+    mean, sd = _moments(shifts, weights)
+    if sd < min_sd < prior_sd:
+        low, high = 0.0, power
+        for _ in range(60):
+            mid = 0.5 * (low + high)
+            if _moments(shifts, _tempered(log_prior, log_lik, mid))[1] >= min_sd:
+                low = mid
+            else:
+                high = mid
+        power = low
+        weights = _tempered(log_prior, log_lik, power)
+        mean, sd = _moments(shifts, weights)
+    result.update(applied=True, weights=weights, mean_logit=mean, sd_logit=sd, likelihood_power=power)
+    return result
+
+
+def posterior_probability(
+    probability: float, swing_weights: Sequence[float], sign: float = 1.0, national_sd: float = NATIONAL_SWING_LOGIT_SD
+) -> float:
+    """A race's win probability under *swing_weights* instead of the prior.
+
+    *probability* is the pre-election probability for a party whose chances
+    rise with the shift when *sign* is +1 (Republican) and fall when it is -1
+    (Democratic). Certain probabilities (0 or 1) come back unchanged.
+    """
+    if not 0.0 < probability < 1.0 or national_sd <= 0:
+        return probability
+    grid = _grid(national_sd)
+    base = _base_logit(probability, grid)
+    return sum(weight * _sigmoid(base + sign * shift) for shift, weight in _weighted(grid, swing_weights))

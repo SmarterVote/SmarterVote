@@ -252,4 +252,95 @@ describe("ForecastRaceCard", () => {
     expect(screen.queryByText("63%")).toBeNull();
     expect(screen.queryByText(/Democratic 63%/)).toBeNull();
   });
+
+  describe("live results", () => {
+    it("shows a called badge and the winner, linked to the race page", () => {
+      const { container } = render(ForecastRaceCard, {
+        race,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+        result: {
+          id: race.id,
+          status: "called",
+          winner_name: "Jamie Rivera",
+          winner_party: "Democratic",
+          pct_reporting: 91,
+          candidates: [],
+          sources: [],
+        },
+      });
+
+      expect(screen.getByTestId("forecast-result-badge").textContent).toContain(
+        "Called",
+      );
+      const line = screen.getByTestId("forecast-result-line");
+      expect(line.textContent).toContain("Called: Jamie Rivera (D)");
+      expect(line.getAttribute("href")).toBe("/races/mi-senate-2026/");
+      // The forecast rating stays alongside the call.
+      expect(screen.getByText("Lean D")).toBeTruthy();
+      expect(
+        container.querySelector("article")?.getAttribute("data-result-settled"),
+      ).toBe("true");
+    });
+
+    it("shows the leader while counting, without a called badge", () => {
+      render(ForecastRaceCard, {
+        race,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+        result: {
+          id: race.id,
+          status: "counting",
+          pct_reporting: 62,
+          candidates: [
+            { name: "Jamie Rivera", party: "Democratic", pct: 50.5 },
+            { name: "Sam Cole", party: "Republican", pct: 48.1 },
+          ],
+          sources: [],
+        },
+      });
+
+      expect(screen.queryByTestId("forecast-result-badge")).toBeNull();
+      expect(screen.getByTestId("forecast-result-line").textContent).toContain(
+        "Jamie Rivera (D) leads by 2.4 pts · 62% counted",
+      );
+    });
+
+    it("relabels and mutes the odds once votes are in", () => {
+      render(ForecastRaceCard, {
+        race,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+        result: {
+          id: race.id,
+          status: "called",
+          winner_name: "Sam Cole",
+          winner_party: "Republican",
+          candidates: [],
+          sources: [],
+        },
+      });
+      expect(screen.getByText("Pre-election odds")).toBeTruthy();
+      expect(screen.getByText("Pre-election margin")).toBeTruthy();
+      expect(screen.queryByText("Win probability")).toBeNull();
+      const odds = screen.getByTestId("forecast-card-win-probability");
+      expect(odds.className).toContain("text-content-muted");
+      expect(odds.className).not.toContain("text-lg");
+    });
+
+    it("shows no result line before votes are reported", () => {
+      render(ForecastRaceCard, {
+        race,
+        isExpanded: false,
+        onToggleExpand: vi.fn(),
+        result: {
+          id: race.id,
+          status: "not_yet_reported",
+          candidates: [],
+          sources: [],
+        },
+      });
+      expect(screen.queryByTestId("forecast-result-line")).toBeNull();
+    });
+  });
 });

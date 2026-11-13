@@ -60,3 +60,26 @@ describe("ForecastProjectionSummary", () => {
     ).toBeTruthy();
   });
 });
+
+describe("ForecastProjectionSummary on the governors tab", () => {
+  afterEach(cleanup);
+
+  it("counts governorships instead of a majority", () => {
+    render(ForecastProjectionSummary, {
+      label: "Pre-election Governors",
+      activeTab: "governors",
+      controlParty: "Democratic",
+      threshold: 26,
+      projectedSeats: { Democratic: 28, Republican: 22, Other: 0 },
+      totalExpected: 50,
+      expectedSeats: undefined,
+      netChange: { Democratic: 4, Republican: -4, Other: 0 },
+    });
+    expect(
+      screen.getByText("Pre-election Projected Governorships"),
+    ).toBeTruthy();
+    expect(screen.getByText("Democrats Favored")).toBeTruthy();
+    expect(screen.getByText("26 of 50 is most governorships")).toBeTruthy();
+    expect(screen.queryByText(/majority|control/i)).toBeNull();
+  });
+});

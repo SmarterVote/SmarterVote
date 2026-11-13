@@ -33,6 +33,8 @@
   export let compact = false;
   export let collapseText = false;
   export let isDraftPreview = false;
+  /** Once results exist, the forecast row is a record of what was expected. */
+  export let preElectionForecast = false;
   export let showQuality = false;
   /** Fewest candidates the toggles may leave selected; checked boxes lock at this floor. */
   export let minSelected = 1;
@@ -214,6 +216,7 @@
 
 {#if layout !== "desktop"}
   <MobileCandidateComparison
+    {preElectionForecast}
     {race}
     {candidates}
     {compact}
@@ -661,7 +664,7 @@
               style="grid-template-columns: {gridColumns}"
             >
               <div role="rowheader" class="row-label">
-                Forecast
+                {preElectionForecast ? "Pre-election forecast" : "Forecast"}
                 <span
                   class="mt-1 block text-xs font-medium uppercase tracking-wider text-content-subtle"
                   >Model estimate</span

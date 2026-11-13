@@ -2,7 +2,7 @@ const LOCAL_RACES_API_URL = "http://127.0.0.1:8080";
 const PRODUCTION_RACES_API_URL =
   "https://races-api-dev-ddsvfazica-uc.a.run.app";
 
-function cleanUrl(value: string | undefined): string | undefined {
+export function cleanUrl(value: string | undefined): string | undefined {
   const trimmed = value?.trim().replace(/\/$/, "");
   return trimmed || undefined;
 }

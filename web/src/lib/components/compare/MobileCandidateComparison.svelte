@@ -30,6 +30,7 @@
   export let compact = false;
   export let collapseText = false;
   export let isDraftPreview = false;
+  export let preElectionForecast = false;
   export let showQuality = false;
 
   /** The issue being compared; bindable so a page can keep it in the URL. */
@@ -297,7 +298,9 @@
     <div class="border-t border-stroke bg-surface-alt/50 px-5 py-4">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <p class="eyebrow">Forecast</p>
+          <p class="eyebrow">
+            {preElectionForecast ? "Pre-election forecast" : "Forecast"}
+          </p>
           <p class="mt-1 text-sm text-content">
             {formatRating(race.forecast.rating) ??
               race.forecast.rating.replaceAll("_", " ")}

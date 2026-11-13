@@ -1,25 +1,31 @@
 <script lang="ts">
   import type { ForecastTab } from "$lib/utils/forecast";
+  import { controlCopy } from "$lib/utils/forecastPresentation";
 
   export let activeTab: ForecastTab;
   export let projectedSeats: Record<string, number>;
   export let totalSeats: number;
   export let threshold: number;
+  /** Heading above the bar; the live projection names itself "Live projected seats". */
+  export let label = "Projected seats";
 
+  $: copy = controlCopy(activeTab);
   $: seatsLabel = [
-    `Projected seats: Democratic ${projectedSeats.Democratic ?? 0}`,
+    `${label}: Democratic ${projectedSeats.Democratic ?? 0}`,
     `Republican ${projectedSeats.Republican ?? 0}`,
     ...(projectedSeats.Other ? [`Other ${projectedSeats.Other}`] : []),
     `of ${totalSeats}`,
-    `${threshold} needed for a majority${
-      activeTab === "senate" ? "; a 50-50 split is marked" : ""
-    }`,
+    `${
+      activeTab === "governors"
+        ? copy.thresholdNote(threshold)
+        : `${threshold} needed for a majority`
+    }${activeTab === "senate" ? "; a 50-50 split is marked" : ""}`,
   ].join(", ");
 </script>
 
 <div class="space-y-3">
   <div class="flex items-center justify-between">
-    <span class="eyebrow text-content-subtle">Projected seats</span>
+    <span class="eyebrow text-content-subtle">{label}</span>
   </div>
 
   <div class="space-y-2">
@@ -73,7 +79,7 @@
         <span
           class="absolute bottom-full left-0 ml-0.5 bg-yellow-500 dark:bg-yellow-400 text-xs font-black text-slate-950 dark:text-slate-950 px-1 py-0.5 rounded-sm shadow-xs whitespace-nowrap animate-fade-in"
         >
-          Majority ({threshold})
+          {copy.thresholdMarker(threshold)}
         </span>
       </div>
 

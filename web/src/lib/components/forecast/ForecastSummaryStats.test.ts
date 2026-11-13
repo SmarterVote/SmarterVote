@@ -42,4 +42,44 @@ describe("ForecastSummaryStats", () => {
     expect(screen.queryByText("Includes 50-50 tie-break via VP")).toBeNull();
     expect(screen.getByText("—")).toBeTruthy();
   });
+
+  it("labels itself pre-election once the live projection is shown", () => {
+    render(ForecastSummaryStats, {
+      activeTab: "senate",
+      controlParty: "Republican",
+      controlProbability: 0.72,
+      vpTiebreakParty: undefined,
+      mostLikelyOutcome: { key: "51D - 49R", probability: 0.23 },
+      tossupCount: 4,
+      competitiveRaceCount: 9,
+      cycleYear: "2026",
+      preElection: true,
+    });
+
+    expect(screen.getByText("2026 Senate Pre-election Summary")).toBeTruthy();
+    expect(
+      screen.getByText(/Republican control projected before results/),
+    ).toBeTruthy();
+  });
+});
+
+describe("ForecastSummaryStats on the governors tab", () => {
+  afterEach(cleanup);
+
+  it("talks about most governorships, not control", () => {
+    render(ForecastSummaryStats, {
+      activeTab: "governors",
+      controlParty: "Democratic",
+      controlProbability: 0.8,
+      vpTiebreakParty: undefined,
+      mostLikelyOutcome: { key: "28D-22R", probability: 0.2 },
+      tossupCount: 2,
+      competitiveRaceCount: 8,
+    });
+    expect(
+      screen.getByText(/Democrats projected to hold most governorships/),
+    ).toBeTruthy();
+    expect(screen.getByText("Chance of most governorships")).toBeTruthy();
+    expect(screen.queryByText(/control/i)).toBeNull();
+  });
 });

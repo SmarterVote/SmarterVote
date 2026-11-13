@@ -1,6 +1,7 @@
 <script lang="ts">
   import { partyFromLabel, type ForecastTab } from "$lib/utils/forecast";
   import {
+    controlCopy,
     controlProbabilities,
     controlProbability,
   } from "$lib/utils/forecastPresentation";
@@ -21,9 +22,7 @@
 <div class="space-y-3">
   <div class="flex items-center justify-between">
     <span class="eyebrow text-content-subtle"
-      >{activeTab === "governors"
-        ? "Control Probabilities"
-        : "Chamber Control Probabilities"}</span
+      >{controlCopy(activeTab).probabilitiesHeading}</span
     >
     {#if activeTab === "senate" && outcomeProbabilities?.tie_50_50}
       <span
