@@ -1,4 +1,4 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import type { PageLoad } from "./$types";
 import { refreshPrerenderedRaces } from "$lib/prerenderData";
 import { directoryRaces } from "$lib/utils/homepage";

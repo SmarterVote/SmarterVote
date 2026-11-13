@@ -67,7 +67,7 @@
         try {
           await auth0.handleRedirectCallback();
           clearAuthQueryParams();
-          await goto("/admin/pipeline", { replaceState: true });
+          await goto("/admin/pipeline", { replace: true });
           return;
         } catch {
           clearAuthQueryParams();
@@ -78,7 +78,7 @@
 
       const isAuthenticated = await auth0.isAuthenticated().catch(() => false);
       if (isAuthenticated) {
-        await goto("/admin/pipeline", { replaceState: true });
+        await goto("/admin/pipeline", { replace: true });
         return;
       }
 

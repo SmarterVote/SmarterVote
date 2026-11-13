@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { afterNavigate, replaceState } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import ResultRaceCard from "$lib/components/results/ResultRaceCard.svelte";
   import ResultsBalanceOfPower from "$lib/components/results/ResultsBalanceOfPower.svelte";
   import ResultsKeyRaces from "$lib/components/results/ResultsKeyRaces.svelte";
@@ -246,7 +246,7 @@
     if (search === window.location.search) return;
     const url = new URL(window.location.href);
     url.search = search;
-    replaceState(url, $page.state);
+    replaceState(url, page.state);
   }, 250);
   $: if (urlReady)
     writeUrl(

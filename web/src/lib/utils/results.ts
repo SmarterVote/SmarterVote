@@ -1,4 +1,4 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { readable, writable } from "svelte/store";
 import { daysUntilElection } from "$lib/utils/electionDate";
 import { canonicalRaceState } from "$lib/utils/states";

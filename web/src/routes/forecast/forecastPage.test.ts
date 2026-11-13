@@ -5,7 +5,7 @@ const h = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
 }));
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
   browser: true,
   dev: false,
   building: false,
@@ -14,19 +14,16 @@ vi.mock("$app/navigation", () => ({
   goto: vi.fn(),
   replaceState: vi.fn(),
 }));
-vi.mock("$app/stores", async () => {
-  const { readable } = await import("svelte/store");
-  return {
-    page: {
-      subscribe: (fn: (value: unknown) => void) =>
-        readable({
-          params: {},
-          url: new URL("https://smarter.vote/forecast/"),
-          data: h.data,
-        }).subscribe(fn),
+vi.mock("$app/state", () => ({
+  page: {
+    params: {},
+    url: new URL("https://smarter.vote/forecast/"),
+    get data() {
+      return h.data;
     },
-  };
-});
+    state: {},
+  },
+}));
 
 function summary(id: string, election_date: string) {
   return {

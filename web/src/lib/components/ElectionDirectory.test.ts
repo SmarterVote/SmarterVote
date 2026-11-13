@@ -11,17 +11,19 @@ const { replaceState, afterNavigateCallbacks, pageControl } = vi.hoisted(
   }),
 );
 
-vi.mock("$app/environment", () => ({ browser: true }));
+vi.mock("$app/env", () => ({ browser: true }));
 vi.mock("$app/navigation", () => ({
   replaceState,
   afterNavigate: (cb: (nav: { to: { url: URL } }) => void) =>
     afterNavigateCallbacks.push(cb),
 }));
-vi.mock("$app/stores", async () => {
-  const { writable } = await import("svelte/store");
-  const store = writable({ url: new URL("https://smarter.vote/elections/") });
-  pageControl.setUrl = (href: string) => store.set({ url: new URL(href) });
-  return { page: store };
+vi.mock("$app/state", async () => {
+  const { testPage } = await import("../../test-support/pageState.svelte");
+  pageControl.setUrl = (href: string) => {
+    testPage.url = new URL(href);
+  };
+  testPage.url = new URL("https://smarter.vote/elections/");
+  return { page: testPage };
 });
 
 const ROUTE = "https://smarter.vote/elections/";

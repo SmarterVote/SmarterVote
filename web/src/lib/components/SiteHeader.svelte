@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { afterNavigate, goto, replaceState } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { onMount, tick } from "svelte";
   import type { RaceSummary } from "$lib/types";
   import { getSearchIndex } from "$lib/api";
@@ -113,17 +113,17 @@
   });
 
   const updateHomepageQuery = debounce((value: string) => {
-    if ($page.url.pathname !== "/") return;
+    if (page.url.pathname !== "/") return;
     const url = new URL(window.location.href);
     value ? url.searchParams.set("q", value) : url.searchParams.delete("q");
-    replaceState(url, $page.state);
+    replaceState(url, page.state);
   }, 300);
 
   function handleInput() {
     activeIndex = -1;
     open = Boolean(query.trim());
     if (open) void ensureSearchRaces();
-    if ($page.url.pathname === "/") {
+    if (page.url.pathname === "/") {
       lastQuery = query.trim();
       updateHomepageQuery(lastQuery);
     }
@@ -342,11 +342,11 @@
           <a
             href={link.href}
             on:click={() => (mobileNavOpen = false)}
-            aria-current={isCurrent($page.url.pathname, link.href)
+            aria-current={isCurrent(page.url.pathname, link.href)
               ? "page"
               : undefined}
-            class:font-semibold={isCurrent($page.url.pathname, link.href)}
-            class:text-content={isCurrent($page.url.pathname, link.href)}
+            class:font-semibold={isCurrent(page.url.pathname, link.href)}
+            class:text-content={isCurrent(page.url.pathname, link.href)}
             class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content sh-nav-link"
           >
             {link.label}
@@ -356,7 +356,7 @@
           <a
             href="/admin/"
             on:click={() => (mobileNavOpen = false)}
-            aria-current={isCurrent($page.url.pathname, "/admin/")
+            aria-current={isCurrent(page.url.pathname, "/admin/")
               ? "page"
               : undefined}
             class="inline-flex min-h-11 items-center whitespace-nowrap px-2 py-3 text-base text-content-muted hover:text-content sh-nav-link"

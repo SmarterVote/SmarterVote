@@ -4,8 +4,6 @@ import svelte from "eslint-plugin-svelte";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-import svelteConfig from "./svelte.config.js";
-
 const unusedVarsOptions = { argsIgnorePattern: "^_", varsIgnorePattern: "^_" };
 
 export default tseslint.config(
@@ -57,7 +55,6 @@ export default tseslint.config(
       parserOptions: {
         parser: tseslint.parser,
         extraFileExtensions: [".svelte"],
-        svelteConfig,
       },
     },
   },

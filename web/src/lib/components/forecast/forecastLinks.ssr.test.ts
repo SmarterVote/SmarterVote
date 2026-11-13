@@ -5,7 +5,7 @@ import type { RaceSummary } from "$lib/types";
 import ForecastMissingRaces from "./ForecastMissingRaces.svelte";
 
 // Vitest's SvelteKit shim reports browser=true; prerendering does not.
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
   browser: false,
   building: true,
   dev: false,

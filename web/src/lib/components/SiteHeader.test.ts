@@ -14,22 +14,24 @@ const {
   replaceState: vi.fn(),
   afterNavigateCallbacks: [] as Array<(nav: { to: { url: URL } }) => void>,
   getRaceSummaries: vi.fn(),
-  // Filled in by the $app/stores factory below so tests can drive the route.
+  // Filled in by the $app/state factory below so tests can drive the route.
   pageControl: { setUrl: (_: string) => {} },
 }));
 
-vi.mock("$app/environment", () => ({ browser: true }));
+vi.mock("$app/env", () => ({ browser: true }));
 vi.mock("$app/navigation", () => ({
   goto,
   replaceState,
   afterNavigate: (cb: (nav: { to: { url: URL } }) => void) =>
     afterNavigateCallbacks.push(cb),
 }));
-vi.mock("$app/stores", async () => {
-  const { writable } = await import("svelte/store");
-  const store = writable({ url: new URL("https://smarter.vote/elections/") });
-  pageControl.setUrl = (href: string) => store.set({ url: new URL(href) });
-  return { page: store };
+vi.mock("$app/state", async () => {
+  const { testPage } = await import("../../test-support/pageState.svelte");
+  pageControl.setUrl = (href: string) => {
+    testPage.url = new URL(href);
+  };
+  testPage.url = new URL("https://smarter.vote/elections/");
+  return { page: testPage };
 });
 // The header loads the compact search index; build it from the mocked
 // summaries so these tests keep exercising the "first search loads data" path.

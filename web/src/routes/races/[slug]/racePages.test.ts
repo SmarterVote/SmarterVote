@@ -2,7 +2,7 @@ import { cleanup, render } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Regression: a failing `?draft=true` fetch used to fall back with a shallow
-// `replaceState()`, which leaves `$page.url` unchanged, so the reactive load
+// `replaceState()`, which leaves `page.url` unchanged, so the reactive load
 // guard refetched the draft in a tight loop (~80 requests/second).
 
 const h = vi.hoisted(() => ({
@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
   params: { slug: "x-race" } as Record<string, string>,
 }));
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
   browser: true,
   dev: false,
   building: false,
@@ -22,16 +22,19 @@ vi.mock("$app/navigation", () => ({
   goto: h.goto,
   replaceState: vi.fn(),
 }));
-vi.mock("$app/stores", async () => {
-  const { readable } = await import("svelte/store");
-  return {
-    page: {
-      // The URL never changes here, exactly like a shallow replaceState.
-      subscribe: (fn: (value: unknown) => void) =>
-        readable({ params: h.params, url: new URL(h.url) }).subscribe(fn),
+vi.mock("$app/state", () => ({
+  page: {
+    // The URL never changes here, exactly like a shallow replaceState.
+    get params() {
+      return h.params;
     },
-  };
-});
+    get url() {
+      return new URL(h.url);
+    },
+    state: {},
+    data: {},
+  },
+}));
 vi.mock("$lib/api", () => ({
   getRace: h.getRace,
   getDraftRace: h.getDraftRace,
@@ -83,7 +86,7 @@ describe("draft preview fallback", () => {
     expect(h.getRace.mock.calls.length).toBeLessThanOrEqual(2);
     expect(h.goto).toHaveBeenCalledWith(
       "/races/x-race/",
-      expect.objectContaining({ replaceState: true }),
+      expect.objectContaining({ replace: true }),
     );
   });
 
@@ -97,7 +100,7 @@ describe("draft preview fallback", () => {
     expect(h.getRace.mock.calls.length).toBeLessThanOrEqual(2);
     expect(h.goto).toHaveBeenCalledWith(
       "/races/x-race/jane-doe/",
-      expect.objectContaining({ replaceState: true }),
+      expect.objectContaining({ replace: true }),
     );
   });
 

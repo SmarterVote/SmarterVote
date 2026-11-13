@@ -60,7 +60,7 @@ CI (`.github/workflows/ci.yaml`) runs on push/PR. `CLAUDE.md` holds the authorit
 - Unused variables prefixed with `_` (ESLint `@typescript-eslint/no-unused-vars` pattern `^_`)
 - Frontend env vars use `VITE_` prefix: `VITE_RACES_API_URL`, `VITE_PUBLIC_DATA_URL`, `VITE_AUTH0_AUDIENCE`
 - Static-site traffic uses Cloudflare Web Analytics; do not infer public traffic from `races-api` request counts
-- Static adapter for Cloudflare Pages (`web/svelte.config.js`)
+- Static adapter for Cloudflare Pages (`web/vite.config.js`)
 
 ## Testing Gotchas
 
