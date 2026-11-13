@@ -31,7 +31,7 @@ const appTemplate = readFileSync(
   "utf8",
 );
 const templateScriptHashes = [
-  ...appTemplate.matchAll(/<script>([\s\S]*?)<\/script>/g),
+  ...appTemplate.matchAll(/<script>([\s\S]*?)<\/script\s*>/gi),
 ].map(
   ([, body]) =>
     /** @type {`sha256-${string}`} */ (
