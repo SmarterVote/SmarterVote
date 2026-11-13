@@ -41,7 +41,7 @@ describe("admin sign-in page", () => {
     render(AdminSignIn);
     await waitFor(() =>
       expect(goto).toHaveBeenCalledWith("/admin/pipeline", {
-        replaceState: true,
+        replace: true,
       }),
     );
     expect(auth0.loginWithRedirect).not.toHaveBeenCalled();

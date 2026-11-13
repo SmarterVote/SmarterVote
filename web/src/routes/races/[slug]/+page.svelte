@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$lib/stores/page.svelte";
   import { onMount } from "svelte";
   import CandidateAvatar from "$lib/components/CandidateAvatar.svelte";
   import CandidateCard from "$lib/components/CandidateCard.svelte";
@@ -146,13 +146,12 @@
 
   /** Drop the rejected `?draft=true` from the address bar (a real navigation, so `$page.url` agrees). */
   function dropDraftParam(target: string) {
-    const params = new URLSearchParams($page.url.searchParams);
+    const params = new URLSearchParams($page.url.search);
     params.delete("draft");
     const query = params.toString();
     goto(`/races/${target}/${query ? `?${query}` : ""}${$page.url.hash}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     }).catch(() => undefined);
   }
 

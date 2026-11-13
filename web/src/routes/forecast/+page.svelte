@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$lib/stores/page.svelte";
   import { onMount } from "svelte";
   import ArchiveNotice from "$lib/components/ArchiveNotice.svelte";
   import ForecastElectoralMap from "$lib/components/forecast/ForecastElectoralMap.svelte";
@@ -152,7 +152,7 @@
 
   function setUrlState(tab: ForecastTab, state: string | null) {
     if (!browser) return;
-    const params = new URLSearchParams($page.url.searchParams);
+    const params = new URLSearchParams($page.url.search);
     if (tab === "house") {
       params.delete("tab");
     } else {
@@ -165,9 +165,8 @@
     }
     const query = params.toString();
     goto(`/forecast/${query ? `?${query}` : ""}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   }
 

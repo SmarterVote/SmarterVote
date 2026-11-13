@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$lib/stores/page.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
 
   $: status = $page.status ?? 404;

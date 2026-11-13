@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
-  import { navigating, page } from "$app/stores";
+  import { navigating } from "$app/state";
+  import { page } from "$lib/stores/page.svelte";
   import { onMount } from "svelte";
   import SiteHeader from "$lib/components/SiteHeader.svelte";
   import SiteFooter from "$lib/components/SiteFooter.svelte";
@@ -91,7 +92,7 @@
 </a>
 
 <div class="min-h-screen bg-page overflow-x-clip flex flex-col">
-  {#if $navigating}
+  {#if navigating.to}
     <div class="fixed top-0 left-0 right-0 z-60 h-0.5 overflow-hidden">
       <div
         class="h-full bg-blue-600 animate-[navprogress_1.2s_ease-in-out_infinite]"

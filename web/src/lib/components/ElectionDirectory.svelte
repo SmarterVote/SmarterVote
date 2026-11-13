@@ -5,8 +5,8 @@
   import { readable } from "svelte/store";
   import { isResultsSeason, liveResults } from "$lib/utils/results";
   import type { PublicRaceResult } from "$lib/types";
-  import { page } from "$app/stores";
-  import { browser } from "$app/environment";
+  import { page } from "$app/state";
+  import { browser } from "$app/env";
   import { onMount } from "svelte";
   import { afterNavigate, replaceState } from "$app/navigation";
   import { canonicalRaceState, canonicalStateName } from "$lib/utils/states";
@@ -87,14 +87,14 @@
   function writeQueryToUrl(q: string) {
     const url = new URL(window.location.href);
     setParam(url, "q", q);
-    replaceState(url, $page.state);
+    replaceState(url, page.state);
   }
 
   function writeFiltersToUrl() {
     const url = new URL(window.location.href);
     setParam(url, "state", selectedState);
     setParam(url, "office", selectedOffice);
-    replaceState(url, $page.state);
+    replaceState(url, page.state);
   }
 
   function setStateFilter(state: string | null) {

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$lib/stores/page.svelte";
   import { onMount, tick } from "svelte";
   import { slide } from "svelte/transition";
   import Card from "$lib/components/Card.svelte";
@@ -125,9 +125,8 @@
     await tick();
     try {
       await goto(`/races/${raceSlug}/${target}/${search}${location.hash}`, {
-        replaceState: true,
-        noScroll: true,
-        keepFocus: true,
+        replace: true,
+        reset: false,
       });
     } catch {
       // Navigation was superseded; nothing to do.
@@ -136,12 +135,12 @@
 
   /** Drop the rejected `?draft=true` from the address bar (a real navigation, so `$page.url` agrees). */
   function dropDraftParam(target: string) {
-    const params = new URLSearchParams($page.url.searchParams);
+    const params = new URLSearchParams($page.url.search);
     params.delete("draft");
     const query = params.toString();
     goto(
       `/races/${target}/${candidateParam}/${query ? `?${query}` : ""}${$page.url.hash}`,
-      { replaceState: true, keepFocus: true, noScroll: true },
+      { replace: true, reset: false },
     ).catch(() => undefined);
   }
 

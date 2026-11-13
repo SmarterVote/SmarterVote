@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import { goto, replaceState } from "$app/navigation";
-  import { page } from "$app/stores";
+  import { page } from "$lib/stores/page.svelte";
   import CandidateComparison from "$lib/components/compare/CandidateComparison.svelte";
   import EmptyState from "$lib/components/EmptyState.svelte";
   import ResultBanner from "$lib/components/ResultBanner.svelte";
@@ -193,13 +193,12 @@
           isDraftPreview = false;
           loadedKey = `${target}|false`;
           draftRejectedSlug = target;
-          const params = new URLSearchParams($page.url.searchParams);
+          const params = new URLSearchParams($page.url.search);
           params.delete("draft");
           const query = params.toString();
           await goto(`/races/${target}/compare/${query ? `?${query}` : ""}`, {
-            replaceState: true,
-            keepFocus: true,
-            noScroll: true,
+            replace: true,
+            reset: false,
           }).catch(() => undefined);
         }
       } else {
@@ -255,9 +254,8 @@
       .map((candidate) => candidateSlug(candidate.name));
     params.set("candidates", ordered.join(","));
     goto(`/races/${slug}/compare/?${params.toString()}`, {
-      replaceState: true,
-      keepFocus: true,
-      noScroll: true,
+      replace: true,
+      reset: false,
     });
   }
 </script>

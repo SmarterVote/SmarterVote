@@ -1,5 +1,5 @@
 # Site-wide header CSP. Every prerendered page also carries SvelteKit's
-# hash-based <meta> CSP (svelte.config.js kit.csp), and browsers enforce both,
+# hash-based <meta> CSP (vite.config.js sveltekit() csp option), and browsers enforce both,
 # so pages run only hashed inline scripts. The header itself must still allow
 # 'unsafe-inline' for script-src: SvelteKit's inline bootstrap script differs
 # on every page and its hash cannot be listed here (a hash in this header would
