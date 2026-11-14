@@ -43,6 +43,21 @@ data with no error. Check the startup line before trusting a "did the fix work"
 test, and remove stale containers rather than leaving them stopped: a `docker
 start` on one silently returns old code to the queue.
 
+This container (`smartervote-pipeline-worker-1`) is not part of the CI/Terraform
+deploy and does not auto-update: there is no Terraform resource for it
+(`infra/pipeline-job.tf` only defines the one-shot `runner="cloud_run"` job), so
+`terraform apply` has zero effect on it. After merging any fix to
+`pipeline_client/agent/` or `pipeline_client/backend/` that queued races need,
+re-run the compose command above from a checkout of the latest `origin/main` on
+the workstation that runs it. Compose refuses to start unless `WORKER_GIT_COMMIT`
+is set (PowerShell: `$env:WORKER_GIT_COMMIT = (git rev-parse HEAD)` first). Every
+30 minutes the worker compares that stamp with GitHub `main`; when pipeline code
+(`pipeline_client/`, `shared/`, requirements) has changed since, it logs an ERROR
+and stops leasing new work until rebuilt (`WORKER_STOP_CLAIMING_WHEN_STALE=false`
+disables this; a commit not pushed to GitHub reads as stale). Verify with
+`docker ps -a` (container uptime versus when the fix merged) before trusting a
+"did the fix work" test.
+
 ### Cloud Run Job
 
 The production-shaped path is:
@@ -137,6 +152,29 @@ candidate/issue pair and repeated whole-profile review. A narrow research step
 can still be expensive when the complete review packet is sent to three
 reviewers before and after iteration. Prefer one well-specified targeted run
 over a sequence of speculative reruns.
+
+### Model catalog guard
+
+Every model choice lives in `shared/model_catalog.py`. Before changing one, run
+`python scripts/check_model_catalog.py` (not a CI gate: it needs live network and
+`OPENROUTER_API_KEY`, while the test suite mocks network calls). The guard
+verifies prices, cache prices, context windows, and maximum completion lengths
+against OpenRouter's live list; that every profile role and escalation target is
+still served; that each escalation climbs the **intelligence index** (not the
+price — an escalation to a cheaper-but-weaker model once read as healthy for
+months); that `premium` is never worse than `default`; that the roster
+adjudicator differs from every profile's research and roster model; and that no
+model ID is hardcoded outside the catalog. Prices and version orderings have
+both drifted silently into shipped bugs — model IDs do not sort the way they read
+(`grok-4.20` predates `grok-4.3`), so trust release dates, not names. After
+changing the catalog, regenerate the frontend copy with
+`python scripts/generate_model_catalog_ts.py` and commit the result.
+
+OpenRouter chat HTTP 404 is ambiguous: it can mean an unknown slug or that no
+eligible endpoint is currently available. A 404 for a model in the checked
+catalog is retried as `provider_unavailable`; unknown model IDs remain permanent
+request errors. This prevents a transient frontier-model routing gap from
+silently aborting an escalation.
 
 ### Post-primary decision rule
 

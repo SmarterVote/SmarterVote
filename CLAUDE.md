@@ -27,7 +27,7 @@ Artifact Registry                → container images for Cloud Run
 2. `.github/workflows/terraform-deploy.yaml` — promotes CI-built containers, runs `terraform apply`, and verifies API health
 3. `.github/workflows/cloudflare-deploy.yaml` — runs after infrastructure succeeds, builds/deploys SvelteKit, and verifies public pages — **may sit in `status: "waiting"` behind a manual approval on the `production` GitHub environment**; check `gh api repos/SmarterVote/SmarterVote/actions/runs/<id>/pending_deployments` if a deploy looks stuck, don't just assume it's still running
 
-**The local Docker worker (`runner="local"`) is NOT part of this pipeline and does not auto-update.** It's a genuinely local container (`smartervote-pipeline-worker-1`) started via `WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build` on whatever workstation runs it — there is no Terraform resource for it (`infra/pipeline-job.tf` only defines the one-shot `runner="cloud_run"` Cloud Run Job). `terraform apply` succeeding has **zero effect** on it. After merging any fix to `pipeline_client/agent/` or `pipeline_client/backend/` that queued races need, you must separately re-run `WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build` from a checkout of the latest `origin/main` on that workstation, or `runner="local"` races keep running the old code indefinitely with no error or warning. Compose refuses to start unless `WORKER_GIT_COMMIT` is set (PowerShell: `$env:WORKER_GIT_COMMIT = (git rev-parse HEAD)` first); every 30 min the worker compares that stamp with GitHub `main` and, when pipeline code (`pipeline_client/`, `shared/`, requirements) has changed since, logs an ERROR and stops leasing new work until rebuilt (`WORKER_STOP_CLAIMING_WHEN_STALE=false` disables this; a commit that isn't pushed to GitHub reads as stale). Verify with `docker ps -a` (check the container's uptime against when the fix merged) before trusting a "did the fix work" test.
+**The local Docker worker (`runner="local"`) is NOT part of this pipeline and does not auto-update; `terraform apply` has zero effect on it.** After merging any fix to `pipeline_client/agent/` or `pipeline_client/backend/` that queued races need, rebuild it from the latest `origin/main` with `WORKER_GIT_COMMIT=$(git rev-parse HEAD) docker compose -f docker-compose.worker.yml up -d --build`, or `runner="local"` races keep running old code. Check `docker ps -a` uptime before trusting a "did the fix work" test. Stamp/staleness-guard details: `docs/pipeline-operations.md` (Local Docker worker).
 
 ## Quick File Map
 
@@ -76,33 +76,11 @@ cd infra && terraform fmt -check -recursive && terraform init -backend=false && 
 
 For the full local gate sequence: `.\scripts\run-ci-gates.ps1`
 
-**Before changing any model choice**, run the catalog guard. It is not a CI gate
-because it needs live network and `OPENROUTER_API_KEY`, while the test suite mocks
-network calls and never needs a real key:
-
-```bash
-python scripts/check_model_catalog.py
-```
-
-Every model choice lives in `shared/model_catalog.py` and nowhere else. The
-guard verifies prices, cache prices, context windows, and maximum completion
-lengths against OpenRouter's live list; that every profile role and escalation target is still served; that
-each escalation climbs the **intelligence index** (not the price — an escalation
-to a cheaper-but-weaker model once read as healthy for months); that `premium`
-is never worse than `default`; that the roster adjudicator differs from every
-profile's research and roster model; and that no model ID is hardcoded anywhere
-outside the catalog. Prices and version orderings have both drifted silently
-into shipped bugs — model IDs do not sort the way they read (`grok-4.20`
-predates `grok-4.3`), so trust release dates, not names.
-
-The frontend's copy is generated: after changing the catalog, run
-`python scripts/generate_model_catalog_ts.py` and commit the result.
-
-OpenRouter chat HTTP 404 is ambiguous: it can mean an unknown slug or that no
-eligible endpoint is currently available. A 404 for a model in the checked
-catalog is retried as `provider_unavailable`; unknown model IDs remain permanent
-request errors. This prevents a transient frontier-model routing gap from
-silently aborting an escalation.
+**Model choices** live only in `shared/model_catalog.py`. Before changing one, run
+`python scripts/check_model_catalog.py` (live network + `OPENROUTER_API_KEY`; not a CI gate);
+escalations must climb the intelligence index, not price, and model IDs don't sort by name — trust
+release dates. Then run `python scripts/generate_model_catalog_ts.py` and commit the result.
+Guard checks and OpenRouter 404 handling: `docs/pipeline-operations.md` (Model catalog guard).
 
 ## Python Conventions
 
