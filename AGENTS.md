@@ -12,11 +12,4 @@ See `CLAUDE.md` for the canonical project guide — conventions, validation comm
 - GCP/deployed is always the source of truth; CI is the validation gate.
 - Treat `docs/README.md` as the documentation map. Operational guides describe current behavior; plans and handoffs are historical unless their status says otherwise.
 - When behavior, commands, configuration, or ownership changes, update the nearest canonical guide in the same change instead of adding a second source of truth.
-
-## Prompt Shortcuts
-
-- Full CI check: follow `.github/prompts/ci-check.prompt.md`.
-- Project improvement review: follow `.github/prompts/project-improvements-review-and-implement.prompt.md`.
-- Pipeline agent work: follow `.github/agents/pipeline-researcher.agent.md`.
-- Frontend type sync: follow `.github/instructions/frontend-types.instructions.md`.
-- Terraform work: follow `.github/instructions/terraform.instructions.md`.
+- Prompt shortcuts (CI check, improvement review, pipeline agent, frontend type sync, Terraform): see `CLAUDE.md`.
