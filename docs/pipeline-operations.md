@@ -196,6 +196,8 @@ Common tools:
 - `get_race_data(draft=true)`: inspect output
 - `publish_race`, `publish_races`: publish only after approval
 - `get_run_diagnostics`, `summarize_run_costs`: run health and exact cost
+- `get_research_program_status(spend_since=...)`: spend since an ISO date;
+  `summary.program_spend_usd` counts manifest races only
 - `get_pipeline_metrics`, `get_pipeline_metrics_summary`: cost reporting
 
 The admin console's **2026 Research** tab is the operator view of the same

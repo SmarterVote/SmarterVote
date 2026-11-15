@@ -432,7 +432,7 @@ async def get_research_manifest() -> Dict[str, Any]:
 
 
 @mcp.tool(structured_output=False)
-async def get_research_program_status(include_rows: bool = True) -> Dict[str, Any]:
+async def get_research_program_status(include_rows: bool = True, spend_since: str | None = None) -> Dict[str, Any]:
     """Return provenance-safe discovery/issue status for the complete manifest.
 
     Published and draft artifact health are returned separately; ``latest`` is
@@ -440,8 +440,16 @@ async def get_research_program_status(include_rows: bool = True) -> Dict[str, An
     pagination, so its summary cannot accidentally count only one catalog page.
     Per-race and program totals distinguish discovery, refresh, issue, targeted,
     and full-run spend.
+
+    ``spend_since`` (ISO date or datetime, naive = UTC, e.g. ``"2026-08-21"``)
+    limits every spend figure to runs active at or after it. Check a forward
+    envelope against ``summary.program_spend_usd`` (manifest races only), not
+    the all-race ``total_pipeline_spend_usd``.
     """
-    return await _client().get("/api/research/status", params={"include_rows": include_rows})
+    params: Dict[str, Any] = {"include_rows": include_rows}
+    if spend_since:
+        params["spend_since"] = spend_since
+    return await _client().get("/api/research/status", params=params)
 
 
 @mcp.tool(structured_output=False)
