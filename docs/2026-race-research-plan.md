@@ -1,6 +1,6 @@
 # 2026 Midterm Research Plan
 
-> Scheduling superseded on 2026-10-02 by [catalog-operations-plan.md](catalog-operations-plan.md).
+> Scheduling superseded on 2026-10-02 by the catalog operations plan, since retired (see Git history).
 > Stable-result, quality, and spend gates below still apply.
 
 Status: active execution. A catalog-wide core refresh is in progress. Production
