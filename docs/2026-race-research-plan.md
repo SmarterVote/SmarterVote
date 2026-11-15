@@ -279,9 +279,11 @@ Cost controls:
 The cost service currently reports **$262.20 all-time** and **$151.89 in the
 last 30 days**. Those figures include historical work and are not the balance of
 this forward envelope. Campaign-attributable core spend since Aug. 21 is $20.75.
-Until program-filtered cost reporting exists, retain the run IDs for every
-cohort and use `summarize_run_costs`; do not infer remaining budget by subtracting
-all-time telemetry from $300.
+Measure the envelope with `get_research_program_status(include_rows=False,
+spend_since="2026-08-21")` and read `summary.program_spend_usd` (manifest races
+only, by workflow in `program_workflow_spend_usd`); do not infer remaining budget
+by subtracting all-time telemetry from $300. Keep each cohort's run IDs and use
+`summarize_run_costs` for per-cohort totals, since runs carry no cohort tag.
 
 ## Implemented controls and remaining gaps
 
@@ -299,8 +301,8 @@ The remaining work is operational first, then product refinement:
 
 1. Backfill result checkpoints as current core outputs are reviewed. This is the
    immediate bottleneck: only 25 of 506 races have checkpoints.
-2. Add cohort/program-filtered spend to status. The current workflow totals are
-   all-time and cannot enforce the forward $300 envelope by themselves.
+2. Done: status accepts `spend_since` and reports manifest-only
+   `program_spend_usd`. Per-cohort spend still needs retained run IDs.
 3. Add explicit envelope/cohort stop controls and outlier alerts to the admin
    cost surface.
 4. Keep Cloudflare, search, and API demand separate; current Cloudflare traffic

@@ -188,6 +188,54 @@ def test_cost_join_uses_run_workflow_and_metric_cost():
     assert by_workflow == {"discovery": 0.24}
 
 
+def test_cost_join_spend_since_excludes_older_and_untimestamped_runs():
+    from datetime import datetime, timezone
+
+    runs = {
+        "old": {"run_id": "old", "race_id": "fl-house-13-2026", "workflow": "issues", "timestamp": "2026-08-01T00:00:00Z"},
+        "new": {"run_id": "new", "race_id": "fl-house-13-2026", "workflow": "discovery", "timestamp": "2026-08-21T00:00:00Z"},
+        "undated": {"run_id": "undated", "race_id": "fl-house-13-2026", "workflow": "issues"},
+    }
+    metrics = {
+        run_id: {"run_id": run_id, "cost_usd": cost} for run_id, cost in (("old", 0.5), ("new", 0.09), ("undated", 0.3))
+    }
+    with patch("routers.pipeline._load_summary_firestore_records", return_value=(metrics, runs, True, True)):
+        all_time, _ = _cost_by_race(MagicMock())
+        windowed, by_workflow = _cost_by_race(MagicMock(), datetime(2026, 8, 21, tzinfo=timezone.utc))
+
+    assert all_time["fl-house-13-2026"]["run_count"] == 3
+    assert windowed["fl-house-13-2026"]["run_count"] == 1
+    assert by_workflow == {"discovery": 0.09}
+
+
+def test_status_program_spend_counts_manifest_races_and_echoes_window():
+    db = _Db()
+    costs = {
+        "fl-house-13-2026": {"run_count": 1, "total_usd": 0.09, "by_workflow": {"discovery": 0.09}, "last_run_at": None},
+        "not-in-manifest-2026": {"run_count": 1, "total_usd": 1.0, "by_workflow": {"issues": 1.0}, "last_run_at": None},
+    }
+    with (
+        patch("firestore_helpers._get_fs", return_value=db),
+        patch("routers.research_program._cost_by_race", return_value=(costs, {"discovery": 0.09, "issues": 1.0})) as cost,
+    ):
+        result = get_research_program_status(include_rows=False, spend_since="2026-08-21")
+
+    since = cost.call_args.args[1]
+    assert since.isoformat() == "2026-08-21T00:00:00+00:00"
+    summary = result["summary"]
+    assert summary["spend_since"] == "2026-08-21T00:00:00+00:00"
+    assert summary["total_pipeline_spend_usd"] == 1.09
+    assert summary["program_spend_usd"] == 0.09
+    assert summary["program_workflow_spend_usd"] == {"discovery": 0.09}
+
+
+def test_status_rejects_unparseable_spend_since():
+    with pytest.raises(HTTPException) as exc:
+        get_research_program_status(include_rows=False, spend_since="last august")
+
+    assert exc.value.status_code == 422
+
+
 def test_status_exposes_published_stage_with_provenance():
     race = _Doc(
         "fl-house-13-2026",

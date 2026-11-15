@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import firestore_helpers
 from auth import verify_token
@@ -109,9 +109,25 @@ def _lifecycle(row: Dict[str, Any]) -> tuple[str, str]:
     return "complete", ("ready" if missing_issues else "complete")
 
 
-def _cost_by_race(db: Any) -> tuple[Dict[str, Dict[str, Any]], Dict[str, float]]:
-    """Join deduplicated run/metric records into workflow-aware spend totals."""
-    from routers.pipeline import _load_summary_firestore_records, _merge_run_metric
+def _parse_spend_since(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO date or datetime spend-window start; a naive value is UTC."""
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="spend_since must be an ISO-8601 date or datetime") from exc
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _cost_by_race(db: Any, since: Optional[datetime] = None) -> tuple[Dict[str, Dict[str, Any]], Dict[str, float]]:
+    """Join deduplicated run/metric records into workflow-aware spend totals.
+
+    With ``since``, only records whose activity timestamp is at or after it
+    count; a record without a parseable timestamp cannot be attributed to the
+    window and is excluded.
+    """
+    from routers.pipeline import _load_summary_firestore_records, _merge_run_metric, _to_epoch_seconds
 
     try:
         metric_records, run_records, _, _ = _load_summary_firestore_records(db)
@@ -119,12 +135,15 @@ def _cost_by_race(db: Any) -> tuple[Dict[str, Dict[str, Any]], Dict[str, float]]
         logger.warning("Research status could not load pipeline costs: %s", exc)
         return {}, {}
 
+    since_epoch = since.timestamp() if since is not None else None
     by_race: Dict[str, Dict[str, Any]] = {}
     by_workflow: Dict[str, float] = {}
     for run_id in set(run_records) | set(metric_records):
         record = _merge_run_metric(run_records.get(run_id, {}), metric_records.get(run_id, {}))
         race_id = str(record.get("race_id") or "")
         if not race_id:
+            continue
+        if since_epoch is not None and _to_epoch_seconds(record.get("timestamp")) < since_epoch:
             continue
         workflow = str(record.get("workflow") or "unknown")
         raw_cost = record.get("cost_usd")
@@ -198,7 +217,16 @@ def record_research_checkpoint(race_id: str, payload: ResearchCheckpointRequest)
 
 
 @router.get("/api/research/status", dependencies=[Depends(verify_token)])
-def get_research_program_status(include_rows: bool = True) -> Dict[str, Any]:
+def get_research_program_status(include_rows: bool = True, spend_since: Optional[str] = None) -> Dict[str, Any]:
+    """Join the manifest, checkpoints, catalog, and pipeline spend.
+
+    ``spend_since`` limits every spend figure to runs active at or after that
+    ISO date/datetime (naive values are UTC), so a forward envelope can be
+    checked without subtracting all-time telemetry. ``program_*`` spend counts
+    manifest races only; ``workflow_spend_usd``/``total_pipeline_spend_usd``
+    cover every race with run records.
+    """
+    since = _parse_spend_since(spend_since)
     # Lazy import avoids a package-initialization cycle: queue and draft routers
     # import the admission helper from this module.
     from routers.races_admin.helpers import _apply_catalog_view
@@ -223,7 +251,7 @@ def get_research_program_status(include_rows: bool = True) -> Dict[str, Any]:
         if plain is not None:
             checkpoints[str(plain.get("race_id") or doc.id)] = plain
 
-    race_costs, workflow_spend = _cost_by_race(db)
+    race_costs, workflow_spend = _cost_by_race(db, since)
 
     rows = []
     for entry in list_research_manifest_entries():
@@ -259,7 +287,10 @@ def get_research_program_status(include_rows: bool = True) -> Dict[str, Any]:
     result_states: Dict[str, int] = {}
     discovery_states: Dict[str, int] = {}
     issue_states: Dict[str, int] = {}
+    program_workflow_spend: Dict[str, float] = {}
     for row in rows:
+        for workflow, cost in row["cost"]["by_workflow"].items():
+            program_workflow_spend[workflow] = program_workflow_spend.get(workflow, 0.0) + cost
         result_state = str((row.get("checkpoint") or {}).get("result_state") or "waiting")
         result_states[result_state] = result_states.get(result_state, 0) + 1
         discovery_states[row["discovery_state"]] = discovery_states.get(row["discovery_state"], 0) + 1
@@ -276,6 +307,9 @@ def get_research_program_status(include_rows: bool = True) -> Dict[str, Any]:
             "issue_states": issue_states,
             "workflow_spend_usd": workflow_spend,
             "total_pipeline_spend_usd": round(sum(workflow_spend.values()), 6),
+            "spend_since": since.isoformat() if since is not None else None,
+            "program_workflow_spend_usd": {key: round(value, 6) for key, value in program_workflow_spend.items()},
+            "program_spend_usd": round(sum(program_workflow_spend.values()), 6),
         },
         "orphaned_catalog_race_ids": orphaned,
         "generated_at": datetime.now(timezone.utc).isoformat(),

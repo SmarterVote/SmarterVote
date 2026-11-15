@@ -729,6 +729,21 @@ async def test_get_research_program_status_uses_canonical_endpoint(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_get_research_program_status_passes_spend_window(monkeypatch):
+    _require_mcp_sdk()
+
+    from smartervote_mcp import server
+
+    client = MagicMock()
+    client.get = AsyncMock(return_value={"summary": {"program_spend_usd": 0.09}})
+    monkeypatch.setattr(server, "_client", lambda: client)
+
+    await server.get_research_program_status(include_rows=False, spend_since="2026-08-21")
+
+    client.get.assert_awaited_once_with("/api/research/status", params={"include_rows": False, "spend_since": "2026-08-21"})
+
+
+@pytest.mark.asyncio
 async def test_record_research_checkpoint_never_queues(monkeypatch):
     _require_mcp_sdk()
 
