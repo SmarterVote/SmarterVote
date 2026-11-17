@@ -168,13 +168,19 @@ if not IS_PRODUCTION:
 _PAGES_PROJECT = os.getenv("CLOUDFLARE_PAGES_PROJECT", "smartervote-web").strip() or "smartervote-web"
 _PAGES_PREVIEW_ORIGIN_REGEX = rf"https://([a-z0-9-]+\.)?{re.escape(_PAGES_PROJECT)}\.pages\.dev"
 
+CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+CORS_ALLOWED_HEADERS = ["Authorization", "Content-Type", "Accept"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_origin_regex=_PAGES_PREVIEW_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Only what the SvelteKit app and admin UI send (web/src): GET/POST/PUT/DELETE
+    # with Authorization and JSON bodies. Accept is CORS-safelisted. Non-browser
+    # clients (MCP, scripts, Stripe webhooks) never preflight, so they are unaffected.
+    allow_methods=CORS_ALLOWED_METHODS,
+    allow_headers=CORS_ALLOWED_HEADERS,
 )
 
 # ---------------------------------------------------------------------------

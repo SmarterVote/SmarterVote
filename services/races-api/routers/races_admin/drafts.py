@@ -22,6 +22,7 @@ from routers.research_program import assert_race_admitted
 from .helpers import _clear_public_race_cache, _published_race_update, _update_summaries_index
 
 router = APIRouter()
+logger = logging.getLogger("races_api")
 
 
 def _assert_publishable_race(data: Dict[str, Any], race_id: str | None = None) -> None:
@@ -173,11 +174,14 @@ def batch_publish_races(request: Request, payload: BatchPublishRequest) -> Dict[
             published.append(race_id)
         except HTTPException as exc:
             errors.append({"race_id": race_id, "error": exc.detail})
-        except ValueError as exc:
-            # Publish-gate rejections carry our own validation message.
-            errors.append({"race_id": race_id, "error": str(exc)})
+        except ValueError:
+            # The publish gate already ran above and reports its message as an
+            # HTTPException; a ValueError here comes from storage, so keep its
+            # text server-side rather than echoing exception strings to the client.
+            logger.exception("Batch publish validation failed for %s", race_id)
+            errors.append({"race_id": race_id, "error": "Publish validation failed; see server logs"})
         except Exception:
-            logging.exception("Batch publish failed for %s", race_id)
+            logger.exception("Batch publish failed for %s", race_id)
             errors.append({"race_id": race_id, "error": "Publish failed; see server logs"})
     result: Dict[str, Any] = {"published": published, "errors": errors}
     if published:

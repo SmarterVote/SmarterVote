@@ -3671,6 +3671,7 @@ def test_delete_race_record_refuses_when_archive_fails():
 
     assert response.status_code == 503
     assert "was not deleted" in response.json()["detail"]
+    assert "copy failed" not in response.json()["detail"]
     delete.assert_not_called()
 
 
@@ -4691,6 +4692,30 @@ def test_gcs_get_race_json_only_treats_not_found_as_missing(monkeypatch):
         gcs_helpers._gcs_get_race_json("ga-senate-2026", "drafts")
 
 
+def test_batch_publish_hides_storage_value_error_text():
+    os.environ["SKIP_AUTH"] = "true"
+    os.environ["ADMIN_API_KEY"] = "test-key"
+    import main as app_module
+    from fastapi.testclient import TestClient
+
+    firestore_helpers._fs_db = None
+    draft_json = {"id": "ar-senate-2026", "title": "Arkansas Senate 2026", "candidates": [{"name": "Alice"}]}
+
+    with (
+        patch("firestore_helpers._get_fs", return_value=_build_empty_firestore_mock()),
+        patch("gcs_helpers._gcs_get_race_json", return_value=draft_json),
+        patch("gcs_helpers._publish_race_gcs", side_effect=ValueError("secret internals at /srv/app")),
+    ):
+        resp = TestClient(app_module.app).post("/api/races/publish", json={"race_ids": ["ar-senate-2026"]})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["published"] == []
+    error = body["errors"][0]["error"]
+    assert "secret internals" not in error
+    assert error == "Publish validation failed; see server logs"
+
+
 def test_publish_still_updates_catalog_when_summaries_index_fails():
     os.environ["SKIP_AUTH"] = "true"
     os.environ["ADMIN_API_KEY"] = "test-key"
@@ -4714,10 +4739,10 @@ def test_publish_still_updates_catalog_when_summaries_index_fails():
 
     assert single.status_code == 502
     assert single.json()["detail"]["published"] == ["ar-senate-2026"]
-    assert "RuntimeError" in single.json()["detail"]["summaries_error"]
+    assert single.json()["detail"]["summaries_error"] == "summaries.json update failed; see server logs"
     assert batch.status_code == 200
     assert batch.json()["published"] == ["ar-senate-2026"]
-    assert "RuntimeError" in batch.json()["summaries_error"]
+    assert batch.json()["summaries_error"] == "summaries.json update failed; see server logs"
     assert [c.args[1]["status"] for c in mock_update.call_args_list] == ["published", "published"]
     assert mock_clear.call_count == 2
 
