@@ -199,3 +199,39 @@ def test_production_docs_can_be_reenabled_explicitly(monkeypatch):
     main_mod = importlib.reload(main_mod)
     with TestClient(main_mod.app) as client:
         assert client.get("/openapi.json").status_code == 200
+
+
+def _preflight(client: TestClient, method: str, headers: str):
+    return client.options(
+        "/api/races/ga-senate-2026/publish",
+        headers={
+            "Origin": "https://smarter.vote",
+            "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers": headers,
+        },
+    )
+
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
+def test_preflight_allows_authorization_and_content_type(client, method):
+    """The admin UI sends a bearer token with JSON bodies; that preflight must pass."""
+    response = _preflight(client, method, "authorization, content-type")
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "https://smarter.vote"
+    assert response.headers["access-control-allow-credentials"] == "true"
+    allowed_methods = {m.strip() for m in response.headers["access-control-allow-methods"].split(",")}
+    assert method in allowed_methods
+    allowed_headers = {h.strip().lower() for h in response.headers["access-control-allow-headers"].split(",")}
+    assert {"authorization", "content-type"} <= allowed_headers
+
+
+def test_preflight_rejects_unlisted_method(client):
+    """PATCH/TRACE are not used by the frontend, so they are no longer allowed cross-origin."""
+    for method in ("PATCH", "TRACE"):
+        assert _preflight(client, method, "authorization").status_code == 400
+
+
+def test_preflight_rejects_unlisted_header(client):
+    """Browsers never send the admin key; arbitrary headers are no longer echoed back."""
+    assert _preflight(client, "POST", "x-admin-key").status_code == 400
+    assert _preflight(client, "POST", "authorization, x-custom-thing").status_code == 400

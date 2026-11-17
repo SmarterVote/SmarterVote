@@ -472,9 +472,9 @@ def _update_summaries_index(updates: Dict[str, Any]) -> str | None:
     """
     try:
         gcs_helpers.update_gcs_summaries_json(updates)
-    except Exception as exc:
+    except Exception:
         logging.exception("races/summaries.json update failed for %s", sorted(updates))
-        return f"summaries.json update failed ({type(exc).__name__}); see server logs"
+        return "summaries.json update failed; see server logs"
     return None
 
 

@@ -41,6 +41,7 @@ from .helpers import (
 )
 
 router = APIRouter()
+logger = logging.getLogger("races_api")
 
 
 @router.get("/api/races", dependencies=[Depends(verify_token)])
@@ -344,7 +345,10 @@ def delete_race_record(request: Request, race_id: str) -> Dict[str, Any]:
         for prefix, label in (("races", "published"), ("drafts", "draft")):
             gcs_helpers._gcs_archive_active_if_present(race_id, prefix, label)
     except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=f"Could not archive active artifact; race was not deleted: {exc}") from exc
+        logger.exception("Archiving active artifacts failed for %s; delete aborted", race_id)
+        raise HTTPException(
+            status_code=503, detail="Could not archive active artifact; race was not deleted; see server logs"
+        ) from exc
     gcs_helpers._gcs_delete_race_json(race_id, "races")
     gcs_helpers._gcs_delete_race_json(race_id, "drafts")
     # The blobs are already gone: an index failure must not skip the catalog
